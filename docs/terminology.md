@@ -8,13 +8,12 @@ It coordinates the platform, exposes the API and provides shared platform servic
 
 ## Satellite
 
-A native module that extends StarCore by providing functionality.
+A Satellite is an installable module that extends StarCore.
 
----
+There are two types of Satellites:
 
-## Link
-
-An integration between StarCore and an external application or service.
+- **Native Satellites**, which provide functionality directly within StarCore.
+- **Link Satellites**, which integrate third-party applications and services.
 
 ---
 

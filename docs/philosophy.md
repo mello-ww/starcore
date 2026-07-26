@@ -4,9 +4,9 @@ StarCore is designed around a simple idea:
 
 A self-hosted server should feel like a single platform rather than a collection of unrelated applications.
 
-Whenever possible, StarCore integrates existing software instead of replacing it.
+Whenever possible, StarCore integrates existing software instead of replacing it. (Link Satellites)
 
-When integration is not enough or a better experience can be provided, functionality can be implemented natively through Satellites.
+When integration is not enough or a better experience can be provided, functionality can be implemented natively. (Native Satellites)
 
 The Engine should remain generic.
 

@@ -17,14 +17,14 @@ Items may change as the project evolves.
 - [ ] Dashboard
 - [ ] Authentication
 
-## Official Satellites
+## Native Satellites
 
 - [ ] Status
 - [ ] Files
 - [ ] Photos
 - [ ] Music
 
-## Official Links
+## Link Satellites
 
 - [ ] Docker
 - [ ] Home Assistant

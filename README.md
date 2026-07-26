@@ -23,14 +23,16 @@ Install only what you need.
 ## Core concepts
 
 - **Engine** — The core runtime that powers StarCore.
-- **Satellites** — Native feature modules.
-- **Links** — Integrations with external services.
+- **Native Satellites** — Native feature modules.
+- **Link Satellites** — Integrations with external services.
 - **Mission Control** — Official web interface.
 - **Signals** — Internal event system.
 
 ## Documentation
 
+- API
 - Architecture
 - Philosophy
-- Terminology
 - Roadmap
+- Satellites
+- Terminology

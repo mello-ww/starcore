@@ -12,7 +12,7 @@ A Satellite can:
 - emit Signals
 - store data
 - provide pages for Mission Control
-- communicate through Links
+- use Links to interact with third-party applications and services
 
 The Engine never contains feature-specific logic.
 

@@ -1,18 +1,34 @@
-# Architecture
+## Components
 
-StarCore is built around a modular architecture where each component has a clearly defined responsibility.
+### Engine
 
-The platform is composed of a single Engine surrounded by independent modules called Satellites and Links.
+The Engine is the foundation of StarCore.
 
-The Engine acts as the foundation of the platform. It is responsible for coordinating components, exposing the API, managing the lifecycle of modules and providing shared platform capabilities such as storage, authentication, configuration and the internal event system.
+It coordinates the platform, exposes the public API, manages the lifecycle of Satellites and provides shared platform services such as storage, authentication, configuration and the internal event system.
 
-Satellites are responsible for implementing features. They extend the platform without modifying the Engine itself. A Satellite may expose API endpoints, store data, register pages in Mission Control and communicate through Signals.
+### Satellites
 
-Links provide integrations with external software and services. Instead of replacing existing applications, StarCore can connect to them and present a unified experience through Mission Control.
+Satellites extend StarCore without modifying the Engine itself.
 
-Mission Control is the official graphical interface. It communicates exclusively with the Engine through its public API.
+Each Satellite is an independent module that can expose API endpoints, store data, emit Signals and contribute pages to Mission Control.
 
-This separation allows the Engine to remain generic while new functionality is continuously added through Satellites and Links.
+There are two categories of Satellites:
+
+- **Native Satellites**, which provide functionality directly within StarCore (Status, Files, Photos, Music...).
+- **Link Satellites**, which integrate third-party applications and services (Docker, Jellyfin, Home Assistant...).
+
+### Mission Control
+
+Mission Control is the official graphical interface for StarCore.
+
+It communicates exclusively with the Engine through its public API.
+
+## Design
+
+The Engine remains generic while functionality is added through Satellites.
+
+By using a common Satellite system for both native features and third-party integrations, StarCore keeps a consistent extension model and avoids maintaining multiple plugin systems.
+
 
 
 ## Component overview
@@ -38,8 +54,8 @@ Config
 end
 
 subgraph Extensions
-Satellites
-Links
+Native Satellites
+Link Satellites
 end
 
 MC --> Engine
