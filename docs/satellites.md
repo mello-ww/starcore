@@ -2,7 +2,9 @@
 
 Satellites extend StarCore.
 
-They are discovered and loaded dynamically by the Engine.
+Satellites are native modules that add functionality to StarCore.
+
+They can be installed, updated and removed independently from the Engine.
 
 A Satellite can:
 

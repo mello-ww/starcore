@@ -1,5 +1,9 @@
 # Roadmap
 
+The roadmap represents the long-term direction of StarCore.
+
+Items may change as the project evolves.
+
 ## Engine
 
 - [ ] Bootstrap
