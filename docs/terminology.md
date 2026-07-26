@@ -1,48 +1,29 @@
-# Terminology
-
 ## Engine
 
-The runtime at the heart of StarCore.
+The core runtime of StarCore.
 
-Responsible for:
-
-- Loading Satellites
-- Managing Links
-- Exposing the API
-- Broadcasting Signals
+It coordinates the platform, exposes the API and provides shared platform services.
 
 ---
 
 ## Satellite
 
-An installable feature that extends StarCore.
-
-Examples:
-
-- Status
-- Music
-- Storage
+A native module that extends StarCore by providing functionality.
 
 ---
 
 ## Link
 
-A connector to an external service.
-
-Examples:
-
-- Docker
-- Home Assistant
-- MQTT
+An integration between StarCore and an external application or service.
 
 ---
 
 ## Signal
 
-An event emitted by the Engine or a Satellite.
+An internal event emitted by the Engine or a Satellite.
 
 ---
 
 ## Mission Control
 
-The main web interface.
+The official graphical interface of StarCore.

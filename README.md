@@ -1,64 +1,36 @@
-# Starcore
+# StarCore
 
-A modular self-hosted platform that brings your personal services together.
+> A modular self-hosted platform for building a unified self-hosted ecosystem.
 
-Install only what you need through Satellites while keeping a single Engine, API and interface.
+StarCore is an open-source platform that provides a single Engine capable of powering both native features and integrations with existing self-hosted applications.
 
----
+Instead of managing isolated applications with different interfaces, APIs and authentication systems, StarCore provides a common foundation where services can coexist and work together.
 
-## Vision
+## Why?
 
-Instead of managing multiple isolated applications, StarCore provides a common platform where services can work together.
+Modern self-hosted environments often require many separate applications.
 
-Some features are built natively as Satellites.
-Others integrate existing self-hosted applications through Links.
+StarCore aims to provide:
 
-The goal is not to replace every existing project, but to create a unified ecosystem.
+- one Engine
+- one API
+- one authentication system
+- one interface
+- one modular ecosystem
 
----
+Install only what you need.
 
 ## Core concepts
 
-### Engine
+- **Engine** — The core runtime that powers StarCore.
+- **Satellites** — Native feature modules.
+- **Links** — Integrations with external services.
+- **Mission Control** — Official web interface.
+- **Signals** — Internal event system.
 
-Coordinates the platform and provides shared capabilities.
+## Documentation
 
-### Satellites
-
-Feature modules that extend StarCore.
-
-### Links
-
-Connect external services and applications.
-
-### Mission Control
-
-Official web interface.
-
-### Signals
-
-Internal event system.
-
----
-
-## Philosophy
-
-- Modular by design
-- API-first
-- Self-hosted
-- Plugin-first
-- Integrates existing software when appropriate
-- Native when it provides additional value
-
----
-
-## Roadmap
-
-- Engine
-- Mission Control
-- Status
-- Files
-- Photos
-- Music
-- Docker
-- Home Assistant
+- Architecture
+- Philosophy
+- Terminology
+- Roadmap
