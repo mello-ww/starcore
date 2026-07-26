@@ -1,4 +1,4 @@
-# StarCore
+# Starcore
 
 A modular self-hosted platform that brings your personal services together.
 
