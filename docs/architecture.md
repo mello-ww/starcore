@@ -37,25 +37,25 @@ By using a common Satellite system for both native features and third-party inte
 flowchart TB
 
 subgraph Clients
-MC[Mission Control]
-CLI[CLI]
-Third[Third-party Applications]
+    MC["Mission Control"]
+    CLI["CLI"]
+    Third["Third-party Applications"]
 end
 
 subgraph Core
-Engine[StarCore Engine]
+    Engine["StarCore Engine"]
 end
 
 subgraph Platform
-Storage
-Auth
-Signals
-Config
+    Storage["Storage"]
+    Auth["Authentication"]
+    Signals["Signals"]
+    Config["Configuration"]
 end
 
-subgraph Extensions
-Native Satellites
-Link Satellites
+subgraph Satellites
+    Native["Native Satellites"]
+    Link["Link Satellites"]
 end
 
 MC --> Engine
@@ -67,6 +67,6 @@ Engine --> Auth
 Engine --> Signals
 Engine --> Config
 
-Engine --> Satellites
-Engine --> Links
+Engine --> Native
+Engine --> Link
 ```
