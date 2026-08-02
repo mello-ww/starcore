@@ -28,21 +28,18 @@ class StarCore:
         print(self.config.get("engine"))
         print("Configuration loaded.\n")
 
-        print(f"Native satellites path: {self.native_path}")
-        print(f"Link satellites path: {self.link_path}")
-        print(f"Native satellites exist: {self.native_path.exists()}")
-        print(f"Link satellites exist: {self.link_path.exists()}")
-        print(f"Native satellite files: {list(self.native_path.iterdir())}")
-        print(f"Link satellite files: {list(self.link_path.iterdir())}")
         print("Discovering satellites...")
-        self.loader.discover()
+        self.loader._discover_directory(self.native_path, "native")
+        self.loader._discover_directory(self.link_path, "link")
         print(f"Satellites discovered: {len(self.registry.all())}")
+        for satellite in self.registry.all():
+            print(f"- {satellite.name} ({satellite.type})")
         
         print("StarCore is ready.")
 
         try:
             while True:
-                time.sleep(1)  # Keep the engine running
+                time.sleep(1) 
         except KeyboardInterrupt:
             self.stop()
 
