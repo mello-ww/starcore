@@ -4,6 +4,7 @@ import tomllib
 from .satellite import Satellite
 from .registry import SatelliteRegistry
 from .manifest import SatelliteManifest
+from .satellite_config import SatelliteConfig
 
 
 class SatelliteLoader:
@@ -20,13 +21,25 @@ class SatelliteLoader:
                     if manifest_path.exists():
                         with open(manifest_path, "rb") as file:
                             manifest_data = tomllib.load(file)
+                    else:
+                        print(f"Warning: satellite.toml not found for satellite in {satellite_dir}. Skipping.")
+                        continue
                     manifest = SatelliteManifest(
                         name=manifest_data["name"],
                         version=manifest_data["version"],
                         author=manifest_data["author"],
                         description=manifest_data["description"]
                     )
-                    satellite = Satellite(manifest, satellite_type, satellite_dir)
+                    config_path = satellite_dir / "config.toml"
+                    if config_path.exists():
+                        with open(config_path, "rb") as file:
+                            config_data = tomllib.load(file)
+                    else:
+                        print(f"Warning: config.toml not found for satellite {manifest.name}. Using empty config.")
+                    config = SatelliteConfig(
+                        data=config_data
+                    )
+                    satellite = Satellite(manifest, config, satellite_type, satellite_dir)
                     self.registry.add(satellite)
 
         else:
