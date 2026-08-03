@@ -11,6 +11,7 @@ from .config import Configuration
 from .loader import SatelliteLoader
 from .registry import SatelliteRegistry
 from .satellite import Satellite
+from .manifest import SatelliteManifest
 
 
 class StarCore:
@@ -33,7 +34,7 @@ class StarCore:
         self.loader._discover_directory(self.link_path, "link")
         print(f"Satellites discovered: {len(self.registry.all())}")
         for satellite in self.registry.all():
-            print(f"- {satellite.name} ({satellite.type})")
+            print(f"- {satellite.manifest.name} v{satellite.manifest.version} ({satellite.type})")
         
         print("StarCore is ready.")
 

@@ -1,8 +1,9 @@
 from pathlib import Path
-
+import tomllib
 
 from .satellite import Satellite
 from .registry import SatelliteRegistry
+from .manifest import SatelliteManifest
 
 
 class SatelliteLoader:
@@ -15,8 +16,17 @@ class SatelliteLoader:
         if path.exists():
             for satellite_dir in path.iterdir():
                 if satellite_dir.is_dir():
-                    satellite_name = satellite_dir.name
-                    satellite = Satellite(satellite_name, satellite_type, satellite_dir)
+                    manifest_path = satellite_dir / "satellite.toml"
+                    if manifest_path.exists():
+                        with open(manifest_path, "rb") as file:
+                            manifest_data = tomllib.load(file)
+                    manifest = SatelliteManifest(
+                        name=manifest_data["name"],
+                        version=manifest_data["version"],
+                        author=manifest_data["author"],
+                        description=manifest_data["description"]
+                    )
+                    satellite = Satellite(manifest, satellite_type, satellite_dir)
                     self.registry.add(satellite)
 
         else:
