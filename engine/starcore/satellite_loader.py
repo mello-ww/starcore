@@ -2,7 +2,7 @@ from pathlib import Path
 import tomllib
 
 from .satellite import Satellite
-from .registry import SatelliteRegistry
+from .satellite_registry import SatelliteRegistry
 from .manifest import SatelliteManifest
 from .satellite_config import SatelliteConfig
 
@@ -22,7 +22,7 @@ class SatelliteLoader:
                         with open(manifest_path, "rb") as file:
                             manifest_data = tomllib.load(file)
                     else:
-                        print(f"Warning: satellite.toml not found for satellite in {satellite_dir}. Skipping.")
+                        print(f"[WARNING]: satellite.toml not found for satellite in {satellite_dir}. Skipping.")
                         continue
                     manifest = SatelliteManifest(
                         name=manifest_data["name"],
@@ -35,7 +35,7 @@ class SatelliteLoader:
                         with open(config_path, "rb") as file:
                             config_data = tomllib.load(file)
                     else:
-                        print(f"Warning: config.toml not found for satellite {manifest.name}. Using empty config.")
+                        print(f"[WARNING]: config.toml not found for satellite {manifest.name}. Using empty config.")
                     config = SatelliteConfig(
                         data=config_data
                     )
@@ -43,5 +43,5 @@ class SatelliteLoader:
                     self.registry.add(satellite)
 
         else:
-            print(f"Directory {path} does not exist. Skipping discovery for {satellite_type} satellites.")
+            print(f"[WARNING]: Directory {path} does not exist. Skipping discovery for {satellite_type} satellites.")
             return

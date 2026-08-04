@@ -6,8 +6,8 @@ Items may change as the project evolves.
 
 ## Engine
 
-- [ ] Bootstrap
-- [ ] Configuration
+- [x] Bootstrap
+- [x] Configuration
 - [ ] Storage
 - [ ] API
 - [ ] Signal Bus

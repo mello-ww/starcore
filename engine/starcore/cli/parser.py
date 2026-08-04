@@ -1,7 +1,11 @@
-import importlib
+from pathlib import Path
+from ..command_registry import CommandRegistry
 
-def parse(command: str):
-    module_name = f"starcore.cli.commands.{command}"
-    module = importlib.import_module(module_name)
-    function = getattr(module, command)
-    return function()
+def parse(command: str, engine, registry: CommandRegistry):
+    function = registry.get(command)
+
+    if function is None:
+        print(f"[ERROR]: command '{command}' not found in registry.")
+        return 
+    
+    return function(engine)
