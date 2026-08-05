@@ -24,8 +24,9 @@ class CommandLoader:
                 module = importlib.import_module(module_name)
                 try:
                     function = getattr(module, command_name)
+                    metadata = getattr(module, "COMMAND", {})
                 except AttributeError:
                     print(f"[WARNING]: command '{command_name}' has no entry function '{command_name}'. Skipping.")
                     continue
 
-                self.command_registry.add(command_name, function)
+                self.command_registry.add(command_name, function, metadata)
