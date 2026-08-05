@@ -32,6 +32,7 @@ Install only what you need.
 
 - API
 - Architecture
+- CLI 
 - Philosophy
 - Roadmap
 - Satellites
