@@ -10,6 +10,7 @@ A Satellite can:
 - emit Signals
 - store data
 - contribute pages to Mission Control
+- provide CLI commands (see CLI)
 
 ## Types of Satellites
 

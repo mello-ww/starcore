@@ -45,14 +45,34 @@ class StarCore:
 
         print("\nDiscovering commands...")
         self.command_loader.discover()
+        for satellite in self.registry.all():
+            self.command_loader.discover_satellite(satellite)
         print(f"\nCommands discovered: {len(self.command_registry.all())}")
-        
+
         print("StarCore is ready.")
+        self._running = True
 
 
     def stop(self):
         print("\nStopping StarCore...")
+        self._running = False
         print("StarCore has stopped.")
 
     def execute_command(self, command: str):
         return parse(command, self, self.command_registry)
+
+    def status(self) -> dict:
+        satellites = self.registry.all()
+        native_count = sum(1 for satellite in satellites if satellite.type == "native")
+        link_count = sum(1 for satellite in satellites if satellite.type == "link")
+
+        return {
+            "engine": self.config.get("engine", {}).get("name", "StarCore"),
+            "running": getattr(self, "_running", False),
+            "satellites": {
+                "total": len(satellites),
+                "native": native_count,
+                "link": link_count,
+            },
+            "commands": len(self.command_registry.all()),
+        }

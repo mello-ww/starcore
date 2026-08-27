@@ -22,7 +22,9 @@ def help(engine, args):
 
         for command_name, entry in commands.items():
             description = entry["metadata"].get("description", "")
-            print(f"{command_name:<{width}}  {description}")
+            source = entry.get("source", "core")
+            suffix = f"  [{source}]" if source != "core" else ""
+            print(f"{command_name:<{width}}  {description}{suffix}")
 
         return
 
@@ -39,6 +41,7 @@ def help(engine, args):
     aliases = metadata.get("aliases", [])
     category = metadata.get("category", "")
     examples = metadata.get("examples", [])
+    source = entry.get("source", "core")
 
     print(f"{command_name}\n")
 
@@ -55,6 +58,10 @@ def help(engine, args):
     if category:
         print("Category")
         print(f"  {category}\n")
+
+    if source != "core":
+        print("Satellite")
+        print(f"  {source}\n")
 
     if examples:
         print("Examples")
