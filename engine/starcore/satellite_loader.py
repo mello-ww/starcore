@@ -5,6 +5,7 @@ from .satellite import Satellite
 from .satellite_registry import SatelliteRegistry
 from .manifest import SatelliteManifest
 from .satellite_config import SatelliteConfig
+from .module_loader import load_module_from_file
 
 
 class SatelliteLoader:
@@ -36,12 +37,32 @@ class SatelliteLoader:
                             config_data = tomllib.load(file)
                     else:
                         print(f"[WARNING]: config.toml not found for satellite {manifest.name}. Using empty config.")
+                        config_data = {}
                     config = SatelliteConfig(
                         data=config_data
                     )
-                    satellite = Satellite(manifest, config, satellite_type, satellite_dir)
+                    state_provider = self._load_state_provider(satellite_dir, satellite_type, manifest.name)
+                    satellite = Satellite(manifest, config, satellite_type, satellite_dir, state_provider)
                     self.registry.add(satellite)
 
         else:
             print(f"[WARNING]: Directory {path} does not exist. Skipping discovery for {satellite_type} satellites.")
             return
+
+    def _load_state_provider(self, satellite_dir: Path, satellite_type: str, satellite_name: str):
+        state_path = satellite_dir / "state.py"
+        if not state_path.exists():
+            return None
+
+        module_name = f"satellites.{satellite_type}.{satellite_dir.name}.state"
+        try:
+            module = load_module_from_file(module_name, state_path)
+        except Exception as error:
+            print(f"[WARNING]: state module of satellite '{satellite_name}' could not be loaded ({error}). Skipping.")
+            return None
+
+        provider = getattr(module, "state", None)
+        if provider is None:
+            print(f"[WARNING]: {state_path} has no entry function 'state'. Skipping.")
+
+        return provider

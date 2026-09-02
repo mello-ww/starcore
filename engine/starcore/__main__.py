@@ -1,9 +1,4 @@
-import time
-from .core import StarCore
-
-def main() -> None:
-    engine = StarCore()
-    engine.start()
+from .cli.main import main
 
 if __name__ == "__main__":
     main()

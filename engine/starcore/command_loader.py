@@ -1,8 +1,8 @@
 from pathlib import Path
 import importlib
-import importlib.util
 
 from .command_registry import CommandRegistry
+from .module_loader import load_module_from_file
 
 class CommandLoader:
     def __init__(self, registry: CommandRegistry, path: Path):
@@ -34,9 +34,7 @@ class CommandLoader:
                     module = importlib.import_module(module_name)
                 else:
                     # satellites aren't part of the starcore package, so load the file directly
-                    spec = importlib.util.spec_from_file_location(module_name, command_file)
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
+                    module = load_module_from_file(module_name, command_file)
 
                 try:
                     function = getattr(module, command_name)
