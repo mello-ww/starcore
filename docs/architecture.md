@@ -23,6 +23,8 @@ Mission Control is the official graphical interface for StarCore.
 
 It communicates exclusively with the Engine through its public API.
 
+The Engine starts it as part of its own lifecycle and serves both the API and the interface over HTTP.
+
 ## Design
 
 The Engine remains generic while functionality is added through Satellites.

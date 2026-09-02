@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mission Control</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="topbar">
+    <div>
+        <h1 id="engine-name">StarCore</h1>
+        <p class="subtitle">Mission Control</p>
+    </div>
+    <div class="topbar-right">
+        <span id="core-state" class="badge badge-unknown">connecting</span>
+        <span id="updated" class="muted">&mdash;</span>
+        <button id="stop-button" class="stop-button" type="button">Stop StarCore</button>
+    </div>
+</header>
+
+<p id="banner" class="error" hidden></p>
+
+<nav class="tabs">
+    <button class="tab-button active" data-tab="overview" type="button">Overview</button>
+    <button class="tab-button" data-tab="satellites" type="button">Satellites</button>
+    <button class="tab-button" data-tab="console" type="button">Console</button>
+</nav>
+
+<main>
+    <section id="tab-overview" class="tab-panel">
+        <section class="panel">
+            <h2>Core</h2>
+            <dl class="facts">
+                <div><dt>State</dt><dd id="fact-state">&mdash;</dd></div>
+                <div><dt>Uptime</dt><dd id="fact-uptime">&mdash;</dd></div>
+                <div><dt>Satellites</dt><dd id="fact-satellites">&mdash;</dd></div>
+                <div><dt>Commands</dt><dd id="fact-commands">&mdash;</dd></div>
+                <div><dt>Mission Control</dt><dd id="fact-mission-control">&mdash;</dd></div>
+            </dl>
+        </section>
+    </section>
+
+    <section id="tab-satellites" class="tab-panel" hidden>
+        <h2>Satellites <span id="satellite-count" class="muted"></span></h2>
+        <div id="satellites" class="cards">
+            <p class="muted">Loading satellites&hellip;</p>
+        </div>
+    </section>
+
+    <section id="tab-console" class="tab-panel" hidden>
+        <h2>Console</h2>
+        <p class="muted">A web equivalent of the terminal CLI &mdash; commands run against the same running Core.</p>
+
+        <div id="console-commands" class="commands"></div>
+
+        <form id="console-form" class="console-form">
+            <input id="console-input" type="text" autocomplete="off" placeholder="help, version, status ..." />
+            <button type="submit">Run</button>
+            <button id="console-clear" type="button">Clear</button>
+        </form>
+
+        <pre id="console-output" class="console-output"></pre>
+    </section>
+</main>
+
+<footer class="muted">
+    Reading <code>/api/status</code> and <code>/api/satellites</code> every 5 seconds.
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>

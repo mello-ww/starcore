@@ -14,7 +14,7 @@ Items may change as the project evolves.
 
 ## Mission Control
 
-- [ ] Dashboard
+- [x] Dashboard
 - [ ] Authentication
 
 ## Native Satellites

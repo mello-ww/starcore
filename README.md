@@ -28,11 +28,28 @@ Install only what you need.
 - **Mission Control** — Official web interface.
 - **Signals** — Internal event system.
 
+## Running StarCore
+
+From the `engine` directory:
+
+```
+python -m starcore
+```
+
+This starts the Engine, loads the Satellites and serves Mission Control at http://127.0.0.1:8080.
+
+The interactive CLI starts the same Core:
+
+```
+python -m starcore.cli.main
+```
+
 ## Documentation
 
 - API
 - Architecture
 - CLI 
+- Mission Control
 - Philosophy
 - Roadmap
 - Satellites
