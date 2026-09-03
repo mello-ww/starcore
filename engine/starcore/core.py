@@ -37,6 +37,7 @@ class StarCore:
 
         server_config = self.config.section("server")
         self.mission_control_enabled = bool(server_config.get("enabled", True))
+        self.satellite_services_enabled = bool(self.config.section("satellites").get("services", True))
         self.api = ApiServer(
             self,
             server_config.get("host", DEFAULT_HOST),
@@ -70,6 +71,12 @@ class StarCore:
         self._started_at = time.time()
         self._running = True
 
+        if self.satellite_services_enabled:
+            print("\nStarting satellites...")
+            for satellite in self.registry.all():
+                if satellite.enabled:
+                    satellite.start(self)
+
         print("\nStarting Mission Control...")
         if not self.mission_control_enabled:
             print("Mission Control is disabled.")
@@ -85,6 +92,9 @@ class StarCore:
 
         print("\nStopping StarCore...")
         self.api.stop()
+        if self.satellite_services_enabled:
+            for satellite in self.registry.all():
+                satellite.stop(self)
         self._running = False
         print("StarCore has stopped.")
         # signals both the CLI reader thread and anyone else waiting for shutdown

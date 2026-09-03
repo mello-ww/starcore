@@ -50,6 +50,25 @@ An unknown command is not treated as a server error: it comes back as a normal `
 
 `POST /api/shutdown` requests a graceful shutdown of the Core - the same shutdown the terminal CLI's `exit` triggers - and stops Mission Control as part of it. It responds immediately with `{"message": "..."}`; the Core stops shortly after.
 
+## Satellite endpoints
+
+A Satellite can serve routes and Mission Control assets of its own, mounted below its name:
+
+```
+GET|POST /api/satellites/<name>/<route>/...   a route the Satellite provides
+GET      /api/satellites/<name>/assets/...    the Satellite's Mission Control files
+```
+
+`assets` is reserved by the Core and served read-only from the Satellite's
+`mission_control/` directory; everything else below a Satellite comes from the mapping its
+`api.py` returns, and the Core neither knows nor cares what those routes do. Only GET and
+POST reach them. The Satellites documentation describes the handler contract, and the Photo
+and Music documentation are worked examples.
+
+A file a Satellite returns is streamed rather than read into memory, and a `Range` request
+is answered with `206` and just the bytes asked for, so a browser can seek in a large file
+without downloading all of it.
+
 Errors are returned as `{"error": "..."}` with an HTTP status: `400` for a malformed request body, `404` for an unknown endpoint or Satellite, `405` for a method a given endpoint doesn't support. The API exposes no way to run arbitrary code or shell commands - only registered commands can be executed.
 
 The same server also serves the Mission Control frontend from the `mission_control` directory.

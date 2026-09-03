@@ -4,69 +4,235 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mission Control</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' fill='none' stroke='%236c9bf0' stroke-width='1.6'%3E%3Ccircle cx='11' cy='12' r='5'/%3E%3Cellipse cx='11' cy='12' rx='9.3' ry='3.3' transform='rotate(-22 11 12)' opacity='.7'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header class="topbar">
-    <div>
-        <h1 id="engine-name">StarCore</h1>
-        <p class="subtitle">Mission Control</p>
+<aside class="sidebar">
+    <div class="brand">
+        <svg class="brand-mark" width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
+            <circle cx="11" cy="12" r="5"/>
+            <ellipse cx="11" cy="12" rx="9.3" ry="3.3" transform="rotate(-22 11 12)" opacity="0.7"/>
+            <circle cx="19" cy="3" r="0.9" fill="currentColor" stroke="none"/>
+        </svg>
+        <div class="brand-text">
+            <strong>StarCore</strong>
+            <span>Mission Control</span>
+        </div>
     </div>
-    <div class="topbar-right">
-        <span id="core-state" class="badge badge-unknown">connecting</span>
-        <span id="updated" class="muted">&mdash;</span>
-        <button id="stop-button" class="stop-button" type="button">Stop StarCore</button>
+
+    <div class="nav-section"><p class="eyebrow">Core</p></div>
+    <nav aria-label="Core">
+    <ul class="nav-list">
+        <li>
+            <button class="nav-item" type="button" data-route="overview" title="Overview">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+                    <circle cx="8" cy="8" r="2.2"/>
+                    <ellipse cx="8" cy="8" rx="7" ry="3.2" transform="rotate(-25 8 8)"/>
+                </svg>
+                <span>Overview</span>
+            </button>
+        </li>
+        <li>
+            <button class="nav-item" type="button" data-route="satellites" title="Satellites">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+                    <circle cx="8" cy="8" r="1.6"/>
+                    <path d="M11.3 4.7a4.7 4.7 0 0 1 0 6.6" stroke-linecap="round"/>
+                    <path d="M4.7 11.3a4.7 4.7 0 0 1 0-6.6" stroke-linecap="round"/>
+                </svg>
+                <span>Satellites</span>
+            </button>
+        </li>
+        <li>
+            <button class="nav-item" type="button" data-route="console" title="Console">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3.6 4.8 6.6 8l-3 3.2"/>
+                    <path d="M8.8 11.4h3.6"/>
+                </svg>
+                <span>Console</span>
+            </button>
+        </li>
+    </ul>
+    </nav>
+
+    <svg class="belt" viewBox="0 0 244 24" fill="none" aria-hidden="true">
+        <path d="M6 15Q122 6 238 15" stroke="currentColor" stroke-width="0.75" opacity="0.35"/>
+        <g class="belt-rocks" fill="currentColor">
+            <circle cx="14" cy="14.4" r="0.7" opacity="0.5"/>
+            <circle cx="26" cy="13.1" r="1.1" opacity="0.75"/>
+            <circle cx="38" cy="15.2" r="0.6" opacity="0.35"/>
+            <circle cx="52" cy="12.4" r="0.8" opacity="0.6"/>
+            <circle cx="67" cy="13.9" r="0.6" opacity="0.4"/>
+            <circle cx="79" cy="11.3" r="1.4" opacity="0.85"/>
+            <circle cx="94" cy="12.8" r="0.7" opacity="0.5"/>
+            <circle cx="108" cy="10.6" r="0.6" opacity="0.35"/>
+            <circle cx="121" cy="11.8" r="1" opacity="0.7"/>
+            <circle cx="134" cy="10.2" r="0.6" opacity="0.4"/>
+            <circle cx="149" cy="11.6" r="0.8" opacity="0.55"/>
+            <circle cx="163" cy="13" r="0.6" opacity="0.35"/>
+            <circle cx="176" cy="11.9" r="1.2" opacity="0.8"/>
+            <circle cx="190" cy="13.6" r="0.7" opacity="0.5"/>
+            <circle cx="204" cy="12.7" r="0.6" opacity="0.35"/>
+            <circle cx="218" cy="14.3" r="0.9" opacity="0.6"/>
+            <circle cx="232" cy="13.4" r="0.6" opacity="0.4"/>
+            <circle cx="246" cy="15" r="1" opacity="0.65"/>
+            <circle cx="258" cy="13.7" r="0.7" opacity="0.45"/>
+            <circle cx="272" cy="15.4" r="0.6" opacity="0.35"/>
+            <circle cx="285" cy="14.1" r="0.9" opacity="0.6"/>
+        </g>
+    </svg>
+
+    <div class="nav-section"><p class="eyebrow">Satellites</p></div>
+    <nav class="satellite-nav" aria-label="Satellites">
+        <ul class="nav-list" id="satellite-nav"></ul>
+        <p class="empty" id="satellite-nav-empty" hidden>No satellite pages.</p>
+    </nav>
+
+    <div class="sidebar-foot">
+        <i class="pulse" id="pulse"></i>
+        <span id="link-state">connecting</span>
     </div>
-</header>
+</aside>
 
-<p id="banner" class="error" hidden></p>
+<div class="main">
+    <header class="topbar">
+        <div>
+            <p class="eyebrow" id="page-eyebrow">Core</p>
+            <h1 id="page-title">Overview</h1>
+        </div>
+        <div class="topbar-right">
+            <span id="core-state" class="badge badge-unknown">connecting</span>
+            <span id="updated">&mdash;</span>
+            <button id="stop-button" class="button button-stop" type="button">Stop StarCore</button>
+        </div>
+    </header>
 
-<nav class="tabs">
-    <button class="tab-button active" data-tab="overview" type="button">Overview</button>
-    <button class="tab-button" data-tab="satellites" type="button">Satellites</button>
-    <button class="tab-button" data-tab="console" type="button">Console</button>
-</nav>
+    <p id="banner" class="banner" hidden></p>
 
-<main>
-    <section id="tab-overview" class="tab-panel">
-        <section class="panel">
-            <h2>Core</h2>
-            <dl class="facts">
-                <div><dt>State</dt><dd id="fact-state">&mdash;</dd></div>
-                <div><dt>Uptime</dt><dd id="fact-uptime">&mdash;</dd></div>
-                <div><dt>Satellites</dt><dd id="fact-satellites">&mdash;</dd></div>
-                <div><dt>Commands</dt><dd id="fact-commands">&mdash;</dd></div>
-                <div><dt>Mission Control</dt><dd id="fact-mission-control">&mdash;</dd></div>
+    <section id="view-overview" class="view">
+        <div class="stack">
+            <dl class="tiles">
+                <div class="tile">
+                    <dt>State</dt>
+                    <dd><i class="state-dot" id="tile-state-dot"></i><span id="tile-state">&mdash;</span></dd>
+                </div>
+                <div class="tile">
+                    <dt>Uptime</dt>
+                    <dd id="tile-uptime">&mdash;</dd>
+                </div>
+                <div class="tile">
+                    <dt>Satellites</dt>
+                    <dd><span id="tile-satellites">&mdash;</span><small id="tile-satellites-split"></small></dd>
+                </div>
+                <div class="tile">
+                    <dt>Commands</dt>
+                    <dd id="tile-commands">&mdash;</dd>
+                </div>
             </dl>
-        </section>
+
+            <div class="split">
+                <div class="stack">
+                    <section class="panel">
+                        <p class="eyebrow">Runtime</p>
+                        <dl class="facts">
+                            <div><dt>Engine</dt><dd id="fact-engine">&mdash;</dd></div>
+                            <div><dt>Mission Control</dt><dd id="fact-mission-control">&mdash;</dd></div>
+                            <div><dt>Interface</dt><dd id="fact-interface">&mdash;</dd></div>
+                            <div><dt>Native</dt><dd id="fact-native">&mdash;</dd></div>
+                            <div><dt>Link</dt><dd id="fact-link">&mdash;</dd></div>
+                            <div><dt>Refresh</dt><dd>5s</dd></div>
+                        </dl>
+                    </section>
+
+                    <section class="panel">
+                        <p class="eyebrow">Registered commands</p>
+                        <div id="overview-commands"></div>
+                    </section>
+                </div>
+
+                <section class="panel">
+                    <p class="eyebrow">Orbit</p>
+                    <svg class="orbit" viewBox="0 0 220 220" fill="none" role="img" aria-label="Satellites in orbit around the Core">
+                        <circle class="orbit-ring" cx="110" cy="110" r="58" opacity="0.8"/>
+                        <circle class="orbit-ring" cx="110" cy="110" r="88" opacity="0.55"/>
+                        <g class="orbit-spin" id="orbit-bodies"></g>
+                        <circle cx="110" cy="110" r="13" fill="#0f52ba" opacity="0.18"/>
+                        <circle class="orbit-ring" cx="110" cy="110" r="13" stroke="#6c9bf0" opacity="0.7"/>
+                        <ellipse cx="110" cy="110" rx="22" ry="7.5" stroke="#6c9bf0" opacity="0.4" transform="rotate(-22 110 110)"/>
+                    </svg>
+                    <div class="orbit-legend">
+                        <span><i></i>native</span>
+                        <span><i class="link"></i>link</span>
+                    </div>
+                </section>
+            </div>
+        </div>
     </section>
 
-    <section id="tab-satellites" class="tab-panel" hidden>
-        <h2>Satellites <span id="satellite-count" class="muted"></span></h2>
+    <section id="view-satellites" class="view" hidden>
+        <div class="page-head">
+            <h2>Loaded satellites</h2>
+            <span id="satellite-count" class="badge badge-unknown">&mdash;</span>
+            <p>Every satellite discovered by the Core, with the commands it contributes and the state it publishes.</p>
+        </div>
         <div id="satellites" class="cards">
             <p class="muted">Loading satellites&hellip;</p>
         </div>
     </section>
 
-    <section id="tab-console" class="tab-panel" hidden>
-        <h2>Console</h2>
-        <p class="muted">A web equivalent of the terminal CLI &mdash; commands run against the same running Core.</p>
+    <section id="view-console" class="view" hidden>
+        <div class="page-head">
+            <h2>Console</h2>
+            <p>A web equivalent of the terminal CLI &mdash; commands run against the same running Core.</p>
+        </div>
 
-        <div id="console-commands" class="commands"></div>
+        <div id="console-commands" class="chips"></div>
 
         <form id="console-form" class="console-form">
-            <input id="console-input" type="text" autocomplete="off" placeholder="help, version, status ..." />
-            <button type="submit">Run</button>
-            <button id="console-clear" type="button">Clear</button>
+            <div class="console-field">
+                <input id="console-input" type="text" autocomplete="off" spellcheck="false" placeholder="help, version, status ...">
+            </div>
+            <button class="button button-primary" type="submit">Run</button>
+            <button id="console-clear" class="button" type="button">Clear</button>
         </form>
 
-        <pre id="console-output" class="console-output"></pre>
+        <div id="console-output" class="console-output"></div>
     </section>
-</main>
 
-<footer class="muted">
-    Reading <code>/api/status</code> and <code>/api/satellites</code> every 5 seconds.
-</footer>
+    <section id="view-satellite" class="view" hidden>
+        <div id="satellite-page"></div>
+
+        <div id="satellite-generic">
+            <div class="page-head">
+                <h2 id="satellite-title">&mdash;</h2>
+                <span id="satellite-type" class="badge badge-type">&mdash;</span>
+                <span id="satellite-enabled" class="badge badge-unknown">&mdash;</span>
+                <p id="satellite-description"></p>
+            </div>
+
+            <div class="stack">
+                <div class="split">
+                    <section class="panel">
+                        <p class="eyebrow">Published state</p>
+                        <div id="satellite-state"></div>
+                    </section>
+                    <section class="panel">
+                        <p class="eyebrow">Identity</p>
+                        <dl class="facts">
+                            <div><dt>Version</dt><dd id="satellite-version">&mdash;</dd></div>
+                            <div><dt>Author</dt><dd id="satellite-author">&mdash;</dd></div>
+                        </dl>
+                    </section>
+                </div>
+
+                <section class="panel">
+                    <p class="eyebrow">Commands</p>
+                    <div id="satellite-commands"></div>
+                </section>
+            </div>
+        </div>
+    </section>
+</div>
 
 <script src="/app.js"></script>
 </body>

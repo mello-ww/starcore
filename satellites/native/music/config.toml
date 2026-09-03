@@ -1,0 +1,3 @@
+enabled = true
+storage = "data" # relative paths are resolved inside the satellite
+library = "~/Music" # the directory 'music scan' indexes by default

@@ -1,13 +1,19 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread, Timer
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 import json
 
 from . import payloads
+from .response import Request, Response
 
 SATELLITE_PREFIX = "/api/satellites/"
 WRITE_ENDPOINTS = ("/api/commands/execute", "/api/shutdown")
+
+# reserved below a satellite, so a satellite cannot claim it as a route name
+ASSETS_SEGMENT = "assets"
+
+FILE_CHUNK = 64 * 1024
 
 CONTENT_TYPES = {
     ".css": "text/css; charset=utf-8",
@@ -74,7 +80,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             elif path.startswith("/api/"):
                 self._handle_api(path)
             else:
-                self._handle_static(path)
+                self._handle_frontend(path)
         except Exception as error:
             if not self._responded:
                 self._send_json({"error": f"internal error: {error}"}, status=500)
@@ -87,6 +93,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._handle_execute()
             elif path == "/api/shutdown":
                 self._handle_shutdown()
+            elif path.startswith(SATELLITE_PREFIX):
+                self._handle_satellite(path, "POST")
             else:
                 self._method_not_allowed()
         except Exception as error:
@@ -114,16 +122,82 @@ class RequestHandler(BaseHTTPRequestHandler):
         elif path == "/api/satellites":
             self._send_json({"satellites": payloads.describe_satellites(engine)})
         elif path.startswith(SATELLITE_PREFIX):
-            name = unquote(path[len(SATELLITE_PREFIX):]).strip("/")
-            satellite = engine.registry.get(name) if name else None
-            if satellite is None:
-                self._send_json({"error": f"unknown satellite '{name}'"}, status=404)
-            else:
-                self._send_json(payloads.describe_satellite(engine, satellite))
+            self._handle_satellite(path, "GET")
         elif path == "/api/commands":
             self._send_json({"commands": payloads.describe_commands(engine)})
         else:
             self._send_json({"error": f"unknown endpoint '{path}'"}, status=404)
+
+    def _handle_satellite(self, path: str, method: str):
+        engine = self.server.engine
+        segments = [unquote(segment) for segment in path[len(SATELLITE_PREFIX):].split("/") if segment]
+        name = segments[0] if segments else ""
+        satellite = engine.registry.get(name) if name else None
+
+        if satellite is None:
+            self._send_json({"error": f"unknown satellite '{name}'"}, status=404)
+            return
+
+        if len(segments) == 1:
+            if method == "GET":
+                self._send_json(payloads.describe_satellite(engine, satellite))
+            else:
+                self._method_not_allowed()
+            return
+
+        if segments[1] == ASSETS_SEGMENT:
+            if method == "GET":
+                self._handle_asset(satellite, segments[2:])
+            else:
+                self._method_not_allowed()
+            return
+
+        handler = satellite.routes.get(segments[1])
+        if handler is None:
+            self._send_json({"error": f"unknown endpoint '{path}'"}, status=404)
+            return
+
+        body = None
+        if method == "POST":
+            body = self._read_json_body()
+            if body is None:
+                return  # a clean error response was already sent
+
+        query = {key: values[-1] for key, values in parse_qs(urlparse(self.path).query).items()}
+        request = Request(engine, satellite, method, tuple(segments[2:]), query, body)
+
+        # a satellite handles its own resources, so its failures are isolated the
+        # same way its state provider's are, and never reach the client as a trace
+        try:
+            response = handler(request)
+        except Exception as error:
+            print(f"[WARNING]: route '{segments[1]}' of satellite '{satellite.manifest.name}' failed: {error}")
+            self._send_json({"error": "the satellite could not handle this request"}, status=500)
+            return
+
+        if not isinstance(response, Response):
+            print(f"[WARNING]: route '{segments[1]}' of satellite '{satellite.manifest.name}' returned no response.")
+            self._send_json({"error": "the satellite returned an invalid response"}, status=500)
+            return
+
+        self._send_response(response)
+
+    def _handle_asset(self, satellite, segments: list):
+        root = satellite.assets_path.resolve()
+        if not root.is_dir() or not segments:
+            self._send_json({"error": "the satellite provides no Mission Control assets"}, status=404)
+            return
+
+        target = (root / "/".join(segments)).resolve()
+        if not target.is_relative_to(root):
+            self._send_text("Forbidden.", status=403)
+            return
+
+        if not target.is_file():
+            self._send_text(f"Not found: {'/'.join(segments)}", status=404)
+            return
+
+        self._send_bytes(target.read_bytes(), CONTENT_TYPES.get(target.suffix, "application/octet-stream"))
 
     def _handle_execute(self):
         body = self._read_json_body()
@@ -149,7 +223,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         # before the response is written back would race the client's request
         Timer(0.2, engine.stop).start()
 
-    def _handle_static(self, path: str):
+    def _handle_frontend(self, path: str):
         root = Path(self.server.web_root).resolve()
         if not root.is_dir():
             self._send_text(f"Mission Control is not available: {self.server.web_root} not found.", status=404)
@@ -183,6 +257,67 @@ class RequestHandler(BaseHTTPRequestHandler):
     def _method_not_allowed(self):
         self._send_json({"error": "the StarCore API is read-only"}, status=405)
 
+    def _send_response(self, response: Response):
+        if response.path is None:
+            self._send_json(response.payload, status=response.status)
+            return
+
+        try:
+            self._send_file(Path(response.path), response.content_type, response.cache)
+        except OSError as error:
+            print(f"[WARNING]: {response.path} could not be read ({error}).")
+            if not self._responded:
+                self._send_json({"error": "the requested file is not available"}, status=404)
+
+    # files are streamed rather than read into memory, and a Range request is
+    # answered with the part that was asked for, so a browser can seek in a large
+    # file a satellite serves without downloading all of it
+    def _send_file(self, path: Path, content_type: str, cache: str = None):
+        size = path.stat().st_size
+        start, end = self._requested_range(size)
+        length = end - start + 1
+
+        self._responded = True
+        self.send_response(206 if length != size else 200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(length))
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Cache-Control", cache or "no-store")
+        if length != size:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.end_headers()
+
+        with open(path, "rb") as file:
+            file.seek(start)
+            remaining = length
+            while remaining > 0:
+                chunk = file.read(min(FILE_CHUNK, remaining))
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                remaining -= len(chunk)
+
+    def _requested_range(self, size: int) -> tuple:
+        header = self.headers.get("Range", "")
+        if not header.startswith("bytes=") or "," in header:
+            return 0, max(size - 1, 0)
+
+        first, _, last = header[len("bytes="):].partition("-")
+        try:
+            if not first:
+                start = max(size - int(last), 0)
+                end = size - 1
+            else:
+                start = int(first)
+                end = int(last) if last else size - 1
+        except ValueError:
+            return 0, max(size - 1, 0)
+
+        if start >= size or start > end:
+            return 0, max(size - 1, 0)
+
+        return start, min(end, size - 1)
+
     def _send_json(self, payload, status: int = 200):
         try:
             body = json.dumps(payload, indent=2).encode("utf-8")
@@ -195,11 +330,11 @@ class RequestHandler(BaseHTTPRequestHandler):
     def _send_text(self, message: str, status: int = 200):
         self._send_bytes(message.encode("utf-8"), "text/plain; charset=utf-8", status)
 
-    def _send_bytes(self, body: bytes, content_type: str, status: int = 200):
+    def _send_bytes(self, body: bytes, content_type: str, status: int = 200, cache: str = None):
         self._responded = True
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", cache or "no-store")
         self.end_headers()
         self.wfile.write(body)

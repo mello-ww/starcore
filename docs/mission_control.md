@@ -22,13 +22,19 @@ http://127.0.0.1:8080
 
 ## What it displays
 
-Mission Control is organized into tabs:
+A persistent sidebar divides Mission Control into the Core and the Satellites orbiting it.
 
-- **Overview** - the engine name, whether the Core is running, uptime, the number of loaded Satellites (split by type), the number of registered commands, and the address Mission Control is served from
-- **Satellites** - a card for every loaded Satellite: name, version, author, description, type, enabled state, the CLI commands it contributes and the state it publishes
+The Core section holds the pages that belong to StarCore itself:
+
+- **Overview** - whether the Core is running, uptime, the number of loaded Satellites (split by type), the number of registered commands, the engine name and the address Mission Control is served from, alongside a map of the Satellites in orbit around the Core
+- **Satellites** - a card for every loaded Satellite: name, version, author, description, type, enabled state and the CLI commands it contributes
 - **Console** - a web equivalent of the terminal CLI: it lists the available commands, lets a user enter and run one, and shows its output. It executes commands through the same command registry as the terminal, so behavior is identical either way.
 
-The Overview and Satellites tabs poll the API every 5 seconds. If the Core becomes unreachable they keep the last known values and show an error message.
+The Satellite section below it is built from the API rather than from a fixed list. A Satellite earns its own page by shipping one (`mission_control/page.js`, as the Photo Satellite does) or by publishing state through the `state.py` convention, in which case Mission Control renders that state generically. A Satellite that does neither stays in the Satellites list without a page of its own. The section scrolls on its own, so the Core pages stay reachable however many Satellites are loaded.
+
+Pages are addressable: `#/overview`, `#/satellites`, `#/console` and `#/satellite/<name>` can be linked to directly, and browser navigation works as expected.
+
+Mission Control polls the API every 5 seconds. If the Core becomes unreachable it keeps the last known values and shows an error message.
 
 ## Stopping StarCore
 
@@ -49,7 +55,7 @@ port = 8080
 
 ## Satellites in Mission Control
 
-Satellites are never hardcoded into the Core or into the frontend. A Satellite appears in Mission Control as soon as the Engine discovers it, and it can publish its own state through the `state.py` convention described in the Satellites documentation. Mission Control renders whatever a Satellite publishes as generic labelled values.
+Satellites are never hardcoded into the Core or into the frontend. A Satellite appears in Mission Control as soon as the Engine discovers it, and it decides for itself what it contributes: state, routes of its own, a page of its own, or nothing at all. Mission Control renders published state as generic labelled values, and hands a Satellite that ships a page the container to draw in. Both are described in the Satellites documentation.
 
 ## API
 

@@ -2,7 +2,7 @@ from pathlib import Path
 import importlib
 
 from .command_registry import CommandRegistry
-from .module_loader import load_module_from_file
+from .module_loader import load_module_from_file, register_package
 
 class CommandLoader:
     def __init__(self, registry: CommandRegistry, path: Path):
@@ -18,6 +18,7 @@ class CommandLoader:
             return
 
         module_prefix = f"satellites.{satellite.type}.{satellite.path.name}.commands"
+        register_package(module_prefix, commands_path)
         self._discover_directory(commands_path, source=satellite.manifest.name, module_prefix=module_prefix)
 
     def _discover_directory(self, path: Path, source: str = "core", module_prefix: str = "starcore.cli.commands"):

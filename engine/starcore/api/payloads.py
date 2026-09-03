@@ -12,6 +12,7 @@ def describe_satellite(engine, satellite) -> dict:
         "enabled": bool(satellite.config.get("enabled", True)),
         "commands": describe_commands(engine, source=satellite.manifest.name),
         "state": satellite.state(engine),
+        "page": satellite.page,
     }
 
 

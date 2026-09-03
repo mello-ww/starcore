@@ -2,6 +2,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 import io
+import sys
 import threading
 import time
 import unittest
@@ -82,6 +83,44 @@ class CoreTest(unittest.TestCase):
 
         self.assertEqual(cli_result, "StarCore CLI v1.0.0")
         self.assertIn(cli_result, api_result["output"])
+
+
+class SatelliteLoadingTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = start_engine()
+
+    @classmethod
+    def tearDownClass(cls):
+        stop_engine(cls.engine)
+
+    def test_every_satellite_loads_what_it_declares(self):
+        # a satellite whose modules fail to import is only reported as a warning, so
+        # the result has to be checked rather than a clean start trusted
+        for satellite in self.engine.registry.all():
+            name = satellite.manifest.name
+            if (satellite.path / "api.py").exists():
+                self.assertTrue(satellite.routes, f"{name} declares api.py but registered no routes")
+            if (satellite.path / "state.py").exists():
+                self.assertIsNotNone(satellite.state_provider, f"{name} declares state.py but has no provider")
+            if (satellite.path / "mission_control" / "page.js").exists():
+                self.assertIsNotNone(satellite.page, f"{name} ships a page that was not picked up")
+
+    def test_a_satellite_is_importable_as_a_package(self):
+        registered = [satellite for satellite in self.engine.registry.all() if satellite.routes]
+        self.assertTrue(registered, "no satellite exercises multi-module loading")
+
+        for satellite in registered:
+            package = f"satellites.{satellite.type}.{satellite.path.name}"
+            self.assertIn(package, sys.modules)
+            self.assertEqual(getattr(sys.modules[package], "__path__", None), [str(satellite.path)])
+
+    def test_the_whole_package_chain_is_registered(self):
+        satellite = next(satellite for satellite in self.engine.registry.all() if satellite.routes)
+
+        for ancestor in ("satellites", f"satellites.{satellite.type}",
+                         f"satellites.{satellite.type}.{satellite.path.name}"):
+            self.assertIn(ancestor, sys.modules, f"{ancestor} is not importable")
 
 
 class CliReplTest(unittest.TestCase):

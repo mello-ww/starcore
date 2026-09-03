@@ -5,7 +5,7 @@ from .satellite import Satellite
 from .satellite_registry import SatelliteRegistry
 from .manifest import SatelliteManifest
 from .satellite_config import SatelliteConfig
-from .module_loader import load_module_from_file
+from .module_loader import load_module_from_file, register_package
 
 
 class SatelliteLoader:
@@ -41,22 +41,27 @@ class SatelliteLoader:
                     config = SatelliteConfig(
                         data=config_data
                     )
-                    state_provider = self._load_state_provider(satellite_dir, satellite_type, manifest.name)
-                    satellite = Satellite(manifest, config, satellite_type, satellite_dir, state_provider)
+                    package = f"satellites.{satellite_type}.{satellite_dir.name}"
+                    register_package(package, satellite_dir)
+                    state_provider = self._load_state_provider(satellite_dir, package, manifest.name)
+                    routes = self._load_routes(satellite_dir, package, manifest.name)
+                    page = self._load_page(satellite_dir)
+                    lifecycle = self._load_lifecycle(satellite_dir, package, manifest.name)
+                    satellite = Satellite(manifest, config, satellite_type, satellite_dir, state_provider, routes,
+                                          page, lifecycle)
                     self.registry.add(satellite)
 
         else:
             print(f"[WARNING]: Directory {path} does not exist. Skipping discovery for {satellite_type} satellites.")
             return
 
-    def _load_state_provider(self, satellite_dir: Path, satellite_type: str, satellite_name: str):
+    def _load_state_provider(self, satellite_dir: Path, package: str, satellite_name: str):
         state_path = satellite_dir / "state.py"
         if not state_path.exists():
             return None
 
-        module_name = f"satellites.{satellite_type}.{satellite_dir.name}.state"
         try:
-            module = load_module_from_file(module_name, state_path)
+            module = load_module_from_file(f"{package}.state", state_path)
         except Exception as error:
             print(f"[WARNING]: state module of satellite '{satellite_name}' could not be loaded ({error}). Skipping.")
             return None
@@ -66,3 +71,45 @@ class SatelliteLoader:
             print(f"[WARNING]: {state_path} has no entry function 'state'. Skipping.")
 
         return provider
+
+    def _load_routes(self, satellite_dir: Path, package: str, satellite_name: str) -> dict:
+        api_path = satellite_dir / "api.py"
+        if not api_path.exists():
+            return {}
+
+        try:
+            module = load_module_from_file(f"{package}.api", api_path)
+            routes = module.routes()
+        except Exception as error:
+            print(f"[WARNING]: api module of satellite '{satellite_name}' could not be loaded ({error}). Skipping.")
+            return {}
+
+        if not isinstance(routes, dict) or not all(callable(handler) for handler in routes.values()):
+            print(f"[WARNING]: {api_path} did not return a mapping of route names to handlers. Skipping.")
+            return {}
+
+        return routes
+
+    def _load_lifecycle(self, satellite_dir: Path, package: str, satellite_name: str) -> dict:
+        module_path = satellite_dir / "satellite.py"
+        if not module_path.exists() or module_path.stat().st_size == 0:
+            return {}
+
+        try:
+            module = load_module_from_file(f"{package}.satellite", module_path)
+        except Exception as error:
+            print(f"[WARNING]: satellite module of '{satellite_name}' could not be loaded ({error}). Skipping.")
+            return {}
+
+        return {hook: getattr(module, hook) for hook in ("start", "stop") if callable(getattr(module, hook, None))}
+
+    def _load_page(self, satellite_dir: Path):
+        assets = satellite_dir / "mission_control"
+        if not (assets / "page.js").is_file():
+            return None
+
+        page = {"module": "page.js"}
+        if (assets / "page.css").is_file():
+            page["stylesheet"] = "page.css"
+
+        return page

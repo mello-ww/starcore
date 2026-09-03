@@ -1,0 +1,9 @@
+enabled = true
+storage = "data" # relative paths are resolved inside the satellite
+thumbnail_size = 480 # longest edge, in pixels
+
+sync_enabled = true
+sync_host = "127.0.0.1" # set to "0.0.0.0" to let phones on the local network reach it
+sync_port = 8081
+sync_token = "" # generated and stored in the library on first start when empty
+sync_max_bytes = 67108864 # 64 MB per upload

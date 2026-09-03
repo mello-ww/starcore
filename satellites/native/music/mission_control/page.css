@@ -1,0 +1,544 @@
+/* Music satellite page, built on the Mission Control design tokens. */
+
+.music-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.music-tabs {
+    display: flex;
+    gap: 1px;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+}
+
+.music-tab {
+    padding: 0.3rem 0.75rem;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 0.82rem;
+    text-transform: capitalize;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.music-tab:hover {
+    color: var(--text);
+}
+
+.music-tab.active {
+    background: rgba(0, 47, 167, 0.55);
+    color: #fff;
+}
+
+.music-search {
+    flex: 1;
+    min-width: 140px;
+    padding: 0.42rem 0.75rem;
+    border: 1px solid var(--line-bright);
+    border-radius: 6px;
+    background: var(--raised);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+}
+
+.music-search:focus {
+    outline: none;
+    border-color: var(--sapphire);
+}
+
+.music-search::placeholder {
+    color: var(--text-faint);
+}
+
+.music-scan p {
+    margin: 0 0 0.35rem;
+    font-size: 0.85rem;
+}
+
+.music-scan-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+}
+
+.music-scan-row input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--line-bright);
+    border-radius: 6px;
+    background: var(--raised);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.85rem;
+}
+
+.music-scan-row input:focus {
+    outline: none;
+    border-color: var(--sapphire);
+}
+
+.music-scan-result {
+    margin: 0.85rem 0 0;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+}
+
+.music-scan-result.failed {
+    color: var(--alert);
+}
+
+.music-notice {
+    margin: 0;
+    padding: 0.7rem 1rem;
+    border: 1px solid rgba(228, 96, 109, 0.4);
+    border-radius: var(--radius);
+    background: rgba(228, 96, 109, 0.08);
+    color: var(--alert);
+    font-size: 0.85rem;
+}
+
+/* ---------- albums ---------- */
+
+.music-albums {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+}
+
+.music-album {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.music-cover {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    overflow: hidden;
+    margin-bottom: 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--line-bright);
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.music-cover svg {
+    width: 44%;
+    height: 44%;
+}
+
+.music-cover img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.music-album:hover .music-cover,
+.music-album:focus-visible .music-cover {
+    border-color: var(--sapphire);
+    box-shadow: 0 6px 20px -12px rgba(15, 82, 186, 0.9);
+}
+
+.music-album:focus-visible {
+    outline: none;
+}
+
+.music-album-name {
+    overflow: hidden;
+    font-size: 0.85rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.music-album-artist {
+    overflow: hidden;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.music-album-meta {
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+}
+
+.music-skeleton {
+    aspect-ratio: 1;
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+    background: var(--raised);
+    cursor: default;
+    animation: music-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes music-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+}
+
+/* ---------- album detail ---------- */
+
+.music-back {
+    padding: 0;
+    border: 0;
+    margin-bottom: 1rem;
+    background: none;
+    color: var(--azure);
+    font: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+.music-back:hover {
+    color: var(--ice);
+}
+
+.music-detail-head {
+    display: flex;
+    align-items: flex-end;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.music-detail-head h3 {
+    margin: 0.15rem 0 0.35rem;
+    font-size: 1.35rem;
+}
+
+.music-detail-head p {
+    margin: 0;
+}
+
+.music-cover.large {
+    flex: none;
+    width: 150px;
+    margin: 0;
+}
+
+/* ---------- artists & tracks ---------- */
+
+.music-artists {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--line);
+}
+
+.music-artist {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.7rem 1rem;
+    border: 0;
+    background: var(--surface);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+
+.music-artist:hover {
+    background: var(--raised);
+}
+
+.music-artist-name {
+    overflow: hidden;
+    font-size: 0.88rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.music-artist-meta {
+    flex: none;
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+}
+
+.music-tracks {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.music-track {
+    display: grid;
+    grid-template-columns: 2.2rem minmax(0, 2.2fr) minmax(0, 1.4fr) 3.5rem;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    border: 0;
+    border-top: 1px solid var(--line);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+
+.music-track:first-child {
+    border-top: 0;
+}
+
+.music-track:has(.music-track-album) {
+    grid-template-columns: 2.2rem minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 1.3fr) 3.5rem;
+}
+
+.music-track:hover {
+    background: var(--raised);
+}
+
+.music-track.playing {
+    background: rgba(0, 47, 167, 0.28);
+}
+
+.music-track.playing .music-track-title {
+    color: var(--ice);
+}
+
+.music-track span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.music-track-number {
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    text-align: right;
+}
+
+.music-track-title {
+    font-size: 0.85rem;
+}
+
+.music-track-artist,
+.music-track-album {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+}
+
+.music-track-duration {
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    text-align: right;
+}
+
+.music-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 3.5rem 1rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    text-align: center;
+}
+
+.music-empty svg {
+    flex: none;
+    width: 46px;
+    height: 46px;
+    margin-bottom: 0.9rem;
+    color: var(--sapphire);
+}
+
+.music-empty p {
+    margin: 0;
+}
+
+.music-empty .button {
+    margin-top: 1rem;
+}
+
+/* ---------- player ---------- */
+
+.music-player[hidden] {
+    display: none;
+}
+
+.music-player {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--line-bright);
+    border-radius: var(--radius);
+    background: var(--raised);
+}
+
+.music-player-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.music-player-step,
+.music-player-toggle,
+.music-player-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--line-bright);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease;
+}
+
+.music-player-toggle {
+    width: 34px;
+    height: 34px;
+    border-color: var(--sapphire);
+    background: linear-gradient(180deg, var(--sapphire), var(--klein));
+    color: #fff;
+}
+
+.music-player-step:hover,
+.music-player-close:hover {
+    border-color: var(--sapphire);
+    color: var(--text);
+}
+
+.music-player-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.music-player-details p {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.music-player-title {
+    font-size: 0.85rem;
+}
+
+.music-player-artist {
+    color: var(--text-faint);
+    font-size: 0.75rem;
+}
+
+.music-player-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex: 1.2;
+    min-width: 0;
+}
+
+.music-player-time {
+    flex: none;
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+}
+
+.music-player-seek {
+    flex: 1;
+    min-width: 0;
+    height: 3px;
+    appearance: none;
+    border-radius: 2px;
+    background: var(--line-bright);
+    cursor: pointer;
+}
+
+.music-player-seek::-webkit-slider-thumb {
+    appearance: none;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--azure);
+}
+
+.music-player-seek::-moz-range-thumb {
+    width: 11px;
+    height: 11px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--azure);
+}
+
+@media (max-width: 860px) {
+    .music-albums {
+        grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    }
+
+    .music-detail-head {
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .music-cover.large {
+        width: 110px;
+    }
+
+    .music-track,
+    .music-track:has(.music-track-album) {
+        grid-template-columns: 2rem minmax(0, 1fr) 3.2rem;
+    }
+
+    .music-track-artist,
+    .music-track-album {
+        display: none;
+    }
+
+    .music-player {
+        flex-wrap: wrap;
+    }
+
+    .music-player-progress {
+        order: 3;
+        flex-basis: 100%;
+    }
+}

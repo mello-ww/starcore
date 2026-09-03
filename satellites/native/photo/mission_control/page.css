@@ -1,0 +1,391 @@
+/* Photo satellite page, built on the Mission Control design tokens. */
+
+.photo-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.photo-toolbar .eyebrow {
+    margin: 0;
+}
+
+.photo-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.photo-import p,
+.photo-sync p {
+    margin: 0 0 0.35rem;
+    font-size: 0.85rem;
+}
+
+.photo-sync .eyebrow {
+    margin: 1.35rem 0 0.85rem;
+}
+
+.photo-sync .eyebrow:first-child {
+    margin-top: 0;
+}
+
+.photo-sync-state {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem !important;
+    font-family: var(--mono);
+    font-size: 0.82rem !important;
+}
+
+.photo-sync .facts {
+    margin-bottom: 1.35rem;
+}
+
+.photo-sync-hint {
+    color: var(--text-faint);
+    font-size: 0.78rem !important;
+}
+
+.photo-address {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.75rem 0 0.5rem;
+}
+
+.photo-address code {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--line-bright);
+    border-radius: 6px;
+    background: var(--raised);
+    color: var(--ice);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.photo-sync-log {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.photo-sync-log li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.4rem 0;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+}
+
+.photo-sync-log li:first-child {
+    border-top: 0;
+}
+
+.photo-sync-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.photo-sync-status {
+    flex: none;
+    color: var(--text-faint);
+}
+
+.photo-sync-status.imported {
+    color: var(--ok);
+}
+
+.photo-sync-status.duplicate {
+    color: var(--azure);
+}
+
+.photo-sync-status.failed {
+    color: var(--alert);
+}
+
+.photo-import-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+}
+
+.photo-import-row input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--line-bright);
+    border-radius: 6px;
+    background: var(--raised);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.85rem;
+}
+
+.photo-import-row input:focus {
+    outline: none;
+    border-color: var(--sapphire);
+}
+
+.photo-import-row input::placeholder {
+    color: var(--text-faint);
+}
+
+.photo-import-result {
+    margin: 0.85rem 0 0;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+}
+
+.photo-import-result.failed {
+    color: var(--alert);
+}
+
+.photo-notice {
+    margin: 0;
+    padding: 0.7rem 1rem;
+    border: 1px solid rgba(228, 96, 109, 0.4);
+    border-radius: var(--radius);
+    background: rgba(228, 96, 109, 0.08);
+    color: var(--alert);
+    font-size: 0.85rem;
+}
+
+/* ---------- gallery ---------- */
+
+.photo-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.6rem;
+}
+
+.photo-tile {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.photo-tile img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.photo-tile:hover,
+.photo-tile:focus-visible {
+    outline: none;
+    border-color: var(--sapphire);
+    box-shadow: 0 6px 20px -12px rgba(15, 82, 186, 0.9);
+}
+
+.photo-tile.unavailable::after {
+    content: "unavailable";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--raised);
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+}
+
+.photo-caption {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    padding: 1.4rem 0.5rem 0.4rem;
+    background: linear-gradient(180deg, transparent, rgba(4, 6, 13, 0.88));
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 140ms ease;
+}
+
+.photo-tile:hover .photo-caption,
+.photo-tile:focus-visible .photo-caption {
+    opacity: 1;
+}
+
+.photo-skeleton {
+    border-style: dashed;
+    background: var(--raised);
+    cursor: default;
+    animation: photo-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes photo-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+}
+
+.photo-empty {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 3.5rem 1rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    text-align: center;
+}
+
+.photo-empty svg {
+    flex: none;
+    width: 46px;
+    height: 46px;
+    margin-bottom: 0.9rem;
+    color: var(--sapphire);
+}
+
+.photo-empty p {
+    margin: 0;
+}
+
+.photo-empty .button {
+    margin-top: 1rem;
+}
+
+/* ---------- viewer ---------- */
+
+.photo-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    background-color: #03050b;
+    background-image: var(--starfield);
+    animation: photo-fade 160ms ease-out;
+}
+
+@keyframes photo-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.photo-viewer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1.5rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.photo-viewer-bar p {
+    margin: 0;
+}
+
+.photo-viewer-title {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+}
+
+.photo-viewer-position {
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+}
+
+.photo-viewer-close {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--line-bright);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease;
+}
+
+.photo-viewer-close:hover {
+    border-color: var(--sapphire);
+    color: var(--text);
+}
+
+.photo-viewer-stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    min-height: 0;
+    padding: 1.5rem;
+}
+
+.photo-viewer-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+}
+
+.photo-viewer-step {
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--line-bright);
+    border-radius: 50%;
+    background: rgba(10, 15, 30, 0.7);
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease;
+}
+
+.photo-viewer-step:hover {
+    border-color: var(--sapphire);
+    color: var(--text);
+}
+
+.photo-viewer-meta {
+    padding: 0.9rem 1.5rem 1.2rem;
+    border-top: 1px solid var(--line);
+}
+
+@media (max-width: 720px) {
+    .photo-gallery {
+        grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    }
+
+    .photo-import-row {
+        flex-wrap: wrap;
+    }
+
+    .photo-viewer-stage {
+        padding: 0.75rem;
+    }
+}
