@@ -128,7 +128,9 @@ class CliReplTest(unittest.TestCase):
         engine = start_engine(mission_control=True)
         inputs = iter(["version", "exit"])
 
-        with mock.patch("builtins.input", lambda prompt="": next(inputs)), redirect_stdout(io.StringIO()):
+        with mock.patch("starcore.cli.main._interactive", return_value=True), \
+             mock.patch("builtins.input", lambda prompt="": next(inputs)), \
+             redirect_stdout(io.StringIO()):
             run(engine)
 
         self.assertTrue(engine.stopped.is_set())
@@ -138,9 +140,31 @@ class CliReplTest(unittest.TestCase):
     def test_eof_stops_the_engine_like_exit(self):
         engine = start_engine(mission_control=False)
 
-        with mock.patch("builtins.input", side_effect=EOFError), redirect_stdout(io.StringIO()):
+        with mock.patch("starcore.cli.main._interactive", return_value=True), \
+             mock.patch("builtins.input", side_effect=EOFError), \
+             redirect_stdout(io.StringIO()):
             run(engine)
 
+        self.assertTrue(engine.stopped.is_set())
+
+    def test_a_non_interactive_stdin_never_starts_a_reader_thread(self):
+        # a service manager or a closed/redirected stdin reads as EOF on the very
+        # first call - starting the reader thread there would immediately stop
+        # the engine the moment it started, so it must not start at all
+        engine = start_engine(mission_control=False)
+
+        with mock.patch("starcore.cli.main._interactive", return_value=False), redirect_stdout(io.StringIO()):
+            runner = threading.Thread(target=run, args=(engine,), daemon=True)
+            runner.start()
+            time.sleep(0.1)
+
+            self.assertTrue(runner.is_alive())
+            self.assertNotIn("starcore-cli", {thread.name for thread in threading.enumerate()})
+
+            engine.stop()
+            runner.join(timeout=2)
+
+        self.assertFalse(runner.is_alive())
         self.assertTrue(engine.stopped.is_set())
 
     def test_remote_shutdown_unblocks_the_cli_without_waiting_for_input(self):

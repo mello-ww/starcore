@@ -30,13 +30,13 @@ Install only what you need.
 
 ## Running StarCore
 
-From the `engine` directory:
+Requires Python 3.13, on Windows or Linux. From the `engine` directory:
 
 ```
 python -m starcore
 ```
 
-This starts the Engine, loads the Satellites and serves Mission Control at http://127.0.0.1:8080.
+This starts the Engine, loads the Satellites and serves Mission Control at http://127.0.0.1:8080. Run in a terminal, the interactive CLI starts alongside it; run headless (a service manager, no terminal attached), StarCore runs Mission Control on its own instead.
 
 The interactive CLI starts the same Core:
 
@@ -44,11 +44,14 @@ The interactive CLI starts the same Core:
 python -m starcore.cli.main
 ```
 
+See the Deployment documentation for installing, running as a Linux service and Windows unattended startup.
+
 ## Documentation
 
 - API
 - Architecture
 - CLI 
+- Deployment
 - Mission Control
 - Philosophy
 - Roadmap

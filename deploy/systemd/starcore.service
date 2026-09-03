@@ -1,0 +1,16 @@
+[Unit]
+Description=StarCore
+After=network.target
+
+[Service]
+Type=simple
+# replace with an unprivileged user that owns the checkout below
+User=starcore
+# both paths must point at the checkout's engine/ directory and its venv
+WorkingDirectory=/opt/starcore/engine
+ExecStart=/opt/starcore/engine/.venv/bin/python -m starcore
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -26,7 +26,9 @@ class CommandLoader:
             print(f"[WARNING]: directory {path} does not exist. Skipping discovery for commands.")
             return
 
-        for command_file in path.iterdir():
+        # sorted for the same reason satellite discovery is: directory iteration
+        # order differs by platform and filesystem, and command order should not
+        for command_file in sorted(path.iterdir()):
             if command_file.is_file() and command_file.suffix == ".py" and command_file.stem != "__init__":
                 command_name = command_file.stem
                 module_name = f"{module_prefix}.{command_name}"

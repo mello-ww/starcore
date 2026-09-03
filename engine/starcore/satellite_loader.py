@@ -16,7 +16,10 @@ class SatelliteLoader:
 
     def _discover_directory(self, path: Path, satellite_type: str):
         if path.exists():
-            for satellite_dir in path.iterdir():
+            # directory iteration order is not guaranteed and differs by platform
+            # and filesystem, so it's sorted to keep discovery order (and therefore
+            # Mission Control's sidebar) the same on every machine
+            for satellite_dir in sorted(path.iterdir()):
                 if satellite_dir.is_dir():
                     manifest_path = satellite_dir / "satellite.toml"
                     if manifest_path.exists():
