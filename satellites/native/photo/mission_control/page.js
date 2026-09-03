@@ -6,6 +6,7 @@ export function mount(context) {
     let photos = [];
     let viewer = null;
     let index = -1;
+    let infoOpen = false;
 
     const summary = el("dl", "tiles");
     const gallery = el("div", "photo-gallery");
@@ -297,6 +298,7 @@ export function mount(context) {
         index = position;
 
         if (viewer === null) {
+            infoOpen = false;
             viewer = buildViewer();
             document.body.appendChild(viewer.element);
         }
@@ -335,26 +337,47 @@ export function mount(context) {
         viewer.title.textContent = photo.filename;
         viewer.position.textContent = `${index + 1} / ${photos.length}`;
 
+        const multiple = photos.length > 1;
+        viewer.previous.hidden = !multiple;
+        viewer.next.hidden = !multiple;
+
         // present fields only - most photos have no EXIF at all, or only some of
-        // it, and a wall of "—" is worse than not showing the row
+        // it, and a wall of "—" is worse than not showing the row. Ordered as a
+        // reader would want it: when and where, then the gear, then exposure,
+        // then the file itself.
         const rows = [
-            ["Dimensions", `${photo.width} × ${photo.height}`],
-            ["Megapixels", metadata.megapixels ? `${metadata.megapixels} MP` : null],
-            ["Size", readableSize(photo.size)],
-            ["Format", photo.format.toUpperCase()],
             ["Captured", formatDate(photo.captured_at) || "unknown"],
-            ["Imported", formatDate(photo.imported_at)],
+            ["Location", metadata.gps_coordinates, mapLink(metadata)],
             ["Camera", cameraLabel(metadata)],
             ["Lens", metadata.lens_model],
             ["Focal length", metadata.focal_length ? `${metadata.focal_length} mm` : null],
             ["Aperture", metadata.aperture ? `f/${metadata.aperture}` : null],
             ["Shutter speed", metadata.shutter_speed],
             ["ISO", metadata.iso ? String(metadata.iso) : null],
+            ["Dimensions", `${photo.width} × ${photo.height}`],
+            ["Megapixels", metadata.megapixels ? `${metadata.megapixels} MP` : null],
+            ["Size", readableSize(photo.size)],
+            ["Format", photo.format.toUpperCase()],
             ["Orientation", orientationLabel(metadata.orientation)],
-            ["Location", metadata.gps_coordinates, mapLink(metadata)],
+            ["Imported", formatDate(photo.imported_at)],
         ];
 
-        viewer.meta.replaceChildren(...rows.filter(([, value]) => value).map(([label, value, href]) => fact(label, value, href)));
+        const visible = rows.filter(([, value]) => value);
+        viewer.meta.replaceChildren(...visible.map(([label, value, href]) => fact(label, value, href)));
+
+        // a photo with nothing beyond its dimensions and size still has those
+        // two rows, so the info button only disappears for a fully empty panel
+        viewer.infoButton.hidden = visible.length === 0;
+        if (visible.length === 0) {
+            toggleInfo(false);
+        }
+    }
+
+    function toggleInfo(force) {
+        infoOpen = force === undefined ? !infoOpen : force;
+        viewer.panel.classList.toggle("open", infoOpen);
+        viewer.infoButton.classList.toggle("active", infoOpen);
+        viewer.infoButton.setAttribute("aria-expanded", String(infoOpen));
     }
 
     function buildViewer() {
@@ -364,17 +387,27 @@ export function mount(context) {
         const image = el("img", "photo-viewer-image");
         const meta = el("dl", "facts photo-viewer-meta");
 
+        const infoButton = el("button", "photo-viewer-info");
+        infoButton.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+                <circle cx="8" cy="8" r="6.2"/>
+                <path d="M8 7.3v4"/>
+                <circle cx="8" cy="4.9" r="0.8" fill="currentColor" stroke="none"/>
+            </svg>`;
         const closeButton = el("button", "photo-viewer-close", "✕");
         const previous = el("button", "photo-viewer-step previous", "‹");
         const next = el("button", "photo-viewer-step next", "›");
 
-        for (const button of [closeButton, previous, next]) {
+        for (const button of [infoButton, closeButton, previous, next]) {
             button.type = "button";
         }
+        infoButton.title = "Details";
+        infoButton.setAttribute("aria-expanded", "false");
         closeButton.title = "Close";
         previous.title = "Previous";
         next.title = "Next";
 
+        infoButton.addEventListener("click", () => toggleInfo());
         closeButton.addEventListener("click", closeViewer);
         previous.addEventListener("click", () => step(-1));
         next.addEventListener("click", () => step(1));
@@ -385,15 +418,57 @@ export function mount(context) {
         });
 
         const bar = el("div", "photo-viewer-bar");
-        const identity = el("div");
+        const identity = el("div", "photo-viewer-identity");
         identity.append(el("p", "eyebrow", "StarCore · Photo"), title);
-        bar.append(identity, position, closeButton);
+        const actions = el("div", "photo-viewer-bar-actions");
+        actions.append(position, infoButton, closeButton);
+        bar.append(identity, actions);
 
         const stage = el("div", "photo-viewer-stage");
         stage.append(previous, image, next);
+        attachSwipe(stage);
 
-        element.append(bar, stage, meta);
-        return { element, image, title, position, meta };
+        const panelBody = el("div", "photo-viewer-panel-body");
+        panelBody.appendChild(meta);
+        const panel = el("div", "photo-viewer-panel");
+        panel.appendChild(panelBody);
+
+        element.append(bar, stage, panel);
+        return { element, image, title, position, meta, panel, infoButton, previous, next };
+    }
+
+    function attachSwipe(stage) {
+        // touch only - a mouse already has the overlay buttons and the keyboard
+        // shortcuts, and dragging with a mouse is more often a text/image
+        // selection than an attempt to change photos
+        let startX = null;
+        let startY = null;
+
+        stage.addEventListener("touchstart", (event) => {
+            if (event.touches.length !== 1) {
+                startX = null;
+                return;
+            }
+            startX = event.touches[0].clientX;
+            startY = event.touches[0].clientY;
+        }, { passive: true });
+
+        stage.addEventListener("touchend", (event) => {
+            if (startX === null || photos.length <= 1) {
+                startX = null;
+                return;
+            }
+
+            const touch = event.changedTouches[0];
+            const deltaX = touch.clientX - startX;
+            const deltaY = touch.clientY - startY;
+            startX = null;
+
+            // a deliberate horizontal swipe, not a scroll or a tap
+            if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+                step(deltaX < 0 ? 1 : -1);
+            }
+        }, { passive: true });
     }
 
     function fact(label, value, href) {
@@ -445,6 +520,10 @@ export function mount(context) {
             step(-1);
         } else if (event.key === "ArrowRight") {
             step(1);
+        } else if (event.key === "i" || event.key === "I") {
+            if (!viewer.infoButton.hidden) {
+                toggleInfo();
+            }
         }
     }
 }

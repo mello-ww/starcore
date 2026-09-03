@@ -306,9 +306,16 @@
     margin: 0;
 }
 
+.photo-viewer-identity {
+    min-width: 0;
+}
+
 .photo-viewer-title {
+    overflow: hidden;
     font-family: var(--mono);
     font-size: 0.9rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .photo-viewer-position {
@@ -317,7 +324,18 @@
     font-size: 0.8rem;
 }
 
+.photo-viewer-bar-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.photo-viewer-info,
 .photo-viewer-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 30px;
     height: 30px;
     border: 1px solid var(--line-bright);
@@ -326,22 +344,36 @@
     color: var(--text-dim);
     font-size: 0.8rem;
     cursor: pointer;
-    transition: border-color 120ms ease, color 120ms ease;
+    transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
 }
 
+.photo-viewer-info:hover,
 .photo-viewer-close:hover {
     border-color: var(--sapphire);
     color: var(--text);
 }
 
+.photo-viewer-info.active {
+    border-color: var(--sapphire);
+    background: rgba(15, 82, 186, 0.18);
+    color: var(--ice);
+}
+
+/* the button still occupies its slot in the bar's layout so the position text
+   and close button don't jump when a photo has no metadata to show */
+.photo-viewer-info[hidden] {
+    visibility: hidden;
+}
+
 .photo-viewer-stage {
+    position: relative;
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 1rem;
     min-height: 0;
     padding: 1.5rem;
+    touch-action: pan-y;
 }
 
 .photo-viewer-image {
@@ -352,7 +384,11 @@
     border-radius: 4px;
 }
 
+/* overlaid on the image edges rather than beside it, so the photo itself gets
+   the full width of the stage - the point of a viewer is the photo */
 .photo-viewer-step {
+    position: absolute;
+    top: 50%;
     flex: none;
     width: 38px;
     height: 38px;
@@ -364,6 +400,15 @@
     line-height: 1;
     cursor: pointer;
     transition: border-color 120ms ease, color 120ms ease;
+    transform: translateY(-50%);
+}
+
+.photo-viewer-step.previous {
+    left: 0.75rem;
+}
+
+.photo-viewer-step.next {
+    right: 0.75rem;
 }
 
 .photo-viewer-step:hover {
@@ -371,9 +416,42 @@
     color: var(--text);
 }
 
+/* collapsed to nothing by default (grid-template-rows: 0fr -> 1fr) so the
+   photo stays the main focus of the viewer until the info button asks for
+   detail; the inner scroll area caps how much the panel can push into the
+   image even when a photo carries a lot of metadata */
+.photo-viewer-panel {
+    flex: none;
+    display: grid;
+    grid-template-rows: 0fr;
+    border-top: 1px solid transparent;
+    transition: grid-template-rows 220ms ease, border-color 220ms ease;
+}
+
+.photo-viewer-panel.open {
+    grid-template-rows: 1fr;
+    border-top-color: var(--line);
+}
+
+.photo-viewer-panel-body {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.photo-viewer-panel-body::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 3px;
+    margin: 0.6rem auto 0;
+    border-radius: 3px;
+    background: var(--line-bright);
+}
+
 .photo-viewer-meta {
-    padding: 0.9rem 1.5rem 1.2rem;
-    border-top: 1px solid var(--line);
+    max-height: min(46vh, 420px);
+    padding: 0.75rem 1.5rem 1.25rem;
+    overflow-y: auto;
 }
 
 .photo-viewer-meta a {
@@ -395,7 +473,28 @@
         flex-wrap: wrap;
     }
 
+    .photo-viewer-bar {
+        padding: 0.75rem 1rem;
+    }
+
     .photo-viewer-stage {
         padding: 0.75rem;
+    }
+
+    .photo-viewer-step {
+        width: 42px;
+        height: 42px;
+    }
+
+    .photo-viewer-meta {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-height: 42vh;
+        padding: 0.75rem 1rem 1rem;
+    }
+}
+
+@media (max-width: 420px) {
+    .photo-viewer-meta {
+        grid-template-columns: 1fr;
     }
 }
