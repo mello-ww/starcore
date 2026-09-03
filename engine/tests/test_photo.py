@@ -14,6 +14,11 @@ from tests.support import start_engine, stop_engine
 SATELLITE = Path(__file__).resolve().parents[2] / "satellites" / "native" / "photo"
 
 
+def images_module():
+    from importlib import import_module
+    return import_module("satellites.native.photo.images")
+
+
 def png(width: int, height: int, colour: bytes = b"\x40\x60\xa0") -> bytes:
     """A real, decodable PNG, so tests do not depend on fixture files."""
     def chunk(kind: bytes, payload: bytes) -> bytes:
@@ -42,6 +47,92 @@ def exif(taken: str) -> bytes:
 
     payload = b"Exif\x00\x00" + tiff
     return b"\xff\xe1" + struct.pack(">H", len(payload) + 2) + payload
+
+
+# tag numbers used by the richer EXIF fixtures below - mirrors images.py's own
+EXIF_MAKE, EXIF_MODEL, EXIF_ORIENTATION = 0x010F, 0x0110, 0x0112
+EXIF_EXPOSURE_TIME, EXIF_FNUMBER, EXIF_ISO = 0x829A, 0x829D, 0x8827
+EXIF_DATE_TIME_ORIGINAL, EXIF_FOCAL_LENGTH, EXIF_LENS_MODEL = 0x9003, 0x920A, 0xA434
+EXIF_SUB_IFD = 0x8769
+EXIF_GPS_IFD = 0x8825
+GPS_LATITUDE_REF, GPS_LATITUDE, GPS_LONGITUDE_REF, GPS_LONGITUDE = 0x0001, 0x0002, 0x0003, 0x0004
+
+ASCII, SHORT, LONG, RATIONAL = 2, 3, 4, 5
+_SIZES = {ASCII: 1, SHORT: 2, LONG: 4, RATIONAL: 8}
+
+
+def text_field(value: str) -> tuple:
+    payload = value.encode("ascii") + b"\x00"
+    return (ASCII, len(payload), payload)
+
+
+def short_field(value: int) -> tuple:
+    return (SHORT, 1, struct.pack("<H", value))
+
+
+def rational_field(*pairs) -> tuple:
+    """pairs are (numerator, denominator) tuples; one field can hold several,
+    as GPSLatitude/GPSLongitude (degrees, minutes, seconds) always do."""
+    payload = b"".join(struct.pack("<II", numerator, denominator) for numerator, denominator in pairs)
+    return (RATIONAL, len(pairs), payload)
+
+
+def _ifd_bytes(entries: dict, base_offset: int) -> bytes:
+    """entries: {tag: (kind, count, payload)}. Builds one IFD - its entry table
+    plus, for any value that doesn't fit inline, a trailing data area - exactly
+    the shape a real EXIF writer produces and images.py's parser expects."""
+    header_size = 2 + 12 * len(entries) + 4
+    data = bytearray()
+    packed = bytearray()
+
+    for tag, (kind, count, payload) in entries.items():
+        size = _SIZES[kind] * count
+        if size <= 4:
+            value_field = payload + b"\x00" * (4 - size)
+        else:
+            value_field = struct.pack("<I", base_offset + header_size + len(data))
+            data += payload
+        packed += struct.pack("<HHI", tag, kind, count) + value_field
+
+    return struct.pack("<H", len(entries)) + bytes(packed) + struct.pack("<I", 0) + bytes(data)
+
+
+def build_exif(root: dict = None, detail: dict = None, gps: dict = None) -> bytes:
+    """A full little-endian TIFF/EXIF blob: IFD0, optionally an Exif sub-IFD and
+    a GPS sub-IFD, linked the same way a camera links them. `root`, `detail` and
+    `gps` are {tag: (kind, count, payload)} - build with text_field/short_field/
+    rational_field, or by hand for a deliberately malformed entry."""
+    root = dict(root or {})
+
+    # the two IFD0 entries are the same 12 bytes whichever offset they end up
+    # pointing at, so IFD0's own length - and therefore where the sub-IFDs
+    # start - is known before those offsets are computed
+    if detail:
+        root[EXIF_SUB_IFD] = (LONG, 1, b"\x00\x00\x00\x00")
+    if gps:
+        root[EXIF_GPS_IFD] = (LONG, 1, b"\x00\x00\x00\x00")
+
+    root_ifd = _ifd_bytes(root, 8)
+    detail_offset = 8 + len(root_ifd)
+    detail_ifd = _ifd_bytes(detail, detail_offset) if detail else b""
+    gps_offset = detail_offset + len(detail_ifd)
+    gps_ifd = _ifd_bytes(gps, gps_offset) if gps else b""
+
+    if detail:
+        root[EXIF_SUB_IFD] = (LONG, 1, struct.pack("<I", detail_offset))
+    if gps:
+        root[EXIF_GPS_IFD] = (LONG, 1, struct.pack("<I", gps_offset))
+    root_ifd = _ifd_bytes(root, 8)  # rebuilt now that the pointer values are known
+
+    return b"II" + struct.pack("<HI", 42, 8) + root_ifd + detail_ifd + gps_ifd
+
+
+def jpeg_with_exif(width: int, height: int, tiff: bytes) -> bytes:
+    """A JPEG whose APP1 segment carries an arbitrary pre-built TIFF/EXIF blob."""
+    payload = b"Exif\x00\x00" + tiff
+    app1 = b"\xff\xe1" + struct.pack(">H", len(payload) + 2) + payload
+    frame = b"\xff\xc0" + struct.pack(">HBHHB", 11, 8, height, width, 1) + b"\x01\x11\x00"
+    return b"\xff\xd8" + app1 + frame + b"\xff\xd9"
 
 
 def photo_library(root: Path):
@@ -271,6 +362,206 @@ class PhotoLibraryTest(unittest.TestCase):
         self.assertEqual(photo_library(self.library.root).count, 1)
 
 
+class PhotoMetadataTest(unittest.TestCase):
+    """EXIF extraction: camera/lens/GPS details, and what happens without them."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = start_engine()  # loads the satellite package so it can be imported
+
+    @classmethod
+    def tearDownClass(cls):
+        stop_engine(cls.engine)
+
+    def setUp(self):
+        self.directory = Path(tempfile.mkdtemp(prefix="starcore-photo-meta-"))
+        self.source = self.directory / "source"
+        self.source.mkdir()
+        self.library = photo_library(self.directory / "library")
+
+    def tearDown(self):
+        shutil.rmtree(self.directory, ignore_errors=True)
+
+    def write(self, name: str, data: bytes) -> Path:
+        path = self.source / name
+        path.write_bytes(data)
+        return path
+
+    def import_one(self, filename: str, data: bytes) -> dict:
+        self.write(filename, data)
+        self.library.import_directory(self.source)
+        return self.library.all()[0]
+
+    def test_full_exif_metadata_is_extracted(self):
+        root = {EXIF_MAKE: text_field("Canon"), EXIF_MODEL: text_field("EOS R5"), EXIF_ORIENTATION: short_field(6)}
+        detail = {
+            EXIF_DATE_TIME_ORIGINAL: text_field("2024:05:17 09:14:03"),
+            EXIF_EXPOSURE_TIME: rational_field((1, 125)),
+            EXIF_FNUMBER: rational_field((28, 10)),
+            EXIF_ISO: short_field(400),
+            EXIF_FOCAL_LENGTH: rational_field((50, 1)),
+            EXIF_LENS_MODEL: text_field("RF24-70mm F2.8L IS USM"),
+        }
+        tiff = build_exif(root, detail)
+        photo = self.import_one("full.jpg", jpeg_with_exif(1920, 1280, tiff))
+        metadata = photo["metadata"]
+
+        self.assertEqual(metadata["camera_make"], "Canon")
+        self.assertEqual(metadata["camera_model"], "EOS R5")
+        self.assertEqual(metadata["lens_model"], "RF24-70mm F2.8L IS USM")
+        self.assertEqual(metadata["focal_length"], 50.0)
+        self.assertEqual(metadata["aperture"], 2.8)
+        self.assertEqual(metadata["shutter_speed"], "1/125")
+        self.assertEqual(metadata["iso"], 400)
+        self.assertEqual(metadata["orientation"], 6)
+        self.assertEqual(metadata["megapixels"], 2.5)
+        self.assertEqual(photo["captured_at"], "2024-05-17T09:14:03")
+
+    def test_gps_metadata_is_extracted_and_made_human_readable(self):
+        gps = {
+            GPS_LATITUDE_REF: text_field("N"),
+            GPS_LATITUDE: rational_field((37, 1), (46, 1), (29, 1)),
+            GPS_LONGITUDE_REF: text_field("W"),
+            GPS_LONGITUDE: rational_field((122, 1), (25, 1), (9, 1)),
+        }
+        tiff = build_exif(gps=gps)
+        photo = self.import_one("located.jpg", jpeg_with_exif(800, 600, tiff))
+        metadata = photo["metadata"]
+
+        self.assertAlmostEqual(metadata["gps_latitude"], 37.774722, places=5)
+        self.assertAlmostEqual(metadata["gps_longitude"], -122.419167, places=5)
+        self.assertIn("N", metadata["gps_coordinates"])
+        self.assertIn("W", metadata["gps_coordinates"])
+
+    def test_southern_and_eastern_hemispheres_are_negated_correctly(self):
+        gps = {
+            GPS_LATITUDE_REF: text_field("S"),
+            GPS_LATITUDE: rational_field((33, 1), (52, 1), (4, 1)),
+            GPS_LONGITUDE_REF: text_field("E"),
+            GPS_LONGITUDE: rational_field((151, 1), (12, 1), (36, 1)),
+        }
+        tiff = build_exif(gps=gps)
+        photo = self.import_one("sydney.jpg", jpeg_with_exif(800, 600, tiff))
+        metadata = photo["metadata"]
+
+        self.assertLess(metadata["gps_latitude"], 0)
+        self.assertGreater(metadata["gps_longitude"], 0)
+        self.assertIn("S", metadata["gps_coordinates"])
+        self.assertIn("E", metadata["gps_coordinates"])
+
+    def test_camera_and_lens_metadata_without_gps(self):
+        root = {EXIF_MAKE: text_field("FUJIFILM"), EXIF_MODEL: text_field("X100V")}
+        detail = {EXIF_LENS_MODEL: text_field("23mm F2")}
+        tiff = build_exif(root, detail)
+        photo = self.import_one("street.jpg", jpeg_with_exif(640, 480, tiff))
+        metadata = photo["metadata"]
+
+        self.assertEqual(metadata["camera_make"], "FUJIFILM")
+        self.assertEqual(metadata["lens_model"], "23mm F2")
+        self.assertIsNone(metadata["gps_latitude"])
+        self.assertIsNone(metadata["gps_coordinates"])
+
+    def test_missing_exif_leaves_metadata_fields_null_without_failing(self):
+        photo = self.import_one("plain.jpg", jpeg(320, 240))
+        metadata = photo["metadata"]
+
+        # captured_at lives at the top level of the photo record, not inside
+        # "metadata" - everything else EXIF-derived does live there
+        for field in images_module().METADATA_FIELDS:
+            if field != "captured_at":
+                self.assertIsNone(metadata[field])
+        self.assertIsNone(photo["captured_at"])
+        self.assertEqual(metadata["megapixels"], 0.1)
+        self.assertIsNotNone(photo["id"])
+
+    def test_a_normal_photo_with_no_exif_support_is_unaffected(self):
+        photo = self.import_one("holiday.png", png(1000, 1000))
+
+        self.assertEqual(photo["metadata"]["megapixels"], 1.0)
+        self.assertIsNone(photo["metadata"]["camera_make"])
+        self.assertIsNone(photo["captured_at"])
+
+    def test_a_truncated_exif_segment_does_not_fail_the_import(self):
+        payload = b"Exif\x00\x00" + b"II" + struct.pack("<HI", 42, 8) + b"\x05\x00" + b"\xff" * 10
+        app1 = b"\xff\xe1" + struct.pack(">H", len(payload) + 2) + payload
+        frame = b"\xff\xc0" + struct.pack(">HBHHB", 11, 8,240, 320, 1) + b"\x01\x11\x00"
+        data = b"\xff\xd8" + app1 + frame + b"\xff\xd9"
+
+        photo = self.import_one("broken-exif.jpg", data)
+
+        self.assertIsNone(photo["metadata"]["camera_make"])
+        self.assertEqual(photo["width"], 320)
+
+    def test_an_exif_offset_pointing_outside_the_segment_is_ignored(self):
+        # a sub-IFD pointer that points past the end of the blob - a malformed
+        # or deliberately hostile file, not just an absent field
+        root = {EXIF_SUB_IFD: (LONG, 1, struct.pack("<I", 999_999))}
+        tiff = build_exif(root)
+        photo = self.import_one("bad-offset.jpg", jpeg_with_exif(320, 240, tiff))
+
+        self.assertIsNone(photo["metadata"]["iso"])
+        self.assertEqual(photo["width"], 320)
+
+    def test_a_zero_denominator_rational_does_not_fail_the_import(self):
+        # some cameras write 0/0 for an unmeasured aperture or focal length
+        detail = {EXIF_FNUMBER: rational_field((0, 0))}
+        tiff = build_exif(detail=detail)
+        photo = self.import_one("zero-rational.jpg", jpeg_with_exif(320, 240, tiff))
+
+        self.assertIsNone(photo["metadata"]["aperture"])
+
+    def test_an_invalid_gps_reference_is_ignored(self):
+        gps = {
+            GPS_LATITUDE_REF: text_field("X"),  # not N/S/E/W
+            GPS_LATITUDE: rational_field((37, 1), (0, 1), (0, 1)),
+        }
+        tiff = build_exif(gps=gps)
+        photo = self.import_one("bad-gps-ref.jpg", jpeg_with_exif(320, 240, tiff))
+
+        # GPSLongitude is entirely absent, so a decimal coordinate cannot be
+        # formed even though GPSLatitude itself decoded fine
+        self.assertIsNone(photo["metadata"]["gps_latitude"])
+
+    def test_metadata_survives_a_library_reload(self):
+        root = {EXIF_MAKE: text_field("Canon")}
+        gps = {
+            GPS_LATITUDE_REF: text_field("N"), GPS_LATITUDE: rational_field((10, 1), (0, 1), (0, 1)),
+            GPS_LONGITUDE_REF: text_field("E"), GPS_LONGITUDE: rational_field((20, 1), (0, 1), (0, 1)),
+        }
+        tiff = build_exif(root, gps=gps)
+        self.import_one("reload.jpg", jpeg_with_exif(400, 300, tiff))
+
+        reopened = photo_library(self.library.root)
+        photo = reopened.all()[0]
+
+        self.assertEqual(photo["metadata"]["camera_make"], "Canon")
+        self.assertAlmostEqual(photo["metadata"]["gps_latitude"], 10.0)
+        self.assertAlmostEqual(photo["metadata"]["gps_longitude"], 20.0)
+
+    def test_a_pre_metadata_library_record_loads_with_metadata_backfilled(self):
+        self.library.root.mkdir(parents=True, exist_ok=True)
+        old_record = {
+            "id": "0" * 16, "filename": "old.jpg", "path": "photos/00/old.jpg", "size": 123,
+            "width": 100, "height": 50, "format": "jpeg",
+            "imported_at": "2020-01-01T00:00:00", "captured_at": None,
+            # no "metadata" key at all - exactly what library.json looked like
+            # before this milestone
+        }
+        (self.library.root / "library.json").write_text(
+            json.dumps({"version": 1, "photos": {old_record["id"]: old_record}}), encoding="utf-8")
+
+        reopened = photo_library(self.library.root)
+        photo = reopened.get(old_record["id"])
+
+        self.assertIsNotNone(photo)
+        self.assertIn("metadata", photo)
+        self.assertEqual(photo["metadata"]["megapixels"], 0.0)
+        self.assertIsNone(photo["metadata"]["camera_make"])
+        # the file on disk is untouched by merely reading it - no silent migration
+        on_disk = json.loads((self.library.root / "library.json").read_text(encoding="utf-8"))
+        self.assertNotIn("metadata", on_disk["photos"][old_record["id"]])
+
+
 class PhotoSatelliteTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -462,6 +753,24 @@ class PhotoCommandTest(unittest.TestCase):
         self.source.mkdir()
         self.satellite.config.data["storage"] = str(self.directory / "library")
 
+        # config.toml is loaded from the real satellite directory, not a
+        # per-test temp file the way engine/config.toml is - redirect it so a
+        # "photo config" test never writes into the working copy on disk. The
+        # in-memory config.data is reset to match, since earlier tests' saves
+        # (which mutate config.data directly) would otherwise leak through -
+        # sync_enabled is off so these CLI plumbing tests never touch a real
+        # socket; that live-restart behaviour has its own coverage in
+        # test_photo_sync.py's PhotoConfigurationTest.
+        self.satellite.config.data["sync_enabled"] = False
+        self.satellite.config.data["sync_host"] = "127.0.0.1"
+        self.satellite.config.data["sync_port"] = 0
+        self.config_path = self.directory / "config.toml"
+        self.config_path.write_text(
+            'enabled = true\nsync_enabled = false\nsync_host = "127.0.0.1"\nsync_port = 0\n',
+            encoding="utf-8",
+        )
+        self.satellite.config.path = self.config_path
+
     def tearDown(self):
         shutil.rmtree(self.directory, ignore_errors=True)
 
@@ -503,6 +812,54 @@ class PhotoCommandTest(unittest.TestCase):
 
     def test_photo_rejects_an_unknown_action(self):
         self.assertIn("Usage", self.run_command("photo explode"))
+
+    def test_photo_config_with_no_arguments_shows_current_settings(self):
+        output = self.run_command("photo config")
+
+        self.assertIn("sync_host", output)
+        self.assertIn("sync_port", output)
+        self.assertIn("127.0.0.1", output)
+
+    def test_photo_config_changes_the_host(self):
+        output = self.run_command("photo config sync_host 0.0.0.0")
+
+        self.assertIn("sync_host = 0.0.0.0", output)
+        self.assertEqual(self.satellite.config.get("sync_host"), "0.0.0.0")
+        self.assertIn("0.0.0.0", self.config_path.read_text(encoding="utf-8"))
+
+    def test_photo_config_changes_the_port(self):
+        output = self.run_command("photo config sync_port 9090")
+
+        self.assertIn("sync_port = 9090", output)
+        self.assertEqual(self.satellite.config.get("sync_port"), 9090)
+        self.assertIn("9090", self.config_path.read_text(encoding="utf-8"))
+
+    def test_photo_config_reports_when_sync_is_turned_off(self):
+        output = self.run_command("photo config sync_port 9090")
+
+        self.assertIn("currently turned off", output)
+
+    def test_photo_config_rejects_an_invalid_port(self):
+        output = self.run_command("photo config sync_port not-a-number")
+
+        self.assertIn("[ERROR]", output)
+        self.assertNotIn("9090", self.config_path.read_text(encoding="utf-8"))
+
+    def test_photo_config_rejects_an_out_of_range_port(self):
+        output = self.run_command("photo config sync_port 70000")
+
+        self.assertIn("[ERROR]", output)
+
+    def test_photo_config_rejects_an_unknown_key(self):
+        output = self.run_command("photo config sync_nonsense value")
+
+        self.assertIn("[ERROR]", output)
+
+    def test_photo_config_requires_exactly_a_key_and_a_value(self):
+        output = self.run_command("photo config sync_host")
+
+        self.assertIn("[ERROR]", output)
+        self.assertIn("Usage", output)
 
 
 if __name__ == "__main__":

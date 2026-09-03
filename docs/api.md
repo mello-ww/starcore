@@ -38,9 +38,15 @@ Responses are JSON. A Satellite entry contains its manifest information, its typ
   "type": "native",
   "enabled": true,
   "commands": [{ "name": "status", "source": "Status", "description": "..." }],
-  "state": { "refresh_rate": 1 }
+  "state": { "refresh_rate": 1 },
+  "configurable": false
 }
 ```
+
+`configurable` is `true` when the Satellite has named one of its own routes
+`"configuration"` - it is the entire signal Mission Control uses to decide whether to show
+that Satellite a Config button, and the only thing the Core itself knows about a Satellite's
+settings. See "Exposing configuration" in the Satellites documentation.
 
 `POST /api/commands/execute` takes `{"command": "<name> [args...]"}` and runs it through `StarCore.execute_command()` - the same call the terminal CLI makes - so behavior and output match the terminal exactly. It responds with the captured output and, if the command raised, an error:
 
@@ -81,6 +87,13 @@ GET      /api/satellites/<name>/assets/...    the Satellite's Mission Control fi
 `api.py` returns, and the Core neither knows nor cares what those routes do. Only GET and
 POST reach them. The Satellites documentation describes the handler contract, and the Photo
 and Music documentation are worked examples.
+
+`configuration` is not reserved the way `assets` is - the Core does not implement it - but
+it is the one route name Mission Control treats specially, purely by name (see
+`configurable` above): a Satellite that wants a Config button in Mission Control names one
+of its own routes `configuration` and answers `GET`/`POST` on it following the convention in
+`docs/satellites.md`. Photo's `GET|POST /api/satellites/photo/configuration` (`docs/photo.md`)
+is the first Satellite to do this.
 
 A file a Satellite returns is streamed rather than read into memory, and a `Range` request
 is answered with `206` and just the bytes asked for, so a browser can seek in a large file

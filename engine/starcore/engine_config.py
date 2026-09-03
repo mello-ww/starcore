@@ -1,14 +1,11 @@
 from pathlib import Path
-import os
-import re
 import tomllib
+
+from .toml_edit import write_value
 
 
 class ConfigurationError(Exception):
     """Raised when a configuration value fails validation."""
-
-
-_SECTION_RE = re.compile(r"^\[(?P<name>[^\[\]]+)\]\s*(#.*)?$")
 
 
 def _validate_host(value) -> str:
@@ -117,67 +114,6 @@ class Configuration:
         written in that case.
         """
         saved = validate(section, key, value)
-        _write_value(self.config_path, section, key, saved)
+        write_value(self.config_path, section, key, saved)
         self.config_data.setdefault(section, {})[key] = saved
         return saved
-
-
-def _write_value(path: Path, section: str, key: str, value) -> None:
-    # read_text() applies universal-newline translation, which would hide a CRLF
-    # file's line endings before they could be detected - the raw bytes are
-    # checked instead, so the file's existing convention is actually preserved
-    newline = "\r\n" if path.exists() and b"\r\n" in path.read_bytes() else "\n"
-    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
-    formatted = _format_scalar(value)
-
-    section_start, section_end = _section_bounds(lines, section)
-
-    if section_start is None:
-        if lines and lines[-1].strip():
-            lines.append("")
-        lines.append(f"[{section}]")
-        lines.append(f"{key} = {formatted}")
-    else:
-        key_pattern = re.compile(rf"^(?P<indent>\s*){re.escape(key)}(?P<eq>\s*=\s*)(?P<value>[^#]*)(?P<comment>#.*)?$")
-        for index in range(section_start + 1, section_end):
-            match = key_pattern.match(lines[index])
-            if match:
-                comment = match.group("comment") or ""
-                spacer = " " if comment else ""
-                lines[index] = f"{match.group('indent')}{key}{match.group('eq')}{formatted}{spacer}{comment}".rstrip()
-                break
-        else:
-            lines.insert(section_end, f"{key} = {formatted}")
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    partial = path.with_suffix(".part")
-    text = newline.join(lines)
-    if text:
-        text += newline
-    partial.write_text(text, encoding="utf-8", newline="")
-    os.replace(partial, path)
-
-
-def _section_bounds(lines: list, section: str) -> tuple:
-    """The line range of a [section] block: (header index, index of the next header or EOF)."""
-    start = None
-    for index, line in enumerate(lines):
-        match = _SECTION_RE.match(line.strip())
-        if not match:
-            continue
-        if start is not None:
-            return start, index
-        if match.group("name").strip() == section:
-            start = index
-
-    return start, len(lines)
-
-
-def _format_scalar(value) -> str:
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, int):
-        return str(value)
-
-    escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{escaped}"'

@@ -120,6 +120,7 @@ class PhotoLibrary:
             return None
 
         information = images.probe(source)
+        exif = images.exif_metadata(source)
         relative = Path("photos") / photo_id[:2] / f"{photo_id}{images.EXTENSIONS[information['format']]}"
         destination = self.root / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -139,7 +140,11 @@ class PhotoLibrary:
             "height": information["height"],
             "format": information["format"],
             "imported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "captured_at": images.capture_date(source),
+            "captured_at": exif["captured_at"],
+            "metadata": {
+                "megapixels": images.megapixels(information["width"], information["height"]),
+                **{key: value for key, value in exif.items() if key != "captured_at"},
+            },
         }
 
         self._photos[photo_id] = photo
@@ -241,6 +246,8 @@ class PhotoLibrary:
 
         photos = index.get("photos")
         if isinstance(photos, dict):
+            for photo in photos.values():
+                _backfill_metadata(photo)
             self._photos = photos
 
     def _save(self):
@@ -248,6 +255,21 @@ class PhotoLibrary:
         partial = self.index_path.with_suffix(".part")
         partial.write_text(json.dumps({"version": INDEX_VERSION, "photos": self._photos}, indent=2), encoding="utf-8")
         os.replace(partial, self.index_path)
+
+
+def _backfill_metadata(photo: dict) -> None:
+    """Fills in the metadata shape for a photo imported before this existed.
+
+    In memory only - existing library.json entries are never rewritten just for
+    being read, so every consumer (API, CLI, UI) can rely on "metadata" always
+    being a dict with the full set of known keys, present or not, without a
+    migration step and without touching a file that otherwise wouldn't change.
+    """
+    if not isinstance(photo.get("metadata"), dict):
+        photo["metadata"] = {
+            "megapixels": images.megapixels(photo.get("width"), photo.get("height")),
+            **dict.fromkeys(images.METADATA_FIELDS),
+        }
 
 
 def readable_size(size: int) -> str:

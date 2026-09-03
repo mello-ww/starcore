@@ -64,6 +64,31 @@ By default `host = "127.0.0.1"` keeps Mission Control reachable only from the ma
 
 Satellites are never hardcoded into the Core or into the frontend. A Satellite appears in Mission Control as soon as the Engine discovers it, and it decides for itself what it contributes: state, routes of its own, a page of its own, or nothing at all. Mission Control renders published state as generic labelled values, and hands a Satellite that ships a page the container to draw in. Both are described in the Satellites documentation.
 
+### Satellite configuration
+
+A Satellite can also expose its own settings, kept separate from the Core's own
+Configuration page (which only ever holds `[server]` - see "Configuration" above). A
+configurable Satellite gets a small gear button: on its card on the Satellites page, and, on
+its own Mission Control page, next to its name in the topbar (a Satellite's custom page fills
+the same space its card's button would normally sit in, so the topbar is where that page's
+gear lives instead).
+
+The button opens a single reusable modal, built from whatever the Satellite's own
+`GET .../configuration` response describes rather than anything Satellite-specific in
+`app.js` - a field per setting, its input type (checkbox, number or text) inferred from the
+current value's type. Saving sends only the changed field to `POST .../configuration`; a
+rejected value is shown as a validation error in the modal without closing it, and a
+successful save shows whatever note the Satellite returned (e.g. that a background service
+was restarted, or that a restart of StarCore itself is still needed) - the same
+error-and-note handling the Core's own Configuration page uses for `[server]`, applied
+generically to any Satellite.
+
+Which settings exist, their defaults, validation and persistence all belong to the
+Satellite; Mission Control and the Core only provide the button, the modal, and the generic
+request plumbing. Photo Sync's `sync_host`/`sync_port` are the first Satellite to use this -
+see `docs/photo.md` - and the underlying mechanism is documented for Satellite authors in
+`docs/satellites.md` under "Exposing configuration".
+
 ## API
 
 Mission Control is a client of the Engine API, which is described in the API documentation. The frontend itself is plain HTML, CSS and JavaScript served by the Engine from the `mission_control` directory, so it has no build step and no dependencies.

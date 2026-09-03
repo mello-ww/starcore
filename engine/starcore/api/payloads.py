@@ -15,6 +15,11 @@ def describe_satellite(engine, satellite) -> dict:
         "commands": describe_commands(engine, source=satellite.manifest.name),
         "state": satellite.state(engine),
         "page": satellite.page,
+        # a satellite exposes configuration purely by naming one of its own
+        # routes "configuration" (see docs/satellites.md) - the Core only ever
+        # checks for that name, so it never needs to know what any satellite's
+        # settings actually are
+        "configurable": "configuration" in satellite.routes,
     }
 
 

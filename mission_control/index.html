@@ -105,9 +105,17 @@
 
 <div class="main">
     <header class="topbar">
-        <div>
-            <p class="eyebrow" id="page-eyebrow">Core</p>
-            <h1 id="page-title">Overview</h1>
+        <div class="topbar-title">
+            <div>
+                <p class="eyebrow" id="page-eyebrow">Core</p>
+                <h1 id="page-title">Overview</h1>
+            </div>
+            <button id="satellite-config-button" class="icon-button" type="button" title="Configuration" hidden>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="8" cy="8" r="1.7"/>
+                    <path d="M8 2.4v1.7M8 11.9v1.7M13.6 8h-1.7M4.1 8H2.4M11.7 4.3l-1.2 1.2M5.5 10.5l-1.2 1.2M11.7 11.7l-1.2-1.2M5.5 5.5 4.3 4.3"/>
+                </svg>
+            </button>
         </div>
         <div class="topbar-right">
             <span id="core-state" class="badge badge-unknown">connecting</span>
@@ -277,6 +285,25 @@
             </div>
         </div>
     </section>
+</div>
+
+<div id="satellite-config-overlay" class="modal-overlay" hidden>
+    <div class="modal panel" role="dialog" aria-modal="true" aria-labelledby="satellite-config-title">
+        <div class="modal-head">
+            <h2 id="satellite-config-title">Configuration</h2>
+            <button id="satellite-config-close" class="modal-close" type="button" title="Close">&times;</button>
+        </div>
+
+        <p id="satellite-config-error" class="banner error" hidden></p>
+        <p id="satellite-config-note" class="banner notice" hidden></p>
+
+        <form id="satellite-config-form" class="stack">
+            <div id="satellite-config-fields" class="stack"></div>
+            <div>
+                <button id="satellite-config-save" class="button button-primary" type="submit">Save</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <script src="/app.js"></script>

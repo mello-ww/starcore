@@ -98,6 +98,56 @@ A Satellite without a page still gets one: Mission Control renders whatever it p
 through `state.py` as generic labelled values. A Satellite that provides neither is listed
 on the Satellites page but has no page of its own.
 
+## Exposing configuration
+
+A Satellite that wants its own settings editable from Mission Control simply names one of
+its `api.py` routes `"configuration"`:
+
+```
+satellites/native/photo/api.py
+    -> def routes() -> {..., "configuration": handler, ...}
+```
+
+That name is the entire contract with the Core. `describe_satellite()` reports
+`"configurable": true` for any Satellite with a `"configuration"` route, Mission Control
+shows a gear button on its card (and, on the Satellite's own page, in the topbar) whenever
+that flag is set, and the button opens a generic modal that renders whatever fields the
+route's GET response describes. The Core never sees a Satellite's setting names or their
+meaning - a Satellite that doesn't name a `"configuration"` route simply has no gear button,
+the same way a Satellite without `mission_control/page.js` simply has no page.
+
+The Core does not prescribe a request or response shape beyond what a Satellite route
+already follows (GET and POST, `Request` in, `Response` out - see "Serving data and
+files"), but the convention every native Satellite follows, and that Mission Control's
+generic modal is built against, is:
+
+```
+GET  /api/satellites/<name>/configuration
+    -> {"settings": [{"key", "value", "description", "live_value", "pending_restart"}, ...],
+        "restart_required": bool, "note": string|null}
+
+POST /api/satellites/<name>/configuration  {"key": ..., "value": ...}
+    -> the same shape, after validating, persisting and applying one setting
+```
+
+A rejected value answers with the Core's usual `error_response` (HTTP 400, `{"error":
+"..."}`), which Mission Control's modal renders as a validation error next to the field
+instead of closing it - the same pattern `engine_config.py`'s own `Configuration.set()`
+uses for the Core's `[server]` settings. `live_value` and `pending_restart` let a Satellite
+say a setting was saved but the running service hasn't picked it up yet, for a value that
+can't simply be re-read from a live listener; a Satellite whose service can just be
+restarted (see "Running a background service") can instead apply the change immediately and
+report it through `note` instead, the way Photo Sync does for `sync_host`/`sync_port`.
+
+Everything else - which settings exist, their defaults, validation and where they persist -
+belongs entirely to the Satellite. `starcore.satellite_config.SatelliteConfig` (a
+Satellite's own `config.toml`, matching the loaded manifest) gained a generic `set(key,
+value)` alongside its existing `get()`, so a Satellite can persist a change with a single
+call; it writes the one key back to the file with the same comment-preserving, targeted edit
+`engine_config.py` uses for `engine/config.toml`, and otherwise does no validation of its
+own - that stays the Satellite's job, exactly as `Configuration.set()` leaves validation to
+its caller for the Core's own settings.
+
 ## Satellites with several modules
 
 A Satellite directory is importable as a package, so a Satellite that outgrows a single

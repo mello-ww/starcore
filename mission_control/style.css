@@ -298,10 +298,98 @@ h3 {
     font-size: 1.15rem;
 }
 
+.topbar-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
 .topbar-right {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+}
+
+.icon-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: color 120ms ease, background 120ms ease;
+}
+
+.icon-button:hover {
+    background: var(--raised);
+    color: var(--azure);
+}
+
+.card-config {
+    margin-left: auto;
+}
+
+/* ---------- modal ---------- */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(4, 6, 13, 0.72);
+    backdrop-filter: blur(2px);
+    z-index: 20;
+}
+
+.modal-overlay[hidden] {
+    display: none;
+}
+
+.modal {
+    width: 100%;
+    max-width: 420px;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 1.25rem 1.35rem;
+    background: var(--surface);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.9rem;
+}
+
+.modal-head h2 {
+    font-size: 1.02rem;
+}
+
+.modal-close {
+    padding: 0.15rem 0.5rem;
+    border: 0;
+    background: none;
+    color: var(--text-faint);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.modal-close:hover {
+    color: var(--text);
+}
+
+.modal .banner {
+    margin: 0 0 0.9rem;
+    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
 }
 
 #updated {

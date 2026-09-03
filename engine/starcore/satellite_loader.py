@@ -42,7 +42,8 @@ class SatelliteLoader:
                         print(f"[WARNING]: config.toml not found for satellite {manifest.name}. Using empty config.")
                         config_data = {}
                     config = SatelliteConfig(
-                        data=config_data
+                        data=config_data,
+                        path=config_path,
                     )
                     package = f"satellites.{satellite_type}.{satellite_dir.name}"
                     register_package(package, satellite_dir)

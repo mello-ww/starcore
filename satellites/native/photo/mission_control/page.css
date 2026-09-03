@@ -376,6 +376,16 @@
     border-top: 1px solid var(--line);
 }
 
+.photo-viewer-meta a {
+    color: var(--azure);
+    text-decoration: none;
+}
+
+.photo-viewer-meta a:hover {
+    color: var(--ice);
+    text-decoration: underline;
+}
+
 @media (max-width: 720px) {
     .photo-gallery {
         grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));

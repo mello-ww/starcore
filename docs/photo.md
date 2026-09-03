@@ -69,8 +69,32 @@ import panel uses to preview a folder.
 
 For every photo the index records the identifier, the original filename, the stored path,
 the file size, width, height, format and the import timestamp. `captured_at` is filled from
-the EXIF `DateTimeOriginal` field when the file carries one; photos without EXIF simply have
-no capture date. Nothing is guessed or invented.
+the EXIF `DateTimeOriginal` field (falling back to `DateTime`) when the file carries one;
+photos without EXIF simply have no capture date. Nothing is guessed or invented.
+
+A JPEG's EXIF segment, when present, also fills a nested `metadata` object on the record:
+
+```
+camera_make, camera_model, lens_model
+focal_length, aperture, shutter_speed, iso
+orientation
+gps_latitude, gps_longitude, gps_coordinates   (a human-readable "37.77414° N, 122.41858° W")
+megapixels                                     (derived from width x height, not EXIF)
+```
+
+Every field defaults to `null` - a photo with no EXIF segment, a format this reads no EXIF
+from (PNG, WEBP), or EXIF that is missing, malformed or truncated simply carries less detail
+in `metadata` rather than failing the import. This is read straight from the file's own
+bytes by the Satellite's `images.py`, using only the standard library's `struct` module - the
+same dependency-free promise as the rest of Photo's format handling, and unrelated to
+whether Pillow happens to be installed for thumbnails (see below). A `library.json` written
+before this existed still loads: a record without a `metadata` object is filled in with all
+fields `null` when read, in memory only, so the file on disk is never rewritten just for
+being loaded.
+
+Mission Control's photo viewer shows whatever of this is present - dimensions and megapixels
+next to size and format, camera and lens details, and, when GPS coordinates are present, a
+link to the location on OpenStreetMap.
 
 ## Thumbnails
 
@@ -98,6 +122,8 @@ GET  /api/satellites/photo/thumbnails/<id>    cached thumbnail
 GET  /api/satellites/photo/originals/<id>     the stored original
 POST /api/satellites/photo/scan               preview a directory  {"source": "..."}
 POST /api/satellites/photo/import             import a directory   {"source": "..."}
+GET  /api/satellites/photo/configuration      current sync_host/sync_port settings
+POST /api/satellites/photo/configuration      change one            {"key": ..., "value": ...}
 ```
 
 Photos are only ever addressed by identifier. An identifier that is not in the index is a
@@ -119,10 +145,15 @@ panel scans first, so the folder can be previewed before anything is copied.
 ## Command
 
 ```
-photo                     summary of the library
-photo list [count]        the most recent photos
-photo import <directory>  import a directory
+photo                          summary of the library
+photo list [count]             the most recent photos
+photo import <directory>       import a directory
+photo config                   show Photo Sync's current settings
+photo config <key> <value>     change one, e.g. photo config sync_port 8090
 ```
+
+`photo config` reads and writes the same settings, the same `config.toml`, as Mission
+Control's Config button on the Photo card - see "Configuring Photo Sync" below.
 
 ## Phone synchronization
 
@@ -147,6 +178,30 @@ The default is deliberately local-only: the listener runs, but nothing outside t
 can reach it until `sync_host` is changed. When `sync_token` is empty a token is generated on
 first start and kept in `data/sync_token`, so a phone set up once keeps working across
 restarts.
+
+### Configuring Photo Sync
+
+`sync_host` and `sync_port` are editable without hand-editing `config.toml`: open the Photo
+card on the Satellites page and use its Config (gear) button, or use the same topbar button
+on Photo's own Mission Control page, or run `photo config` from the CLI (see "Command"
+above). This is Photo's own use of the Satellite configuration mechanism described in
+`docs/satellites.md` under "Exposing configuration" - the Core has no notion of `sync_host`
+or `sync_port` by name; Photo is simply the first Satellite to name a `"configuration"`
+route.
+
+`config.toml` remains the source of truth either way - a change made through Mission Control
+or the CLI is validated (a host may not be empty, a port must be a whole number from 0 to
+65535) and written back to the same file, the same comment-preserving edit `photo config`
+and the Core's own `config` command both use, so nothing else in the file is disturbed.
+
+Because Photo Sync's listener is a background service independent of Mission Control's own
+API server (see "Running a background service" in `docs/satellites.md`), a validated change
+restarts it immediately - `sync_port 8090` takes effect right away, not on the next StarCore
+restart. Mission Control and the CLI both report what actually happened: a successful
+restart names the address it is now listening on, and a port already in use is reported as
+such rather than silently pretending the change took effect. `sync_port = 0` (let the OS
+choose a port) is never reported as a pending restart merely because the live bound port
+differs from the literal `0` on disk - that mismatch is the point of `0`, not a stale value.
 
 ### Sending a photo
 

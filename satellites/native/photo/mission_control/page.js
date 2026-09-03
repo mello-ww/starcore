@@ -328,17 +328,33 @@ export function mount(context) {
             return;
         }
 
+        const metadata = photo.metadata || {};
+
         viewer.image.src = api.url(`/originals/${photo.id}`);
         viewer.image.alt = photo.filename;
         viewer.title.textContent = photo.filename;
         viewer.position.textContent = `${index + 1} / ${photos.length}`;
-        viewer.meta.replaceChildren(
-            fact("Dimensions", `${photo.width} × ${photo.height}`),
-            fact("Size", readableSize(photo.size)),
-            fact("Format", photo.format),
-            fact("Captured", formatDate(photo.captured_at) || "unknown"),
-            fact("Imported", formatDate(photo.imported_at)),
-        );
+
+        // present fields only - most photos have no EXIF at all, or only some of
+        // it, and a wall of "—" is worse than not showing the row
+        const rows = [
+            ["Dimensions", `${photo.width} × ${photo.height}`],
+            ["Megapixels", metadata.megapixels ? `${metadata.megapixels} MP` : null],
+            ["Size", readableSize(photo.size)],
+            ["Format", photo.format.toUpperCase()],
+            ["Captured", formatDate(photo.captured_at) || "unknown"],
+            ["Imported", formatDate(photo.imported_at)],
+            ["Camera", cameraLabel(metadata)],
+            ["Lens", metadata.lens_model],
+            ["Focal length", metadata.focal_length ? `${metadata.focal_length} mm` : null],
+            ["Aperture", metadata.aperture ? `f/${metadata.aperture}` : null],
+            ["Shutter speed", metadata.shutter_speed],
+            ["ISO", metadata.iso ? String(metadata.iso) : null],
+            ["Orientation", orientationLabel(metadata.orientation)],
+            ["Location", metadata.gps_coordinates, mapLink(metadata)],
+        ];
+
+        viewer.meta.replaceChildren(...rows.filter(([, value]) => value).map(([label, value, href]) => fact(label, value, href)));
     }
 
     function buildViewer() {
@@ -380,10 +396,42 @@ export function mount(context) {
         return { element, image, title, position, meta };
     }
 
-    function fact(label, value) {
+    function fact(label, value, href) {
         const row = document.createElement("div");
-        row.append(el("dt", null, label), el("dd", null, value));
+        const body = document.createElement("dd");
+
+        if (href) {
+            const link = el("a", null, value);
+            link.href = href;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            body.appendChild(link);
+        } else {
+            body.textContent = value;
+        }
+
+        row.append(el("dt", null, label), body);
         return row;
+    }
+
+    function cameraLabel(metadata) {
+        const { camera_make: make, camera_model: model } = metadata;
+        // many cameras (Canon, Nikon...) already write the make into the model
+        // string ("Canon EOS R5", "NIKON D850") - shown as-is that would read
+        // "Canon Canon EOS R5", so the make is only prefixed when it isn't
+        // already there
+        if (make && model) {
+            return model.toLowerCase().startsWith(make.toLowerCase()) ? model : `${make} ${model}`;
+        }
+        return make || model || null;
+    }
+
+    function mapLink(metadata) {
+        if (metadata.gps_latitude == null || metadata.gps_longitude == null) {
+            return null;
+        }
+        const { gps_latitude: lat, gps_longitude: lon } = metadata;
+        return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=15/${lat}/${lon}`;
     }
 
     function onKeyDown(event) {
@@ -426,6 +474,15 @@ function readableSize(bytes) {
             return `${value.toFixed(1)} ${unit}`;
         }
     }
+}
+
+const ORIENTATIONS = {
+    1: "Normal", 2: "Flipped horizontally", 3: "Rotated 180°", 4: "Flipped vertically",
+    5: "Rotated 90° CW, flipped", 6: "Rotated 90° CW", 7: "Rotated 90° CCW, flipped", 8: "Rotated 90° CCW",
+};
+
+function orientationLabel(code) {
+    return ORIENTATIONS[code] || null;
 }
 
 function formatDate(value) {

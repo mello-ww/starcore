@@ -19,6 +19,11 @@ def sync_module():
     return import_module("satellites.native.photo.sync")
 
 
+def configuration_module():
+    from importlib import import_module
+    return import_module("satellites.native.photo.configuration")
+
+
 class SyncServiceTest(unittest.TestCase):
     """Every test drives the real listener over HTTP on a temporary library."""
 
@@ -309,6 +314,151 @@ class SyncIntegrationTest(unittest.TestCase):
 
         self.assertIn("[WARNING]", output.getvalue())
         self.assertTrue(self.engine.status()["running"])
+
+
+class PhotoConfigurationTest(unittest.TestCase):
+    """Photo Sync's own sync_host/sync_port, through the generic satellite
+    configuration mechanism - never through any Photo-specific Core code."""
+
+    def setUp(self):
+        self.directory = Path(tempfile.mkdtemp(prefix="starcore-photo-config-"))
+        self.engine = start_engine()
+        self.satellite = self.engine.registry.get("Photo")
+        self.satellite.config.data["storage"] = str(self.directory / "library")
+        self.satellite.config.data["sync_port"] = 0
+
+        # configuration.update() persists through satellite.config.set(), which
+        # would otherwise write into the real satellites/native/photo/config.toml
+        # on disk - every test here redirects that to a throwaway file first
+        self.config_path = self.directory / "config.toml"
+        self.config_path.write_text(
+            'enabled = true\nsync_enabled = true\nsync_host = "127.0.0.1"\nsync_port = 0\n',
+            encoding="utf-8")
+        self.satellite.config.path = self.config_path
+
+    def tearDown(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            sync_module().stop(self.engine, self.satellite)
+        stop_engine(self.engine)
+        shutil.rmtree(self.directory, ignore_errors=True)
+
+    def test_reading_the_configuration_reports_the_current_values(self):
+        payload = configuration_module().describe(self.satellite)
+        by_key = {setting["key"]: setting for setting in payload["settings"]}
+
+        self.assertEqual(by_key["sync_host"]["value"], "127.0.0.1")
+        self.assertEqual(by_key["sync_port"]["value"], 0)
+        self.assertIn("sync_host", by_key["sync_host"]["description"] + " " + by_key["sync_host"]["key"])
+
+    def test_changing_the_host_persists_and_restarts_the_listener(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = configuration_module().update(self.engine, self.satellite, "sync_host", "127.0.0.2")
+
+        self.assertEqual(self.satellite.config.get("sync_host"), "127.0.0.2")
+        self.assertIn('sync_host = "127.0.0.2"', self.config_path.read_text(encoding="utf-8"))
+
+        running = sync_module().service(self.satellite)
+        self.assertIsNotNone(running)
+        self.assertEqual(running.host, "127.0.0.2")
+        self.assertIn("applied", result["note"].lower())
+        self.assertFalse(result["restart_required"])
+
+    def test_changing_the_port_persists_and_restarts_the_listener(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            configuration_module().update(self.engine, self.satellite, "sync_host", "127.0.0.1")
+            result = configuration_module().update(self.engine, self.satellite, "sync_port", "0")
+
+        running = sync_module().service(self.satellite)
+        self.assertIsNotNone(running)
+        self.assertTrue(running.running)
+        self.assertEqual(result["settings"][1]["live_value"], running.port)
+
+    def test_an_invalid_host_is_rejected_and_nothing_is_written(self):
+        before = self.config_path.read_text(encoding="utf-8")
+
+        with self.assertRaises(configuration_module().ConfigurationError):
+            configuration_module().update(self.engine, self.satellite, "sync_host", "   ")
+
+        self.assertEqual(self.config_path.read_text(encoding="utf-8"), before)
+        self.assertIsNone(sync_module().service(self.satellite))
+
+    def test_an_invalid_port_is_rejected(self):
+        for bad in ("not-a-port", "70000", "-1"):
+            with self.assertRaises(configuration_module().ConfigurationError):
+                configuration_module().update(self.engine, self.satellite, "sync_port", bad)
+
+    def test_an_unknown_setting_is_rejected(self):
+        with self.assertRaises(configuration_module().ConfigurationError):
+            configuration_module().update(self.engine, self.satellite, "sync_token", "anything")
+
+    def test_the_saved_value_survives_a_fresh_read_of_the_satellite_config(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            configuration_module().update(self.engine, self.satellite, "sync_port", "0")
+
+        from starcore.satellite_config import SatelliteConfig
+        import tomllib
+        with open(self.config_path, "rb") as file:
+            reloaded = SatelliteConfig(tomllib.load(file), path=self.config_path)
+
+        self.assertEqual(reloaded.get("sync_port"), 0)
+
+    def test_startup_uses_the_configured_host_and_port(self):
+        self.satellite.config.data["sync_host"] = "127.0.0.1"
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.satellite.start(self.engine)
+
+        running = sync_module().service(self.satellite)
+        self.assertEqual(running.host, "127.0.0.1")
+
+    def test_the_generic_mechanism_marks_photo_as_configurable(self):
+        from starcore.api import payloads
+
+        described = payloads.describe_satellite(self.engine, self.satellite)
+
+        self.assertTrue(described["configurable"])
+        self.assertIn("configuration", self.satellite.routes)
+
+    def test_a_satellite_without_a_configuration_route_is_not_configurable(self):
+        from starcore.api import payloads
+
+        status = self.engine.registry.get("Status")
+        described = payloads.describe_satellite(self.engine, status)
+
+        self.assertFalse(described["configurable"])
+
+    def test_the_configuration_route_handles_get_and_post_generically(self):
+        handler = self.satellite.routes["configuration"]
+
+        get_request = type("Request", (), {
+            "method": "GET", "satellite": self.satellite, "engine": self.engine, "path": (), "body": None,
+        })()
+        response = handler(get_request)
+        self.assertIn("settings", response.payload)
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            post_request = type("Request", (), {
+                "method": "POST", "satellite": self.satellite, "engine": self.engine, "path": (),
+                "body": {"key": "sync_port", "value": 0},
+            })()
+            response = handler(post_request)
+        self.assertIn("note", response.payload)
+
+    def test_core_source_has_no_photo_specific_configuration_logic(self):
+        """A regression guard, not just a design intention: the Core's own
+        engine_config.py, satellite_config.py, toml_edit.py and api/*.py must
+        never come to know about sync_host, sync_port, or "photo" by name -
+        the generic mechanism (docs/satellites.md) is what has to keep working
+        for any future satellite, not a special case for this one."""
+        core_path = Path(sync_module().__file__).resolve().parents[2].parent / "engine" / "starcore"
+        offenders = []
+
+        for path in core_path.rglob("*.py"):
+            text = path.read_text(encoding="utf-8").lower()
+            if "sync_host" in text or "sync_port" in text or "photo" in text:
+                offenders.append(str(path))
+
+        self.assertEqual(offenders, [])
 
 
 if __name__ == "__main__":

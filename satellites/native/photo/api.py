@@ -2,7 +2,7 @@
 
 from starcore.api.response import error_response, file_response, json_response
 
-from . import images, sync
+from . import configuration, images, sync
 from .library import PhotoImportError, library
 
 # photos are addressed by the digest of their content, so a stored file can be
@@ -19,6 +19,9 @@ def routes() -> dict:
         "scan": scan,
         "import": import_directory,
         "sync": sync_status,
+        # naming a route "configuration" is the whole contract with the Core's
+        # generic satellite configuration mechanism - see docs/satellites.md
+        "configuration": configuration_route,
     }
 
 
@@ -27,6 +30,24 @@ def sync_status(request):
         return error_response("only GET is supported here", status=405)
 
     return json_response(sync.describe(request.satellite))
+
+
+def configuration_route(request):
+    if request.method == "GET":
+        return json_response(configuration.describe(request.satellite))
+
+    if request.method != "POST":
+        return error_response("only GET and POST are supported here", status=405)
+
+    body = request.body or {}
+    key, value = body.get("key"), body.get("value")
+    if not isinstance(key, str):
+        return error_response("'key' must be a string", status=400)
+
+    try:
+        return json_response(configuration.update(request.engine, request.satellite, key, value))
+    except configuration.ConfigurationError as error:
+        return error_response(str(error), status=400)
 
 
 def summary(request):

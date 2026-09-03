@@ -1,15 +1,19 @@
+from .. import configuration
 from ..images import thumbnails_available
 from ..library import PhotoImportError, library_for, readable_size
 
 COMMAND = {
     "description": "Inspect and fill the local StarCore photo library.",
-    "usage": "photo [list [count] | import <directory>]",
+    "usage": "photo [list [count] | import <directory> | config [<key> <value>]]",
     "aliases": [],
     "category": "Photo",
     "examples": [
         "photo",
         "photo list 20",
-        "photo import ~/Pictures"
+        "photo import ~/Pictures",
+        "photo config",
+        "photo config sync_host 0.0.0.0",
+        "photo config sync_port 8090",
     ]
 }
 
@@ -28,6 +32,8 @@ def photo(engine, args):
         _list(photos, args[1:])
     elif args[0] == "import":
         _import(photos, args[1:])
+    elif args[0] == "config":
+        _config(engine, args[1:])
     else:
         print(f"[ERROR]: Usage: {COMMAND['usage']}")
 
@@ -79,3 +85,45 @@ def _import(photos, args):
 
     for failure in result["failed"]:
         print(f"- {failure['file']}: {failure['reason']}")
+
+
+def _config(engine, args):
+    satellite = engine.registry.get("Photo")
+    if satellite is None:
+        print("[ERROR]: the Photo satellite is not loaded.")
+        return
+
+    if not args:
+        _show_config(satellite)
+        return
+
+    if len(args) != 2:
+        print(f"[ERROR]: Usage: {COMMAND['usage']}")
+        return
+
+    key, raw_value = args
+    try:
+        result = configuration.update(engine, satellite, key, raw_value)
+    except configuration.ConfigurationError as error:
+        print(f"[ERROR]: {error}")
+        return
+
+    saved = next(setting for setting in result["settings"] if setting["key"] == key)
+    print(f"{key} = {saved['value']}")
+    if result["note"]:
+        print(result["note"])
+
+
+def _show_config(satellite):
+    settings = configuration.describe(satellite)["settings"]
+    if not settings:
+        print("No configurable settings are registered.")
+        return
+
+    print("Photo Sync configuration\n")
+    width = max(len(setting["key"]) for setting in settings)
+    for setting in settings:
+        print(f"{setting['key']:<{width}}  {setting['value']!r:<10}  {setting['description']}")
+
+    print("\nChange a setting:  photo config <key> <value>")
+    print("Changes are saved to config.toml immediately, and Photo Sync restarts on its own to apply them.")

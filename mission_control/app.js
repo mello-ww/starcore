@@ -16,6 +16,7 @@ let navSignature = "";
 let route = { name: "overview", satellite: null };
 let mounted = null;
 let configurationSettings = [];
+let satelliteConfigState = null;
 
 async function getJson(path) {
     const response = await fetch(path, { headers: { Accept: "application/json" } });
@@ -169,6 +170,8 @@ function showRoute() {
             loadConfiguration();
         }
     }
+
+    updateSatelliteConfigButton();
 }
 
 /* ---------- core ---------- */
@@ -292,6 +295,9 @@ function renderSatelliteCard(satellite) {
     head.appendChild(element("h3", null, satellite.name));
     head.appendChild(element("span", "badge badge-type", satellite.type));
     head.appendChild(element("span", `badge ${satellite.enabled ? "badge-up" : "badge-down"}`, satellite.enabled ? "enabled" : "disabled"));
+    if (satellite.configurable) {
+        head.appendChild(buildConfigButton(satellite, "card-config"));
+    }
     card.appendChild(head);
 
     card.appendChild(element("p", "card-meta", `v${satellite.version} · ${satellite.author}`));
@@ -441,6 +447,7 @@ async function refresh() {
         if (route.name === "satellite") {
             renderSatellitePage();
         }
+        updateSatelliteConfigButton();
 
         setLink(true);
         clearBanner();
@@ -592,6 +599,203 @@ async function handleConfigurationSubmit(event) {
     button.disabled = false;
 }
 
+/* ---------- satellite configuration ----------
+ *
+ * Generic for any satellite: whether one has configuration at all comes from
+ * satellite.configurable (the Core's own generic discovery - see payloads.py),
+ * and what its settings are comes entirely from GET/POST
+ * /api/satellites/<name>/configuration, which every satellite answers for
+ * itself. Nothing here knows what any particular satellite's settings mean. */
+
+function gearIcon() {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", "14");
+    svg.setAttribute("height", "14");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.4");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(shape("circle", { cx: 8, cy: 8, r: 1.7 }));
+    svg.appendChild(shape("path", {
+        d: "M8 2.4v1.7M8 11.9v1.7M13.6 8h-1.7M4.1 8H2.4M11.7 4.3l-1.2 1.2M5.5 10.5l-1.2 1.2M11.7 11.7l-1.2-1.2M5.5 5.5 4.3 4.3",
+    }));
+    return svg;
+}
+
+function buildConfigButton(satellite, extraClass) {
+    const button = element("button", extraClass ? `icon-button ${extraClass}` : "icon-button");
+    button.type = "button";
+    button.title = `${satellite.name} configuration`;
+    button.appendChild(gearIcon());
+    button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openSatelliteConfig(satellite);
+    });
+    return button;
+}
+
+// shown in the topbar whenever the current route is a configurable satellite's
+// page, in addition to the same button already on its card in the list
+function updateSatelliteConfigButton() {
+    const button = document.getElementById("satellite-config-button");
+    const satellite = route.name === "satellite" ? findSatellite(route.satellite) : null;
+
+    if (!satellite || !satellite.configurable) {
+        button.hidden = true;
+        button.onclick = null;
+        return;
+    }
+
+    button.hidden = false;
+    button.onclick = () => openSatelliteConfig(satellite);
+}
+
+function openSatelliteConfig(satellite) {
+    satelliteConfigState = { satellite, settings: [] };
+
+    setText("satellite-config-title", `${satellite.name} configuration`);
+    document.getElementById("satellite-config-error").hidden = true;
+    document.getElementById("satellite-config-note").hidden = true;
+    document.getElementById("satellite-config-overlay").hidden = false;
+
+    loadSatelliteConfig(satellite);
+}
+
+function closeSatelliteConfig() {
+    document.getElementById("satellite-config-overlay").hidden = true;
+    satelliteConfigState = null;
+}
+
+async function loadSatelliteConfig(satellite) {
+    const fields = document.getElementById("satellite-config-fields");
+    fields.replaceChildren(element("p", "muted", "Loading…"));
+
+    try {
+        renderSatelliteConfig(await getJson(satelliteUrl(satellite.name, "/configuration")));
+    } catch (error) {
+        fields.replaceChildren();
+        showSatelliteConfigError(`Configuration could not be loaded: ${error.message}`);
+    }
+}
+
+function renderSatelliteConfig(payload) {
+    // the modal can be closed (or reopened on a different satellite) while a
+    // request from the one before it is still in flight
+    if (!satelliteConfigState) {
+        return;
+    }
+
+    satelliteConfigState.settings = payload.settings || [];
+
+    const fields = document.getElementById("satellite-config-fields");
+    fields.replaceChildren();
+    for (const setting of satelliteConfigState.settings) {
+        fields.appendChild(buildConfigField(setting));
+    }
+
+    const note = document.getElementById("satellite-config-note");
+    if (payload.note) {
+        note.textContent = payload.note;
+        note.hidden = false;
+    } else if (payload.restart_required) {
+        note.textContent = "Saved. A restart may be required for this to take effect.";
+        note.hidden = false;
+    } else {
+        note.hidden = true;
+    }
+}
+
+function showSatelliteConfigError(message) {
+    const errorBox = document.getElementById("satellite-config-error");
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+}
+
+// one field per setting, its input type inferred from the current value - a
+// satellite's settings can be anything, so the form has to be built from
+// whatever shape the response actually has rather than a fixed template
+function buildConfigField(setting) {
+    const id = `satellite-config-${setting.key}`;
+
+    if (typeof setting.value === "boolean") {
+        const wrapper = element("label", "config-checkbox");
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.id = id;
+        input.dataset.key = setting.key;
+        input.checked = setting.value;
+        wrapper.append(input, element("span", null, label(setting.key)));
+        if (setting.description) {
+            wrapper.appendChild(element("p", "hint", setting.description));
+        }
+        return wrapper;
+    }
+
+    const wrapper = element("div", "config-field");
+    const fieldLabel = element("label", null, label(setting.key));
+    fieldLabel.htmlFor = id;
+
+    const input = document.createElement("input");
+    input.id = id;
+    input.dataset.key = setting.key;
+    input.autocomplete = "off";
+    input.spellcheck = false;
+
+    if (typeof setting.value === "number") {
+        input.type = "number";
+        input.value = String(setting.value);
+    } else {
+        input.type = "text";
+        input.value = setting.value ?? "";
+    }
+
+    wrapper.append(fieldLabel, input);
+    if (setting.description) {
+        wrapper.appendChild(element("p", "hint", setting.description));
+    }
+    return wrapper;
+}
+
+function fieldValue(setting) {
+    const input = document.getElementById(`satellite-config-${setting.key}`);
+    return input.type === "checkbox" ? input.checked : input.value;
+}
+
+async function handleSatelliteConfigSubmit(event) {
+    event.preventDefault();
+    if (!satelliteConfigState) {
+        return;
+    }
+
+    const { satellite, settings } = satelliteConfigState;
+    document.getElementById("satellite-config-error").hidden = true;
+
+    // only changed fields are sent - the satellite (like the Core's own
+    // configuration) saves one setting at a time, so an untouched field is
+    // never re-validated or re-written
+    const changed = settings.filter((setting) => String(fieldValue(setting)) !== String(setting.value))
+        .map((setting) => [setting.key, fieldValue(setting)]);
+    if (changed.length === 0) {
+        return;
+    }
+
+    const button = document.getElementById("satellite-config-save");
+    button.disabled = true;
+
+    for (const [key, value] of changed) {
+        try {
+            renderSatelliteConfig(await postJson(satelliteUrl(satellite.name, "/configuration"), { key, value }));
+        } catch (error) {
+            showSatelliteConfigError(error.message);
+            break;
+        }
+    }
+
+    button.disabled = false;
+}
+
 /* ---------- shutdown ---------- */
 
 function setStopButtonConfirming(confirming) {
@@ -661,6 +865,18 @@ document.getElementById("console-form").addEventListener("submit", (event) => {
 
 document.getElementById("console-clear").addEventListener("click", resetConsole);
 document.getElementById("configuration-form").addEventListener("submit", handleConfigurationSubmit);
+document.getElementById("satellite-config-form").addEventListener("submit", handleSatelliteConfigSubmit);
+document.getElementById("satellite-config-close").addEventListener("click", closeSatelliteConfig);
+document.getElementById("satellite-config-overlay").addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) {
+        closeSatelliteConfig();
+    }
+});
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !document.getElementById("satellite-config-overlay").hidden) {
+        closeSatelliteConfig();
+    }
+});
 document.getElementById("stop-button").addEventListener("click", handleStopClick);
 window.addEventListener("hashchange", applyRoute);
 
