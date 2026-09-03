@@ -1,6 +1,8 @@
 from contextlib import redirect_stdout
 import io
 
+from .. import engine_config
+
 
 def describe_satellite(engine, satellite) -> dict:
     return {
@@ -38,6 +40,39 @@ def describe_commands(engine, source=None) -> list:
         })
 
     return commands
+
+
+def describe_configuration(engine) -> dict:
+    settings = [{**setting, **_live_state(engine, setting)} for setting in engine_config.describe(engine.config)]
+
+    return {
+        "settings": settings,
+        "restart_required": any(setting["pending_restart"] for setting in settings),
+    }
+
+
+def _live_state(engine, setting: dict) -> dict:
+    """Whether what's actually running still matches the saved value.
+
+    The Core reads [server] once at startup, so a value saved after that keeps
+    running under the old one until StarCore restarts - this is what lets the
+    API (and the CLI and Mission Control) say so truthfully instead of just
+    assuming a save took effect.
+    """
+    live = None
+    if setting["section"] == "server":
+        live = {
+            "host": engine.api.host,
+            "port": engine.api.port,
+            "enabled": engine.mission_control_enabled,
+        }.get(setting["key"])
+
+    # port 0 means "let the OS choose one" - the live port then never equals the
+    # configured value by design, which isn't a change waiting on a restart
+    if setting["key"] == "port" and setting["value"] == 0:
+        return {"live_value": live, "pending_restart": False}
+
+    return {"live_value": live, "pending_restart": live is not None and live != setting["value"]}
 
 
 def execute(engine, command: str) -> dict:

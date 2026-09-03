@@ -159,7 +159,15 @@ host = "127.0.0.1"
 port = 8080
 ```
 
-`host = "0.0.0.0"` exposes Mission Control beyond localhost, on either platform. The same is true for the Photo Satellite's phone-sync listener, configured separately in `satellites/native/photo/config.toml` (`sync_host`, `sync_port`).
+`host = "0.0.0.0"` exposes Mission Control beyond localhost, on either platform. The same is true for the Photo Satellite's phone-sync listener, configured separately in `satellites/native/photo/config.toml` (`sync_host`, `sync_port`) - it already followed this same one-`config.toml`-per-component pattern before this milestone, so it wasn't changed.
+
+`[server]` doesn't have to be edited by hand. All three of the following read and write the exact same `config.toml`, through the same validation, and none of them ever claims a change is live - `[server]` is only read once at startup, so any of these always says a restart is required:
+
+- the terminal CLI's `config` command (`config` to inspect, `config server.host 0.0.0.0` to change a setting)
+- `GET`/`POST /api/configuration`
+- Mission Control's Configuration page
+
+See "Private LAN access" below for the specific case of `server.host`, and `docs/api.md` / `docs/mission_control.md` for the API and the Configuration page respectively.
 
 ## Persistent data
 
@@ -170,3 +178,63 @@ A Satellite's `storage` key in its `config.toml` accepts an absolute path instea
 ## Mission Control address
 
 `http://<host>:<port>` from the `[server]` section above - `http://127.0.0.1:8080` by default, on both platforms.
+
+## Private LAN access
+
+By default `host = "127.0.0.1"` means Mission Control only accepts connections from the same machine it runs on - nothing else on the network can reach it, even if the machine is on the same LAN.
+
+To reach Mission Control from another device on your private network (a phone, another computer), change `server.host` to `0.0.0.0`, which listens on every network interface instead of just loopback. On a Linux server this is the change referred to at the top of this milestone:
+
+```toml
+[server]
+host = "0.0.0.0"
+port = 8090
+```
+
+Any of these three ways make the same change:
+
+```
+# terminal CLI, from the engine directory
+config server.host 0.0.0.0
+config server.port 8090
+```
+
+```
+# API
+curl -X POST http://127.0.0.1:8090/api/configuration -H 'Content-Type: application/json' \
+     -d '{"section": "server", "key": "host", "value": "0.0.0.0"}'
+```
+
+or the Configuration page in Mission Control, described in `docs/mission_control.md`.
+
+Whichever way you use, the change is saved to `config.toml` immediately but does **not** apply to the process that's already running - `[server]` is only read at startup. **Restart StarCore** (`systemctl restart starcore` on Linux, or stop and re-run `python -m starcore` on Windows) for the new bind address to take effect. After restarting, reach Mission Control from another device using the server's LAN IP and the configured port, e.g. `http://192.168.1.20:8090`.
+
+### Reverting to localhost-only
+
+Set `server.host` back to `127.0.0.1` the same way (CLI, API, or the Configuration page) and restart StarCore. Mission Control then stops accepting connections from other devices again.
+
+### Firewall considerations
+
+Binding to `0.0.0.0` only changes which interfaces StarCore listens on - it doesn't open a path through the OS firewall by itself. Depending on the server's default firewall policy, an inbound rule may also be needed for the configured port:
+
+**Linux**, `ufw`:
+```
+sudo ufw allow 8090/tcp
+```
+**Linux**, `firewalld`:
+```
+sudo firewall-cmd --add-port=8090/tcp --permanent
+sudo firewall-cmd --reload
+```
+**Windows** (PowerShell, elevated):
+```powershell
+New-NetFirewallRule -DisplayName "StarCore Mission Control" -Direction Inbound -Protocol TCP -LocalPort 8090 -Action Allow
+```
+
+Scope any of the above to the private/LAN network profile rather than "any network" where the tool allows it, since the goal is reachability from trusted devices on the same private network, not from anywhere.
+
+### What this does not do
+
+- It does not add authentication. Mission Control has none yet (a planned future milestone) - anyone who can reach the configured host and port on the network has the same access as someone sitting at the machine, including the "Stop StarCore" button. Only bind to `0.0.0.0` on networks you trust.
+- It does not expose StarCore to the public internet. `0.0.0.0` only reaches devices that can already route to the server's private LAN address; it says nothing about port-forwarding, a reverse proxy, or any other path in from outside the LAN, and none of that is set up or recommended here.
+- It does not touch Pterodactyl/Wings or its own configuration. StarCore's `[server]` section and port are independent of anything Pterodactyl manages.

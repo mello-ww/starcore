@@ -5,6 +5,7 @@ const CORE_PAGES = {
     overview: "Overview",
     satellites: "Satellites",
     console: "Console",
+    configuration: "Configuration",
 };
 
 let pollTimer = null;
@@ -14,6 +15,7 @@ let satellites = [];
 let navSignature = "";
 let route = { name: "overview", satellite: null };
 let mounted = null;
+let configurationSettings = [];
 
 async function getJson(path) {
     const response = await fetch(path, { headers: { Accept: "application/json" } });
@@ -163,6 +165,9 @@ function showRoute() {
         unmountSatellitePage();
         setText("page-eyebrow", "Core");
         setText("page-title", CORE_PAGES[route.name]);
+        if (route.name === "configuration") {
+            loadConfiguration();
+        }
     }
 }
 
@@ -520,6 +525,73 @@ async function runConsoleCommand(command) {
     }
 }
 
+/* ---------- configuration ---------- */
+
+function settingValue(path) {
+    const setting = configurationSettings.find((item) => item.path === path);
+    return setting ? setting.value : "";
+}
+
+function renderConfiguration(payload) {
+    configurationSettings = payload.settings;
+
+    document.getElementById("config-host").value = settingValue("server.host");
+    document.getElementById("config-port").value = settingValue("server.port");
+    document.getElementById("config-enabled").checked = Boolean(settingValue("server.enabled"));
+
+    document.getElementById("configuration-restart").hidden = !payload.restart_required;
+}
+
+async function loadConfiguration() {
+    const errorBox = document.getElementById("configuration-error");
+    errorBox.hidden = true;
+
+    try {
+        renderConfiguration(await getJson("/api/configuration"));
+    } catch (error) {
+        errorBox.textContent = `Configuration could not be loaded: ${error.message}`;
+        errorBox.hidden = false;
+    }
+}
+
+async function handleConfigurationSubmit(event) {
+    event.preventDefault();
+
+    const errorBox = document.getElementById("configuration-error");
+    errorBox.hidden = true;
+
+    const fields = [
+        ["server.host", document.getElementById("config-host").value.trim()],
+        ["server.port", document.getElementById("config-port").value],
+        ["server.enabled", document.getElementById("config-enabled").checked],
+    ];
+    // only changed fields are sent - the API (like the CLI) saves one setting at
+    // a time, so an untouched field is never re-validated or re-written
+    const changed = fields.filter(([path, value]) => String(value) !== String(settingValue(path)));
+    if (changed.length === 0) {
+        return;
+    }
+
+    const button = document.getElementById("configuration-save");
+    button.disabled = true;
+
+    for (const [path, value] of changed) {
+        const [section, key] = path.split(".");
+        try {
+            // rendered as each field saves, so a field that succeeded before one
+            // that failed is reflected correctly rather than left showing stale
+            // pre-save state
+            renderConfiguration(await postJson("/api/configuration", { section, key, value }));
+        } catch (error) {
+            errorBox.textContent = error.message;
+            errorBox.hidden = false;
+            break;
+        }
+    }
+
+    button.disabled = false;
+}
+
 /* ---------- shutdown ---------- */
 
 function setStopButtonConfirming(confirming) {
@@ -588,6 +660,7 @@ document.getElementById("console-form").addEventListener("submit", (event) => {
 });
 
 document.getElementById("console-clear").addEventListener("click", resetConsole);
+document.getElementById("configuration-form").addEventListener("submit", handleConfigurationSubmit);
 document.getElementById("stop-button").addEventListener("click", handleStopClick);
 window.addEventListener("hashchange", applyRoute);
 

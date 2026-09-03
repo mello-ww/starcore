@@ -781,6 +781,51 @@ button.chip:hover {
     color: var(--text-faint);
 }
 
+/* ---------- configuration ---------- */
+
+.config-field {
+    margin-bottom: 0.9rem;
+}
+
+.config-field label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+}
+
+.config-field input {
+    width: 100%;
+    max-width: 320px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--line-bright);
+    border-radius: 6px;
+    background: var(--raised);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.85rem;
+}
+
+.config-field input:focus {
+    outline: none;
+    border-color: var(--sapphire);
+}
+
+.config-field .hint {
+    margin: 0.35rem 0 0;
+    color: var(--text-faint);
+    font-size: 0.78rem;
+}
+
+.config-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    cursor: pointer;
+}
+
 .console-output {
     min-height: 300px;
     max-height: 52vh;

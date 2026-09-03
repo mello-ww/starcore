@@ -14,14 +14,16 @@ The API consists of REST endpoints and a WebSocket interface.
 
 ## Implemented endpoints
 
-The Engine currently serves an HTTP API. It is started with the Core and configured through the `[server]` section of `engine/config.toml`. Everything is read-only except the two control endpoints below.
+The Engine currently serves an HTTP API. It is started with the Core and configured through the `[server]` section of `engine/config.toml`. Everything is read-only except the three control endpoints below.
 
 ```
 GET  /api/status                  current Core status
 GET  /api/satellites              every loaded Satellite
 GET  /api/satellites/<name>       a single Satellite, matched case-insensitively
 GET  /api/commands                every registered CLI command and its metadata
+GET  /api/configuration           the configurable settings and their current value
 POST /api/commands/execute        run a registered command
+POST /api/configuration           change one configuration setting
 POST /api/shutdown                gracefully stop the Core
 ```
 
@@ -49,6 +51,21 @@ Responses are JSON. A Satellite entry contains its manifest information, its typ
 An unknown command is not treated as a server error: it comes back as a normal `200` with the registry's own "not found" message in `output`. Only an exception escaping the command itself produces `error` and a `500`.
 
 `POST /api/shutdown` requests a graceful shutdown of the Core - the same shutdown the terminal CLI's `exit` triggers - and stops Mission Control as part of it. It responds immediately with `{"message": "..."}`; the Core stops shortly after.
+
+`GET /api/configuration` lists the settings that can be changed through the API, the CLI's `config` command and Mission Control's Configuration page - currently just `[server]`. Each entry carries its saved value from `config.toml` and whether it differs from what's actually running, since `[server]` is only read once, at startup:
+
+```json
+{
+  "settings": [
+    { "section": "server", "key": "host", "path": "server.host", "value": "127.0.0.1",
+      "description": "Mission Control bind address", "restart_required": true,
+      "live_value": "127.0.0.1", "pending_restart": false }
+  ],
+  "restart_required": false
+}
+```
+
+`POST /api/configuration` takes `{"section": "...", "key": "...", "value": ...}`, validates and saves one setting through `Configuration.set()`, and responds with the same shape as the `GET`. An unknown `section.key` or a value that fails validation (an empty host, a non-numeric or out-of-range port, ...) is rejected with a `400` and nothing is written.
 
 ## Satellite endpoints
 

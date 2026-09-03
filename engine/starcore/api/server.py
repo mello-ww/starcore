@@ -6,6 +6,7 @@ import json
 
 from . import payloads
 from .response import Request, Response
+from ..engine_config import ConfigurationError
 
 SATELLITE_PREFIX = "/api/satellites/"
 WRITE_ENDPOINTS = ("/api/commands/execute", "/api/shutdown")
@@ -93,6 +94,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._handle_execute()
             elif path == "/api/shutdown":
                 self._handle_shutdown()
+            elif path == "/api/configuration":
+                self._handle_configuration_update()
             elif path.startswith(SATELLITE_PREFIX):
                 self._handle_satellite(path, "POST")
             else:
@@ -125,6 +128,8 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._handle_satellite(path, "GET")
         elif path == "/api/commands":
             self._send_json({"commands": payloads.describe_commands(engine)})
+        elif path == "/api/configuration":
+            self._send_json(payloads.describe_configuration(engine))
         else:
             self._send_json({"error": f"unknown endpoint '{path}'"}, status=404)
 
@@ -214,6 +219,28 @@ class RequestHandler(BaseHTTPRequestHandler):
         # "[ERROR]: ...") is still a normal 200 - only an exception that
         # escaped the command function itself counts as a server error
         self._send_json(result, status=500 if result["error"] else 200)
+
+    def _handle_configuration_update(self):
+        body = self._read_json_body()
+        if body is None:
+            return  # a clean error response was already sent
+
+        if not isinstance(body, dict):
+            self._send_json({"error": "request body must be a JSON object"}, status=400)
+            return
+
+        section, key, value = body.get("section"), body.get("key"), body.get("value")
+        if not isinstance(section, str) or not isinstance(key, str):
+            self._send_json({"error": "'section' and 'key' must be strings"}, status=400)
+            return
+
+        try:
+            self.server.engine.config.set(section, key, value)
+        except ConfigurationError as error:
+            self._send_json({"error": str(error)}, status=400)
+            return
+
+        self._send_json(payloads.describe_configuration(self.server.engine))
 
     def _handle_shutdown(self):
         engine = self.server.engine

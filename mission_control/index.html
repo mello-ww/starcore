@@ -52,6 +52,15 @@
                 <span>Console</span>
             </button>
         </li>
+        <li>
+            <button class="nav-item" type="button" data-route="configuration" title="Configuration">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="8" cy="8" r="1.7"/>
+                    <path d="M8 2.4v1.7M8 11.9v1.7M13.6 8h-1.7M4.1 8H2.4M11.7 4.3l-1.2 1.2M5.5 10.5l-1.2 1.2M11.7 11.7l-1.2-1.2M5.5 5.5 4.3 4.3"/>
+                </svg>
+                <span>Configuration</span>
+            </button>
+        </li>
     </ul>
     </nav>
 
@@ -197,6 +206,42 @@
         </form>
 
         <div id="console-output" class="console-output"></div>
+    </section>
+
+    <section id="view-configuration" class="view" hidden>
+        <div class="page-head">
+            <h2>Configuration</h2>
+            <p>Server settings from <code>engine/config.toml</code>. Changes are saved immediately but need a restart to take effect.</p>
+        </div>
+
+        <p id="configuration-error" class="banner error" hidden></p>
+        <p id="configuration-restart" class="banner notice" hidden>Saved. Restart StarCore for this to take effect.</p>
+
+        <form id="configuration-form" class="stack">
+            <section class="panel">
+                <p class="eyebrow">Mission Control</p>
+
+                <div class="config-field">
+                    <label for="config-host">Host / bind address</label>
+                    <input id="config-host" type="text" autocomplete="off" spellcheck="false" placeholder="127.0.0.1">
+                    <p class="hint">127.0.0.1 allows only this machine. 0.0.0.0 allows other devices on the local network.</p>
+                </div>
+
+                <div class="config-field">
+                    <label for="config-port">Port</label>
+                    <input id="config-port" type="number" min="0" max="65535" placeholder="8080">
+                </div>
+
+                <label class="config-checkbox">
+                    <input id="config-enabled" type="checkbox">
+                    <span>Mission Control enabled</span>
+                </label>
+            </section>
+
+            <div>
+                <button id="configuration-save" class="button button-primary" type="submit">Save</button>
+            </div>
+        </form>
     </section>
 
     <section id="view-satellite" class="view" hidden>
