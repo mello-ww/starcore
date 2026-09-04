@@ -254,12 +254,16 @@ function renderCore(status) {
     setText("updated", new Date().toLocaleTimeString());
 }
 
-// native satellites hold the inner orbit, link satellites the outer one
+// native satellites hold the inner orbit, link satellites the outer one - each
+// ring is its own <g> (see index.html) so the two can spin independently
+// (different speeds, opposite directions - see .orbit-spin-native/-link)
 function renderOrbit() {
-    const bodies = document.getElementById("orbit-bodies");
-    bodies.replaceChildren();
-
-    for (const [type, radius, phase] of [["native", 58, -1.4], ["link", 88, 0.7]]) {
+    for (const [type, radius, phase, groupId] of [
+        ["native", 58, -1.4, "orbit-bodies-native"],
+        ["link", 88, 0.7, "orbit-bodies-link"],
+    ]) {
+        const bodies = document.getElementById(groupId);
+        bodies.replaceChildren();
         const members = satellites.filter((satellite) => satellite.type === type);
 
         members.forEach((satellite, index) => {
