@@ -20,10 +20,16 @@ StarCore aims to provide:
 
 Install only what you need.
 
+StarCore's own single-administrator authentication protects every API endpoint (Mission
+Control, satellite management, shutdown/restart, and satellite APIs alike) once an
+administrator account is created - see "Authentication" in `docs/api.md` and
+`docs/deployment.md`. Mission Control can also serve over HTTPS using a certificate you
+provide - see "HTTPS" in the same two documents.
+
 ## Core concepts
 
 - **Engine** — The core runtime that powers StarCore.
-- **Native Satellites** — Native feature modules.
+- **Native Satellites** — Native feature modules, including Status, FileExplorer, Photo and Music.
 - **Link Satellites** — Integrations with external services.
 - **Mission Control** — Official web interface.
 - **Signals** — Internal event system.

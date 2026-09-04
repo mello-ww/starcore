@@ -211,6 +211,10 @@ h3 {
     color: var(--ok);
 }
 
+.nav-item .dot.error {
+    color: var(--alert);
+}
+
 /* asteroid belt dividing the Core from its satellites */
 .belt {
     display: block;
@@ -328,8 +332,24 @@ h3 {
     color: var(--azure);
 }
 
-.card-config {
-    margin-left: auto;
+/* an author rule with the same specificity as the [hidden] attribute's own
+   UA default otherwise wins by source order and would keep showing the
+   button - this affected the existing config button too, just less visibly
+   with only one icon-button in the topbar */
+.icon-button[hidden] {
+    display: none;
+}
+
+.icon-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+    background: none;
+    color: var(--text-dim);
+}
+
+.icon-button-alert:hover {
+    background: rgba(228, 96, 109, 0.12);
+    color: var(--alert);
 }
 
 /* ---------- modal ---------- */
@@ -627,6 +647,26 @@ h3 {
     stroke-width: 1.2;
 }
 
+.orbit-body.status-error {
+    fill: var(--alert);
+    stroke: none;
+    animation: orbit-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes orbit-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+
+.orbit-body {
+    cursor: default;
+}
+
+.orbit-body:focus-visible {
+    outline: 2px solid var(--ice);
+    outline-offset: 2px;
+}
+
 .orbit-legend {
     display: flex;
     justify-content: center;
@@ -653,7 +693,18 @@ h3 {
     background: var(--text-faint);
 }
 
-/* ---------- satellite cards ---------- */
+/* ---------- satellite groups & cards ---------- */
+
+.satellite-group + .satellite-group {
+    margin-top: 1.75rem;
+}
+
+.satellite-group-head {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 0.85rem;
+}
 
 .cards {
     display: grid;
@@ -678,12 +729,58 @@ h3 {
 
 .card-head {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
 }
 
 .card-head h3 {
     font-size: 0.98rem;
+}
+
+/* the satellite's own icon (or the generic fallback) - a small fixed square so
+   cards, the topbar and the sidebar nav can all show it at a consistent size
+   without it ever dominating the layout */
+.satellite-icon {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: var(--raised);
+    border: 1px solid var(--line);
+    color: var(--azure);
+}
+
+.satellite-icon img,
+.satellite-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.satellite-icon.small {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+}
+
+.satellite-icon.small img,
+.satellite-icon.small svg {
+    width: 11px;
+    height: 11px;
+}
+
+/* reload + enable/disable (and the config gear, when present) - always
+   right-aligned, and never the reason the head has to wrap onto a second
+   line before the name and badges do */
+.card-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.15rem;
+    margin-left: auto;
 }
 
 .card-meta {
@@ -768,6 +865,19 @@ button.chip:hover {
     color: var(--text-dim);
 }
 
+/* a satellite that's enabled but has no running background service right now
+   (or whose service is only stopped because satellite services are globally
+   off) - distinct from "disabled" (turned off on purpose) and "error" */
+.badge-stopped {
+    background: rgba(110, 123, 153, 0.14);
+    color: var(--text-dim);
+}
+
+.badge-error {
+    background: rgba(228, 96, 109, 0.22);
+    color: var(--alert);
+}
+
 .badge-type {
     border: 1px solid var(--line-bright);
     color: var(--text-faint);
@@ -821,6 +931,16 @@ button.chip:hover {
     font-weight: 600;
 }
 
+/* generic confirm state for any other button that asks for a second click
+   (Restart StarCore, in particular) - the same idea as .button-stop.confirm,
+   just not in alert red since restarting isn't as destructive as stopping */
+.button.confirm {
+    border-color: var(--sapphire);
+    background: var(--sapphire);
+    color: #fff;
+    font-weight: 600;
+}
+
 .button:disabled {
     opacity: 0.55;
     cursor: default;
@@ -870,6 +990,79 @@ button.chip:hover {
 }
 
 /* ---------- configuration ---------- */
+
+/* ---------- authentication ---------- */
+
+.auth-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    background:
+        var(--starfield),
+        radial-gradient(circle at 50% 20%, rgba(15, 82, 186, 0.18), transparent 60%),
+        var(--deep);
+}
+
+/* [hidden] and a same-specificity "display: flex" rule tie on specificity, so
+   the later one in source order wins - without this override the overlay
+   would stay visible (and still intercept clicks) even after JS sets
+   .hidden = true. Same bug class already fixed once for .icon-button. */
+.auth-overlay[hidden] {
+    display: none;
+}
+
+.auth-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    width: 100%;
+    max-width: 340px;
+    padding: 1.75rem 1.6rem;
+    border: 1px solid var(--line-bright);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.auth-card h2 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.auth-card .muted {
+    margin: -0.5rem 0 0;
+    font-size: 0.82rem;
+}
+
+.auth-card .button {
+    margin-top: 0.2rem;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+}
+
+.field input {
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--line-bright);
+    border-radius: 6px;
+    background: var(--raised);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.85rem;
+}
+
+.field input:focus {
+    outline: none;
+    border-color: var(--sapphire);
+}
 
 .config-field {
     margin-bottom: 0.9rem;
@@ -1008,6 +1201,39 @@ button.chip:hover {
 @media (max-width: 820px) {
     .split {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* the topbar's left side can now carry a title plus up to three icon
+       buttons (satellite reload/enable-disable/configuration) - past a point
+       that no longer fits next to the state badge and Stop button on one
+       line, so the right side drops to its own row instead of being pushed
+       off screen */
+    .topbar {
+        flex-wrap: wrap;
+        row-gap: 0.6rem;
+    }
+
+    /* the state badge, timestamp and now two lifecycle buttons (Restart,
+       Stop) no longer fit on one line even once they've dropped to their own
+       row below the title - wrap those too rather than letting them push the
+       page wider than the viewport */
+    .topbar-right {
+        flex-wrap: wrap;
+        row-gap: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    /* the exact capture time isn't worth the width it costs once the two
+       lifecycle buttons are also fighting for room on a phone-sized topbar */
+    #updated {
+        display: none;
+    }
+
+    #restart-button,
+    #stop-button {
+        padding: 0.35rem 0.6rem;
+        font-size: 0.78rem;
     }
 }
 

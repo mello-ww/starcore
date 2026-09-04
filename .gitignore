@@ -15,4 +15,12 @@ env/
 Thumbs.db
 
 # Satellite storage
-satellites/*/*/data/
+satellites/*/*/data/
+
+# Credentials, sessions and TLS material - never committed
+engine/data/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx

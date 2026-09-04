@@ -3,3 +3,4 @@ version = "1.0.0"
 author = "mellow"
 # this part is optional
 description = "Docker container support satellite."
+icon = "icon.svg"

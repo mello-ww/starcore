@@ -79,6 +79,58 @@ Setting `services = false` under `[satellites]` in `engine/config.toml` starts t
 without any Satellite service, which is what the test suite does so a run never binds a port
 or writes into a Satellite's real storage.
 
+## Status and icon
+
+`describe_satellite()` (`starcore/api/payloads.py`) reports a generic `status` for every
+Satellite - `"running"`, `"stopped"`, `"disabled"` or `"error"` - computed entirely from
+things the Core already knows: whether the Satellite is enabled, whether it declares a
+background service at all (`Satellite.has_service`, `True` whenever `satellite.py` defines
+`start` or `stop`), whether `[satellites].services` is on, and the outcome of its last
+`start`/`stop` hook (`Satellite.running` / `Satellite.last_error`, updated by `_run()` on
+every hook call). None of this is per-Satellite branching - a Satellite with no `satellite.py`
+at all is simply `"running"` whenever it's enabled, since there's nothing that could be
+stopped out from under it.
+
+A Satellite can also declare an icon in its `satellite.toml`:
+
+```toml
+icon = "icon.svg"
+```
+
+naming a file under its own `mission_control/` directory. It's validated at load time - a
+declared file that doesn't exist is dropped with a warning rather than failing the whole
+Satellite - and served through the same `GET /api/satellites/<name>/assets/<icon>` route as
+any other Mission Control asset (see "Contributing a Mission Control page" below), so nothing
+new is needed to serve it. `describe_satellite()` reports it as `icon`, or `null` if the
+Satellite didn't declare one; Mission Control falls back to a generic icon in that case. The
+Core holds no name-to-icon mapping of its own - a Satellite that wants a recognizable mark in
+the sidebar and on its card provides its own image, the same way it provides its own page.
+
+## Enabling, disabling and reloading
+
+Every Satellite - native or link, with or without a background service - can be enabled,
+disabled and reloaded from Mission Control's Satellites page, or directly through
+`POST /api/satellites/<name>/enable|disable|reload` (see `docs/api.md`). This is generic: it
+is implemented once, entirely in the Core (`StarCore.set_satellite_enabled()` and
+`.reload_satellite()`), and works the same way for every Satellite without any of them having
+to do anything beyond the `start`/`stop` hooks described above.
+
+Disabling calls `stop`, then persists `enabled = false` to the Satellite's `config.toml` -
+but only once `stop` actually succeeds, so a Satellite whose service fails to stop is not
+falsely reported as disabled. Enabling does the same in reverse with `start`. Reloading calls
+`stop` (if the Satellite is currently enabled), rebuilds the Satellite from disk exactly the
+way discovery does - a fresh read of its manifest and config, and a fresh import of its
+`state.py`, `api.py` and `satellite.py` - and, if it's still enabled, calls `start` again. A
+Satellite whose manifest can no longer be read, or that fails to stop before a reload, is
+left registered and running exactly as it was rather than replaced or left half-restarted.
+
+None of this reaches into what a Satellite's `start`/`stop` actually do, or restarts the Core
+or any other Satellite - reloading Photo does not touch Music, and does not require Mission
+Control itself to restart. A Satellite's routes, commands and Mission Control page are all
+rebuilt as part of a reload; only its already-imported submodules (anything a `state.py` or
+`api.py` reaches with `from .library import ...`) keep the code they had at the last
+successful (re)load, the same way any other Python import caching works.
+
 ## Contributing a Mission Control page
 
 A Satellite that ships `mission_control/page.js` gets its own page in Mission Control,
@@ -163,7 +215,7 @@ Native Satellites provide functionality directly within StarCore.
 Examples include:
 
 - Status
-- Files
+- FileExplorer
 - Photos
 - Music
 
@@ -179,3 +231,19 @@ Examples include:
 - MQTT
 
 Both categories share the same lifecycle and extension model. The only difference is their purpose.
+
+## Worked examples
+
+- **Photo** (`satellites/native/photo/`, `docs/photo.md`) - state, routes, a Mission Control
+  page, a background service (its phone-sync listener) and Satellite configuration, all
+  together.
+- **FileExplorer** (`satellites/native/file_explorer/`) - a Satellite with routes and a
+  Mission Control page but no background service (`has_service` is `False`, so its status is
+  always `"running"` while enabled), and the first to use `file_response(...,
+  download_name=...)` and a raw (non-JSON) request body - see "Satellite endpoints" in
+  `docs/api.md`. It also shows the security discipline expected of any Satellite that serves
+  files under a configured root: every path it's given is resolved and re-checked against
+  that root (`satellites/native/file_explorer/paths.py`) before it's read, written or
+  deleted, so a request can never escape the root through `..`, an absolute path, or a
+  symlink - the Core does not do this for a Satellite, so a Satellite that serves files from
+  disk (as noted in "Serving data and files" above) is responsible for its own containment.

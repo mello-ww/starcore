@@ -17,6 +17,11 @@ let route = { name: "overview", satellite: null };
 let mounted = null;
 let configurationSettings = [];
 let satelliteConfigState = null;
+// "<name>:enable" | "<name>:disable" | "<name>:reload" while a lifecycle
+// request is in flight, so a card or topbar button re-rendered mid-request
+// (the 5s poll doesn't wait for one to finish) still shows as busy instead of
+// silently becoming clickable again
+let pendingSatelliteActions = new Set();
 
 async function getJson(path) {
     const response = await fetch(path, { headers: { Accept: "application/json" } });
@@ -124,6 +129,54 @@ function satelliteUrl(name, path = "") {
     return `/api/satellites/${encodeURIComponent(name)}${path}`;
 }
 
+// "running" / "stopped" / "disabled" / "error" -> a compact badge, entirely
+// generic (see docs/satellites.md - Core never branches on a satellite's name)
+const STATUS_BADGES = {
+    running: ["badge-up", "running"],
+    stopped: ["badge-stopped", "stopped"],
+    disabled: ["badge-down", "disabled"],
+    error: ["badge-error", "error"],
+};
+
+function buildStatusBadge(satellite) {
+    const [cls, label] = STATUS_BADGES[satellite.status] || ["badge-unknown", satellite.status || "unknown"];
+    return element("span", `badge ${cls}`, label);
+}
+
+// a generic orbiting-dot glyph, used whenever a satellite doesn't ship (or
+// declare) its own icon - never a per-satellite fallback, just one shared mark
+function buildGenericIcon() {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.appendChild(shape("ellipse", {
+        cx: "12", cy: "12", rx: "9", ry: "5",
+        stroke: "currentColor", "stroke-width": "1.6",
+    }));
+    svg.appendChild(shape("circle", { cx: "12", cy: "12", r: "2.4", fill: "currentColor" }));
+    return svg;
+}
+
+// small square carrying a satellite's own icon (served through the same
+// generic assets route as its Mission Control page), or the generic fallback
+// when it has none / its declared icon couldn't be loaded
+function buildSatelliteIcon(satellite, extraClass = "") {
+    const wrapper = element("span", `satellite-icon${extraClass ? ` ${extraClass}` : ""}`);
+    wrapper.setAttribute("aria-hidden", "true");
+    if (satellite.icon) {
+        const img = document.createElement("img");
+        img.src = satelliteUrl(satellite.name, `/assets/${satellite.icon}`);
+        img.alt = "";
+        img.addEventListener("error", () => {
+            img.replaceWith(buildGenericIcon());
+        });
+        wrapper.appendChild(img);
+    } else {
+        wrapper.appendChild(buildGenericIcon());
+    }
+    return wrapper;
+}
+
 function findSatellite(name) {
     return satellites.find((satellite) => satellite.name.toLowerCase() === String(name).toLowerCase());
 }
@@ -172,6 +225,8 @@ function showRoute() {
     }
 
     updateSatelliteConfigButton();
+    updateSatelliteReloadButton();
+    updateSatelliteToggleButton();
 }
 
 /* ---------- core ---------- */
@@ -212,11 +267,16 @@ function renderOrbit() {
                 cx: (110 + Math.cos(angle) * radius).toFixed(1),
                 cy: (110 + Math.sin(angle) * radius).toFixed(1),
                 r: 4,
-                class: `orbit-body ${type}${satellite.enabled ? "" : " off"}`,
+                class: `orbit-body ${type} status-${satellite.status || "unknown"}${satellite.status === "running" ? "" : " off"}`,
+                tabindex: "0",
+                role: "img",
             });
+            // one real, generic status string - never hardcoded per-satellite
+            // text - shown on hover and via a native tooltip on keyboard focus
+            body.setAttribute("aria-label", `${satellite.name} — ${satellite.status || "unknown"}`);
 
             const title = shape("title", {});
-            title.textContent = `${satellite.name} (${type})`;
+            title.textContent = `${satellite.name} — ${satellite.status || "unknown"}`;
             body.appendChild(title);
             bodies.appendChild(body);
         });
@@ -227,7 +287,7 @@ function renderOrbit() {
 
 function renderSatelliteNav() {
     const pages = satellites.filter(hasPage);
-    const signature = pages.map((satellite) => `${satellite.name}:${satellite.enabled}`).join("|");
+    const signature = pages.map((satellite) => `${satellite.name}:${satellite.status}:${satellite.icon}`).join("|");
     if (signature === navSignature) {
         return;
     }
@@ -241,9 +301,10 @@ function renderSatelliteNav() {
         const button = element("button", "nav-item");
         button.type = "button";
         button.dataset.satellite = satellite.name;
-        button.title = satellite.name;
-        button.appendChild(element("i", `dot${satellite.enabled ? " on" : ""}`));
+        button.title = `${satellite.name} — ${satellite.status}`;
+        button.appendChild(buildSatelliteIcon(satellite, "small"));
         button.appendChild(element("span", null, satellite.name));
+        button.appendChild(element("i", `dot${satellite.status === "running" ? " on" : ""}${satellite.status === "error" ? " error" : ""}`));
         button.addEventListener("click", () => {
             location.hash = `#/satellite/${encodeURIComponent(satellite.name)}`;
         });
@@ -292,12 +353,19 @@ function renderSatelliteCard(satellite) {
     const card = element("article", "card");
 
     const head = element("div", "card-head");
+    head.appendChild(buildSatelliteIcon(satellite));
     head.appendChild(element("h3", null, satellite.name));
     head.appendChild(element("span", "badge badge-type", satellite.type));
-    head.appendChild(element("span", `badge ${satellite.enabled ? "badge-up" : "badge-down"}`, satellite.enabled ? "enabled" : "disabled"));
+    head.appendChild(buildStatusBadge(satellite));
+
+    const actions = element("div", "card-actions");
     if (satellite.configurable) {
-        head.appendChild(buildConfigButton(satellite, "card-config"));
+        actions.appendChild(buildConfigButton(satellite));
     }
+    actions.appendChild(buildReloadButton(satellite));
+    actions.appendChild(buildToggleButton(satellite));
+    head.appendChild(actions);
+
     card.appendChild(head);
 
     card.appendChild(element("p", "card-meta", `v${satellite.version} · ${satellite.author}`));
@@ -319,6 +387,30 @@ function renderSatelliteCard(satellite) {
     return card;
 }
 
+// native and link satellites are kept in two clearly separate groups rather
+// than one mixed grid - "the same lifecycle and extension model" (docs/
+// satellites.md) doesn't mean they should look interchangeable in the list
+function renderSatelliteGroup(title, members) {
+    const section = element("section", "satellite-group");
+
+    const head = element("div", "satellite-group-head");
+    head.appendChild(element("p", "eyebrow", title));
+    head.appendChild(element("span", "badge badge-unknown", String(members.length)));
+    section.appendChild(head);
+
+    const grid = element("div", "cards");
+    if (members.length === 0) {
+        grid.appendChild(element("p", "muted", "None."));
+    } else {
+        for (const satellite of members) {
+            grid.appendChild(renderSatelliteCard(satellite));
+        }
+    }
+    section.appendChild(grid);
+
+    return section;
+}
+
 function renderSatelliteList() {
     const container = document.getElementById("satellites");
     container.replaceChildren();
@@ -330,9 +422,11 @@ function renderSatelliteList() {
         return;
     }
 
-    for (const satellite of satellites) {
-        container.appendChild(renderSatelliteCard(satellite));
-    }
+    const native = satellites.filter((satellite) => satellite.type === "native");
+    const link = satellites.filter((satellite) => satellite.type === "link");
+
+    container.appendChild(renderSatelliteGroup("Native Satellites", native));
+    container.appendChild(renderSatelliteGroup("Link Satellites", link));
 }
 
 // a satellite can ship its own Mission Control page as an ES module; the module
@@ -417,9 +511,10 @@ function renderSatellitePage() {
     setText("satellite-version", satellite.version);
     setText("satellite-author", satellite.author);
 
+    const [statusClass, statusLabel] = STATUS_BADGES[satellite.status] || ["badge-unknown", satellite.status || "unknown"];
     const enabled = document.getElementById("satellite-enabled");
-    enabled.textContent = satellite.enabled ? "enabled" : "disabled";
-    enabled.className = `badge ${satellite.enabled ? "badge-up" : "badge-down"}`;
+    enabled.textContent = statusLabel;
+    enabled.className = `badge ${statusClass}`;
 
     document.getElementById("satellite-state").replaceChildren(renderState(satellite.state));
     document.getElementById("satellite-commands").replaceChildren(renderCommands(satellite.commands));
@@ -448,6 +543,8 @@ async function refresh() {
             renderSatellitePage();
         }
         updateSatelliteConfigButton();
+        updateSatelliteReloadButton();
+        updateSatelliteToggleButton();
 
         setLink(true);
         clearBanner();
@@ -597,6 +694,149 @@ async function handleConfigurationSubmit(event) {
     }
 
     button.disabled = false;
+}
+
+/* ---------- satellite lifecycle: enable, disable, reload ----------
+ *
+ * Just as generic as satellite configuration below: every satellite gets a
+ * reload button and an enable/disable button, native or link, whether or not
+ * it has a background service at all - the Core's set_satellite_enabled()
+ * and reload_satellite() are what actually run, and neither this file nor
+ * the Core has to know anything Photo- or Music-specific to offer them. */
+
+function reloadIcon() {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", "14");
+    svg.setAttribute("height", "14");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.4");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(shape("path", { d: "M12.8 5.2A5.4 5.4 0 1 0 13.6 9" }));
+    svg.appendChild(shape("path", { d: "M12.6 2.6v3h-3" }));
+    return svg;
+}
+
+function powerIcon() {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", "14");
+    svg.setAttribute("height", "14");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.4");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.appendChild(shape("path", { d: "M8 2.6v5.2" }));
+    svg.appendChild(shape("path", { d: "M4.6 4.4a5.4 5.4 0 1 0 6.8 0" }));
+    return svg;
+}
+
+// action is "enable", "disable" or "reload" - each is a reserved route
+// segment the Core handles directly (see docs/api.md), never a satellite's
+// own route, so this is the one function every lifecycle control goes through
+async function runSatelliteAction(satellite, action) {
+    const key = `${satellite.name}:${action}`;
+    if (pendingSatelliteActions.has(key)) {
+        return;
+    }
+
+    pendingSatelliteActions.add(key);
+    renderSatelliteList();
+    updateSatelliteReloadButton();
+    updateSatelliteToggleButton();
+
+    // do not fake success: the badge and every button reflect satellite.enabled
+    // from the Core's own response after refresh() below, never an assumption
+    // that the request worked - and the banner itself is only shown after that
+    // refresh, since refresh() would otherwise immediately clear it again
+    let message;
+    let kind = "notice";
+    try {
+        const result = await postJson(satelliteUrl(satellite.name, `/${action}`), {});
+        if (result.error) {
+            message = `${satellite.name}: ${result.error}`;
+            kind = "error";
+        } else {
+            message = `${satellite.name} ${action === "reload" ? "reloaded" : `${action}d`}.`;
+        }
+    } catch (error) {
+        message = `${satellite.name}: ${error.message}`;
+        kind = "error";
+    } finally {
+        pendingSatelliteActions.delete(key);
+        await refresh();
+        showBanner(message, kind);
+    }
+}
+
+function buildReloadButton(satellite) {
+    const pending = pendingSatelliteActions.has(`${satellite.name}:reload`);
+    const button = element("button", "icon-button");
+    button.type = "button";
+    button.title = `Reload ${satellite.name}`;
+    button.disabled = pending;
+    button.appendChild(reloadIcon());
+    button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        runSatelliteAction(satellite, "reload");
+    });
+    return button;
+}
+
+function buildToggleButton(satellite) {
+    const action = satellite.enabled ? "disable" : "enable";
+    const pending = pendingSatelliteActions.has(`${satellite.name}:${action}`);
+    const button = element("button", "icon-button");
+    button.classList.toggle("icon-button-alert", satellite.enabled);
+    button.type = "button";
+    button.title = `${satellite.enabled ? "Disable" : "Enable"} ${satellite.name}`;
+    button.disabled = pending;
+    button.appendChild(powerIcon());
+    button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        runSatelliteAction(satellite, action);
+    });
+    return button;
+}
+
+// shown in the topbar for any satellite route, in addition to the same two
+// buttons already on its card in the list - so the controls are reachable
+// both from the overview and from the satellite's own page (including a
+// satellite that ships a custom Mission Control page of its own)
+function updateSatelliteReloadButton() {
+    const button = document.getElementById("satellite-reload-button");
+    const satellite = route.name === "satellite" ? findSatellite(route.satellite) : null;
+
+    if (!satellite) {
+        button.hidden = true;
+        button.onclick = null;
+        return;
+    }
+
+    button.hidden = false;
+    button.disabled = pendingSatelliteActions.has(`${satellite.name}:reload`);
+    button.title = `Reload ${satellite.name}`;
+    button.onclick = () => runSatelliteAction(satellite, "reload");
+}
+
+function updateSatelliteToggleButton() {
+    const button = document.getElementById("satellite-toggle-button");
+    const satellite = route.name === "satellite" ? findSatellite(route.satellite) : null;
+
+    if (!satellite) {
+        button.hidden = true;
+        button.onclick = null;
+        return;
+    }
+
+    const action = satellite.enabled ? "disable" : "enable";
+    button.hidden = false;
+    button.disabled = pendingSatelliteActions.has(`${satellite.name}:${action}`);
+    button.title = `${satellite.enabled ? "Disable" : "Enable"} ${satellite.name}`;
+    button.classList.toggle("icon-button-alert", satellite.enabled);
+    button.onclick = () => runSatelliteAction(satellite, action);
 }
 
 /* ---------- satellite configuration ----------
@@ -826,6 +1066,54 @@ async function handleStopClick() {
     onStarCoreStopped();
 }
 
+let confirmRestartTimer = null;
+
+function setRestartButtonConfirming(confirming) {
+    const button = document.getElementById("restart-button");
+    button.classList.toggle("confirm", confirming);
+    button.textContent = confirming ? "Confirm restart?" : "Restart StarCore";
+}
+
+async function handleRestartClick() {
+    const button = document.getElementById("restart-button");
+
+    if (!button.classList.contains("confirm")) {
+        setRestartButtonConfirming(true);
+        confirmRestartTimer = setTimeout(() => setRestartButtonConfirming(false), STOP_CONFIRM_MS);
+        return;
+    }
+
+    clearTimeout(confirmRestartTimer);
+    button.disabled = true;
+    document.getElementById("stop-button").disabled = true;
+    button.textContent = "Restarting…";
+
+    try {
+        await fetch("/api/restart", { method: "POST" });
+    } catch (error) {
+        // the connection drops as part of the restart itself; that's expected
+    }
+
+    // unlike a plain stop, StarCore comes back on its own - refresh() keeps
+    // polling on its normal schedule and clears this banner itself the
+    // moment the new process answers again, no reload needed
+    showBanner("StarCore is restarting. This page will reconnect automatically.", "notice");
+
+    const check = setInterval(async () => {
+        try {
+            await getJson("/api/status");
+            clearInterval(check);
+            button.textContent = "Restart StarCore";
+            button.disabled = false;
+            document.getElementById("stop-button").disabled = false;
+            refresh(); // clears the "restarting" banner immediately rather than
+                       // waiting for the next scheduled poll
+        } catch (error) {
+            // still restarting - keep waiting
+        }
+    }, 1000);
+}
+
 function onStarCoreStopped() {
     stopped = true;
     clearInterval(pollTimer);
@@ -842,6 +1130,9 @@ function onStarCoreStopped() {
 
     document.getElementById("console-input").disabled = true;
     document.getElementById("console-form").querySelector("button[type=submit]").disabled = true;
+    // the process is gone for good after a plain stop (unlike a restart) -
+    // there's nothing left to restart via the API
+    document.getElementById("restart-button").disabled = true;
 }
 
 /* ---------- wiring ---------- */
@@ -878,10 +1169,94 @@ document.addEventListener("keydown", (event) => {
     }
 });
 document.getElementById("stop-button").addEventListener("click", handleStopClick);
+document.getElementById("restart-button").addEventListener("click", handleRestartClick);
+document.getElementById("logout-button").addEventListener("click", handleLogoutClick);
 window.addEventListener("hashchange", applyRoute);
 
-resetConsole();
-applyRoute();
-loadCommands();
-refresh();
-pollTimer = setInterval(refresh, REFRESH_MS);
+initAuth();
+
+/* ---------- authentication gate ---------- */
+
+function showAppShell(visible) {
+    document.querySelector(".sidebar").hidden = !visible;
+    document.querySelector(".main").hidden = !visible;
+}
+
+function startApp() {
+    resetConsole();
+    applyRoute();
+    loadCommands();
+    refresh();
+    pollTimer = setInterval(refresh, REFRESH_MS);
+}
+
+function setAuthMode(bootstrapped) {
+    document.getElementById("auth-title").textContent = bootstrapped
+        ? "Sign in" : "Create the administrator account";
+    document.getElementById("auth-subtitle").textContent = bootstrapped
+        ? "Sign in to StarCore Mission Control."
+        : "This StarCore install has no administrator account yet. Create one to continue - it's the only account needed to manage everything below.";
+    document.getElementById("auth-submit").textContent = bootstrapped ? "Sign in" : "Create account";
+    document.getElementById("auth-password").autocomplete = bootstrapped ? "current-password" : "new-password";
+}
+
+// gates the whole app behind a session: shown once at boot, before anything
+// else touches the API - every other endpoint already enforces this
+// server-side (see starcore.api.server._authorized), this is purely so the
+// UI itself doesn't sit there showing empty cards and 401 errors
+async function initAuth() {
+    let status;
+    try {
+        status = await getJson("/api/auth/status");
+    } catch (error) {
+        // StarCore isn't reachable at all yet - show the app shell anyway so
+        // the normal "Cannot reach StarCore" banner (from refresh()) explains
+        // why, rather than a login form that could never succeed either way
+        showAppShell(true);
+        startApp();
+        return;
+    }
+
+    if (status.authenticated) {
+        showAppShell(true);
+        startApp();
+        return;
+    }
+
+    showAppShell(false);
+    document.getElementById("auth-overlay").hidden = false;
+    setAuthMode(status.bootstrapped);
+    document.getElementById("auth-username").focus();
+
+    document.getElementById("auth-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const errorBox = document.getElementById("auth-error");
+        errorBox.hidden = true;
+
+        const username = document.getElementById("auth-username").value.trim();
+        const password = document.getElementById("auth-password").value;
+        const submit = document.getElementById("auth-submit");
+        submit.disabled = true;
+
+        try {
+            await postJson(status.bootstrapped ? "/api/auth/login" : "/api/auth/setup", { username, password });
+            document.getElementById("auth-overlay").hidden = true;
+            showAppShell(true);
+            startApp();
+        } catch (error) {
+            errorBox.textContent = error.message;
+            errorBox.hidden = false;
+            submit.disabled = false;
+        }
+    });
+}
+
+async function handleLogoutClick() {
+    try {
+        await postJson("/api/auth/logout");
+    } catch (error) {
+        // the session may already be gone server-side; reloading either way
+        // lands back on the login screen, which is the goal either way
+    }
+    location.reload();
+}

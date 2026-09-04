@@ -235,6 +235,104 @@ Scope any of the above to the private/LAN network profile rather than "any netwo
 
 ### What this does not do
 
-- It does not add authentication. Mission Control has none yet (a planned future milestone) - anyone who can reach the configured host and port on the network has the same access as someone sitting at the machine, including the "Stop StarCore" button. Only bind to `0.0.0.0` on networks you trust.
+- It does not by itself make Mission Control safe to reach from outside a trusted network. Authentication (below) protects every API endpoint once an administrator account exists, but StarCore still has no built-in reverse proxy, rate limiting or intrusion detection - only bind to `0.0.0.0`, and only forward a port, on networks and to the extent you trust.
 - It does not expose StarCore to the public internet. `0.0.0.0` only reaches devices that can already route to the server's private LAN address; it says nothing about port-forwarding, a reverse proxy, or any other path in from outside the LAN, and none of that is set up or recommended here.
 - It does not touch Pterodactyl/Wings or its own configuration. StarCore's `[server]` section and port are independent of anything Pterodactyl manages.
+
+## Authentication
+
+StarCore ships with a single-administrator authentication system - see "Authentication" in
+`docs/api.md` for the full mechanics (endpoints, sessions, password hashing). What matters for
+deployment:
+
+- A fresh install has no administrator account, and the API is deliberately open until one is
+  created - Mission Control shows a setup screen for exactly this reason. **Create the
+  administrator account before binding `server.host` to anything other than `127.0.0.1`.**
+  There is no way to reach the setup screen remotely and lock everyone else out - the first
+  visitor to complete it becomes the administrator - so do this from the machine itself, or
+  over a connection you already trust, before opening the port up.
+- Once the account exists, every API endpoint other than `/api/auth/*` requires a valid
+  session, enforced entirely server-side (`ApiServer._authorized()`) - Mission Control hiding
+  a button never was, and still isn't, the actual protection.
+- Sessions last 7 days and are stored in `engine/data/auth.json` (created on first use,
+  already covered by `.gitignore` - see "What's covered" below). Deleting that file forgets
+  every session and the administrator account itself, which is the supported way to reset
+  a lost password: stop StarCore, delete `engine/data/auth.json`, start it again, and the
+  setup screen reappears.
+- Photo Sync (`satellites/native/photo/sync.py`) keeps its own separate device-token
+  authentication on its own port - see "Photo Sync and authentication" in `docs/photo.md` -
+  and is unaffected by any of this.
+
+## HTTPS
+
+Configured through the same `[server]` section as everything else in `engine/config.toml`:
+
+```toml
+[server]
+https_enabled = false
+https_cert = ""   # path to a PEM certificate file
+https_key = ""    # path to a PEM private key file
+```
+
+Enabling it wraps Mission Control's listening socket in TLS using Python's standard `ssl`
+module - no extra dependency, on either platform. If the certificate or key is missing,
+unreadable, or the two don't match, StarCore prints a `[WARNING]` explaining why and Mission
+Control does **not** start - it never falls back to plain HTTP silently, since that would
+give a false sense of security on a deployment that thinks it configured HTTPS correctly.
+
+### Getting a certificate
+
+For local or private-LAN use, a self-signed certificate is enough - browsers will warn about
+it once, which is expected and fine on a network you already trust; it's the same trust model
+as connecting to any other device on your LAN by IP.
+
+**Linux/macOS** (`openssl` is normally already installed):
+```
+openssl req -x509 -newkey rsa:2048 -nodes \
+  -keyout starcore-key.pem -out starcore-cert.pem -days 365 \
+  -subj "/CN=localhost"
+```
+
+**Windows** (PowerShell, no separate install needed):
+```powershell
+$cert = New-SelfSignedCertificate -DnsName "localhost" -CertStoreLocation "cert:\CurrentUser\My"
+$pwd = ConvertTo-SecureString -String "temporary" -Force -AsPlainText
+Export-PfxCertificate -Cert $cert -FilePath starcore.pfx -Password $pwd
+# Convert to PEM (requires OpenSSL for Windows, or do this step from WSL/Git Bash instead):
+openssl pkcs12 -in starcore.pfx -out starcore-cert.pem -clcerts -nokeys -passin pass:temporary
+openssl pkcs12 -in starcore.pfx -out starcore-key.pem -nocerts -nodes -passin pass:temporary
+```
+
+or, more simply on Windows, generate the PEM pair directly from WSL or Git Bash using the same
+`openssl req` command shown for Linux/macOS above.
+
+For a certificate a browser won't warn about (a real domain name, reachable from the
+internet), use a normal CA-issued certificate - for example [Let's
+Encrypt](https://letsencrypt.org/) via `certbot` - and point `https_cert`/`https_key` at the
+files it produces (`fullchain.pem` / `privkey.pem`). That is a much bigger step than running
+StarCore on a private LAN and isn't required for the common case this document otherwise
+covers.
+
+Then point the config at the files and enable it:
+
+```toml
+[server]
+https_enabled = true
+https_cert = "/opt/starcore/certs/starcore-cert.pem"
+https_key = "/opt/starcore/certs/starcore-key.pem"
+```
+
+`[server]` is only read at startup, same as `host`/`port` - restart StarCore for this to take
+effect. Once it does, Mission Control is at `https://<host>:<port>` instead of `http://`.
+
+**Never commit a certificate or private key to the repository** - `.gitignore` already
+excludes `*.pem`, `*.key`, `*.crt`, `*.p12` and `*.pfx` (see "What's covered" below), but keep
+them outside the checkout entirely (e.g. `/opt/starcore/certs/` on Linux, a sibling folder on
+Windows) as good practice regardless.
+
+## What's covered by `.gitignore`
+
+Alongside the usual Python/OS/editor noise, `.gitignore` excludes everything this milestone
+added that must never be committed: `engine/data/` (the authentication store and any other
+Engine-level runtime data) and any `*.pem`/`*.key`/`*.crt`/`*.p12`/`*.pfx` file, wherever it
+lives in the checkout.

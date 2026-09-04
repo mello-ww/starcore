@@ -26,9 +26,9 @@ A persistent sidebar divides Mission Control into the Core and the Satellites or
 
 The Core section holds the pages that belong to StarCore itself:
 
-- **Overview** - whether the Core is running, uptime, the number of loaded Satellites (split by type), the number of registered commands, the engine name and the address Mission Control is served from, alongside a map of the Satellites in orbit around the Core
-- **Satellites** - a card for every loaded Satellite: name, version, author, description, type, enabled state and the CLI commands it contributes
-- **Console** - a web equivalent of the terminal CLI: it lists the available commands, lets a user enter and run one, and shows its output. It executes commands through the same command registry as the terminal, so behavior is identical either way.
+- **Overview** - whether the Core is running, uptime, the number of loaded Satellites (split by type), the number of registered commands, the engine name and the address Mission Control is served from, alongside a map of the Satellites in orbit around the Core. Each Satellite in the orbit map is drawn from its generic `status` (see "Satellite status and icons" below); hovering or focusing one shows its name and status (`"Photo — running"`), and reduced-motion preferences are respected the same way they are everywhere else in Mission Control.
+- **Satellites** - a card for every loaded Satellite: its own icon (or a generic fallback), name, version, author, description, type, status badge and the CLI commands it contributes
+- **Console** - a web equivalent of the terminal CLI: it lists the available commands, lets a user enter and run one, and shows its output. It executes commands through the same command registry as the terminal, so behavior is identical either way. Its topbar also carries the Stop and Restart controls described in "Stopping and restarting StarCore" below.
 - **Configuration** - view the current `[server]` settings and change them, with the same validation and "restart required" honesty as the CLI's `config` command. See "Configuration" below.
 
 The Satellite section below it is built from the API rather than from a fixed list. A Satellite earns its own page by shipping one (`mission_control/page.js`, as the Photo Satellite does) or by publishing state through the `state.py` convention, in which case Mission Control renders that state generically. A Satellite that does neither stays in the Satellites list without a page of its own. The section scrolls on its own, so the Core pages stay reachable however many Satellites are loaded.
@@ -37,9 +37,28 @@ Pages are addressable: `#/overview`, `#/satellites`, `#/console`, `#/configurati
 
 Mission Control polls the API every 5 seconds. If the Core becomes unreachable it keeps the last known values and shows an error message.
 
-## Stopping StarCore
+## Stopping and restarting StarCore
 
-The topbar's "Stop StarCore" button requests a graceful shutdown of the Core through the API - the same shutdown a terminal CLI `exit` triggers. It asks for confirmation before sending the request, and once StarCore has stopped the page stops polling and disables the Console.
+The topbar's "Stop StarCore" button requests a graceful shutdown of the Core through the API - the same shutdown a terminal CLI `exit` triggers. It asks for confirmation before sending the request, and once StarCore has stopped the page stops polling and disables the Console and Restart button.
+
+The "Restart" button next to it does the same graceful shutdown - it is not a second,
+separate shutdown path - but leaves StarCore's process ready to start itself straight back up
+(`POST /api/restart`, see `docs/api.md`). Like Stop, it asks for confirmation first (a second
+click within a few seconds). After the request is sent, Mission Control shows a "StarCore is
+restarting..." banner and polls `/api/status` in the background until the new process
+answers, then reconnects and clears the banner automatically - there is nothing to click to
+reconnect.
+
+## Logging in
+
+Mission Control is protected by StarCore's authentication system (`docs/api.md` -
+"Authentication") once an administrator account exists. A fresh install shows a setup screen
+instead of the app itself, asking for a username and password to create that first account;
+after that, Mission Control shows a login screen to anyone without a valid session, and a
+"Log out" button next to "Stop StarCore" in the topbar ends the current session and returns
+to the login screen. Until an administrator account is created, the setup screen itself is
+reachable with no session, by design - see the "Authentication architecture" note in
+`docs/api.md`.
 
 ## Configuration
 
@@ -63,6 +82,16 @@ By default `host = "127.0.0.1"` keeps Mission Control reachable only from the ma
 ## Satellites in Mission Control
 
 Satellites are never hardcoded into the Core or into the frontend. A Satellite appears in Mission Control as soon as the Engine discovers it, and it decides for itself what it contributes: state, routes of its own, a page of its own, or nothing at all. Mission Control renders published state as generic labelled values, and hands a Satellite that ships a page the container to draw in. Both are described in the Satellites documentation.
+
+### Satellite status and icons
+
+Every Satellite card, its sidebar entry and its own page show a status badge -
+"Running", "Stopped", "Disabled" or "Error" - built from the generic `status` field
+`GET /api/satellites` already reports (see "Status and icon" in `docs/satellites.md`); the
+frontend does not compute or guess status itself, only labels the value it's given. The same
+Satellite also shows an icon next to its name wherever it's listed, taken from its own
+declared `icon` (again generic - the Core does not maintain a name-to-icon mapping) or a
+neutral placeholder icon when it didn't declare one.
 
 ### Satellite configuration
 

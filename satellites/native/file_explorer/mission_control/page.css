@@ -1,0 +1,164 @@
+.fe-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.fe-toolbar label.button {
+    cursor: pointer;
+}
+
+.fe-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--raised);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    overflow-x: auto;
+}
+
+.fe-crumb {
+    padding: 0.1rem 0.3rem;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--azure);
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.fe-crumb:hover {
+    background: rgba(43, 91, 215, 0.12);
+    color: var(--ice);
+}
+
+.fe-crumb-sep {
+    color: var(--text-faint);
+}
+
+.fe-progress {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 0.82rem;
+}
+
+.fe-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.fe-list.fe-busy {
+    opacity: 0.6;
+}
+
+.fe-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+    min-width: 0;
+}
+
+.fe-row:last-child {
+    border-bottom: 0;
+}
+
+.fe-row:hover {
+    background: var(--raised);
+}
+
+.fe-row-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    flex: 1 1 220px;
+}
+
+.fe-type-icon {
+    flex: none;
+    color: var(--text-faint);
+}
+
+.fe-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.88rem;
+}
+
+button.fe-name {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+button.fe-name:hover {
+    color: var(--azure);
+}
+
+.fe-meta {
+    flex: none;
+    min-width: 72px;
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    text-align: right;
+}
+
+.fe-row-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.1rem;
+    margin-left: auto;
+}
+
+.fe-row-actions a.icon-button {
+    text-decoration: none;
+}
+
+.icon-button.confirm {
+    color: var(--alert);
+    background: rgba(228, 96, 109, 0.14);
+    border-radius: 6px;
+}
+
+/* on a phone, a name plus two size/date columns plus four action buttons
+   no longer fits one line - the meta columns move under the name instead of
+   forcing the row (and the page) wider than the viewport */
+@media (max-width: 560px) {
+    .fe-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .fe-row-info {
+        flex: 1 1 auto;
+    }
+
+    .fe-meta {
+        text-align: left;
+        min-width: 0;
+    }
+
+    .fe-row-actions {
+        margin-left: 0;
+    }
+}

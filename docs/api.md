@@ -25,7 +25,15 @@ GET  /api/configuration           the configurable settings and their current va
 POST /api/commands/execute        run a registered command
 POST /api/configuration           change one configuration setting
 POST /api/shutdown                gracefully stop the Core
+POST /api/restart                 gracefully stop the Core, then restart the process
+GET  /api/auth/status             whether an administrator account exists and this client is signed in
+POST /api/auth/setup              create the first (and only) administrator account
+POST /api/auth/login              start a session
+POST /api/auth/logout             end the current session
 ```
+
+Every endpoint above other than the four `/api/auth/*` ones requires a session once an
+administrator account has been created - see "Authentication" below.
 
 Responses are JSON. A Satellite entry contains its manifest information, its type, whether it is enabled, the commands it contributes and the state it publishes:
 
@@ -35,13 +43,26 @@ Responses are JSON. A Satellite entry contains its manifest information, its typ
   "version": "1.0.0",
   "author": "mellow",
   "description": "System monitoring satellite.",
+  "icon": "icon.svg",
   "type": "native",
   "enabled": true,
+  "status": "running",
   "commands": [{ "name": "status", "source": "Status", "description": "..." }],
   "state": { "refresh_rate": 1 },
   "configurable": false
 }
 ```
+
+`status` is one of `"running"`, `"stopped"`, `"disabled"` or `"error"` - computed entirely
+generically (see `_satellite_status()` in `starcore/api/payloads.py`), never by branching on
+a Satellite's name. `"error"` means the Satellite's last `start`/`stop` hook failed;
+`"stopped"` means it declares a background service (see "Running a background service" in
+`docs/satellites.md`) that isn't currently running, whether because it's between starts or
+because `[satellites].services` is off entirely; a Satellite with no background service at
+all is simply `"running"` whenever it's enabled, since there's nothing to actually be
+stopped. `icon` is the filename of an icon the Satellite declared in its own `satellite.toml`
+(served through the same `assets` route below), or `null` if it didn't - Mission Control
+falls back to a generic icon in that case.
 
 `configurable` is `true` when the Satellite has named one of its own routes
 `"configuration"` - it is the entire signal Mission Control uses to decide whether to show
@@ -57,6 +78,15 @@ settings. See "Exposing configuration" in the Satellites documentation.
 An unknown command is not treated as a server error: it comes back as a normal `200` with the registry's own "not found" message in `output`. Only an exception escaping the command itself produces `error` and a `500`.
 
 `POST /api/shutdown` requests a graceful shutdown of the Core - the same shutdown the terminal CLI's `exit` triggers - and stops Mission Control as part of it. It responds immediately with `{"message": "..."}`; the Core stops shortly after.
+
+`POST /api/restart` stops the Core the same way `/api/shutdown` does - it is not a second
+shutdown implementation - but leaves `StarCore.restart_requested` set, so the process
+entrypoint (`starcore.cli.main.main()`) re-execs itself (`os.execv`) once `stop()` returns,
+instead of exiting for good. Every service is fully torn down and a fresh interpreter starts
+StarCore from scratch, so nothing can be left half-initialized; this is a real restart, not a
+Mission-Control-only refresh. It responds immediately with `{"message": "..."}`. Mission
+Control's own Restart button polls `/api/status` afterwards and reconnects automatically once
+the new process answers.
 
 `GET /api/configuration` lists the settings that can be changed through the API, the CLI's `config` command and Mission Control's Configuration page - currently just `[server]`. Each entry carries its saved value from `config.toml` and whether it differs from what's actually running, since `[server]` is only read once, at startup:
 
@@ -82,11 +112,40 @@ GET|POST /api/satellites/<name>/<route>/...   a route the Satellite provides
 GET      /api/satellites/<name>/assets/...    the Satellite's Mission Control files
 ```
 
-`assets` is reserved by the Core and served read-only from the Satellite's
-`mission_control/` directory; everything else below a Satellite comes from the mapping its
-`api.py` returns, and the Core neither knows nor cares what those routes do. Only GET and
-POST reach them. The Satellites documentation describes the handler contract, and the Photo
-and Music documentation are worked examples.
+`assets`, `enable`, `disable` and `reload` are reserved by the Core and never reach a
+Satellite's own `api.py` - `assets` is served read-only from the Satellite's
+`mission_control/` directory, and the other three are the generic lifecycle controls below.
+Everything else below a Satellite comes from the mapping its `api.py` returns, and the Core
+neither knows nor cares what those routes do. Only GET and POST reach them. The Satellites
+documentation describes the handler contract, and the Photo and Music documentation are
+worked examples.
+
+```
+POST /api/satellites/<name>/enable    starts the Satellite and marks it enabled
+POST /api/satellites/<name>/disable   stops the Satellite and marks it disabled
+POST /api/satellites/<name>/reload    rebuilds the Satellite from disk and restarts it if enabled
+```
+
+These work identically for every Satellite, native or link - they are handled entirely by
+the Core (`StarCore.set_satellite_enabled()` / `.reload_satellite()`), never by a Satellite's
+own code, and are what Mission Control's Satellites page uses for its enable/disable and
+reload controls. Each responds with the same shape:
+
+```json
+{ "satellite": { "...": "the same object GET /api/satellites/<name> returns" },
+  "error": null }
+```
+
+`error` is `null` on success. It is a message, and the response status is `500`, when the
+Satellite's own `start`/`stop` hook (see "Running a background service" in
+`docs/satellites.md`) raised - the same way `/api/commands/execute` reports a command that
+raised. Crucially, a failed `enable`/`disable` never leaves the Satellite looking like it
+changed state: the config is only persisted once the hook actually reports success, so
+`satellite.enabled` in the response always reflects what actually happened, not what was
+requested. A `reload` whose Satellite failed to stop first, or whose manifest can no longer
+be read, is left registered exactly as it was rather than replaced with something broken.
+An unknown Satellite name is a `404`, and any method other than `POST` is rejected the same
+way every other write endpoint is.
 
 `configuration` is not reserved the way `assets` is - the Core does not implement it - but
 it is the one route name Mission Control treats specially, purely by name (see
@@ -97,10 +156,78 @@ is the first Satellite to do this.
 
 A file a Satellite returns is streamed rather than read into memory, and a `Range` request
 is answered with `206` and just the bytes asked for, so a browser can seek in a large file
-without downloading all of it.
+without downloading all of it. A Satellite route can also ask for the response to download
+as an attachment (`file_response(path, content_type, download_name="report.pdf")`) - the File
+Explorer Satellite (`docs/api.md` below, `satellites/native/file_explorer/`) is the first to
+use this; nothing else has needed to yet.
+
+A `POST` to a Satellite route is parsed as JSON the same way it always has been, *unless* the
+request's `Content-Type` isn't `application/json` - in which case `request.body` is `None`
+and `request.raw` is a `RawBody` the handler reads in chunks (`request.raw.read(size)`),
+never buffered whole into memory. This is what lets a Satellite accept a file upload as a
+raw request body (see File Explorer's `upload` route) without a second, JSON-only dispatch
+path or a second body-parsing implementation.
 
 Errors are returned as `{"error": "..."}` with an HTTP status: `400` for a malformed request body, `404` for an unknown endpoint or Satellite, `405` for a method a given endpoint doesn't support. The API exposes no way to run arbitrary code or shell commands - only registered commands can be executed.
 
 The same server also serves the Mission Control frontend from the `mission_control` directory.
+
+## Authentication
+
+StarCore ships with a single-administrator authentication system (`starcore/auth.py`) -
+deliberately not a multi-user account system; see "Authentication architecture" below for
+why. Until an administrator account exists, the API is intentionally open (see
+`ApiServer._authorized()` docstring in `starcore/api/server.py`) so that `/api/auth/setup`
+itself - and Mission Control's setup screen - are reachable with no session at all. This is
+exactly why the default bind address is `127.0.0.1`: exposing a freshly-installed,
+not-yet-configured StarCore beyond localhost is a decision for whoever deploys it to make
+deliberately, not something the API alone makes safe.
+
+Once an administrator account exists (`GET /api/auth/status` reports `"bootstrapped": true`),
+every endpoint above other than `/api/auth/*` itself requires a valid session, checked by one
+generic gate before any dispatch happens - there is no per-endpoint special-casing, and this
+is also why File Explorer, Photo, Music and Console shutdown/restart are all protected for
+free the moment they're reachable under `/api/`.
+
+```
+POST /api/auth/setup   { "username": "...", "password": "..." }  -> 200 + session, or 409 if already set up
+POST /api/auth/login    { "username": "...", "password": "..." } -> 200 + session, or 401
+POST /api/auth/logout   (no body)                                -> 200, ends the current session
+GET  /api/auth/status   (no body)                                -> { "bootstrapped": bool, "authenticated": bool }
+```
+
+A successful setup or login sets a `starcore_session` cookie (`HttpOnly`, `SameSite=Lax`,
+and `Secure` automatically when HTTPS is enabled - see below). A client that isn't a browser
+(a future mobile app, a script) can use the same token as a bearer token instead:
+`Authorization: Bearer <token>` - both are checked by the same `AuthStore.validate_session()`,
+so nothing about session handling assumes a browser.
+
+Passwords are hashed with `hashlib.pbkdf2_hmac` (260,000 iterations, a random 16-byte salt
+per account) - never stored, logged, or returned anywhere. Sessions expire after 7 days.
+Nothing about the credential store depends on a third-party package; see "Dependencies" in
+`docs/deployment.md`.
+
+Photo Sync (`satellites/native/photo/sync.py`) is a separate, deliberately unauthenticated
+HTTP listener on its own port, protected by its own device token instead - it is not part of
+Mission Control's API server and this authentication system does not apply to it. See
+"Photo Sync and authentication" in `docs/photo.md` for why that separation stays as it is.
+
+## HTTPS
+
+Configured through the same `[server]` section as everything else in `engine/config.toml`:
+
+```toml
+[server]
+https_enabled = false
+https_cert = ""   # path to a PEM certificate file
+https_key = ""    # path to a PEM private key file
+```
+
+When `https_enabled` is true, `ApiServer.start()` wraps its listening socket in TLS using the
+stdlib `ssl` module - no dependency. If the certificate or key is missing, unreadable, or
+doesn't match, Mission Control does **not** start and a `[WARNING]` explains why - it never
+silently falls back to plain HTTP, since that would be a false sense of security. See
+"HTTPS" in `docs/deployment.md` for how to obtain a certificate (including a self-signed one
+for local/LAN use) on both Windows and Linux.
 
 This document will evolve as the API grows.

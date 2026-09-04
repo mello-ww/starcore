@@ -1,0 +1,5 @@
+name = "FileExplorer"
+version = "1.0.0"
+author = "mellow"
+description = "Browse, upload and manage files under a configured root directory."
+icon = "icon.svg"
