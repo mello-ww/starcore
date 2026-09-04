@@ -185,6 +185,12 @@ function findSatellite(name) {
 /* ---------- routing ---------- */
 
 function applyRoute() {
+    // a real navigation (as opposed to the ~5s poll refresh, which never
+    // touches the hash or calls this) is the right moment to close the
+    // mobile sidebar - it does nothing when the sidebar isn't a phone-width
+    // overlay in the first place
+    closeSidebar();
+
     const [name, param] = location.hash.replace(/^#\/?/, "").split("/");
 
     if (name === "satellite" && param) {
@@ -254,12 +260,16 @@ function renderCore(status) {
     setText("updated", new Date().toLocaleTimeString());
 }
 
-// native satellites hold the inner orbit, link satellites the outer one
+// native satellites hold the inner orbit, link satellites the outer one - each
+// ring is its own <g> (see index.html) so the two can spin independently
+// (different speeds, opposite directions - see .orbit-spin-native/-link)
 function renderOrbit() {
-    const bodies = document.getElementById("orbit-bodies");
-    bodies.replaceChildren();
-
-    for (const [type, radius, phase] of [["native", 58, -1.4], ["link", 88, 0.7]]) {
+    for (const [type, radius, phase, groupId] of [
+        ["native", 58, -1.4, "orbit-bodies-native"],
+        ["link", 88, 0.7, "orbit-bodies-link"],
+    ]) {
+        const bodies = document.getElementById(groupId);
+        bodies.replaceChildren();
         const members = satellites.filter((satellite) => satellite.type === type);
 
         members.forEach((satellite, index) => {
@@ -1300,6 +1310,35 @@ function onStarCoreStopped() {
     document.getElementById("restart-button").disabled = true;
 }
 
+/* ---------- mobile sidebar ---------- */
+
+// only meaningful on phone-width viewports, where the sidebar is a
+// slide-in overlay (see the ≤600px rules in style.css) rather than the
+// permanently-visible column it is everywhere else
+const MOBILE_SIDEBAR_QUERY = "(max-width: 600px)";
+
+function openSidebar() {
+    document.body.classList.add("sidebar-open");
+    const toggle = document.getElementById("sidebar-toggle");
+    toggle.setAttribute("aria-expanded", "true");
+    toggle.setAttribute("aria-label", "Close menu");
+}
+
+function closeSidebar() {
+    document.body.classList.remove("sidebar-open");
+    const toggle = document.getElementById("sidebar-toggle");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-label", "Open menu");
+}
+
+function toggleSidebar() {
+    if (document.body.classList.contains("sidebar-open")) {
+        closeSidebar();
+    } else {
+        openSidebar();
+    }
+}
+
 /* ---------- wiring ---------- */
 
 for (const item of document.querySelectorAll(".nav-item[data-route]")) {
@@ -1343,12 +1382,35 @@ document.addEventListener("keydown", (event) => {
         closeDirectoryPicker();
     } else if (!document.getElementById("satellite-config-overlay").hidden) {
         closeSatelliteConfig();
+    } else if (document.body.classList.contains("sidebar-open")) {
+        closeSidebar();
     }
 });
 document.getElementById("stop-button").addEventListener("click", handleStopClick);
 document.getElementById("restart-button").addEventListener("click", handleRestartClick);
 document.getElementById("logout-button").addEventListener("click", handleLogoutClick);
 window.addEventListener("hashchange", applyRoute);
+
+document.getElementById("sidebar-toggle").addEventListener("click", toggleSidebar);
+document.getElementById("sidebar-backdrop").addEventListener("click", closeSidebar);
+// covers every nav item, including the satellite pages rendered later by
+// renderSatelliteNav() - and closes the sidebar even when tapping the item
+// for the page already showing, when the hash doesn't change and applyRoute()
+// never runs
+document.querySelector(".sidebar").addEventListener("click", (event) => {
+    if (event.target.closest(".nav-item")) {
+        closeSidebar();
+    }
+});
+// if the viewport grows past the phone breakpoint while the sidebar happens
+// to be open, drop the "open" state so it doesn't linger once the sidebar is
+// back to being permanently visible rather than an overlay
+const mobileSidebarQuery = window.matchMedia(MOBILE_SIDEBAR_QUERY);
+mobileSidebarQuery.addEventListener("change", (event) => {
+    if (!event.matches) {
+        closeSidebar();
+    }
+});
 
 initAuth();
 

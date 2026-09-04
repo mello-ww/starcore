@@ -25,16 +25,59 @@
     --radius: 8px;
     --sidebar: 244px;
 
-    /* a handful of stars, deliberately sparse */
+    /* a handful of stars, deliberately sparse - slightly larger than a single
+       hairline pixel so they actually read as stars rather than noise */
     --starfield:
-        radial-gradient(1.1px 1.1px at 16% 30%, rgba(255, 255, 255, 0.55), transparent 60%),
-        radial-gradient(1px 1px at 61% 66%, rgba(255, 255, 255, 0.38), transparent 60%),
-        radial-gradient(1px 1px at 83% 32%, rgba(255, 255, 255, 0.26), transparent 60%),
-        radial-gradient(0.9px 0.9px at 37% 78%, rgba(255, 255, 255, 0.2), transparent 60%);
+        radial-gradient(1.6px 1.6px at 16% 30%, rgba(255, 255, 255, 0.62), transparent 60%),
+        radial-gradient(1.4px 1.4px at 61% 66%, rgba(255, 255, 255, 0.44), transparent 60%),
+        radial-gradient(1.4px 1.4px at 83% 32%, rgba(255, 255, 255, 0.32), transparent 60%),
+        radial-gradient(1.2px 1.2px at 37% 78%, rgba(255, 255, 255, 0.26), transparent 60%),
+        radial-gradient(1.1px 1.1px at 8% 82%, rgba(255, 255, 255, 0.2), transparent 60%);
 }
 
 * {
     box-sizing: border-box;
+}
+
+/* ---------- ambient starfield ----------
+ *
+ * A reusable decorative backdrop for the few places a starfield is a whole
+ * scene rather than a small accent (the sign-in screen, the Orbit panel) -
+ * `--starfield` itself stays a plain, unanimated background layer everywhere
+ * else (the active nav pill, primary buttons) since those are small
+ * interactive controls, not backdrops. Very slow drift plus a handful of
+ * independently-timed twinkle points keep it feeling alive without being
+ * distracting; `prefers-reduced-motion` (below) turns every animation here
+ * off along with everything else in the app. */
+
+.starfield {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    background-image: var(--starfield);
+    background-repeat: no-repeat;
+    animation: starfield-drift 220s ease-in-out infinite alternate;
+}
+
+.starfield .twinkle {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: #fff;
+    opacity: 0;
+    animation: star-twinkle 6.5s ease-in-out infinite;
+}
+
+@keyframes starfield-drift {
+    from { background-position: 0% 0%; }
+    to { background-position: 1.6% 2.2%; }
+}
+
+@keyframes star-twinkle {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 0.8; }
 }
 
 html,
@@ -85,6 +128,13 @@ h3 {
     padding: 1.25rem 0 0.75rem;
     border-right: 1px solid var(--line);
     background: linear-gradient(180deg, var(--deep), var(--void));
+}
+
+/* dims the page behind the sidebar while it's open as an overlay on phone
+   widths (see the responsive section below); does nothing at any other
+   viewport size, where the sidebar is never an overlay */
+.sidebar-backdrop {
+    display: none;
 }
 
 .brand {
@@ -234,6 +284,17 @@ h3 {
     to { transform: translateX(-42px); }
 }
 
+/* a few of the rocks catch the light now and then - only a handful (not the
+   whole belt), each on its own delay so they never sparkle in unison */
+.belt-twinkle {
+    animation: belt-twinkle 6s ease-in-out infinite;
+}
+
+@keyframes belt-twinkle {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 1; }
+}
+
 .satellite-nav {
     flex: 1;
     min-height: 0;
@@ -350,6 +411,14 @@ h3 {
 .icon-button-alert:hover {
     background: rgba(228, 96, 109, 0.12);
     color: var(--alert);
+}
+
+/* the sidebar collapse/expand toggle - a plain icon-button that only exists
+   on genuinely phone-sized viewports (see the responsive section below); on
+   desktop and tablet widths the sidebar is always visible so there is
+   nothing for it to do */
+.sidebar-toggle {
+    display: none;
 }
 
 /* ---------- modal ---------- */
@@ -612,6 +681,22 @@ h3 {
 
 /* ---------- orbital map ---------- */
 
+/* the panel Orbit lives in gets its own small starfield behind it (see
+   "ambient starfield" above) - relative positioning plus lifting the panel's
+   real content onto its own stacking layer keeps that backdrop from ever
+   painting over the rings, bodies or legend */
+.orbit-panel {
+    position: relative;
+    overflow: hidden;
+}
+
+.orbit-panel > .eyebrow,
+.orbit-panel > .orbit,
+.orbit-panel > .orbit-legend {
+    position: relative;
+    z-index: 1;
+}
+
 .orbit {
     display: block;
     width: 100%;
@@ -624,13 +709,39 @@ h3 {
     stroke: #27355c;
 }
 
+/* the inner (native) and outer (link) rings spin at different speeds and in
+   opposite directions, the way two orbits at different radii actually would
+   - a small, physically-motivated touch that reads as "alive" rather than a
+   single stiff carousel */
 .orbit-spin {
     transform-origin: 110px 110px;
-    animation: spin 300s linear infinite;
+}
+
+.orbit-spin-native {
+    animation: spin 220s linear infinite;
+}
+
+.orbit-spin-link {
+    animation: spin-reverse 340s linear infinite;
 }
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+@keyframes spin-reverse {
+    to { transform: rotate(-360deg); }
+}
+
+/* a slow, faint breathing glow on the core - restrained enough to read as
+   ambient rather than a flashing light */
+.orbit-nucleus {
+    animation: nucleus-glow 7s ease-in-out infinite;
+}
+
+@keyframes nucleus-glow {
+    0%, 100% { opacity: 0.14; }
+    50% { opacity: 0.26; }
 }
 
 .orbit-body {
@@ -1002,10 +1113,12 @@ button.chip:hover {
     justify-content: center;
     padding: 1.25rem;
     background:
-        var(--starfield),
         radial-gradient(circle at 50% 20%, rgba(15, 82, 186, 0.18), transparent 60%),
         var(--deep);
 }
+
+/* the animated .starfield element (see "ambient starfield" above) replaces
+   the plain --starfield layer that used to sit in the background above */
 
 /* [hidden] and a same-specificity "display: flex" rule tie on specificity, so
    the later one in source order wins - without this override the overlay
@@ -1016,6 +1129,8 @@ button.chip:hover {
 }
 
 .auth-card {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex-direction: column;
     gap: 0.9rem;
@@ -1353,6 +1468,136 @@ button.chip:hover {
     #stop-button {
         padding: 0.35rem 0.6rem;
         font-size: 0.78rem;
+    }
+}
+
+/* ---------- phone-width sidebar overlay ----------
+ *
+ * Below this the icon-only rail from the >=1040px rules above is no longer
+ * usable - there isn't enough width to spare a permanent column for it at
+ * all. The sidebar instead becomes a full, labelled off-canvas panel that
+ * slides in over the page (never squeezing it) and is opened/closed with the
+ * new sidebar-toggle button; app.js toggles `sidebar-open` on <body>. This
+ * block is deliberately last in source order so its overrides win the
+ * cascade over the wider breakpoints above wherever both apply at once. */
+@media (max-width: 600px) {
+    body {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 40;
+        width: min(82vw, 300px);
+        transform: translateX(-100%);
+        box-shadow: 12px 0 32px rgba(4, 6, 13, 0.55);
+        transition: transform 200ms ease;
+    }
+
+    body.sidebar-open .sidebar {
+        transform: translateX(0);
+    }
+
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 39;
+        background: rgba(4, 6, 13, 0.6);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 200ms ease;
+    }
+
+    body.sidebar-open .sidebar-backdrop {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* the sidebar is a full overlay again here, not the >=1040px icon rail -
+       restore the labelled layout explicitly rather than relying on
+       `revert`, which would fall back to each element's plain UA default
+       instead of the specific value it actually needs */
+    .brand {
+        justify-content: flex-start;
+        padding: 0 1.15rem 1.25rem;
+    }
+
+    .brand-text {
+        display: block;
+    }
+
+    .nav-section {
+        display: flex;
+    }
+
+    .nav-item span {
+        display: inline;
+    }
+
+    .satellite-nav .empty {
+        display: block;
+    }
+
+    /* .satellite-nav .empty's two classes outrank the [hidden] attribute's
+       own UA specificity, so without this override the empty-state message
+       would stay visible even while JS has it hidden - the same
+       specificity tie already fixed for .icon-button and .auth-overlay */
+    .satellite-nav .empty[hidden] {
+        display: none;
+    }
+
+    .sidebar-foot {
+        justify-content: flex-start;
+        padding-inline: 1.15rem;
+    }
+
+    .sidebar-foot span {
+        display: inline;
+    }
+
+    .nav-item {
+        justify-content: flex-start;
+        padding: 0.45rem 0.55rem;
+    }
+
+    .sidebar-toggle {
+        display: flex;
+        position: relative;
+        z-index: 46;
+        padding: 0.45rem;
+    }
+
+    body.sidebar-open .sidebar-toggle .icon-menu,
+    .sidebar-toggle .icon-close {
+        display: none;
+    }
+
+    body.sidebar-open .sidebar-toggle .icon-close {
+        display: block;
+    }
+
+    .topbar,
+    .banner,
+    .view {
+        padding-inline: 1rem;
+    }
+
+    .view {
+        padding-block: 1.1rem 2.5rem;
+    }
+
+    .cards {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .tiles {
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    }
+
+    .facts {
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     }
 }
 
