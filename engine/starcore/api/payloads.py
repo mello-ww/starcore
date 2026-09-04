@@ -10,8 +10,10 @@ def describe_satellite(engine, satellite) -> dict:
         "version": satellite.manifest.version,
         "author": satellite.manifest.author,
         "description": satellite.manifest.description,
+        "icon": satellite.manifest.icon,
         "type": satellite.type,
         "enabled": bool(satellite.config.get("enabled", True)),
+        "status": _satellite_status(engine, satellite),
         "commands": describe_commands(engine, source=satellite.manifest.name),
         "state": satellite.state(engine),
         "page": satellite.page,
@@ -21,6 +23,31 @@ def describe_satellite(engine, satellite) -> dict:
         # settings actually are
         "configurable": "configuration" in satellite.routes,
     }
+
+
+def _satellite_status(engine, satellite) -> str:
+    """One of "running" / "stopped" / "disabled" / "error", entirely generic.
+
+    - "error": the satellite's last start/stop hook failed. Takes priority
+      over everything else so a broken satellite is never shown as healthy.
+    - "disabled": turned off via its own config - see Satellite.enabled.
+    - "running": either it has no background service at all (has_service is
+      False, so being enabled *is* the whole story), or it does and its last
+      known state is running.
+    - "stopped": it has a service, is enabled, but isn't currently running -
+      either because satellite services are globally disabled
+      (engine.satellite_services_enabled) or its stop hook last ran (or it
+      simply hasn't started yet).
+    """
+    if satellite.last_error:
+        return "error"
+    if not satellite.enabled:
+        return "disabled"
+    if not satellite.has_service:
+        return "running"
+    if not engine.satellite_services_enabled:
+        return "stopped"
+    return "running" if satellite.running else "stopped"
 
 
 def describe_satellites(engine) -> list:
@@ -70,6 +97,9 @@ def _live_state(engine, setting: dict) -> dict:
             "host": engine.api.host,
             "port": engine.api.port,
             "enabled": engine.mission_control_enabled,
+            "https_enabled": engine.api.https_enabled,
+            "https_cert": str(engine.api.https_cert) if engine.api.https_cert else "",
+            "https_key": str(engine.api.https_key) if engine.api.https_key else "",
         }.get(setting["key"])
 
     # port 0 means "let the OS choose one" - the live port then never equals the

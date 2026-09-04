@@ -1,18 +1,29 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread, Timer
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 import json
+import ssl
 
 from . import payloads
-from .response import Request, Response
+from .response import RawBody, Request, Response
+from ..auth import AuthError, AuthStore, SESSION_COOKIE, SESSION_TTL_SECONDS
+from ..core import SatelliteError
 from ..engine_config import ConfigurationError
 
 SATELLITE_PREFIX = "/api/satellites/"
-WRITE_ENDPOINTS = ("/api/commands/execute", "/api/shutdown")
+AUTH_PREFIX = "/api/auth/"
+WRITE_ENDPOINTS = ("/api/commands/execute", "/api/shutdown", "/api/restart",
+                   "/api/auth/setup", "/api/auth/login", "/api/auth/logout")
 
-# reserved below a satellite, so a satellite cannot claim it as a route name
+# reserved below a satellite, so a satellite cannot claim any of these as a
+# route name of its own - "assets" is the satellite's Mission Control files,
+# the other three are the Core's generic lifecycle controls (see
+# docs/satellites.md); every satellite gets them for free, so none of them
+# can be shadowed
 ASSETS_SEGMENT = "assets"
+LIFECYCLE_ACTIONS = {"enable": True, "disable": False}
+RELOAD_SEGMENT = "reload"
 
 FILE_CHUNK = 64 * 1024
 
@@ -20,15 +31,38 @@ CONTENT_TYPES = {
     ".css": "text/css; charset=utf-8",
     ".html": "text/html; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".ico": "image/x-icon",
 }
 
 
+def _content_disposition(filename: str) -> str:
+    """A Content-Disposition: attachment header for an arbitrary filename.
+
+    filename= carries an ASCII-safe fallback (anything else replaced with
+    '_') and filename*= carries the exact name percent-encoded per RFC 5987,
+    so a non-ASCII name (e.g. accented characters) still downloads correctly
+    in the browsers that use it, while older clients fall back cleanly.
+    """
+    ascii_fallback = filename.encode("ascii", "replace").decode("ascii").replace('"', "_")
+    encoded = quote(filename, safe="")
+    return f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{encoded}'
+
+
 class ApiServer:
-    def __init__(self, engine, host: str, port: int, web_root: Path):
+    def __init__(self, engine, host: str, port: int, web_root: Path,
+                 https_enabled: bool = False, https_cert: Path = None, https_key: Path = None):
         self.engine = engine
         self.host = host
         self.port = port
         self.web_root = web_root
+        self.https_enabled = https_enabled
+        self.https_cert = https_cert
+        self.https_key = https_key
         self._server = None
         self._thread = None
 
@@ -38,18 +72,34 @@ class ApiServer:
 
     @property
     def url(self) -> str:
-        return f"http://{self.host}:{self.port}"
+        scheme = "https" if self.https_enabled else "http"
+        return f"{scheme}://{self.host}:{self.port}"
 
     def start(self) -> bool:
+        if self.https_enabled:
+            ssl_context = self._build_ssl_context()
+            if ssl_context is None:
+                return False  # a warning explaining why was already printed
+
         try:
             server = ThreadingHTTPServer((self.host, self.port), RequestHandler)
         except (OSError, TypeError, ValueError) as error:
             print(f"[WARNING]: Mission Control could not start on {self.host}:{self.port} ({error}).")
             return False
 
+        if self.https_enabled:
+            try:
+                server.socket = ssl_context.wrap_socket(server.socket, server_side=True)
+            except ssl.SSLError as error:
+                print(f"[WARNING]: Mission Control could not start HTTPS on {self.host}:{self.port} "
+                      f"({error}). Check that https_cert and https_key are a matching certificate/key pair.")
+                server.server_close()
+                return False
+
         server.daemon_threads = True
         server.engine = self.engine
         server.web_root = self.web_root
+        server.https_enabled = self.https_enabled
 
         self.port = server.server_address[1]
         self._server = server
@@ -67,6 +117,34 @@ class ApiServer:
         self._server = None
         self._thread = None
 
+    def _build_ssl_context(self):
+        """Loads https_cert/https_key into an SSLContext, or returns None (after
+        printing exactly why) if HTTPS was requested but can't actually be
+        served - startup fails closed rather than silently falling back to
+        plain HTTP, since that would be a false sense of security.
+        """
+        if self.https_cert is None or self.https_key is None:
+            print("[WARNING]: https_enabled is true but https_cert and/or https_key is not configured. "
+                  "Mission Control was not started. See docs/deployment.md for HTTPS setup.")
+            return None
+
+        if not self.https_cert.is_file():
+            print(f"[WARNING]: HTTPS certificate file not found: {self.https_cert}. Mission Control was not started.")
+            return None
+
+        if not self.https_key.is_file():
+            print(f"[WARNING]: HTTPS private key file not found: {self.https_key}. Mission Control was not started.")
+            return None
+
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        try:
+            context.load_cert_chain(certfile=str(self.https_cert), keyfile=str(self.https_key))
+        except ssl.SSLError as error:
+            print(f"[WARNING]: HTTPS certificate/key could not be loaded ({error}). Mission Control was not started.")
+            return None
+
+        return context
+
 
 class RequestHandler(BaseHTTPRequestHandler):
     server_version = "StarCore"
@@ -76,8 +154,12 @@ class RequestHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
 
         try:
+            if not self._authorized(path):
+                return
             if path in WRITE_ENDPOINTS:
                 self._send_json({"error": f"{path} requires POST"}, status=405)
+            elif path == "/api/auth/status":
+                self._handle_auth_status()
             elif path.startswith("/api/"):
                 self._handle_api(path)
             else:
@@ -90,10 +172,20 @@ class RequestHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
 
         try:
-            if path == "/api/commands/execute":
+            if not self._authorized(path):
+                return
+            if path == "/api/auth/setup":
+                self._handle_auth_setup()
+            elif path == "/api/auth/login":
+                self._handle_auth_login()
+            elif path == "/api/auth/logout":
+                self._handle_auth_logout()
+            elif path == "/api/commands/execute":
                 self._handle_execute()
             elif path == "/api/shutdown":
                 self._handle_shutdown()
+            elif path == "/api/restart":
+                self._handle_restart()
             elif path == "/api/configuration":
                 self._handle_configuration_update()
             elif path.startswith(SATELLITE_PREFIX):
@@ -103,6 +195,33 @@ class RequestHandler(BaseHTTPRequestHandler):
         except Exception as error:
             if not self._responded:
                 self._send_json({"error": f"internal error: {error}"}, status=500)
+
+    def _authorized(self, path: str) -> bool:
+        """True if this request may proceed without further checks.
+
+        Every /api/ path (other than /api/auth/* itself) needs a valid
+        session once an administrator account exists. Before that - a fresh,
+        not-yet-configured install - the API is intentionally still open, the
+        same way the frontend's own setup screen has to be reachable with no
+        session at all. This is exactly why the default bind address stays
+        127.0.0.1 (see engine/config.toml): exposing an unconfigured StarCore
+        beyond localhost is the administrator's decision to make, not
+        something this alone makes safe. Sends the 401 itself on failure, so
+        callers only need to check the return value and return.
+        """
+        if not path.startswith("/api/") or path.startswith(AUTH_PREFIX):
+            return True
+
+        engine = self.server.engine
+        if not engine.auth.is_bootstrapped:
+            return True
+
+        token = AuthStore.token_from_request(self.headers.get("Cookie", ""), self.headers.get("Authorization", ""))
+        if engine.auth.validate_session(token):
+            return True
+
+        self._send_json({"error": "authentication required"}, status=401)
+        return False
 
     def do_PUT(self):
         self._method_not_allowed()
@@ -157,19 +276,36 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._method_not_allowed()
             return
 
+        if segments[1] in LIFECYCLE_ACTIONS or segments[1] == RELOAD_SEGMENT:
+            if method == "POST":
+                self._handle_satellite_action(engine, satellite, segments[1])
+            else:
+                self._method_not_allowed()
+            return
+
         handler = satellite.routes.get(segments[1])
         if handler is None:
             self._send_json({"error": f"unknown endpoint '{path}'"}, status=404)
             return
 
         body = None
+        raw = None
         if method == "POST":
-            body = self._read_json_body()
-            if body is None:
-                return  # a clean error response was already sent
+            content_type = self.headers.get("Content-Type", "")
+            # JSON (the default for every existing route) is parsed up front,
+            # same as always; anything else - a file upload, in practice -
+            # is handed to the satellite as a RawBody it reads in chunks,
+            # rather than buffered whole into a dict that can never be huge
+            if not content_type or content_type.startswith("application/json"):
+                body = self._read_json_body()
+                if body is None:
+                    return  # a clean error response was already sent
+            else:
+                length = int(self.headers.get("Content-Length", 0) or 0)
+                raw = RawBody(self.rfile, length)
 
         query = {key: values[-1] for key, values in parse_qs(urlparse(self.path).query).items()}
-        request = Request(engine, satellite, method, tuple(segments[2:]), query, body)
+        request = Request(engine, satellite, method, tuple(segments[2:]), query, body, raw)
 
         # a satellite handles its own resources, so its failures are isolated the
         # same way its state provider's are, and never reach the client as a trace
@@ -186,6 +322,32 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         self._send_response(response)
+
+    # generic satellite lifecycle controls - enable, disable and reload work
+    # the same way for every satellite, native or link, so unlike the routes a
+    # satellite declares in its own api.py, these are handled directly by the
+    # Core and never reach a satellite's code (see StarCore.set_satellite_enabled
+    # / .reload_satellite, which do the actual work and are what a satellite's
+    # own start()/stop() hooks and manifest reload run through)
+    def _handle_satellite_action(self, engine, satellite, action: str):
+        name = satellite.manifest.name
+        try:
+            if action == RELOAD_SEGMENT:
+                result = engine.reload_satellite(name)
+            else:
+                result = engine.set_satellite_enabled(name, LIFECYCLE_ACTIONS[action])
+        except SatelliteError as error:
+            self._send_json({"error": str(error)}, status=404)
+            return
+
+        payload = {
+            "satellite": payloads.describe_satellite(engine, result["satellite"]),
+            "error": result["error"],
+        }
+        # a hook that raised is caught and reported, never left to crash the
+        # request - but it's still a real failure, the same way an exception
+        # escaping a run command is reported as a 500 by /api/commands/execute
+        self._send_json(payload, status=500 if result["error"] else 200)
 
     def _handle_asset(self, satellite, segments: list):
         root = satellite.assets_path.resolve()
@@ -242,6 +404,59 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         self._send_json(payloads.describe_configuration(self.server.engine))
 
+    def _session_cookie(self, token: str, max_age: int = SESSION_TTL_SECONDS) -> str:
+        parts = [f"{SESSION_COOKIE}={token}", "Path=/", "HttpOnly", "SameSite=Lax", f"Max-Age={max_age}"]
+        if getattr(self.server, "https_enabled", False):
+            parts.append("Secure")
+        return "; ".join(parts)
+
+    def _handle_auth_status(self):
+        engine = self.server.engine
+        token = AuthStore.token_from_request(self.headers.get("Cookie", ""), self.headers.get("Authorization", ""))
+        self._send_json({
+            "bootstrapped": engine.auth.is_bootstrapped,
+            "authenticated": engine.auth.validate_session(token),
+        })
+
+    def _handle_auth_setup(self):
+        engine = self.server.engine
+        body = self._read_json_body()
+        if body is None:
+            return  # a clean error response was already sent
+
+        username = str(body.get("username", "")) if isinstance(body, dict) else ""
+        password = str(body.get("password", "")) if isinstance(body, dict) else ""
+        try:
+            token = engine.auth.bootstrap(username, password)
+        except AuthError as error:
+            self._send_json({"error": str(error)}, status=409)
+            return
+
+        self._send_json({"message": "Administrator account created."},
+                         headers={"Set-Cookie": self._session_cookie(token)})
+
+    def _handle_auth_login(self):
+        engine = self.server.engine
+        body = self._read_json_body()
+        if body is None:
+            return  # a clean error response was already sent
+
+        username = str(body.get("username", "")) if isinstance(body, dict) else ""
+        password = str(body.get("password", "")) if isinstance(body, dict) else ""
+        try:
+            token = engine.auth.login(username, password)
+        except AuthError as error:
+            self._send_json({"error": str(error)}, status=401)
+            return
+
+        self._send_json({"message": "Logged in."}, headers={"Set-Cookie": self._session_cookie(token)})
+
+    def _handle_auth_logout(self):
+        engine = self.server.engine
+        token = AuthStore.token_from_request(self.headers.get("Cookie", ""), self.headers.get("Authorization", ""))
+        engine.auth.logout(token)
+        self._send_json({"message": "Logged out."}, headers={"Set-Cookie": self._session_cookie("", max_age=0)})
+
     def _handle_shutdown(self):
         engine = self.server.engine
         self._send_json({"message": "StarCore is shutting down."})
@@ -249,6 +464,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         # inline: engine.stop() tears down this very server, and doing that
         # before the response is written back would race the client's request
         Timer(0.2, engine.stop).start()
+
+    def _handle_restart(self):
+        engine = self.server.engine
+        self._send_json({"message": "StarCore is restarting."})
+        # same race-avoidance as _handle_shutdown - request_restart() ends up
+        # calling engine.stop(), which tears down this very server
+        Timer(0.2, engine.request_restart).start()
 
     def _handle_frontend(self, path: str):
         root = Path(self.server.web_root).resolve()
@@ -290,7 +512,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            self._send_file(Path(response.path), response.content_type, response.cache)
+            self._send_file(Path(response.path), response.content_type, response.cache, response.download_name)
         except OSError as error:
             print(f"[WARNING]: {response.path} could not be read ({error}).")
             if not self._responded:
@@ -299,7 +521,7 @@ class RequestHandler(BaseHTTPRequestHandler):
     # files are streamed rather than read into memory, and a Range request is
     # answered with the part that was asked for, so a browser can seek in a large
     # file a satellite serves without downloading all of it
-    def _send_file(self, path: Path, content_type: str, cache: str = None):
+    def _send_file(self, path: Path, content_type: str, cache: str = None, download_name: str = None):
         size = path.stat().st_size
         start, end = self._requested_range(size)
         length = end - start + 1
@@ -312,6 +534,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", cache or "no-store")
         if length != size:
             self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        if download_name:
+            self.send_header("Content-Disposition", _content_disposition(download_name))
         self.end_headers()
 
         with open(path, "rb") as file:
@@ -345,23 +569,25 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         return start, min(end, size - 1)
 
-    def _send_json(self, payload, status: int = 200):
+    def _send_json(self, payload, status: int = 200, headers: dict = None):
         try:
             body = json.dumps(payload, indent=2).encode("utf-8")
         except (TypeError, ValueError) as error:
             status = 500
             body = json.dumps({"error": f"response could not be serialized: {error}"}).encode("utf-8")
 
-        self._send_bytes(body, "application/json; charset=utf-8", status)
+        self._send_bytes(body, "application/json; charset=utf-8", status, headers=headers)
 
     def _send_text(self, message: str, status: int = 200):
         self._send_bytes(message.encode("utf-8"), "text/plain; charset=utf-8", status)
 
-    def _send_bytes(self, body: bytes, content_type: str, status: int = 200, cache: str = None):
+    def _send_bytes(self, body: bytes, content_type: str, status: int = 200, cache: str = None, headers: dict = None):
         self._responded = True
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", cache or "no-store")
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)

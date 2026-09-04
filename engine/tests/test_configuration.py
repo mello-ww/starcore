@@ -251,7 +251,8 @@ class ConfigurationApiTest(unittest.TestCase):
 
         self.assertEqual(status, 200)
         paths = {setting["path"] for setting in payload["settings"]}
-        self.assertEqual(paths, {"server.host", "server.port", "server.enabled"})
+        self.assertEqual(paths, {"server.host", "server.port", "server.enabled",
+                                  "server.https_enabled", "server.https_cert", "server.https_key"})
         self.assertIn("restart_required", payload)
 
     def test_no_secret_looking_fields_are_exposed(self):

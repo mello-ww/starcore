@@ -4,6 +4,7 @@ import io
 import shutil
 import tempfile
 
+from starcore.auth import AuthStore
 from starcore.core import StarCore
 
 CONFIG_TEMPLATE = """[engine]
@@ -30,6 +31,10 @@ def start_engine(mission_control=False, services=False, host="127.0.0.1", port=0
         encoding="utf-8")
 
     engine = StarCore(config_path)
+    # a disposable, per-test credential/session store - never the real
+    # engine/data/auth.json - so one test bootstrapping a user (or creating a
+    # session) can never leak into, or be affected by, any other test
+    engine.auth = AuthStore(directory / "auth.json")
     shutil.rmtree(directory, ignore_errors=True)
 
     with redirect_stdout(io.StringIO()):

@@ -82,6 +82,18 @@ def main():
     finally:
         engine.stop()
 
+    if engine.restart_requested:
+        # re-exec this same process rather than starting a second one and
+        # exiting - a real restart, not a Mission-Control-only refresh: every
+        # service StarCore started is gone (stop() above already completed
+        # cleanly) and a brand new interpreter picks it back up from scratch,
+        # so nothing can be left half-initialized. "-m starcore" is one of the
+        # two documented run modes (see README) regardless of which one this
+        # process was actually launched with, so this doesn't need to guess
+        # at (or reconstruct) the original invocation.
+        os.execv(sys.executable, [sys.executable, "-m", "starcore"] + sys.argv[1:])
+        return  # unreachable outside tests, where os.execv is mocked out
+
     # a remote shutdown (e.g. from Mission Control) can leave the CLI reader
     # thread blocked inside input() - it's a daemon thread so it can't block
     # process exit, but CPython's normal interpreter shutdown still tries to

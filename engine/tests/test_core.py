@@ -3,11 +3,13 @@ from pathlib import Path
 from unittest import mock
 import io
 import sys
+import tempfile
 import threading
 import time
 import unittest
 
-from starcore.cli.main import run
+from starcore.cli.main import main, run
+from starcore.core import StarCore
 from starcore.manifest import SatelliteManifest
 from starcore.satellite import Satellite
 from starcore.satellite_config import SatelliteConfig
@@ -175,18 +177,124 @@ class CliReplTest(unittest.TestCase):
             never.wait()
             raise EOFError
 
-        with mock.patch("builtins.input", blocking_input), redirect_stdout(io.StringIO()):
-            reader = threading.Thread(target=run, args=(engine,), daemon=True)
-            reader.start()
+        try:
+            # _interactive() is mocked explicitly (rather than relying on
+            # whatever stdin happens to be while the suite runs) so this test
+            # deterministically exercises the reader thread it's named after,
+            # instead of silently testing nothing when stdin isn't a tty.
+            with mock.patch("starcore.cli.main._interactive", return_value=True), \
+                 mock.patch("builtins.input", blocking_input), redirect_stdout(io.StringIO()):
+                reader = threading.Thread(target=run, args=(engine,), daemon=True)
+                reader.start()
 
-            time.sleep(0.1)  # let the reader thread reach the blocking input() call
-            self.assertTrue(reader.is_alive())
+                time.sleep(0.1)  # let the reader thread reach the blocking input() call
+                self.assertTrue(reader.is_alive())
 
-            engine.stop()  # simulates what the API's /api/shutdown handler does
-            reader.join(timeout=2)
+                engine.stop()  # simulates what the API's /api/shutdown handler does
+                reader.join(timeout=2)
 
-        self.assertFalse(reader.is_alive())
+            self.assertFalse(reader.is_alive())
+            self.assertTrue(engine.stopped.is_set())
+        finally:
+            # engine.stop() above only unblocks run()'s own wait() - the inner
+            # "starcore-cli" thread it spawned is still genuinely stuck inside
+            # blocking_input()'s never.wait(), exactly as intended. Release it
+            # and wait for it to actually finish here, or it leaks as a real,
+            # permanently-blocked "starcore-cli"-named thread for the rest of
+            # the test process - which would then poison every later test that
+            # enumerates threads by name (e.g. the headless-stdin tests in
+            # this file and in test_deployment.py).
+            never.set()
+            for thread in threading.enumerate():
+                if thread.name == "starcore-cli":
+                    thread.join(timeout=2)
+
+    def test_request_restart_stops_the_engine_and_sets_the_flag(self):
+        engine = start_engine(mission_control=False)
+        self.assertFalse(engine.restart_requested)
+
+        with redirect_stdout(io.StringIO()):
+            engine.request_restart()
+
+        self.assertTrue(engine.restart_requested)
         self.assertTrue(engine.stopped.is_set())
+        self.assertFalse(engine.status()["running"])
+
+    def test_a_plain_stop_never_sets_the_restart_flag(self):
+        # request_restart() reuses stop() - this documents that stop() itself
+        # never implies a restart was ever asked for
+        engine = start_engine(mission_control=False)
+        stop_engine(engine)
+
+        self.assertFalse(engine.restart_requested)
+
+
+class MainEntrypointTest(unittest.TestCase):
+    """starcore.cli.main.main() itself - specifically, that a restart request
+    makes it re-exec the process (never a second shutdown implementation, and
+    never just refreshing Mission Control) while a plain stop exits for good.
+
+    os.execv/os._exit are mocked because actually calling either would tear
+    down the test process; StarCore is swapped for a disposable, unstarted
+    instance the same way tests/support.start_engine() builds one, since
+    main() constructs its own engine with no way to inject one.
+    """
+
+    def _disposable_engine(self, services=False) -> StarCore:
+        directory = Path(tempfile.mkdtemp(prefix="starcore-tests-"))
+        native = directory / "native"
+        link = directory / "link"
+        native.mkdir(parents=True)
+        link.mkdir(parents=True)
+        config_path = directory / "config.toml"
+        config_path.write_text(
+            f"[server]\nenabled = false\nhost = \"127.0.0.1\"\nport = 0\n"
+            f"\n[satellites]\nservices = {str(services).lower()}\n",
+            encoding="utf-8")
+
+        engine = StarCore(config_path)
+        engine.native_path = native
+        engine.link_path = link
+        return engine
+
+    def test_main_re_execs_itself_after_a_requested_restart(self):
+        engine = self._disposable_engine()
+
+        with mock.patch("starcore.cli.main.StarCore", return_value=engine), \
+             mock.patch("starcore.cli.main._interactive", return_value=False), \
+             mock.patch("starcore.cli.main.os.execv") as execv, \
+             mock.patch("starcore.cli.main.os._exit") as exit_, \
+             redirect_stdout(io.StringIO()):
+            threading.Thread(target=lambda: (time.sleep(0.1), engine.request_restart()), daemon=True).start()
+            main()
+
+        execv.assert_called_once()
+        exit_.assert_not_called()
+        args = execv.call_args[0]
+        self.assertEqual(args[0], sys.executable)
+        # the re-exec always targets "-m starcore" (one of the two documented
+        # run modes) regardless of how this process itself was originally
+        # invoked; anything the process was launched with beyond argv[0] is
+        # carried through unchanged
+        self.assertEqual(args[1][:3], [sys.executable, "-m", "starcore"])
+        self.assertEqual(args[1][3:], sys.argv[1:])
+        self.assertTrue(engine.restart_requested)
+        self.assertTrue(engine.stopped.is_set())
+
+    def test_main_exits_for_good_after_a_plain_stop(self):
+        engine = self._disposable_engine()
+
+        with mock.patch("starcore.cli.main.StarCore", return_value=engine), \
+             mock.patch("starcore.cli.main._interactive", return_value=False), \
+             mock.patch("starcore.cli.main.os.execv") as execv, \
+             mock.patch("starcore.cli.main.os._exit") as exit_, \
+             redirect_stdout(io.StringIO()):
+            threading.Thread(target=lambda: (time.sleep(0.1), engine.stop()), daemon=True).start()
+            main()
+
+        execv.assert_not_called()
+        exit_.assert_called_once_with(0)
+        self.assertFalse(engine.restart_requested)
 
 
 class SatelliteStateTest(unittest.TestCase):

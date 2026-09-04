@@ -25,6 +25,12 @@ def _validate_port(value) -> int:
     return port
 
 
+def _validate_optional_path(value) -> str:
+    text = str(value).strip() if value is not None else ""
+    return text  # existence is checked at startup (see ApiServer.start()), not here -
+                 # an empty string just means "no HTTPS certificate/key configured"
+
+
 def _validate_bool(value) -> bool:
     if isinstance(value, bool):
         return value
@@ -53,6 +59,21 @@ SETTINGS = {
     ("server", "enabled"): {
         "validate": _validate_bool,
         "description": "Whether Mission Control starts at all",
+        "restart_required": True,
+    },
+    ("server", "https_enabled"): {
+        "validate": _validate_bool,
+        "description": "Serve Mission Control over HTTPS instead of plain HTTP",
+        "restart_required": True,
+    },
+    ("server", "https_cert"): {
+        "validate": _validate_optional_path,
+        "description": "Path to the TLS certificate file (PEM), used when https_enabled is true",
+        "restart_required": True,
+    },
+    ("server", "https_key"): {
+        "validate": _validate_optional_path,
+        "description": "Path to the TLS private key file (PEM), used when https_enabled is true",
         "restart_required": True,
     },
 }

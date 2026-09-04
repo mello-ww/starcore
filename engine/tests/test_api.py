@@ -219,5 +219,57 @@ class ShutdownTest(unittest.TestCase):
             stop_engine(engine)
 
 
+class RestartTest(unittest.TestCase):
+    """Each test starts its own engine, since restart is destructive too.
+
+    Actually re-exec'ing the interpreter (os.execv) only happens in the
+    process entrypoint (starcore.cli.main.main()), not here - these tests
+    cover everything up to that point: the API accepts the request, and it
+    reuses engine.stop() (via request_restart()) rather than a second
+    shutdown implementation, and leaves restart_requested set so the
+    entrypoint knows to re-exec instead of exiting for good.
+    """
+
+    def request(self, engine, path, method="GET"):
+        connection = HTTPConnection("127.0.0.1", engine.api.port, timeout=5)
+        try:
+            connection.request(method, path)
+            response = connection.getresponse()
+            return response.status, json.loads(response.read().decode("utf-8"))
+        finally:
+            connection.close()
+
+    def wait_until(self, predicate, timeout=2.0):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if predicate():
+                return True
+            time.sleep(0.05)
+        return predicate()
+
+    def test_restart_stops_the_core_and_flags_a_restart(self):
+        engine = start_engine(mission_control=True)
+        self.assertFalse(engine.restart_requested)
+
+        status, payload = self.request(engine, "/api/restart", method="POST")
+        self.assertEqual(status, 200)
+        self.assertIn("restarting", payload["message"])
+
+        self.assertTrue(self.wait_until(lambda: not engine.status()["running"]))
+        self.assertTrue(self.wait_until(lambda: not engine.api.running))
+        self.assertTrue(engine.stopped.is_set())
+        self.assertTrue(engine.restart_requested)
+
+    def test_restart_via_get_is_rejected(self):
+        engine = start_engine(mission_control=True)
+        try:
+            status, payload = self.request(engine, "/api/restart", method="GET")
+            self.assertEqual(status, 405)
+            self.assertIn("error", payload)
+            self.assertFalse(engine.restart_requested)
+        finally:
+            stop_engine(engine)
+
+
 if __name__ == "__main__":
     unittest.main()

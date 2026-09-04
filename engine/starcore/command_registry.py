@@ -22,3 +22,14 @@ class CommandRegistry:
 
     def all(self):
         return self.commands
+
+    def remove_source(self, source):
+        """Drops every command registered by one source (a satellite's name).
+
+        add() refuses to overwrite an existing command name rather than
+        silently replacing it, so a satellite's stale commands have to be
+        cleared out this way before it is reloaded - otherwise reload would
+        keep serving the old command and just warn about the "conflict".
+        """
+        for name in [name for name, entry in self.commands.items() if entry["source"] == source]:
+            del self.commands[name]
