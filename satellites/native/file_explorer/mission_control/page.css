@@ -9,6 +9,12 @@
     cursor: pointer;
 }
 
+/* the roots/drives list isn't a real, writable directory - New folder and
+   Upload have nothing to act on while it's shown */
+.fe-toolbar .hidden-control {
+    display: none;
+}
+
 .fe-breadcrumb {
     display: flex;
     flex-wrap: wrap;

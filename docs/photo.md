@@ -34,11 +34,16 @@ without ever putting an original at risk.
 
 ```toml
 enabled = true
-storage = "data"      # relative paths are resolved inside the satellite
-thumbnail_size = 480  # longest edge, in pixels
+storage = "data"          # relative paths are resolved inside the satellite
+thumbnail_size = 480      # longest edge, in pixels
+photo_directory = ""      # default directory 'scan'/'import' use when none is given
 ```
 
 `storage` may be an absolute path, which is how the library is moved to another disk.
+
+`photo_directory` is the directory `scan` and `import` fall back to when a request doesn't
+name a `source` explicitly - see "Import" and "Configuring the default photo directory"
+below. Left empty (the default), a `source` must always be given explicitly.
 
 ## Supported formats
 
@@ -64,6 +69,11 @@ reported and skipped; it never stops the rest of the import.
 
 `scan` performs the same walk without writing anything, which is what the Mission Control
 import panel uses to preview a folder.
+
+A request that doesn't name a `source` falls back to the configured `photo_directory` (see
+"Configuration" above); if neither is available, the request is rejected with a clear error
+rather than doing nothing silently. An explicit `source` always takes priority over the
+configured default when both are present.
 
 ## Metadata
 
@@ -120,9 +130,9 @@ GET  /api/satellites/photo/photos             every photo, newest first
 GET  /api/satellites/photo/photos/<id>        one photo's metadata
 GET  /api/satellites/photo/thumbnails/<id>    cached thumbnail
 GET  /api/satellites/photo/originals/<id>     the stored original
-POST /api/satellites/photo/scan               preview a directory  {"source": "..."}
-POST /api/satellites/photo/import             import a directory   {"source": "..."}
-GET  /api/satellites/photo/configuration      current sync_host/sync_port settings
+POST /api/satellites/photo/scan               preview a directory  {"source": "..."} (optional - see below)
+POST /api/satellites/photo/import             import a directory   {"source": "..."} (optional - see below)
+GET  /api/satellites/photo/configuration      current settings (sync_host, sync_port, photo_directory)
 POST /api/satellites/photo/configuration      change one            {"key": ..., "value": ...}
 ```
 
@@ -140,7 +150,10 @@ Selecting a photo opens a viewer with the full image, its metadata, and keyboard
 
 Because a browser cannot read a folder on the machine running StarCore, the import panel
 asks for a path on that machine rather than pretending to open a local folder picker. The
-panel scans first, so the folder can be previewed before anything is copied.
+panel scans first, so the folder can be previewed before anything is copied. When a default
+`photo_directory` is configured (see below) and the field hasn't been typed into yet, the
+panel pre-fills it so importing from the usual place doesn't mean retyping the same path
+every time - typing a different path always overrides the default for that one import.
 
 ## Command
 
@@ -202,6 +215,27 @@ restart names the address it is now listening on, and a port already in use is r
 such rather than silently pretending the change took effect. `sync_port = 0` (let the OS
 choose a port) is never reported as a pending restart merely because the live bound port
 differs from the literal `0` on disk - that mismatch is the point of `0`, not a stale value.
+
+### Configuring the default photo directory
+
+`photo_directory` is edited through the same Config button, page and CLI command as
+`sync_host`/`sync_port` above - it is simply another setting on Photo's own
+`"configuration"` route. Unlike the sync listener, there is nothing running for this setting
+to fall out of sync with: a saved value applies to the very next `scan` or `import` that
+doesn't name its own `source`, so it is never reported as a pending restart.
+
+A value must be an absolute path, or start with `~` (expanded to the user's home directory
+at scan/import time) - a relative path is rejected before anything is written. Leaving it
+empty (the default) means `scan` and `import` always require a `source` explicitly. A
+directory that has since become missing or inaccessible is never a crash: the same
+validation `scan`/`import` already perform on an explicit `source` (see "Import" above)
+applies just the same to the configured default, and is reported as a normal `400` error
+naming the problem.
+
+Mission Control's Config modal also offers a "Browse…" button next to this field, backed by
+the FileExplorer Satellite (see `docs/satellites.md`, "Exposing configuration"), so a
+directory can be picked instead of typed - the button only appears when FileExplorer is
+present and enabled; the field still accepts a typed path either way.
 
 ### Sending a photo
 

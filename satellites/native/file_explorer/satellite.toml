@@ -1,5 +1,5 @@
 name = "FileExplorer"
 version = "1.0.0"
 author = "mellow"
-description = "Browse, upload and manage files under a configured root directory."
+description = "Browse, upload and manage files anywhere on this machine that StarCore itself can reach."
 icon = "icon.svg"

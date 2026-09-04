@@ -80,13 +80,26 @@ def originals(request):
     return _serve(request, thumbnail=False)
 
 
+def _requested_source(request):
+    """The 'source' a scan/import request named, or the satellite's own
+    configured photo_directory (see configuration.py) when it didn't name
+    one - the default directory only ever applies when a request is silent
+    about where to look, never overriding an explicit source."""
+    source = (request.body or {}).get("source")
+    if source is not None:
+        return source
+
+    return request.satellite.config.get("photo_directory", "") or None
+
+
 def scan(request):
     if request.method != "POST":
         return error_response("only POST is supported here", status=405)
 
-    source = (request.body or {}).get("source")
-    if not isinstance(source, str):
-        return error_response("'source' must be a path to a directory on this machine", status=400)
+    source = _requested_source(request)
+    if not isinstance(source, str) or not source:
+        return error_response("'source' must be a path to a directory on this machine, or configure a "
+                               "default photo_directory", status=400)
 
     try:
         return json_response(library(request.satellite).scan(source))
@@ -98,9 +111,10 @@ def import_directory(request):
     if request.method != "POST":
         return error_response("only POST is supported here", status=405)
 
-    source = (request.body or {}).get("source")
-    if not isinstance(source, str):
-        return error_response("'source' must be a path to a directory on this machine", status=400)
+    source = _requested_source(request)
+    if not isinstance(source, str) or not source:
+        return error_response("'source' must be a path to a directory on this machine, or configure a "
+                               "default photo_directory", status=400)
 
     try:
         return json_response(library(request.satellite).import_directory(source))

@@ -118,6 +118,14 @@ request plumbing. Photo Sync's `sync_host`/`sync_port` are the first Satellite t
 see `docs/photo.md` - and the underlying mechanism is documented for Satellite authors in
 `docs/satellites.md` under "Exposing configuration".
 
+A setting a Satellite describes with `"type": "path"` (Photo's `photo_directory` and Music's
+`library` - see `docs/photo.md` and `docs/music.md`) gets a "Browse…" button next to its
+field in the modal, opening a small directory picker. The picker is itself completely
+generic: it browses through the FileExplorer Satellite's own `entries` route - the same one
+its own Mission Control page uses - and simply hands back whatever absolute path was chosen.
+It only appears when a Satellite named `FileExplorer` is present and enabled; a `"path"`
+field always still accepts a typed path directly, with or without it.
+
 ## API
 
 Mission Control is a client of the Engine API, which is described in the API documentation. The frontend itself is plain HTML, CSS and JavaScript served by the Engine from the `mission_control` directory, so it has no build step and no dependencies.

@@ -1,7 +1,8 @@
 export function mount(context) {
     const { element: root, satellite, api } = context;
 
-    let path = "";       // relative path of the directory currently shown
+    let path = "";       // "" means the top-level list of roots/drives;
+                          // anything else is a real, absolute filesystem path
     let listing = null;  // last successful /entries response
     let busy = false;
     let selected = null; // name of the entry a confirm-delete is pending on
@@ -12,7 +13,7 @@ export function mount(context) {
         el("h2", null, "File Explorer"),
         el("span", "badge badge-type", satellite.type),
         el("span", `badge ${satellite.enabled ? "badge-up" : "badge-down"}`, satellite.enabled ? "enabled" : "disabled"),
-        el("p", null, satellite.description || "Browse and manage files under a configured directory."),
+        el("p", null, satellite.description || "Browse and manage files anywhere on this machine."),
     );
 
     const breadcrumb = el("div", "fe-breadcrumb");
@@ -20,7 +21,7 @@ export function mount(context) {
     const error = el("p", "banner error", "");
     error.hidden = true;
     const list = el("div", "fe-list");
-    const empty = el("p", "muted", "This directory is empty.");
+    const empty = el("p", "muted", "This is empty.");
     empty.hidden = true;
     const progress = el("p", "fe-progress", "");
     progress.hidden = true;
@@ -51,6 +52,30 @@ export function mount(context) {
 
     function refresh() {
         return load(path);
+    }
+
+    /* ---------- path helpers ----------
+     *
+     * File Explorer now browses the whole filesystem, so a path is always
+     * either "" (the virtual list of roots/drives) or a real absolute path
+     * ("/home/user/photos" on Linux, "C:/Users/foo" on Windows - the server
+     * accepts forward slashes on both, so that is all this file ever sends).
+     * There is no per-satellite "root" to be relative to any more. */
+
+    // splits an absolute path into its anchor ("/" or "C:/") and the
+    // segments after it, so the breadcrumb can render one crumb per level
+    // without caring which platform it's talking to
+    function splitPath(value) {
+        const normalized = value.replace(/\\/g, "/");
+        const match = normalized.match(/^([A-Za-z]:\/)(.*)$/) || normalized.match(/^(\/)(.*)$/);
+        if (!match) {
+            return { anchor: normalized, segments: [] };
+        }
+        return { anchor: match[1], segments: match[2].split("/").filter(Boolean) };
+    }
+
+    function joinPath(base, name) {
+        return base.endsWith("/") ? `${base}${name}` : `${base}/${name}`;
     }
 
     /* ---------- structure ---------- */
@@ -91,26 +116,46 @@ export function mount(context) {
         breadcrumb.replaceChildren(...buildBreadcrumb());
         upButton.disabled = listing.parent === null;
 
+        // the roots/drives list isn't a real, writable directory - there is
+        // nothing to create a folder in or upload into at that level
+        const atRoots = path === "";
+        toolbar.querySelectorAll(".fe-toolbar > button, .fe-toolbar > label").forEach((control) => {
+            if (control !== upButton) {
+                control.classList.toggle("hidden-control", atRoots);
+            }
+        });
+
         const entries = listing.entries;
         empty.hidden = entries.length > 0;
-        list.replaceChildren(...entries.map(buildRow));
+        list.replaceChildren(...entries.map((item) => buildRow(item, atRoots)));
     }
 
     function buildBreadcrumb() {
-        const parts = path ? path.split("/") : [];
         const crumbs = [];
 
-        const rootCrumb = el("button", "fe-crumb", "root");
-        rootCrumb.type = "button";
-        rootCrumb.addEventListener("click", () => load(""));
-        crumbs.push(rootCrumb);
+        const computerCrumb = el("button", "fe-crumb", "Computer");
+        computerCrumb.type = "button";
+        computerCrumb.addEventListener("click", () => load(""));
+        crumbs.push(computerCrumb);
 
-        let accumulated = "";
-        for (const part of parts) {
-            accumulated = accumulated ? `${accumulated}/${part}` : part;
+        if (path === "") {
+            return crumbs;
+        }
+
+        const { anchor, segments } = splitPath(path);
+
+        crumbs.push(el("span", "fe-crumb-sep", "/"));
+        const anchorCrumb = el("button", "fe-crumb", anchor);
+        anchorCrumb.type = "button";
+        anchorCrumb.addEventListener("click", () => load(anchor));
+        crumbs.push(anchorCrumb);
+
+        let accumulated = anchor;
+        for (const segment of segments) {
+            accumulated = joinPath(accumulated, segment);
             const target = accumulated;
             crumbs.push(el("span", "fe-crumb-sep", "/"));
-            const crumb = el("button", "fe-crumb", part);
+            const crumb = el("button", "fe-crumb", segment);
             crumb.type = "button";
             crumb.addEventListener("click", () => load(target));
             crumbs.push(crumb);
@@ -119,9 +164,12 @@ export function mount(context) {
         return crumbs;
     }
 
-    function buildRow(item) {
+    function buildRow(item, atRoots) {
         const row = el("div", "fe-row");
-        const itemPath = path ? `${path}/${item.name}` : item.name;
+        // at the roots/drives level, an entry's name IS the absolute path to
+        // navigate to ("/", "C:/", ...) - everywhere else it's a bare name
+        // that has to be joined onto the directory currently shown
+        const itemPath = atRoots ? item.name : joinPath(path, item.name);
 
         const info = el("div", "fe-row-info");
         info.appendChild(typeIcon(item.type));
@@ -153,20 +201,23 @@ export function mount(context) {
             actions.appendChild(download);
         }
 
-        const renameButton = el("button", "icon-button", "");
-        renameButton.type = "button";
-        renameButton.title = "Rename";
-        renameButton.appendChild(renameIcon());
-        renameButton.addEventListener("click", () => handleRename(item, itemPath));
-        actions.appendChild(renameButton);
+        // a root/drive itself can't be renamed or deleted through here
+        if (!atRoots) {
+            const renameButton = el("button", "icon-button", "");
+            renameButton.type = "button";
+            renameButton.title = "Rename";
+            renameButton.appendChild(renameIcon());
+            renameButton.addEventListener("click", () => handleRename(item, itemPath));
+            actions.appendChild(renameButton);
 
-        const deleteButton = el("button", "icon-button icon-button-alert", "");
-        deleteButton.type = "button";
-        deleteButton.title = selected === itemPath ? "Confirm delete?" : "Delete";
-        deleteButton.classList.toggle("confirm", selected === itemPath);
-        deleteButton.appendChild(deleteIcon());
-        deleteButton.addEventListener("click", () => handleDelete(item, itemPath, deleteButton));
-        actions.appendChild(deleteButton);
+            const deleteButton = el("button", "icon-button icon-button-alert", "");
+            deleteButton.type = "button";
+            deleteButton.title = selected === itemPath ? "Confirm delete?" : "Delete";
+            deleteButton.classList.toggle("confirm", selected === itemPath);
+            deleteButton.appendChild(deleteIcon());
+            deleteButton.addEventListener("click", () => handleDelete(item, itemPath, deleteButton));
+            actions.appendChild(deleteButton);
+        }
 
         row.appendChild(actions);
         return row;
@@ -278,6 +329,9 @@ export function mount(context) {
     }
 
     function formatDate(iso) {
+        if (!iso) {
+            return "—";
+        }
         try {
             return new Date(iso).toLocaleString();
         } catch (failure) {

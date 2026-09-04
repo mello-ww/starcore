@@ -391,6 +391,52 @@ class PhotoConfigurationTest(unittest.TestCase):
         with self.assertRaises(configuration_module().ConfigurationError):
             configuration_module().update(self.engine, self.satellite, "sync_token", "anything")
 
+    def test_photo_directory_defaults_to_not_configured(self):
+        payload = configuration_module().describe(self.satellite)
+        by_key = {setting["key"]: setting for setting in payload["settings"]}
+
+        self.assertEqual(by_key["photo_directory"]["value"], "")
+        self.assertEqual(by_key["photo_directory"]["type"], "path")
+        # unlike sync_host/sync_port there is no running listener to fall out
+        # of sync with, so this is never "pending" a restart
+        self.assertEqual(by_key["photo_directory"]["live_value"], "")
+        self.assertFalse(by_key["photo_directory"]["pending_restart"])
+
+    def test_changing_photo_directory_persists_without_touching_the_listener(self):
+        directory = str(self.directory / "photos")
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = configuration_module().update(self.engine, self.satellite, "photo_directory", directory)
+
+        self.assertEqual(self.satellite.config.get("photo_directory"), directory)
+        self.assertIn(f'photo_directory = "{directory}"', self.config_path.read_text(encoding="utf-8"))
+        by_key = {setting["key"]: setting for setting in result["settings"]}
+        self.assertEqual(by_key["photo_directory"]["value"], directory)
+        self.assertFalse(by_key["photo_directory"]["pending_restart"])
+        self.assertIn(directory, result["note"])
+        # sync_host/sync_port are untouched by a photo_directory change
+        self.assertIsNone(sync_module().service(self.satellite))
+
+    def test_photo_directory_may_be_cleared_back_to_not_configured(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            configuration_module().update(self.engine, self.satellite, "photo_directory", str(self.directory))
+            result = configuration_module().update(self.engine, self.satellite, "photo_directory", "")
+
+        self.assertEqual(self.satellite.config.get("photo_directory"), "")
+        self.assertIn("no default directory", result["note"].lower())
+
+    def test_a_relative_photo_directory_is_rejected(self):
+        with self.assertRaises(configuration_module().ConfigurationError):
+            configuration_module().update(self.engine, self.satellite, "photo_directory", "relative/path")
+
+    def test_a_photo_directory_starting_with_tilde_is_accepted(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = configuration_module().update(self.engine, self.satellite, "photo_directory", "~/Pictures")
+
+        self.assertEqual(self.satellite.config.get("photo_directory"), "~/Pictures")
+        by_key = {setting["key"]: setting for setting in result["settings"]}
+        self.assertEqual(by_key["photo_directory"]["value"], "~/Pictures")
+
     def test_the_saved_value_survives_a_fresh_read_of_the_satellite_config(self):
         with contextlib.redirect_stdout(io.StringIO()):
             configuration_module().update(self.engine, self.satellite, "sync_port", "0")

@@ -17,6 +17,7 @@ let route = { name: "overview", satellite: null };
 let mounted = null;
 let configurationSettings = [];
 let satelliteConfigState = null;
+let directoryPickerState = null;
 // "<name>:enable" | "<name>:disable" | "<name>:reload" while a lifecycle
 // request is in flight, so a card or topbar button re-rendered mid-request
 // (the 5s poll doesn't wait for one to finish) still shows as busy instead of
@@ -991,7 +992,29 @@ function buildConfigField(setting) {
         input.value = setting.value ?? "";
     }
 
-    wrapper.append(fieldLabel, input);
+    wrapper.appendChild(fieldLabel);
+
+    // a "path"-typed setting gets a "Browse…" button that opens a directory
+    // picker backed by the FileExplorer satellite's own /entries route - the
+    // one, narrow exception to never hardcoding a satellite's name into this
+    // generic form, since it's delegating to the satellite whose whole job is
+    // generic filesystem browsing, not branching per caller (see docs/satellites.md)
+    const fileExplorer = setting.type === "path" ? findSatellite("FileExplorer") : null;
+    if (fileExplorer && fileExplorer.enabled) {
+        const row = element("div", "config-field-row");
+        const browse = element("button", "button", "Browse…");
+        browse.type = "button";
+        browse.addEventListener("click", () => {
+            openDirectoryPicker(input.value, (chosen) => {
+                input.value = chosen;
+            });
+        });
+        row.append(input, browse);
+        wrapper.appendChild(row);
+    } else {
+        wrapper.appendChild(input);
+    }
+
     if (setting.description) {
         wrapper.appendChild(element("p", "hint", setting.description));
     }
@@ -1034,6 +1057,148 @@ async function handleSatelliteConfigSubmit(event) {
     }
 
     button.disabled = false;
+}
+
+/* ---------- directory picker ----------
+ *
+ * Opened from any "path"-typed configuration field (see buildConfigField
+ * above). It browses through the FileExplorer satellite's own /entries
+ * route - the same one its own Mission Control page uses - so a directory
+ * can be chosen without retyping a path by hand. Nothing here is specific to
+ * Photo, Music, or any other caller: it just hands back whatever absolute
+ * path the user picked. */
+
+function openDirectoryPicker(initialPath, onChoose) {
+    directoryPickerState = { onChoose, path: "", parent: null };
+
+    document.getElementById("directory-picker-error").hidden = true;
+    document.getElementById("directory-picker-overlay").hidden = false;
+    document.getElementById("directory-picker-choose").disabled = true;
+
+    // an already-typed absolute path is opened directly so the picker starts
+    // where the field already points; anything else (empty, relative, or a
+    // path that turns out not to exist) just falls back to the roots list
+    const start = typeof initialPath === "string" && initialPath.trim() ? initialPath.trim() : "";
+    loadDirectoryPicker(start, /* fallbackToRoots */ true);
+}
+
+function closeDirectoryPicker() {
+    document.getElementById("directory-picker-overlay").hidden = true;
+    directoryPickerState = null;
+}
+
+async function loadDirectoryPicker(path, fallbackToRoots = false) {
+    const list = document.getElementById("directory-picker-list");
+    list.replaceChildren(element("p", "dir-picker-empty", "Loading…"));
+
+    try {
+        const payload = await getJson(satelliteUrl("FileExplorer", `/entries?path=${encodeURIComponent(path)}`));
+        renderDirectoryPicker(payload);
+    } catch (error) {
+        if (fallbackToRoots && path !== "") {
+            loadDirectoryPicker("", false);
+            return;
+        }
+        list.replaceChildren();
+        showDirectoryPickerError(error.message);
+    }
+}
+
+function renderDirectoryPicker(payload) {
+    // the picker can be closed (or the field it was opened from can vanish
+    // with the whole modal) while a request from before is still in flight
+    if (!directoryPickerState) {
+        return;
+    }
+
+    directoryPickerState.path = payload.path;
+    directoryPickerState.parent = payload.parent;
+    document.getElementById("directory-picker-error").hidden = true;
+    document.getElementById("directory-picker-current").textContent = payload.path || "Computer";
+    document.getElementById("directory-picker-choose").disabled = payload.path === "";
+
+    const breadcrumb = document.getElementById("directory-picker-breadcrumb");
+    breadcrumb.replaceChildren(buildDirectoryPickerCrumb("Computer", ""));
+    if (payload.path) {
+        for (const segment of directoryPickerSegments(payload.path)) {
+            breadcrumb.append(
+                element("span", "dir-picker-crumb-sep", "/"),
+                buildDirectoryPickerCrumb(segment.label, segment.path),
+            );
+        }
+    }
+
+    const directories = (payload.entries || []).filter((entry) => entry.type === "dir");
+    const list = document.getElementById("directory-picker-list");
+    list.replaceChildren();
+
+    if (directories.length === 0) {
+        list.appendChild(element("p", "dir-picker-empty", "No subdirectories here."));
+        return;
+    }
+
+    for (const entry of directories) {
+        // at the roots level an entry's name IS the absolute path already
+        // (e.g. "/", or "C:\") - everywhere else it's a bare name that has to
+        // be joined onto the directory being shown (see FileExplorer's own
+        // page.js, which follows this same convention for the same reason)
+        const target = payload.path === "" ? entry.name : joinDirectoryPickerPath(payload.path, entry.name);
+        const row = element("button", "dir-picker-row");
+        row.type = "button";
+        row.appendChild(element("span", null, entry.name));
+        row.addEventListener("click", () => loadDirectoryPicker(target));
+        list.appendChild(row);
+    }
+}
+
+function buildDirectoryPickerCrumb(text, path) {
+    const button = element("button", "dir-picker-crumb", text);
+    button.type = "button";
+    button.addEventListener("click", () => loadDirectoryPicker(path));
+    return button;
+}
+
+// splits an absolute path into breadcrumb segments without branching on the
+// platform - both POSIX ("/a/b") and Windows ("C:\a\b") paths are just a
+// leading anchor followed by "/"-or-"\"-separated names
+function directoryPickerSegments(path) {
+    const normalized = path.replace(/\\/g, "/");
+    const match = normalized.match(/^([A-Za-z]:\/|\/)(.*)$/);
+    if (!match) {
+        return [];
+    }
+
+    const [, anchor, rest] = match;
+    const names = rest.split("/").filter(Boolean);
+    const segments = [];
+    let current = anchor;
+
+    for (const name of names) {
+        current = joinDirectoryPickerPath(current, name);
+        segments.push({ label: name, path: current });
+    }
+
+    return segments;
+}
+
+function joinDirectoryPickerPath(base, name) {
+    const normalized = base.replace(/\\/g, "/");
+    return normalized.endsWith("/") ? `${normalized}${name}` : `${normalized}/${name}`;
+}
+
+function showDirectoryPickerError(message) {
+    const errorBox = document.getElementById("directory-picker-error");
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+}
+
+function chooseDirectoryPickerCurrent() {
+    if (!directoryPickerState || !directoryPickerState.path) {
+        return;
+    }
+
+    directoryPickerState.onChoose(directoryPickerState.path);
+    closeDirectoryPicker();
 }
 
 /* ---------- shutdown ---------- */
@@ -1163,8 +1328,20 @@ document.getElementById("satellite-config-overlay").addEventListener("click", (e
         closeSatelliteConfig();
     }
 });
+document.getElementById("directory-picker-close").addEventListener("click", closeDirectoryPicker);
+document.getElementById("directory-picker-choose").addEventListener("click", chooseDirectoryPickerCurrent);
+document.getElementById("directory-picker-overlay").addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) {
+        closeDirectoryPicker();
+    }
+});
 document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !document.getElementById("satellite-config-overlay").hidden) {
+    if (event.key !== "Escape") {
+        return;
+    }
+    if (!document.getElementById("directory-picker-overlay").hidden) {
+        closeDirectoryPicker();
+    } else if (!document.getElementById("satellite-config-overlay").hidden) {
         closeSatelliteConfig();
     }
 });

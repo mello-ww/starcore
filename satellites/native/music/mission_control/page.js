@@ -138,12 +138,27 @@ export function mount(context) {
         return panel;
     }
 
-    function toggleScan(force) {
+    async function toggleScan(force) {
         scanPanel.hidden = force === undefined ? !scanPanel.hidden : !force;
-        if (!scanPanel.hidden) {
-            const input = scanPanel.querySelector("input");
-            input.value = summary ? summary.source : "";
-            input.focus();
+        if (scanPanel.hidden) return;
+
+        const input = scanPanel.querySelector("input");
+        input.value = summary ? summary.source : "";
+        input.focus();
+
+        // summary.source reflects the library as it was last constructed, which
+        // can lag behind a "library" directory saved through the satellite's own
+        // configuration (the gear icon) until StarCore restarts - prefer the
+        // freshly configured value here so the scan panel never shows a stale
+        // default
+        try {
+            const configuration = await api.get("/configuration");
+            const library = configuration.settings.find((setting) => setting.key === "library");
+            if (library && library.value) {
+                input.value = library.value;
+            }
+        } catch (error) {
+            // the scan panel still works with the library summary's source above
         }
     }
 

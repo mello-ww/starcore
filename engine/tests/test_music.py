@@ -15,6 +15,11 @@ from tests.support import start_engine, stop_engine
 COVER = b"\x89PNG\r\n\x1a\n" + b"cover-bytes" * 4
 
 
+def configuration_module():
+    from importlib import import_module
+    return import_module("satellites.native.music.configuration")
+
+
 def flac(title="Title", artist="Artist", album="Album", seconds=180, cover=None) -> bytes:
     """A FLAC header carrying exactly what the library reads."""
     sample_rate = 44100
@@ -323,6 +328,128 @@ class MusicLibraryTest(unittest.TestCase):
         result = library_inside.scan()
 
         self.assertEqual(result["found"], 1)
+
+
+class MusicConfigurationTest(unittest.TestCase):
+    """Music's own "library" setting, through the generic satellite
+    configuration mechanism - never through any Music-specific Core code."""
+
+    def setUp(self):
+        self.directory = Path(tempfile.mkdtemp(prefix="starcore-music-config-"))
+        self.engine = start_engine()
+        self.satellite = self.engine.registry.get("Music")
+        self.satellite.config.data["storage"] = str(self.directory / "library")
+        self.satellite.config.data["library"] = "~/Music"
+
+        # configuration.update() persists through satellite.config.set(), which
+        # would otherwise write into the real satellites/native/music/config.toml
+        # on disk - every test here redirects that to a throwaway file first
+        self.config_path = self.directory / "config.toml"
+        self.config_path.write_text('enabled = true\nlibrary = "~/Music"\n', encoding="utf-8")
+        self.satellite.config.path = self.config_path
+
+    def tearDown(self):
+        stop_engine(self.engine)
+        shutil.rmtree(self.directory, ignore_errors=True)
+
+    def test_reading_the_configuration_reports_the_existing_default(self):
+        payload = configuration_module().describe(self.satellite)
+        by_key = {setting["key"]: setting for setting in payload["settings"]}
+
+        self.assertEqual(by_key["library"]["value"], "~/Music")
+        self.assertEqual(by_key["library"]["type"], "path")
+        self.assertEqual(by_key["library"]["live_value"], "~/Music")
+        self.assertFalse(by_key["library"]["pending_restart"])
+        self.assertFalse(payload["restart_required"])
+
+    def test_changing_library_persists(self):
+        directory = str(self.directory / "collection")
+
+        result = configuration_module().update(self.satellite, "library", directory)
+
+        self.assertEqual(self.satellite.config.get("library"), directory)
+        self.assertIn(f'library = "{directory}"', self.config_path.read_text(encoding="utf-8"))
+        by_key = {setting["key"]: setting for setting in result["settings"]}
+        self.assertEqual(by_key["library"]["value"], directory)
+        self.assertIn(directory, result["note"])
+
+    def test_music_actually_scans_the_newly_configured_library(self):
+        collection = self.directory / "collection"
+        collection.mkdir()
+        (collection / "one.flac").write_bytes(flac())
+        configuration_module().update(self.satellite, "library", str(collection))
+
+        from importlib import import_module
+        report = import_module("satellites.native.music.library").library(self.satellite).scan()
+
+        self.assertEqual(report["found"], 1)
+        self.assertEqual(report["source"], str(collection))
+
+    def test_library_may_be_cleared_back_to_not_configured(self):
+        configuration_module().update(self.satellite, "library", str(self.directory))
+        result = configuration_module().update(self.satellite, "library", "")
+
+        self.assertEqual(self.satellite.config.get("library"), "")
+        self.assertIn("no default directory", result["note"].lower())
+
+    def test_a_relative_library_is_rejected_and_nothing_is_written(self):
+        before = self.config_path.read_text(encoding="utf-8")
+
+        with self.assertRaises(configuration_module().ConfigurationError):
+            configuration_module().update(self.satellite, "library", "relative/path")
+
+        self.assertEqual(self.config_path.read_text(encoding="utf-8"), before)
+
+    def test_a_library_starting_with_tilde_is_accepted(self):
+        result = configuration_module().update(self.satellite, "library", "~/Tunes")
+
+        self.assertEqual(self.satellite.config.get("library"), "~/Tunes")
+        by_key = {setting["key"]: setting for setting in result["settings"]}
+        self.assertEqual(by_key["library"]["value"], "~/Tunes")
+
+    def test_an_unknown_setting_is_rejected(self):
+        with self.assertRaises(configuration_module().ConfigurationError):
+            configuration_module().update(self.satellite, "storage", "anything")
+
+    def test_the_generic_mechanism_marks_music_as_configurable(self):
+        from starcore.api import payloads
+
+        described = payloads.describe_satellite(self.engine, self.satellite)
+
+        self.assertTrue(described["configurable"])
+        self.assertIn("configuration", self.satellite.routes)
+
+    def test_the_configuration_route_handles_get_and_post_generically(self):
+        handler = self.satellite.routes["configuration"]
+
+        get_request = type("Request", (), {
+            "method": "GET", "satellite": self.satellite, "engine": self.engine, "path": (), "body": None,
+        })()
+        response = handler(get_request)
+        self.assertIn("settings", response.payload)
+
+        post_request = type("Request", (), {
+            "method": "POST", "satellite": self.satellite, "engine": self.engine, "path": (),
+            "body": {"key": "library", "value": str(self.directory)},
+        })()
+        response = handler(post_request)
+        self.assertIn("note", response.payload)
+
+    def test_core_source_has_no_music_specific_configuration_logic(self):
+        """A regression guard: the Core's own engine_config.py,
+        satellite_config.py, toml_edit.py and api/*.py must never come to know
+        about "library" or "music" by name - the generic mechanism
+        (docs/satellites.md) is what has to keep working for any future
+        satellite, not a special case for this one."""
+        core_path = Path(configuration_module().__file__).resolve().parents[2].parent / "engine" / "starcore"
+        offenders = []
+
+        for path in core_path.rglob("*.py"):
+            text = path.read_text(encoding="utf-8").lower()
+            if "music" in text:
+                offenders.append(str(path))
+
+        self.assertEqual(offenders, [])
 
 
 class MusicSatelliteTest(unittest.TestCase):

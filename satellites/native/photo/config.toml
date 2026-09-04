@@ -1,6 +1,7 @@
 enabled = true
 storage = "data" # relative paths are resolved inside the satellite
 thumbnail_size = 480 # longest edge, in pixels
+photo_directory = "" # default directory 'scan'/'import' use when none is given; must be absolute (or start with ~)
 
 sync_enabled = true
 sync_host = "127.0.0.1" # set to "0.0.0.0" to let phones on the local network reach it

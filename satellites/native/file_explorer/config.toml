@@ -1,8 +1,1 @@
 enabled = true
-# relative paths are resolved inside the satellite (never the server's
-# real filesystem root) - the same convention Photo's "storage" and Music's
-# "storage" settings use. Point this at an absolute path to browse anywhere
-# else on the machine; whatever it resolves to is the hard boundary every
-# request is checked against (see paths.py) - nothing outside it is ever
-# reachable, no matter what a request asks for.
-root = "data"

@@ -1,64 +1,83 @@
 """Path resolution and safety for the File Explorer satellite.
 
-The configured root (see config.toml's "root") is the entire security
-boundary. Every operation goes through resolve() before touching the
-filesystem - nothing a request supplies is ever trusted or used directly
-(see docs/api.md - File Explorer - Security). This is the one module that
-matters for that guarantee; api.py never builds a filesystem path itself.
+File Explorer gives access to the entire filesystem the StarCore process
+itself can reach - there is no sandbox or configured root confining it (see
+"File Explorer" in docs/api.md). The operating system's own permissions are
+the only boundary that matters: this module's job is turning a request's
+path into a real, canonical filesystem Path and rejecting anything
+malformed before it ever reaches the filesystem; actual existence and
+permission checks happen in api.py, which turns the OS's own errors into
+clean responses instead of ever letting one crash the request.
 """
 
 from pathlib import Path
+import os
+import string
 
 
 class PathError(Exception):
-    """Raised when a requested path is invalid or would escape the configured root."""
+    """Raised when a requested path is malformed (never for a permission or
+    existence problem - those are for the caller to turn into a clean,
+    specific response once the operating system actually reports one)."""
 
 
-def storage_root(satellite) -> Path:
-    """Resolves and creates the configured root - mirrors Photo's and Music's
-    own 'storage' resolution convention exactly (relative paths are resolved
-    inside the satellite's own directory, never the server's real root)."""
-    configured = Path(str(satellite.config.get("root", "data"))).expanduser()
-    root = configured if configured.is_absolute() else satellite.path / configured
-    root = root.resolve()
-    root.mkdir(parents=True, exist_ok=True)
-    return root
+def list_roots() -> list:
+    """The starting points File Explorer offers to browse from.
 
-
-def resolve(root: Path, relative: str) -> Path:
-    """Turns a browser-supplied relative path into a real filesystem path
-    guaranteed to be inside `root`, or raises PathError.
-
-    Never trusts the client: the path arrives already URL-decoded (the
-    server decodes query values before a satellite ever sees them), so a
-    literal '..' segment - encoded or not - is caught here the same way,
-    and an absolute-looking segment is just another path component relative
-    to root, never a jump to the real filesystem root. Once a candidate
-    path is built, it's resolved (following any symlinks) and re-checked
-    for containment - so a symlink *inside* root that points outside it is
-    caught too, not just '..' in the request itself.
+    A single '/' on Linux/macOS - the one real filesystem root there. On
+    Windows there is no equivalent single root; every drive letter that
+    actually exists is its own root, and nothing here assumes StarCore is
+    installed on any particular one.
     """
-    relative = (relative or "").strip("/").replace("\\", "/")
-    segments = [segment for segment in relative.split("/") if segment not in ("", ".")]
+    if os.name == "nt":
+        return [drive for letter in string.ascii_uppercase
+                if (drive := Path(f"{letter}:\\")).exists()]
+    return [Path("/")]
 
-    if any(segment == ".." for segment in segments):
-        raise PathError("the path may not contain '..'")
 
-    candidate = root.joinpath(*segments) if segments else root
+def resolve_path(raw: str) -> Path:
+    """Turns a browser-supplied absolute path into a real, canonical Path.
+
+    The path must already be absolute - a relative path (including one that
+    leans on '..' to climb above wherever the caller assumes it starts) is
+    not a legitimate request here, since there is no boundary to climb out
+    of in the first place; it is rejected as malformed rather than silently
+    reinterpreted. Whatever the path resolves to - including through a
+    symlink - is used as-is. Whether it can actually be read, written,
+    listed or deleted is entirely up to the operating system's own
+    permissions, which the caller checks once it tries.
+    """
+    text = (raw or "").strip()
+    if not text:
+        raise PathError("no path was given")
+    if "\x00" in text:
+        raise PathError("the path contains an invalid character")
+
+    candidate = Path(text)
+    if not candidate.is_absolute():
+        raise PathError("the path must be absolute")
 
     try:
-        resolved = candidate.resolve()
+        return candidate.resolve(strict=False)
     except (OSError, RuntimeError) as error:
         raise PathError(f"the path could not be resolved ({error})")
 
-    if resolved != root and root not in resolved.parents:
-        raise PathError("the path is outside the configured root")
 
-    return resolved
+def is_filesystem_root(path: Path) -> bool:
+    """True for '/' on Linux/macOS, or a drive root such as 'C:\\' on
+    Windows - the top of a filesystem, which can never be renamed or
+    deleted, however permissive the operating system is willing to be."""
+    return path.parent == path
 
 
-def relative_path(root: Path, path: Path) -> str:
-    return "" if path == root else str(path.relative_to(root)).replace("\\", "/")
+def parent_of(path: Path):
+    """The path to show when the user asks to go up a level, or None if
+    there is nowhere further up - only true at the very top, the list of
+    roots itself (which list_roots() returns, and which is not itself
+    addressed by any single path)."""
+    if is_filesystem_root(path):
+        return ""  # up from a real root goes to the list of roots
+    return str(path.parent)
 
 
 def safe_name(name: str) -> str:

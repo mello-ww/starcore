@@ -182,6 +182,21 @@ export function mount(context) {
             notice.textContent = `The photo library could not be read: ${error.message}`;
             notice.hidden = false;
         }
+
+        // pre-fills the import field with the configured default directory
+        // (set from the satellite's own configuration - the gear icon in the
+        // topbar) so importing doesn't require typing the same path every
+        // time; a value the user has already typed is never overwritten
+        try {
+            const configuration = await api.get("/configuration");
+            const directory = configuration.settings.find((setting) => setting.key === "photo_directory");
+            const input = importPanel.querySelector("input");
+            if (directory && directory.value && !input.value) {
+                input.value = directory.value;
+            }
+        } catch (error) {
+            // the import panel still works with a typed-in path if this fails
+        }
     }
 
     async function submit(action, input, buttons, result) {

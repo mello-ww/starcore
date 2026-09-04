@@ -582,6 +582,9 @@ class PhotoSatelliteTest(unittest.TestCase):
         self.source = self.directory / "source"
         self.source.mkdir()
         self.satellite.config.data["storage"] = str(self.directory / "library")
+        # a previous test in this class may have configured a default -
+        # every test here starts from "not configured" unless it says otherwise
+        self.satellite.config.data["photo_directory"] = ""
 
     def tearDown(self):
         shutil.rmtree(self.directory, ignore_errors=True)
@@ -707,6 +710,46 @@ class PhotoSatelliteTest(unittest.TestCase):
 
         self.assertEqual(status, 400)
         self.assertIn("error", payload)
+
+    def test_import_falls_back_to_the_configured_photo_directory(self):
+        (self.source / "photo.png").write_bytes(png(5, 5))
+        self.satellite.config.data["photo_directory"] = str(self.source)
+
+        status, payload = self.json_request("/api/satellites/photo/import", "POST", {})
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["imported"], 1)
+
+    def test_scan_falls_back_to_the_configured_photo_directory(self):
+        (self.source / "photo.png").write_bytes(png(5, 5))
+        self.satellite.config.data["photo_directory"] = str(self.source)
+
+        status, payload = self.json_request("/api/satellites/photo/scan", "POST", {})
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["new"], 1)
+
+    def test_an_explicit_source_overrides_the_configured_photo_directory(self):
+        elsewhere = self.directory / "elsewhere"
+        elsewhere.mkdir()
+        (elsewhere / "photo.png").write_bytes(png(5, 5))
+        # deliberately pointed somewhere with nothing in it, to prove the
+        # explicit source below is what actually gets used
+        self.satellite.config.data["photo_directory"] = str(self.source)
+
+        status, payload = self.json_request(
+            "/api/satellites/photo/import", "POST", {"source": str(elsewhere)})
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["imported"], 1)
+
+    def test_a_nonexistent_configured_photo_directory_is_reported_cleanly(self):
+        self.satellite.config.data["photo_directory"] = str(self.directory / "nowhere")
+
+        status, payload = self.json_request("/api/satellites/photo/import", "POST", {})
+
+        self.assertEqual(status, 400)
+        self.assertIn("does not exist", payload["error"])
 
     def test_scan_does_not_import(self):
         (self.source / "photo.png").write_bytes(png(4, 3))

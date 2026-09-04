@@ -1,10 +1,15 @@
 """The File Explorer satellite: browsing, download, upload, mkdir, rename,
-delete, and - most importantly - that none of it can ever reach outside the
-configured root, however a request tries to get there.
+delete - across the whole filesystem the StarCore process can reach, not a
+sandboxed root. There is no boundary to escape any more (see paths.py), so
+what matters here is that malformed requests are rejected cleanly, that a
+filesystem root itself can never be renamed or deleted, and that whatever
+the operating system's own permissions refuse comes back as a clean, useful
+error instead of a crash.
 """
 
 from http.client import HTTPConnection
 from pathlib import Path
+from urllib.parse import urlencode
 import json
 import os
 import shutil
@@ -12,6 +17,13 @@ import tempfile
 import unittest
 
 from tests.support import start_engine, stop_engine
+
+# root privileges (common inside a container) bypass POSIX permission bits
+# entirely, and POSIX permission bits themselves don't apply on Windows the
+# same way - both make a real "permission denied" impossible to provoke
+_CAN_TEST_PERMISSION_DENIAL = (
+    os.name != "nt" and not (hasattr(os, "geteuid") and os.geteuid() == 0)
+)
 
 
 class FileExplorerApiTest(unittest.TestCase):
@@ -32,12 +44,14 @@ class FileExplorerApiTest(unittest.TestCase):
         stop_engine(cls.engine)
 
     def setUp(self):
-        # the satellite is pointed at a fresh, disposable root for every test,
-        # so the real satellite data/ directory (and other tests) are never touched
-        self.directory = Path(tempfile.mkdtemp(prefix="starcore-fe-"))
-        self.satellite.config.data["root"] = str(self.directory)
+        # a fresh, disposable directory for every test - real, ordinary
+        # storage completely outside the StarCore checkout, exactly like
+        # anywhere else on the machine File Explorer can now reach
+        self.directory = Path(tempfile.mkdtemp(prefix="starcore-fe-")).resolve()
 
     def tearDown(self):
+        if os.name != "nt":
+            os.chmod(self.directory, 0o755)
         shutil.rmtree(self.directory, ignore_errors=True)
 
     def request(self, path, method="GET", payload=None, raw=None, content_type=None):
@@ -66,20 +80,35 @@ class FileExplorerApiTest(unittest.TestCase):
     def base(self, route: str) -> str:
         return f"/api/satellites/FileExplorer/{route}"
 
+    def with_path(self, route: str, path, **extra) -> str:
+        query = {"path": str(path), **extra}
+        return f"{self.base(route)}?{urlencode(query)}"
+
     # ---------- browsing ----------
 
-    def test_an_empty_root_lists_no_entries(self):
+    def test_the_roots_listing_has_no_parent_and_is_not_empty(self):
         status, payload = self.json_request(self.base("entries"))
         self.assertEqual(status, 200)
-        self.assertEqual(payload["entries"], [])
-        self.assertIsNone(payload["parent"])
         self.assertEqual(payload["path"], "")
+        self.assertIsNone(payload["parent"])
+        self.assertTrue(payload["entries"])
+        self.assertTrue(all(entry["type"] == "dir" for entry in payload["entries"]))
+
+    def test_the_roots_listing_matches_the_current_platform(self):
+        status, payload = self.json_request(self.base("entries"))
+        self.assertEqual(status, 200)
+        names = [entry["name"] for entry in payload["entries"]]
+        if os.name == "nt":
+            for name in names:
+                self.assertRegex(name, r"^[A-Za-z]:\\$")
+        else:
+            self.assertEqual(names, ["/"])
 
     def test_files_and_directories_are_listed_with_metadata(self):
         (self.directory / "notes.txt").write_text("hello", encoding="utf-8")
         (self.directory / "sub").mkdir()
 
-        status, payload = self.json_request(self.base("entries"))
+        status, payload = self.json_request(self.with_path("entries", self.directory))
         self.assertEqual(status, 200)
         names = {entry["name"]: entry for entry in payload["entries"]}
         self.assertEqual(names["notes.txt"]["type"], "file")
@@ -92,128 +121,169 @@ class FileExplorerApiTest(unittest.TestCase):
         (self.directory / "z_file.txt").write_text("x", encoding="utf-8")
         (self.directory / "a_dir").mkdir()
 
-        status, payload = self.json_request(self.base("entries"))
+        status, payload = self.json_request(self.with_path("entries", self.directory))
         self.assertEqual(status, 200)
         self.assertEqual(payload["entries"][0]["name"], "a_dir")
 
-    def test_nested_directories_can_be_browsed(self):
+    def test_nested_directories_can_be_browsed_and_report_their_real_parent(self):
         nested = self.directory / "a" / "b"
         nested.mkdir(parents=True)
         (nested / "deep.txt").write_text("x", encoding="utf-8")
 
-        status, payload = self.json_request(self.base("entries") + "?path=a/b")
+        status, payload = self.json_request(self.with_path("entries", nested))
         self.assertEqual(status, 200)
-        self.assertEqual(payload["path"], "a/b")
-        self.assertEqual(payload["parent"], "a")
+        self.assertEqual(payload["path"], str(nested))
+        self.assertEqual(payload["parent"], str(self.directory / "a"))
         self.assertEqual([entry["name"] for entry in payload["entries"]], ["deep.txt"])
 
+    def test_a_directory_with_spaces_and_special_characters_can_be_browsed(self):
+        odd = self.directory / "My Files (2024) #1 & Co"
+        odd.mkdir()
+        (odd / "a file, with commas.txt").write_text("x", encoding="utf-8")
+
+        status, payload = self.json_request(self.with_path("entries", self.directory))
+        self.assertEqual(status, 200)
+        self.assertIn(odd.name, [entry["name"] for entry in payload["entries"]])
+
+        status, payload = self.json_request(self.with_path("entries", odd))
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["path"], str(odd))
+        self.assertEqual([entry["name"] for entry in payload["entries"]], ["a file, with commas.txt"])
+
+    def test_going_up_from_a_real_filesystem_root_returns_to_the_roots_listing(self):
+        for root in self._roots():
+            status, payload = self.json_request(self.with_path("entries", root))
+            self.assertEqual(status, 200)
+            self.assertEqual(payload["parent"], "")
+
     def test_a_nonexistent_directory_is_404(self):
-        status, payload = self.json_request(self.base("entries") + "?path=does/not/exist")
+        status, payload = self.json_request(self.with_path("entries", self.directory / "does-not-exist"))
         self.assertEqual(status, 404)
         self.assertIn("error", payload)
 
     def test_listing_a_file_as_a_directory_is_rejected(self):
         (self.directory / "file.txt").write_text("x", encoding="utf-8")
-        status, payload = self.json_request(self.base("entries") + "?path=file.txt")
+        status, payload = self.json_request(self.with_path("entries", self.directory / "file.txt"))
         self.assertEqual(status, 400)
+
+    def test_listing_a_location_outside_any_satellite_storage_works(self):
+        # the whole point of this milestone: nothing confines File Explorer to
+        # its own satellite directory, or to the StarCore checkout at all
+        status, payload = self.json_request(self.with_path("entries", self.directory.parent))
+        self.assertEqual(status, 200)
+        self.assertIn(self.directory.name, [entry["name"] for entry in payload["entries"]])
 
     # ---------- path safety ----------
 
-    def test_a_literal_dotdot_is_refused(self):
-        status, payload = self.json_request(self.base("entries") + "?path=../")
+    def test_a_relative_path_is_rejected(self):
+        status, payload = self.json_request(self.base("entries") + "?path=relative/path")
         self.assertEqual(status, 400)
         self.assertIn("error", payload)
 
-    def test_a_dotdot_buried_in_a_deeper_path_is_refused(self):
-        status, payload = self.json_request(self.base("entries") + "?path=a/../../etc")
+    def test_a_bare_dotdot_is_rejected_as_not_absolute(self):
+        status, payload = self.json_request(self.base("entries") + "?path=..")
         self.assertEqual(status, 400)
 
-    def test_a_url_encoded_dotdot_is_refused(self):
-        # the server decodes %2e%2e before this satellite ever sees the
-        # segment, so it is caught by exactly the same check as a literal ..
-        status, payload = self.json_request(self.base("entries") + "?path=%2e%2e%2fetc")
+    def test_a_path_with_a_null_byte_is_rejected(self):
+        status, payload = self.json_request(self.with_path("entries", str(self.directory) + "\x00etc"))
         self.assertEqual(status, 400)
 
-    def test_an_absolute_looking_path_stays_confined_to_root(self):
-        (self.directory / "etc").mkdir()
-        (self.directory / "etc" / "passwd").write_text("safe", encoding="utf-8")
-
-        # a leading slash in the query value is just another path component
-        # once decoded - not a jump to the real filesystem root
-        status, payload = self.json_request(self.base("entries") + "?path=/etc")
+    def test_dotdot_inside_an_absolute_path_is_resolved_normally(self):
+        # there is no boundary left to escape, so '..' is just ordinary
+        # filesystem navigation now, not a security bypass to catch
+        nested = self.directory / "sub"
+        nested.mkdir()
+        status, payload = self.json_request(self.with_path("entries", f"{nested}/../"))
         self.assertEqual(status, 200)
-        self.assertEqual(payload["path"], "etc")
+        self.assertEqual(payload["path"], str(self.directory))
 
-    def test_a_symlink_escaping_the_root_is_refused(self):
-        outside = Path(tempfile.mkdtemp(prefix="starcore-fe-outside-"))
-        (outside / "secret.txt").write_text("do not read this", encoding="utf-8")
-        try:
-            link = self.directory / "escape"
-            try:
-                os.symlink(outside, link, target_is_directory=True)
-            except OSError as error:
-                # Creating a symlink needs a privilege this process may not
-                # have - notably on Windows, where it requires either
-                # SeCreateSymbolicLinkPrivilege or Developer Mode. That is an
-                # environmental limitation, not something the security check
-                # itself can be blamed for, so skip rather than weaken the
-                # assertion below. Any other OSError is a real failure and is
-                # left to fail the test.
-                if os.name == "nt" and getattr(error, "winerror", None) == 1314:
-                    raise unittest.SkipTest(
-                        "creating symlinks requires elevated privileges or "
-                        "Developer Mode on this Windows host"
-                    )
-                raise
-            except NotImplementedError:
-                raise unittest.SkipTest("this platform does not support symlinks")
+    @unittest.skipIf(os.name == "nt", "creating symlinks needs elevated privileges on Windows")
+    def test_a_symlink_is_followed_to_its_real_target(self):
+        target = self.directory / "target"
+        target.mkdir()
+        (target / "inside.txt").write_text("x", encoding="utf-8")
+        link = self.directory / "link"
+        os.symlink(target, link, target_is_directory=True)
 
-            status, payload = self.json_request(self.base("entries") + "?path=escape")
+        status, payload = self.json_request(self.with_path("entries", link))
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["path"], str(target))
+
+    def test_a_filesystem_root_cannot_be_deleted(self):
+        for root in self._roots():
+            status, payload = self.json_request(self.base("delete"), method="POST", payload={"path": str(root)})
             self.assertEqual(status, 400)
+
+    def test_a_filesystem_root_cannot_be_renamed(self):
+        for root in self._roots():
+            status, payload = self.json_request(self.base("rename"), method="POST",
+                                                  payload={"path": str(root), "name": "elsewhere"})
+            self.assertEqual(status, 400)
+
+    @unittest.skipUnless(_CAN_TEST_PERMISSION_DENIAL, "cannot provoke a real permission error here")
+    def test_a_permission_denied_directory_returns_a_clean_error_not_a_crash(self):
+        blocked = self.directory / "blocked"
+        blocked.mkdir()
+        (blocked / "secret.txt").write_text("do not read this", encoding="utf-8")
+        os.chmod(blocked, 0o000)
+        try:
+            status, payload = self.json_request(self.with_path("entries", blocked))
+            self.assertEqual(status, 403)
             self.assertIn("error", payload)
         finally:
-            shutil.rmtree(outside, ignore_errors=True)
+            os.chmod(blocked, 0o755)
 
-    def test_the_configured_root_itself_cannot_be_deleted(self):
-        status, payload = self.json_request(self.base("delete"), method="POST", payload={"path": ""})
-        self.assertEqual(status, 400)
+    @unittest.skipUnless(_CAN_TEST_PERMISSION_DENIAL, "cannot provoke a real permission error here")
+    def test_uploading_into_a_permission_denied_directory_is_a_clean_error(self):
+        blocked = self.directory / "blocked"
+        blocked.mkdir()
+        os.chmod(blocked, 0o555)  # read + execute, no write
+        try:
+            status, headers, body = self.request(
+                self.with_path("upload", blocked, name="x.txt"), method="POST", raw=b"data")
+            self.assertEqual(status, 403)
+        finally:
+            os.chmod(blocked, 0o755)
 
-    def test_the_configured_root_itself_cannot_be_renamed(self):
-        status, payload = self.json_request(self.base("rename"), method="POST",
-                                              payload={"path": "", "name": "elsewhere"})
-        self.assertEqual(status, 400)
+    def _roots(self):
+        from importlib import import_module
+        return import_module("satellites.native.file_explorer.paths").list_roots()
 
     # ---------- download ----------
 
     def test_a_file_can_be_downloaded(self):
         (self.directory / "report.txt").write_text("the contents", encoding="utf-8")
-        status, headers, body = self.request(self.base("content") + "?path=report.txt")
+        status, headers, body = self.request(self.with_path("content", self.directory / "report.txt"))
         self.assertEqual(status, 200)
         self.assertEqual(body, b"the contents")
 
     def test_download_with_the_download_flag_sets_content_disposition(self):
         (self.directory / "report.txt").write_text("x", encoding="utf-8")
-        status, headers, body = self.request(self.base("content") + "?path=report.txt&download=1")
+        status, headers, body = self.request(self.with_path("content", self.directory / "report.txt", download="1"))
         self.assertEqual(status, 200)
         self.assertIn("attachment", headers.get("Content-Disposition", ""))
         self.assertIn("report.txt", headers.get("Content-Disposition", ""))
 
     def test_an_unrecognized_extension_downloads_as_an_attachment_by_default(self):
         (self.directory / "data.bin").write_bytes(b"\x00\x01\x02")
-        status, headers, body = self.request(self.base("content") + "?path=data.bin")
+        status, headers, body = self.request(self.with_path("content", self.directory / "data.bin"))
         self.assertEqual(status, 200)
         self.assertIn("attachment", headers.get("Content-Disposition", ""))
 
     def test_a_known_type_can_be_viewed_inline(self):
         (self.directory / "notes.txt").write_text("hi", encoding="utf-8")
-        status, headers, body = self.request(self.base("content") + "?path=notes.txt")
+        status, headers, body = self.request(self.with_path("content", self.directory / "notes.txt"))
         self.assertEqual(status, 200)
         self.assertNotIn("Content-Disposition", headers)
         self.assertIn("text/plain", headers.get("Content-Type", ""))
 
     def test_downloading_a_nonexistent_file_is_404(self):
-        status, payload = self.json_request(self.base("content") + "?path=nope.txt")
+        status, payload = self.json_request(self.with_path("content", self.directory / "nope.txt"))
         self.assertEqual(status, 404)
+
+    def test_downloading_a_directory_is_rejected_not_crashed(self):
+        status, payload = self.json_request(self.with_path("content", self.directory))
+        self.assertEqual(status, 400)
 
     def test_a_large_file_can_be_downloaded_with_a_range_request(self):
         content = os.urandom(3 * 1024 * 1024)  # large enough to exercise chunked streaming
@@ -221,7 +291,7 @@ class FileExplorerApiTest(unittest.TestCase):
 
         connection = HTTPConnection("127.0.0.1", self.engine.api.port, timeout=10)
         try:
-            connection.request("GET", self.base("content") + "?path=big.bin",
+            connection.request("GET", self.with_path("content", self.directory / "big.bin"),
                                 headers={"Range": "bytes=1000-1999"})
             response = connection.getresponse()
             body = response.read()
@@ -234,7 +304,7 @@ class FileExplorerApiTest(unittest.TestCase):
     def test_a_full_large_file_download_matches_byte_for_byte(self):
         content = os.urandom(2 * 1024 * 1024)
         (self.directory / "big.bin").write_bytes(content)
-        status, headers, body = self.request(self.base("content") + "?path=big.bin")
+        status, headers, body = self.request(self.with_path("content", self.directory / "big.bin"))
         self.assertEqual(status, 200)
         self.assertEqual(body, content)
 
@@ -242,49 +312,63 @@ class FileExplorerApiTest(unittest.TestCase):
 
     def test_a_file_can_be_uploaded(self):
         status, headers, body = self.request(
-            self.base("upload") + "?path=&name=new.txt", method="POST", raw=b"uploaded content")
+            self.with_path("upload", self.directory, name="new.txt"), method="POST", raw=b"uploaded content")
         self.assertEqual(status, 200)
         self.assertEqual((self.directory / "new.txt").read_bytes(), b"uploaded content")
 
     def test_uploading_into_a_nested_directory(self):
-        (self.directory / "sub").mkdir()
+        sub = self.directory / "sub"
+        sub.mkdir()
         status, headers, body = self.request(
-            self.base("upload") + "?path=sub&name=new.txt", method="POST", raw=b"data")
+            self.with_path("upload", sub, name="new.txt"), method="POST", raw=b"data")
         self.assertEqual(status, 200)
-        self.assertEqual((self.directory / "sub" / "new.txt").read_bytes(), b"data")
+        self.assertEqual((sub / "new.txt").read_bytes(), b"data")
+
+    def test_uploading_a_file_with_spaces_in_its_name(self):
+        status, headers, body = self.request(
+            self.with_path("upload", self.directory, name="my report (final).txt"),
+            method="POST", raw=b"data")
+        self.assertEqual(status, 200)
+        self.assertEqual((self.directory / "my report (final).txt").read_bytes(), b"data")
 
     def test_uploading_over_an_existing_file_without_overwrite_is_a_conflict(self):
         (self.directory / "existing.txt").write_text("old", encoding="utf-8")
         status, headers, body = self.request(
-            self.base("upload") + "?path=&name=existing.txt", method="POST", raw=b"new")
+            self.with_path("upload", self.directory, name="existing.txt"), method="POST", raw=b"new")
         self.assertEqual(status, 409)
         self.assertEqual((self.directory / "existing.txt").read_text(encoding="utf-8"), "old")
 
     def test_uploading_over_an_existing_file_with_overwrite_replaces_it(self):
         (self.directory / "existing.txt").write_text("old", encoding="utf-8")
         status, headers, body = self.request(
-            self.base("upload") + "?path=&name=existing.txt&overwrite=1", method="POST", raw=b"new")
+            self.with_path("upload", self.directory, name="existing.txt", overwrite="1"),
+            method="POST", raw=b"new")
         self.assertEqual(status, 200)
         self.assertEqual((self.directory / "existing.txt").read_bytes(), b"new")
 
     def test_uploading_to_a_nonexistent_directory_is_404(self):
         status, headers, body = self.request(
-            self.base("upload") + "?path=does-not-exist&name=x.txt", method="POST", raw=b"data")
+            self.with_path("upload", self.directory / "does-not-exist", name="x.txt"), method="POST", raw=b"data")
         self.assertEqual(status, 404)
+
+    def test_uploading_to_a_relative_path_is_rejected(self):
+        status, headers, body = self.request(
+            self.base("upload") + "?path=relative&name=x.txt", method="POST", raw=b"data")
+        self.assertEqual(status, 400)
 
     def test_an_empty_upload_is_refused(self):
         status, headers, body = self.request(
-            self.base("upload") + "?path=&name=empty.txt", method="POST", raw=b"")
+            self.with_path("upload", self.directory, name="empty.txt"), method="POST", raw=b"")
         self.assertEqual(status, 400)
 
     def test_uploading_with_a_traversal_name_is_refused(self):
         status, headers, body = self.request(
-            self.base("upload") + "?path=&name=..%2f..%2fescaped.txt", method="POST", raw=b"data")
+            self.with_path("upload", self.directory, name="../escaped.txt"), method="POST", raw=b"data")
         self.assertEqual(status, 400)
 
     def test_a_partial_upload_never_leaves_a_stray_dot_part_file(self):
         status, headers, body = self.request(
-            self.base("upload") + "?path=&name=new.txt", method="POST", raw=b"content")
+            self.with_path("upload", self.directory, name="new.txt"), method="POST", raw=b"content")
         self.assertEqual(status, 200)
         leftovers = [item.name for item in self.directory.iterdir() if item.name.startswith(".")]
         self.assertEqual(leftovers, [])
@@ -292,45 +376,56 @@ class FileExplorerApiTest(unittest.TestCase):
     def test_a_large_upload_round_trips_correctly(self):
         content = os.urandom(3 * 1024 * 1024)
         status, headers, body = self.request(
-            self.base("upload") + "?path=&name=big.bin", method="POST", raw=content)
+            self.with_path("upload", self.directory, name="big.bin"), method="POST", raw=content)
         self.assertEqual(status, 200)
         self.assertEqual((self.directory / "big.bin").read_bytes(), content)
 
     def test_a_json_body_on_upload_is_rejected(self):
         status, payload = self.json_request(
-            self.base("upload") + "?path=&name=x.txt", method="POST", payload={"not": "a file"})
+            self.with_path("upload", self.directory, name="x.txt"), method="POST", payload={"not": "a file"})
         self.assertEqual(status, 400)
 
     # ---------- mkdir ----------
 
     def test_a_directory_can_be_created(self):
         status, payload = self.json_request(self.base("mkdir"), method="POST",
-                                              payload={"path": "", "name": "new_dir"})
+                                              payload={"path": str(self.directory), "name": "new_dir"})
         self.assertEqual(status, 200)
         self.assertTrue((self.directory / "new_dir").is_dir())
+
+    def test_a_directory_with_spaces_and_special_characters_can_be_created(self):
+        status, payload = self.json_request(self.base("mkdir"), method="POST",
+                                              payload={"path": str(self.directory), "name": "New Folder (1) #2"})
+        self.assertEqual(status, 200)
+        self.assertTrue((self.directory / "New Folder (1) #2").is_dir())
 
     def test_creating_a_directory_that_already_exists_is_a_conflict(self):
         (self.directory / "existing").mkdir()
         status, payload = self.json_request(self.base("mkdir"), method="POST",
-                                              payload={"path": "", "name": "existing"})
+                                              payload={"path": str(self.directory), "name": "existing"})
         self.assertEqual(status, 409)
 
     def test_creating_a_directory_with_a_traversal_name_is_refused(self):
         status, payload = self.json_request(self.base("mkdir"), method="POST",
-                                              payload={"path": "", "name": "../escape"})
+                                              payload={"path": str(self.directory), "name": "../escape"})
         self.assertEqual(status, 400)
 
     def test_creating_a_directory_under_a_missing_parent_is_404(self):
         status, payload = self.json_request(self.base("mkdir"), method="POST",
-                                              payload={"path": "missing", "name": "new_dir"})
+                                              payload={"path": str(self.directory / "missing"), "name": "new_dir"})
         self.assertEqual(status, 404)
+
+    def test_creating_a_directory_with_a_relative_parent_is_rejected(self):
+        status, payload = self.json_request(self.base("mkdir"), method="POST",
+                                              payload={"path": "relative", "name": "new_dir"})
+        self.assertEqual(status, 400)
 
     # ---------- rename ----------
 
     def test_a_file_can_be_renamed(self):
         (self.directory / "old.txt").write_text("x", encoding="utf-8")
         status, payload = self.json_request(self.base("rename"), method="POST",
-                                              payload={"path": "old.txt", "name": "new.txt"})
+                                              payload={"path": str(self.directory / "old.txt"), "name": "new.txt"})
         self.assertEqual(status, 200)
         self.assertFalse((self.directory / "old.txt").exists())
         self.assertTrue((self.directory / "new.txt").exists())
@@ -339,25 +434,26 @@ class FileExplorerApiTest(unittest.TestCase):
         (self.directory / "a.txt").write_text("a", encoding="utf-8")
         (self.directory / "b.txt").write_text("b", encoding="utf-8")
         status, payload = self.json_request(self.base("rename"), method="POST",
-                                              payload={"path": "a.txt", "name": "b.txt"})
+                                              payload={"path": str(self.directory / "a.txt"), "name": "b.txt"})
         self.assertEqual(status, 409)
 
     def test_renaming_a_nonexistent_file_is_404(self):
         status, payload = self.json_request(self.base("rename"), method="POST",
-                                              payload={"path": "nope.txt", "name": "new.txt"})
+                                              payload={"path": str(self.directory / "nope.txt"), "name": "new.txt"})
         self.assertEqual(status, 404)
 
     def test_renaming_with_a_traversal_name_is_refused(self):
         (self.directory / "a.txt").write_text("a", encoding="utf-8")
         status, payload = self.json_request(self.base("rename"), method="POST",
-                                              payload={"path": "a.txt", "name": "../escaped.txt"})
+                                              payload={"path": str(self.directory / "a.txt"), "name": "../escaped.txt"})
         self.assertEqual(status, 400)
 
     # ---------- delete ----------
 
     def test_a_file_can_be_deleted(self):
         (self.directory / "gone.txt").write_text("x", encoding="utf-8")
-        status, payload = self.json_request(self.base("delete"), method="POST", payload={"path": "gone.txt"})
+        status, payload = self.json_request(self.base("delete"), method="POST",
+                                              payload={"path": str(self.directory / "gone.txt")})
         self.assertEqual(status, 200)
         self.assertFalse((self.directory / "gone.txt").exists())
 
@@ -365,16 +461,18 @@ class FileExplorerApiTest(unittest.TestCase):
         nested = self.directory / "sub"
         nested.mkdir()
         (nested / "inside.txt").write_text("x", encoding="utf-8")
-        status, payload = self.json_request(self.base("delete"), method="POST", payload={"path": "sub"})
+        status, payload = self.json_request(self.base("delete"), method="POST",
+                                              payload={"path": str(nested)})
         self.assertEqual(status, 200)
         self.assertFalse(nested.exists())
 
     def test_deleting_a_nonexistent_path_is_404(self):
-        status, payload = self.json_request(self.base("delete"), method="POST", payload={"path": "nope.txt"})
+        status, payload = self.json_request(self.base("delete"), method="POST",
+                                              payload={"path": str(self.directory / "nope.txt")})
         self.assertEqual(status, 404)
 
-    def test_deleting_with_a_traversal_path_is_refused(self):
-        status, payload = self.json_request(self.base("delete"), method="POST", payload={"path": "../escape"})
+    def test_deleting_with_a_relative_path_is_refused(self):
+        status, payload = self.json_request(self.base("delete"), method="POST", payload={"path": "relative"})
         self.assertEqual(status, 400)
 
     # ---------- malformed requests ----------
@@ -395,48 +493,73 @@ class FileExplorerApiTest(unittest.TestCase):
 
     # ---------- configuration ----------
 
-    def test_configuration_reports_the_current_root(self):
-        status, payload = self.json_request(self.base("configuration"))
-        self.assertEqual(status, 200)
-        root_setting = next(setting for setting in payload["settings"] if setting["key"] == "root")
-        self.assertEqual(root_setting["live_value"], str(self.directory))
-
-    def test_configuration_never_appears_in_generic_satellite_listing_specially(self):
-        # the generic mechanism (docs/satellites.md) is just "a route named
-        # 'configuration' exists" - nothing FileExplorer-specific in the Core
+    def test_file_explorer_has_no_configurable_settings(self):
+        # there is no longer a boundary (or anything else) to configure - the
+        # generic mechanism (docs/satellites.md) is just "a route named
+        # 'configuration' exists", and File Explorer no longer names one
         status, payload = self.json_request("/api/satellites/FileExplorer")
         self.assertEqual(status, 200)
-        self.assertTrue(payload["configurable"])
+        self.assertFalse(payload["configurable"])
         self.assertEqual(payload["type"], "native")
 
 
-class FileExplorerSecurityBoundaryTest(unittest.TestCase):
-    """paths.resolve() on its own, independent of the HTTP layer above."""
+class FileExplorerPathSafetyTest(unittest.TestCase):
+    """paths.py on its own, independent of the HTTP layer above."""
 
     def setUp(self):
-        self.directory = Path(tempfile.mkdtemp(prefix="starcore-fe-paths-"))
+        self.directory = Path(tempfile.mkdtemp(prefix="starcore-fe-paths-")).resolve()
         from importlib import import_module
         self.paths = import_module("satellites.native.file_explorer.paths")
 
     def tearDown(self):
+        if os.name != "nt":
+            os.chmod(self.directory, 0o755)
         shutil.rmtree(self.directory, ignore_errors=True)
 
-    def test_resolving_the_empty_path_returns_the_root(self):
-        self.assertEqual(self.paths.resolve(self.directory, ""), self.directory)
+    def test_list_roots_matches_the_current_platform(self):
+        roots = self.paths.list_roots()
+        self.assertTrue(roots)
+        if os.name == "nt":
+            for root in roots:
+                self.assertRegex(str(root), r"^[A-Za-z]:\\$")
+                self.assertTrue(root.exists())
+        else:
+            self.assertEqual(roots, [Path("/")])
 
-    def test_resolving_a_plain_relative_path_stays_inside_root(self):
-        (self.directory / "sub").mkdir()
-        resolved = self.paths.resolve(self.directory, "sub")
-        self.assertEqual(resolved, self.directory / "sub")
-
-    def test_a_single_dotdot_is_refused(self):
+    def test_resolve_path_rejects_an_empty_string(self):
         with self.assertRaises(self.paths.PathError):
-            self.paths.resolve(self.directory, "..")
+            self.paths.resolve_path("")
 
-    def test_a_dotdot_after_a_real_subdirectory_is_refused(self):
-        (self.directory / "sub").mkdir()
+    def test_resolve_path_rejects_a_relative_path(self):
         with self.assertRaises(self.paths.PathError):
-            self.paths.resolve(self.directory, "sub/../../")
+            self.paths.resolve_path("relative/path")
+
+    def test_resolve_path_rejects_a_null_byte(self):
+        with self.assertRaises(self.paths.PathError):
+            self.paths.resolve_path(f"{self.directory}\x00/etc")
+
+    def test_resolve_path_accepts_a_real_absolute_path(self):
+        self.assertEqual(self.paths.resolve_path(str(self.directory)), self.directory)
+
+    def test_resolve_path_collapses_dotdot_within_an_absolute_path(self):
+        sub = self.directory / "sub"
+        sub.mkdir()
+        self.assertEqual(self.paths.resolve_path(f"{sub}/../"), self.directory)
+
+    def test_is_filesystem_root_true_for_a_real_root(self):
+        for root in self.paths.list_roots():
+            self.assertTrue(self.paths.is_filesystem_root(root))
+
+    def test_is_filesystem_root_false_for_an_ordinary_directory(self):
+        self.assertFalse(self.paths.is_filesystem_root(self.directory))
+
+    def test_parent_of_a_root_is_the_empty_string(self):
+        for root in self.paths.list_roots():
+            self.assertEqual(self.paths.parent_of(root), "")
+
+    def test_parent_of_an_ordinary_path_is_its_real_parent(self):
+        sub = self.directory / "sub"
+        self.assertEqual(self.paths.parent_of(sub), str(self.directory))
 
     def test_a_name_with_a_separator_is_refused_by_safe_name(self):
         with self.assertRaises(self.paths.PathError):
@@ -449,6 +572,10 @@ class FileExplorerSecurityBoundaryTest(unittest.TestCase):
     def test_an_empty_name_is_refused_by_safe_name(self):
         with self.assertRaises(self.paths.PathError):
             self.paths.safe_name("   ")
+
+    def test_a_dotdot_name_is_refused_by_safe_name(self):
+        with self.assertRaises(self.paths.PathError):
+            self.paths.safe_name("..")
 
 
 if __name__ == "__main__":

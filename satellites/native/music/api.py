@@ -2,7 +2,7 @@
 
 from starcore.api.response import error_response, file_response, json_response
 
-from . import audio
+from . import audio, configuration
 from .library import MusicScanError, library
 
 # a track is addressed by a digest of its content, so what comes back can be cached
@@ -18,7 +18,28 @@ def routes() -> dict:
         "artwork": artwork,
         "stream": stream,
         "scan": scan,
+        # naming a route "configuration" is the whole contract with the Core's
+        # generic satellite configuration mechanism - see docs/satellites.md
+        "configuration": configuration_route,
     }
+
+
+def configuration_route(request):
+    if request.method == "GET":
+        return json_response(configuration.describe(request.satellite))
+
+    if request.method != "POST":
+        return error_response("only GET and POST are supported here", status=405)
+
+    body = request.body or {}
+    key, value = body.get("key"), body.get("value")
+    if not isinstance(key, str):
+        return error_response("'key' must be a string", status=400)
+
+    try:
+        return json_response(configuration.update(request.satellite, key, value))
+    except configuration.ConfigurationError as error:
+        return error_response(str(error), status=400)
 
 
 def summary(request):
@@ -104,12 +125,25 @@ def stream(request):
     return file_response(path, audio.CONTENT_TYPES[track["format"]], IMMUTABLE)
 
 
+def _requested_source(request):
+    """The 'source' a scan request named, or the satellite's own configured
+    library directory (see configuration.py) when it didn't name one - read
+    fresh from config on every call so a change saved through the
+    configuration route takes effect on the very next scan, even though the
+    MusicLibrary instance itself is cached for the satellite's lifetime."""
+    source = (request.body or {}).get("source")
+    if source is not None:
+        return source
+
+    return request.satellite.config.get("library", "~/Music")
+
+
 def scan(request):
     if request.method != "POST":
         return error_response("only POST is supported here", status=405)
 
-    source = (request.body or {}).get("source")
-    if source is not None and not isinstance(source, str):
+    source = _requested_source(request)
+    if not isinstance(source, str):
         return error_response("'source' must be a path to a directory on this machine", status=400)
 
     try:

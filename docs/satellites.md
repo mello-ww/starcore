@@ -182,6 +182,18 @@ POST /api/satellites/<name>/configuration  {"key": ..., "value": ...}
     -> the same shape, after validating, persisting and applying one setting
 ```
 
+A setting descriptor may also carry an optional `"type"`. The only value defined so far is
+`"path"`, meaning the setting is a filesystem directory (Photo's `photo_directory` and
+Music's `library` both use it - see `docs/photo.md`); Mission Control's generic modal reacts
+to it by adding a "Browse…" button next to the field, backed by the FileExplorer
+Satellite's own `entries` route, so a directory can be picked instead of typed. This is the
+one, narrow exception to Mission Control never hardcoding a Satellite's name into its
+generic code: it delegates to whichever Satellite is named `"FileExplorer"` (if any is
+present and enabled) because that Satellite's entire purpose is generic filesystem
+browsing, not because the picker branches on who asked. A Satellite with a `"path"`-typed
+setting still works with no FileExplorer present or enabled - the field simply has no
+Browse button, and typing a path directly still works.
+
 A rejected value answers with the Core's usual `error_response` (HTTP 400, `{"error":
 "..."}`), which Mission Control's modal renders as a validation error next to the field
 instead of closing it - the same pattern `engine_config.py`'s own `Configuration.set()`
@@ -241,9 +253,15 @@ Both categories share the same lifecycle and extension model. The only differenc
   Mission Control page but no background service (`has_service` is `False`, so its status is
   always `"running"` while enabled), and the first to use `file_response(...,
   download_name=...)` and a raw (non-JSON) request body - see "Satellite endpoints" in
-  `docs/api.md`. It also shows the security discipline expected of any Satellite that serves
-  files under a configured root: every path it's given is resolved and re-checked against
-  that root (`satellites/native/file_explorer/paths.py`) before it's read, written or
-  deleted, so a request can never escape the root through `..`, an absolute path, or a
-  symlink - the Core does not do this for a Satellite, so a Satellite that serves files from
-  disk (as noted in "Serving data and files" above) is responsible for its own containment.
+  `docs/api.md`. It has no `"configuration"` route and no configured root: it browses
+  anywhere this StarCore process can itself reach - the whole Linux filesystem from `/`, or
+  every present drive on Windows (`satellites/native/file_explorer/paths.py`'s
+  `list_roots()`) - and lets the operating system's own permissions decide what actually
+  succeeds, the same as any other program running as the same user. `paths.resolve_path()`
+  still rejects malformed input outright (relative paths, empty paths, embedded null bytes)
+  and `api.py`'s `_stat()` turns every `OSError` the OS reports (missing, permission denied,
+  not a directory, ...) into a clean, specific response instead of a crash or a bare 500 -
+  and a real filesystem root or drive can never be renamed or deleted through it - but there
+  is no sandboxed root to stay inside of, by design. It is also what Mission Control's
+  generic "path"-typed configuration fields (see "Exposing configuration" above) delegate to
+  for their directory picker, through this same `entries` route.

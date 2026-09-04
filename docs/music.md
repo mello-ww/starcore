@@ -37,6 +37,24 @@ library = "~/Music"  # the directory 'music scan' indexes by default
 `library` is only the default target. A scan can be pointed at any directory, and the index
 is the union of everything scanned that still exists on disk.
 
+### Configuring the default library directory
+
+`library` is editable without hand-editing `config.toml`: open the Music card on the
+Satellites page and use its Config (gear) button, or the same topbar button on Music's own
+Mission Control page. This is Music's own use of the Satellite configuration mechanism
+described in `docs/satellites.md` under "Exposing configuration" - the Core has no notion of
+`library` by name. A value must be an absolute path, or start with `~` (expanded at scan
+time); a relative path is rejected before anything is written. There is nothing running for
+this setting to fall out of sync with, so a saved change is never reported as pending a
+restart - the next `scan` that doesn't name its own directory simply uses whatever is saved,
+and a directory that has since become missing or inaccessible is reported as a normal error
+rather than crashing StarCore (see "Scanning" below).
+
+Mission Control's Config modal also offers a "Browse…" button next to this field, backed by
+the FileExplorer Satellite, so a directory can be picked instead of typed - the button only
+appears when FileExplorer is present and enabled; the field still accepts a typed path
+either way.
+
 ## Supported formats
 
 MP3, FLAC, WAV and MP4/M4A. Tags, duration and embedded cover art are read straight from the
@@ -79,7 +97,12 @@ GET  /api/satellites/music/artists         every artist
 GET  /api/satellites/music/artwork/<album> cover art, extracted on first request
 GET  /api/satellites/music/stream/<track>  the audio file, with Range support
 POST /api/satellites/music/scan            index a directory  {"source": "..."} (optional)
+GET  /api/satellites/music/configuration   current settings (library)
+POST /api/satellites/music/configuration   change one          {"key": ..., "value": ...}
 ```
+
+A `scan` request that doesn't name a `source` falls back to the configured `library`
+directory - see "Configuring the default library directory" above.
 
 Albums and artists are grouped from the index rather than stored separately, so there is one
 source of truth. Tracks and albums are only ever addressed by identifier: an identifier the

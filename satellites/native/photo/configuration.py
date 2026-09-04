@@ -7,9 +7,15 @@ defaults, validation and persistence belongs to the satellite itself. The
 Core never sees sync_host or sync_port by name.
 """
 
+from pathlib import Path
+
 from . import sync
 
-DEFAULTS = {"sync_host": "127.0.0.1", "sync_port": 8081}
+DEFAULTS = {"sync_host": "127.0.0.1", "sync_port": 8081, "photo_directory": ""}
+
+# settings with nothing running to fall out of sync with (unlike sync_host/
+# sync_port, which describe a live listener - see describe()/update() below)
+_STATIC_SETTINGS = {"photo_directory"}
 
 
 class ConfigurationError(Exception):
@@ -33,6 +39,16 @@ def _validate_port(value) -> int:
     return port
 
 
+def _validate_directory(value) -> str:
+    text = str(value).strip() if value is not None else ""
+    if not text:
+        return ""  # empty means "not configured" - scan/import then require one explicitly
+
+    if not Path(text).expanduser().is_absolute():
+        raise ConfigurationError("photo_directory must be an absolute path (or start with ~)")
+    return text
+
+
 SETTINGS = {
     "sync_host": {
         "validate": _validate_host,
@@ -41,6 +57,13 @@ SETTINGS = {
     "sync_port": {
         "validate": _validate_port,
         "description": "Port Photo Sync listens on.",
+    },
+    "photo_directory": {
+        "validate": _validate_directory,
+        "description": "Default directory Photo scans and imports from when a request doesn't name one "
+                        "explicitly. Must be an absolute path (or start with ~). Leave empty to always "
+                        "require one explicitly.",
+        "type": "path",
     },
 }
 
@@ -60,20 +83,30 @@ def describe(satellite) -> dict:
 
     for key, meta in SETTINGS.items():
         value = satellite.config.get(key, DEFAULTS[key])
-        live = {"sync_host": running.host, "sync_port": running.port}[key] if running is not None else None
 
-        # sync_port = 0 means "let the OS choose one" - the live port then never
-        # equals the configured value by design, which isn't a change waiting
-        # on a restart (the same edge case the Core's own [server].port has)
-        pending_restart = live is not None and live != value and not (key == "sync_port" and value == 0)
+        if key in _STATIC_SETTINGS:
+            # photo_directory has no running listener to fall out of sync
+            # with - the next scan/import just uses whatever is saved, so
+            # there is never a change "pending" the way a listener restart is
+            live = value
+            pending_restart = False
+        else:
+            live = {"sync_host": running.host, "sync_port": running.port}[key] if running is not None else None
+            # sync_port = 0 means "let the OS choose one" - the live port then never
+            # equals the configured value by design, which isn't a change waiting
+            # on a restart (the same edge case the Core's own [server].port has)
+            pending_restart = live is not None and live != value and not (key == "sync_port" and value == 0)
 
-        settings.append({
+        setting = {
             "key": key,
             "value": value,
             "description": meta["description"],
             "live_value": live,
             "pending_restart": pending_restart,
-        })
+        }
+        if "type" in meta:
+            setting["type"] = meta["type"]
+        settings.append(setting)
 
     return {
         "settings": settings,
@@ -93,10 +126,16 @@ def update(engine, satellite, key: str, value) -> dict:
     """
     saved = validate(key, value)
     satellite.config.set(key, saved)
-    note = _apply(engine, satellite)
 
-    # described only after the listener has (or hasn't) come back up on the new
-    # value, so live_value/pending_restart reflect what actually happened
+    if key in _STATIC_SETTINGS:
+        note = (f"Saved. Photo will use '{saved}' as the default directory to scan and import from."
+                if saved else "Saved. No default directory is configured - scan and import will "
+                               "require one explicitly.")
+    else:
+        note = _apply(engine, satellite)
+
+    # described only after the change has (or hasn't) taken effect, so
+    # live_value/pending_restart reflect what actually happened
     result = describe(satellite)
     result["note"] = note
     return result

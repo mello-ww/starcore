@@ -1107,6 +1107,125 @@ button.chip:hover {
     cursor: pointer;
 }
 
+/* a "path"-typed setting's input plus its "Browse…" button, side by side */
+.config-field-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.config-field-row input {
+    flex: 1;
+    max-width: none;
+}
+
+.config-field-row .button {
+    flex: none;
+    white-space: nowrap;
+}
+
+/* ---------- directory picker ----------
+ *
+ * A generic filesystem directory picker, opened from any "path"-typed
+ * configuration field. It delegates entirely to the FileExplorer satellite's
+ * own /entries route (docs/satellites.md) - nothing here knows about Photo,
+ * Music, or any other satellite's settings. */
+
+#directory-picker-overlay .modal {
+    max-width: 560px;
+}
+
+.dir-picker-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2rem;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--raised);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    overflow-x: auto;
+}
+
+.dir-picker-crumb {
+    padding: 0.1rem 0.3rem;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--azure);
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.dir-picker-crumb:hover {
+    background: rgba(43, 91, 215, 0.12);
+    color: var(--ice);
+}
+
+.dir-picker-crumb-sep {
+    color: var(--text-faint);
+}
+
+.dir-picker-list {
+    max-height: 40vh;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin-bottom: 0.9rem;
+}
+
+.dir-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    background: none;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.dir-picker-row:last-child {
+    border-bottom: 0;
+}
+
+.dir-picker-row:hover {
+    background: var(--raised);
+}
+
+.dir-picker-empty {
+    margin: 0;
+    padding: 0.75rem;
+    color: var(--text-faint);
+    font-size: 0.85rem;
+}
+
+.dir-picker-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.dir-picker-current {
+    flex: 1;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+}
+
 .console-output {
     min-height: 300px;
     max-height: 52vh;
