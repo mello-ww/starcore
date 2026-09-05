@@ -69,6 +69,24 @@ class GitignoreProtectsRuntimeDataTest(unittest.TestCase):
         ]
         self.assertEqual(_ignored(paths), set(paths))
 
+    def test_machine_specific_config_toml_is_ignored_wherever_it_lives(self):
+        # config.toml is what an installation actually edits (bind
+        # address/port, HTTPS paths, a Locked Folder path, a library
+        # location, ...) - see config_defaults.py and docs/deployment.md,
+        # "Keeping configuration up to date". Its config.default.toml
+        # sibling (the tracked schema/shipped-defaults, never machine-
+        # specific) is covered by GitignoreDoesNotHideSourceTest below.
+        paths = [
+            "engine/config.toml",
+            "satellites/native/locked_folder/config.toml",
+            "satellites/native/photo/config.toml",
+            "satellites/native/music/config.toml",
+            "satellites/native/file_explorer/config.toml",
+            "satellites/native/status/config.toml",
+            "satellites/link/docker/config.toml",
+        ]
+        self.assertEqual(_ignored(paths), set(paths))
+
 
 class GitignoreDoesNotHideSourceTest(unittest.TestCase):
     """What must always be trackable - the rules above must not be so broad
@@ -79,13 +97,14 @@ class GitignoreDoesNotHideSourceTest(unittest.TestCase):
         paths = [
             "engine/starcore/auth.py",
             "engine/starcore/runtime_paths.py",
+            "engine/starcore/config_defaults.py",
             "engine/starcore/api/server.py",
-            "engine/config.toml",
-            "satellites/native/locked_folder/config.toml",
+            "engine/config.default.toml",
+            "satellites/native/locked_folder/config.default.toml",
             "satellites/native/locked_folder/satellite.toml",
             "satellites/native/locked_folder/api.py",
             "satellites/native/locked_folder/mission_control/page.js",
-            "satellites/native/photo/config.toml",
+            "satellites/native/photo/config.default.toml",
             "docs/deployment.md",
             "docs/locked_folder.md",
             "mission_control/index.html",

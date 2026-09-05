@@ -169,6 +169,49 @@ port = 8080
 
 See "Private LAN access" below for the specific case of `server.host`, and `docs/api.md` / `docs/mission_control.md` for the API and the Configuration page respectively.
 
+### Keeping configuration up to date
+
+`config.toml` - the engine's own, and every Satellite's own (`satellites/native/photo/config.toml`
+and the rest) - is **this installation's own file**: your bind address, your HTTPS certificate
+paths, your Locked Folder location, your library paths, your sync port, whatever you've changed.
+It is never committed, and `git pull` never touches it.
+
+Right beside each `config.toml` is a `config.default.toml` - the same keys, shipped with generic
+defaults, and the *only* one of the pair that's tracked in the repository. That's the file a
+future StarCore version edits to introduce a new setting. At startup, StarCore reads it and adds
+to your `config.toml` any key it's missing - nothing else. A value you already have, however you
+got it, is never touched; a custom key your `config.default.toml` doesn't even know about is left
+alone too. You'll see it happen, one line per key, in the startup log:
+
+```
+[INFO]: added new configuration default 'server.https_enabled' to .../config.toml - see docs/deployment.md, "Keeping configuration up to date".
+```
+
+A fresh install with no `config.toml` at all yet gets one written from scratch, entirely from
+`config.default.toml` - so there's nothing to set up by hand before the first run either.
+
+This is what makes `git pull` conflict-free even when a new StarCore version adds a setting:
+upstream only ever changes the tracked `config.default.toml`, never your own `config.toml`, so
+there's nothing of yours for the merge to collide with.
+
+**Existing installation, upgrading from before this existed:** your `config.toml` files are
+already tracked in git from before this mechanism was introduced (`.gitignore` alone can't
+untrack a file that's already committed). Once you've pulled this change, run this from the
+repository root to stop tracking them - it only removes them from git's index, never from disk,
+so your live settings (including anything Locked Folder or Photo/Music has customized) are left
+completely alone:
+
+```bash
+git rm -r --cached engine/config.toml satellites/*/*/config.toml
+git commit -m "Stop tracking machine-specific config.toml files"
+```
+
+Nothing needs to be copied or renamed by hand - every `config.default.toml` this milestone adds is
+already tracked, and every `config.toml` you already have already has every key its
+`config.default.toml` does (this milestone doesn't add any new setting itself), so reconciliation
+is a no-op for an existing install: nothing in your `config.toml` files changes the first time you
+restart on this version.
+
 ## Persistent data
 
 Each Satellite that stores anything keeps it under its own `data/` directory by default (`satellites/native/photo/data/`, `satellites/native/music/data/` - see `.gitignore`), resolved relative to the Satellite's own location, not the working directory or the platform. This is unchanged by this milestone and identical on Windows and Linux.
@@ -396,6 +439,11 @@ excludes, as a backstop:
   Locked Folder's PIN hash too, if explicitly configured to live inside the checkout rather
   than the application-data directory);
 - any `*.pem`/`*.key`/`*.crt`/`*.p12`/`*.pfx` file, wherever it lives in the checkout.
+
+Also excluded, for a different reason - not a secret, but still machine-specific - is
+`config.toml` itself, wherever it lives: `engine/config.toml` and every Satellite's own (see
+"Keeping configuration up to date" above). Its tracked `config.default.toml` sibling is a
+different filename, so this rule never hides it (see `test_gitignore.py`).
 
 None of this is a substitute for the application-data directory being the default in the
 first place - it is exactly the "defense in depth" a `.gitignore` rule is: a backstop for the

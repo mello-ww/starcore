@@ -4,6 +4,7 @@ from pathlib import Path
 
 ENGINE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ENGINE_DIR / "config.toml"
+CONFIG_DEFAULTS_PATH = ENGINE_DIR / "config.default.toml"
 
 BASE_DIR = ENGINE_DIR.parent
 
@@ -37,7 +38,12 @@ from .cli.parser import parse
 
 class StarCore:
     def __init__(self, config_path: Path = CONFIG_PATH):
-        self.config = Configuration(config_path)
+        # config.default.toml is always the one next to *this* engine's own
+        # config.toml, regardless of which config_path was given - a test
+        # passing its own temp config_path still reconciles against the real
+        # shipped defaults, exactly as a real install would (see
+        # docs/deployment.md, "Keeping configuration up to date")
+        self.config = Configuration(config_path, defaults_path=CONFIG_DEFAULTS_PATH)
         self.registry = SatelliteRegistry()
         self.native_path = BASE_DIR / "satellites" / "native"
         self.link_path = BASE_DIR / "satellites" / "link"

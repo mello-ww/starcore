@@ -1,6 +1,7 @@
 from pathlib import Path
 import tomllib
 
+from .config_defaults import load_defaults, reconcile
 from .toml_edit import write_value
 
 
@@ -103,9 +104,18 @@ def describe(configuration: "Configuration") -> list:
 
 
 class Configuration:
-    def __init__(self, config_path: Path):
+    def __init__(self, config_path: Path, defaults_path: Path = None):
+        """`defaults_path` is the config.default.toml shipped next to this
+        config.toml (see docs/deployment.md, "Keeping configuration up to
+        date") - optional, and None by default, so anything that constructs
+        a Configuration directly with just a path (every test that isn't
+        going through StarCore itself) keeps behaving exactly as it always
+        has: no defaults file means reconcile_defaults() below is a no-op.
+        """
         self.config_path = Path(config_path)
+        self.defaults_path = Path(defaults_path) if defaults_path is not None else None
         self.config_data = self.load_config()
+        self.added_defaults = self.reconcile_defaults()
 
     def load_config(self):
         if not self.config_path.exists():
@@ -118,6 +128,20 @@ class Configuration:
         except tomllib.TOMLDecodeError as error:
             print(f"[WARNING]: configuration file {self.config_path} is invalid ({error}). Using defaults.")
             return {}
+
+    def reconcile_defaults(self) -> list:
+        """Adds any key config.default.toml has that this config.toml is
+        missing - a fresh install with no config.toml yet gets one written
+        from scratch this way, and an existing one only ever gains keys it
+        didn't already have. Returns the "section.key" paths that were
+        added, logged once here so a restart's console output says exactly
+        what changed and why."""
+        defaults = load_defaults(self.defaults_path)
+        added = reconcile(self.config_path, self.config_data, defaults)
+        for section, key in added:
+            print(f"[INFO]: added new configuration default '{section}.{key}' to {self.config_path} "
+                  f"- see docs/deployment.md, \"Keeping configuration up to date\".")
+        return added
 
     def get(self, key, default=None):
         return self.config_data.get(key, default)

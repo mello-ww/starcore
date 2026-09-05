@@ -1,6 +1,6 @@
 enabled = true
 storage = "data"                     # where the PIN hash is kept (relative paths resolve inside the satellite)
-locked_folder_path = "" # empty means "not configured" - nothing is protected yet
+locked_folder_path = ""              # empty means "not configured" - nothing is protected yet
 session_timeout_seconds = 900        # how long an unlock lasts before the session must PIN in again
 max_pin_attempts = 5                 # incorrect PINs allowed before a temporary lockout
 lockout_seconds = 300                # how long that lockout lasts

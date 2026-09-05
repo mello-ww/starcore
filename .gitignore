@@ -34,3 +34,17 @@ engine/data/
 *.crt
 *.p12
 *.pfx
+
+# Machine-specific configuration - the engine's own bind address/port/HTTPS
+# paths, and each Satellite's own settings (a Locked Folder path, a photo or
+# music library location, a sync port, ...). This is what an installation
+# actually edits, so it must never be committed - the tracked config.default.toml
+# right beside it (a different filename, so this pattern never matches it -
+# see test_gitignore.py) is the schema/shipped-defaults a future StarCore
+# version adds a new setting to, read once to fill in anything this
+# installation's own config.toml is missing, and never overwritten by it.
+# See docs/deployment.md, "Keeping configuration up to date". An existing
+# checkout that already has these tracked from before this exists needs one
+# `git rm --cached` to stop tracking them - see that same section for the
+# exact command.
+config.toml

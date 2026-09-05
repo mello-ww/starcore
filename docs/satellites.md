@@ -212,6 +212,11 @@ call; it writes the one key back to the file with the same comment-preserving, t
 own - that stays the Satellite's job, exactly as `Configuration.set()` leaves validation to
 its caller for the Core's own settings.
 
+A Satellite that ships a `config.default.toml` beside its `config.toml` gets its defaults kept
+up to date automatically the same way the Core's own `[server]` settings do: discovery fills in
+any key an installation's `config.toml` is missing from it, and never touches a key that's
+already there - see `docs/deployment.md`, "Keeping configuration up to date".
+
 ## Satellites with several modules
 
 A Satellite directory is importable as a package, so a Satellite that outgrows a single

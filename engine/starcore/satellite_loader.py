@@ -77,15 +77,22 @@ class SatelliteLoader:
             manifest.icon = None
 
         config_path = satellite_dir / "config.toml"
+        defaults_path = satellite_dir / "config.default.toml"
         if config_path.exists():
             with open(config_path, "rb") as file:
                 config_data = tomllib.load(file)
         else:
-            print(f"[WARNING]: config.toml not found for satellite {manifest.name}. Using empty config.")
+            if not defaults_path.is_file():
+                print(f"[WARNING]: config.toml not found for satellite {manifest.name}. Using empty config.")
+            # else: no config.toml yet, but this satellite ships a
+            # config.default.toml (see docs/deployment.md, "Keeping
+            # configuration up to date") - SatelliteConfig below bootstraps
+            # one from it, so this isn't the "using empty config" case above
             config_data = {}
         config = SatelliteConfig(
             data=config_data,
             path=config_path,
+            defaults_path=defaults_path,
         )
         package = f"satellites.{satellite_type}.{satellite_dir.name}"
         register_package(package, satellite_dir)
