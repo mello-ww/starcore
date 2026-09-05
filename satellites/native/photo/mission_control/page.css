@@ -162,6 +162,82 @@
     font-size: 0.85rem;
 }
 
+/* ---------- Photo Library tabs ---------- */
+
+.photo-tabs {
+    display: flex;
+    gap: 1px;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+}
+
+.photo-tab {
+    padding: 0.3rem 0.75rem;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.photo-tab:hover {
+    color: var(--text);
+}
+
+.photo-tab.active {
+    background: rgba(0, 47, 167, 0.55);
+    color: #fff;
+}
+
+.photo-tab-panel[hidden] {
+    display: none;
+}
+
+.photo-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+
+.photo-toolbar-left .eyebrow {
+    margin: 0;
+}
+
+.photo-group-toggle {
+    display: flex;
+    gap: 1px;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+}
+
+.photo-group-toggle[hidden] {
+    display: none;
+}
+
+.photo-group-toggle .photo-tab {
+    padding: 0.2rem 0.6rem;
+    font-size: 0.76rem;
+}
+
+/* ---------- grouping (by camera/device) ---------- */
+
+.photo-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.photo-group-title {
+    margin: 0 0 0.6rem;
+}
+
 /* ---------- gallery ---------- */
 
 .photo-gallery {
@@ -464,6 +540,397 @@
     text-decoration: underline;
 }
 
+/* ---------- Albums ---------- */
+
+.photo-albums-content {
+    margin-top: 1rem;
+}
+
+.photo-albums {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.photo-album-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.photo-album-card:hover,
+.photo-album-card:focus-visible {
+    outline: none;
+    border-color: var(--sapphire);
+    box-shadow: 0 6px 20px -12px rgba(15, 82, 186, 0.9);
+}
+
+.photo-album-cover {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    background: var(--raised);
+    overflow: hidden;
+}
+
+.photo-album-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.photo-album-cover.empty::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(135deg, transparent 46%, var(--line) 46% 54%, transparent 54%),
+        linear-gradient(45deg, transparent 46%, var(--line) 46% 54%, transparent 54%);
+}
+
+.photo-album-meta {
+    padding: 0.75rem 0.85rem;
+}
+
+.photo-album-name {
+    margin: 0 0 0.15rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.photo-album-meta p.muted {
+    margin: 0;
+    font-size: 0.8rem;
+}
+
+.photo-album-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    gap: 0.3rem;
+    opacity: 0;
+    transition: opacity 140ms ease;
+}
+
+.photo-album-card:hover .photo-album-actions,
+.photo-album-card:focus-within .photo-album-actions {
+    opacity: 1;
+}
+
+.photo-icon-button {
+    background: rgba(4, 6, 13, 0.72);
+    backdrop-filter: blur(2px);
+}
+
+.photo-icon-button:hover {
+    background: rgba(4, 6, 13, 0.9);
+}
+
+.photo-back {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--azure);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.photo-back:hover {
+    color: var(--ice);
+    text-decoration: underline;
+}
+
+.photo-album-detail-head {
+    margin-bottom: 1.15rem;
+}
+
+.photo-album-detail-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.photo-album-detail-title h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.photo-album-detail-head p.muted {
+    margin: 0.2rem 0 0.85rem;
+}
+
+.photo-album-detail-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.photo-tile-remove {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--line-bright);
+    border-radius: 50%;
+    background: rgba(4, 6, 13, 0.78);
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 140ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.photo-tile:hover .photo-tile-remove,
+.photo-tile:focus-within .photo-tile-remove {
+    opacity: 1;
+}
+
+.photo-tile-remove:hover {
+    border-color: var(--alert);
+    color: var(--alert);
+}
+
+.photo-picker-modal {
+    max-width: 640px;
+}
+
+.photo-picker-grid {
+    max-height: 55vh;
+    margin-top: 0.9rem;
+    overflow-y: auto;
+}
+
+.photo-picker-tile {
+    position: relative;
+}
+
+.photo-picker-tile.selected {
+    border-color: var(--ok);
+    box-shadow: 0 0 0 2px rgba(62, 207, 142, 0.35);
+}
+
+.photo-picker-tile.selected::after {
+    content: "✓";
+    position: absolute;
+    top: 0.3rem;
+    right: 0.3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--ok);
+    color: #06251a;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.photo-picker-tile:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/* ---------- Map ---------- */
+
+/* the StarCore skin around the map: a dark panel that reads as part of
+   Mission Control rather than a foreign embed, with the map itself inset
+   inside it - see docs/photo.md "Map" for the CSS trick that recolors the
+   OpenStreetMap tiles to fit, and why an external map library is the one
+   documented departure from Mission Control's usual zero-dependency rule */
+.photo-map-shell {
+    position: relative;
+    height: min(70vh, 640px);
+    min-height: 320px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background:
+        radial-gradient(circle at 12% 18%, rgba(108, 155, 240, 0.14), transparent 55%),
+        var(--void);
+    overflow: hidden;
+}
+
+.photo-map {
+    width: 100%;
+    height: 100%;
+    border-radius: calc(var(--radius) - 2px);
+    background: var(--void);
+}
+
+.photo-map[hidden] {
+    display: none;
+}
+
+.photo-map-notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 2rem;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.photo-map-notice[hidden] {
+    display: none;
+}
+
+/* recolors standard OpenStreetMap tiles into something that fits StarCore's
+   deep-space palette while keeping roads/terrain/coastlines legible - only
+   the tile imagery is filtered, never the markers or controls layered above
+   it, so marker/control contrast is unaffected */
+.photo-map .leaflet-tile-pane,
+.photo-location-map .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.55);
+}
+
+.photo-map .leaflet-control-zoom a,
+.photo-location-map .leaflet-control-zoom a {
+    border-color: var(--line-bright) !important;
+    background: var(--raised) !important;
+    color: var(--text) !important;
+}
+
+.photo-map .leaflet-control-zoom a:hover,
+.photo-location-map .leaflet-control-zoom a:hover {
+    background: rgba(43, 91, 215, 0.25) !important;
+    color: var(--ice) !important;
+}
+
+.photo-map .leaflet-control-attribution {
+    background: rgba(4, 6, 13, 0.72) !important;
+    color: var(--text-faint) !important;
+}
+
+.photo-map .leaflet-control-attribution a {
+    color: var(--azure) !important;
+}
+
+.photo-map-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.photo-map-marker-dot {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--ice);
+    border-radius: 50%;
+    background: var(--azure);
+    box-shadow: 0 0 0 5px rgba(108, 155, 240, 0.25);
+}
+
+.photo-map-marker-count {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
+    border-radius: 8px;
+    background: var(--klein);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    font-weight: 700;
+    transform: translate(6px, -8px);
+}
+
+.photo-map .leaflet-popup-content-wrapper,
+.photo-location-map .leaflet-popup-content-wrapper {
+    border: 1px solid var(--line-bright);
+    background: var(--surface);
+    color: var(--text);
+}
+
+.photo-map .leaflet-popup-tip {
+    background: var(--surface);
+}
+
+.photo-map-popup-body p.muted {
+    margin: 0 0 0.5rem;
+    font-size: 0.78rem;
+}
+
+.photo-map-popup-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.3rem;
+}
+
+.photo-map-popup-thumb {
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+    aspect-ratio: 1;
+    cursor: pointer;
+}
+
+.photo-map-popup-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* ---------- photo-details location panel ---------- */
+
+.photo-viewer-location {
+    margin-top: 1rem;
+}
+
+.photo-location-map {
+    height: 190px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--void);
+    overflow: hidden;
+}
+
+.photo-location-map[hidden] {
+    display: none;
+}
+
+.photo-location-unavailable {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 120px;
+    margin: 0;
+    border: 1px dashed var(--line-bright);
+    border-radius: 6px;
+    color: var(--text-faint);
+    font-size: 0.82rem;
+}
+
+.photo-location-unavailable[hidden] {
+    display: none;
+}
+
 @media (max-width: 720px) {
     .photo-gallery {
         grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
@@ -491,10 +958,46 @@
         max-height: 42vh;
         padding: 0.75rem 1rem 1rem;
     }
+
+    .photo-toolbar,
+    .photo-albums-content > .photo-toolbar {
+        flex-wrap: wrap;
+        row-gap: 0.6rem;
+    }
+
+    .photo-albums {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+
+    .photo-album-actions {
+        opacity: 1;
+    }
+
+    .photo-map-shell {
+        height: min(60vh, 480px);
+    }
+
+    .photo-map-popup-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 
 @media (max-width: 420px) {
     .photo-viewer-meta {
         grid-template-columns: 1fr;
+    }
+
+    .photo-tabs,
+    .photo-group-toggle {
+        flex-wrap: wrap;
+    }
+
+    .photo-toolbar-left {
+        flex-wrap: wrap;
+        row-gap: 0.5rem;
+    }
+
+    .photo-album-detail-actions {
+        flex-wrap: wrap;
     }
 }

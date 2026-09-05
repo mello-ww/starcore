@@ -1,0 +1,5 @@
+name = "LockedFolder"
+version = "1.0.0"
+author = "mellow"
+description = "A PIN- and session-protected storage area, kept off-limits to File Explorer until unlocked."
+icon = "icon.svg"

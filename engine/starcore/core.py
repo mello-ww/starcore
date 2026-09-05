@@ -22,6 +22,7 @@ class SatelliteError(Exception):
     """
 
 
+from . import runtime_paths
 from .auth import AuthStore
 from .engine_config import Configuration
 from .satellite_loader import SatelliteLoader, SatelliteLoadError
@@ -50,11 +51,18 @@ class StarCore:
         server_config = self.config.section("server")
         self.mission_control_enabled = bool(server_config.get("enabled", True))
         self.satellite_services_enabled = bool(self.config.section("satellites").get("services", True))
-        # the credential/session store lives under the engine's own data/ next to
-        # config.toml - a fixed, non-configurable location (unlike satellite
-        # config) since there's exactly one of these per StarCore install and
-        # nothing satellite-specific ever touches it
-        self.auth = AuthStore(ENGINE_DIR / "data" / "auth.json")
+        # the credential/session store lives in StarCore's application-data
+        # directory (see runtime_paths.data_dir()) - a fixed, non-configurable
+        # location (unlike satellite config) since there's exactly one of
+        # these per StarCore install and nothing satellite-specific ever
+        # touches it. A store from before this was introduced - engine/data/
+        # auth.json, inside the checkout - is migrated over automatically,
+        # once, the first time this runs; see docs/deployment.md, "Runtime
+        # data location".
+        self.auth = AuthStore(runtime_paths.migrate_legacy_file(
+            ENGINE_DIR / "data" / "auth.json",
+            runtime_paths.data_dir() / "auth.json",
+        ))
         https_cert = server_config.get("https_cert", "")
         https_key = server_config.get("https_key", "")
         self.api = ApiServer(

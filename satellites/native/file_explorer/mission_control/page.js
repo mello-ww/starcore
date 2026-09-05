@@ -179,6 +179,17 @@ export function mount(context) {
             name.addEventListener("click", () => load(itemPath));
         }
         info.append(name);
+        // this is the Locked Folder itself (or, in principle, something
+        // nested under it) - the entry still shows up here, it just can't be
+        // opened without unlocking first (see locked_folder_guard.py, which
+        // is what actually enforces that; this badge is a hint, not a lock)
+        if (item.locked) {
+            const badge = el("span", "badge badge-down fe-locked-badge", "");
+            badge.title = "Protected by the Locked Folder - unlock it from the Locked Folder page first.";
+            badge.appendChild(lockIcon());
+            badge.append(" locked");
+            info.appendChild(badge);
+        }
         row.appendChild(info);
 
         row.appendChild(el("span", "fe-meta", item.type === "dir" ? "—" : formatBytes(item.size)));
@@ -400,6 +411,15 @@ function downloadIcon() {
 function renameIcon() {
     const svg = iconBase();
     svg.appendChild(shape("path", { d: "M10.6 2.9 13.1 5.4 5.2 13.3l-3 0.6 0.6-3Z" }));
+    return svg;
+}
+
+function lockIcon() {
+    const svg = iconBase();
+    svg.setAttribute("width", "11");
+    svg.setAttribute("height", "11");
+    svg.appendChild(shape("rect", { x: "3.2", y: "7.2", width: "9.6", height: "6.3", rx: "1" }));
+    svg.appendChild(shape("path", { d: "M5.3 7.2V5a2.7 2.7 0 0 1 5.4 0v2.2" }));
     return svg;
 }
 

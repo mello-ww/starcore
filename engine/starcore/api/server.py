@@ -13,8 +13,12 @@ from ..engine_config import ConfigurationError
 
 SATELLITE_PREFIX = "/api/satellites/"
 AUTH_PREFIX = "/api/auth/"
+# the only /api/auth/* endpoints reachable with no session at all - everything
+# else under /api/auth/ (notably /api/auth/sessions and its /revoke) is just
+# as protected as any other satellite route once an administrator exists
+AUTH_OPEN_ENDPOINTS = {"/api/auth/status", "/api/auth/setup", "/api/auth/login", "/api/auth/logout"}
 WRITE_ENDPOINTS = ("/api/commands/execute", "/api/shutdown", "/api/restart",
-                   "/api/auth/setup", "/api/auth/login", "/api/auth/logout")
+                   "/api/auth/setup", "/api/auth/login", "/api/auth/logout", "/api/auth/sessions/revoke")
 
 # reserved below a satellite, so a satellite cannot claim any of these as a
 # route name of its own - "assets" is the satellite's Mission Control files,
@@ -149,6 +153,9 @@ class ApiServer:
 class RequestHandler(BaseHTTPRequestHandler):
     server_version = "StarCore"
     _responded = False
+    _session_token = ""  # set by _authorized() for this request, so
+                          # _handle_satellite() can hand it to a Satellite's
+                          # Request without recomputing or re-validating it
 
     def do_GET(self):
         path = urlparse(self.path).path
@@ -160,6 +167,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": f"{path} requires POST"}, status=405)
             elif path == "/api/auth/status":
                 self._handle_auth_status()
+            elif path == "/api/auth/sessions":
+                self._handle_auth_sessions()
             elif path.startswith("/api/"):
                 self._handle_api(path)
             else:
@@ -180,6 +189,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._handle_auth_login()
             elif path == "/api/auth/logout":
                 self._handle_auth_logout()
+            elif path == "/api/auth/sessions/revoke":
+                self._handle_auth_revoke_session()
             elif path == "/api/commands/execute":
                 self._handle_execute()
             elif path == "/api/shutdown":
@@ -199,7 +210,8 @@ class RequestHandler(BaseHTTPRequestHandler):
     def _authorized(self, path: str) -> bool:
         """True if this request may proceed without further checks.
 
-        Every /api/ path (other than /api/auth/* itself) needs a valid
+        Every /api/ path (other than the always-open auth endpoints in
+        AUTH_OPEN_ENDPOINTS - status/setup/login/logout) needs a valid
         session once an administrator account exists. Before that - a fresh,
         not-yet-configured install - the API is intentionally still open, the
         same way the frontend's own setup screen has to be reachable with no
@@ -209,7 +221,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         something this alone makes safe. Sends the 401 itself on failure, so
         callers only need to check the return value and return.
         """
-        if not path.startswith("/api/") or path.startswith(AUTH_PREFIX):
+        if not path.startswith("/api/") or path in AUTH_OPEN_ENDPOINTS:
             return True
 
         engine = self.server.engine
@@ -218,6 +230,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         token = AuthStore.token_from_request(self.headers.get("Cookie", ""), self.headers.get("Authorization", ""))
         if engine.auth.validate_session(token):
+            self._session_token = token
             return True
 
         self._send_json({"error": "authentication required"}, status=401)
@@ -305,7 +318,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 raw = RawBody(self.rfile, length)
 
         query = {key: values[-1] for key, values in parse_qs(urlparse(self.path).query).items()}
-        request = Request(engine, satellite, method, tuple(segments[2:]), query, body, raw)
+        request = Request(engine, satellite, method, tuple(segments[2:]), query, body, raw, token=self._session_token)
 
         # a satellite handles its own resources, so its failures are isolated the
         # same way its state provider's are, and never reach the client as a trace
@@ -443,8 +456,15 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         username = str(body.get("username", "")) if isinstance(body, dict) else ""
         password = str(body.get("password", "")) if isinstance(body, dict) else ""
+        # "kind"/"device_name" are optional labels a non-browser caller (a
+        # future mobile client, chiefly) can send to identify itself in the
+        # "your devices" list below - see AuthStore.create_session(). A
+        # browser never sends either, and simply gets a "web" session exactly
+        # as before; this is additive, not a second login mechanism.
+        kind = str(body.get("kind", "web")) if isinstance(body, dict) else "web"
+        device_name = body.get("device_name") if isinstance(body, dict) else None
         try:
-            token = engine.auth.login(username, password)
+            token = engine.auth.login(username, password, kind=kind, device_name=device_name)
         except AuthError as error:
             self._send_json({"error": str(error)}, status=401)
             return
@@ -456,6 +476,29 @@ class RequestHandler(BaseHTTPRequestHandler):
         token = AuthStore.token_from_request(self.headers.get("Cookie", ""), self.headers.get("Authorization", ""))
         engine.auth.logout(token)
         self._send_json({"message": "Logged out."}, headers={"Set-Cookie": self._session_cookie("", max_age=0)})
+
+    def _handle_auth_sessions(self):
+        engine = self.server.engine
+        token = AuthStore.token_from_request(self.headers.get("Cookie", ""), self.headers.get("Authorization", ""))
+        self._send_json({"sessions": engine.auth.list_sessions(current_token=token)})
+
+    def _handle_auth_revoke_session(self):
+        engine = self.server.engine
+        body = self._read_json_body()
+        if body is None:
+            return  # a clean error response was already sent
+
+        session_id = body.get("session_id") if isinstance(body, dict) else None
+        if not isinstance(session_id, str) or not session_id:
+            self._send_json({"error": "'session_id' must be a non-empty string"}, status=400)
+            return
+
+        found = engine.auth.revoke_session(session_id)
+        if not found:
+            self._send_json({"error": f"no session '{session_id}'"}, status=404)
+            return
+
+        self._send_json({"revoked": session_id})
 
     def _handle_shutdown(self):
         engine = self.server.engine

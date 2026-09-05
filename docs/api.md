@@ -30,10 +30,16 @@ GET  /api/auth/status             whether an administrator account exists and th
 POST /api/auth/setup              create the first (and only) administrator account
 POST /api/auth/login              start a session
 POST /api/auth/logout             end the current session
+GET  /api/auth/sessions           every active session (labeled web/mobile), for the "Active sessions" panel
+POST /api/auth/sessions/revoke    end one specific session by id, from anywhere
 ```
 
-Every endpoint above other than the four `/api/auth/*` ones requires a session once an
-administrator account has been created - see "Authentication" below.
+Every endpoint above other than `/api/auth/status`, `/api/auth/setup`, `/api/auth/login` and
+`/api/auth/logout` requires a session once an administrator account has been created - see
+"Authentication" below. Note that this now includes `/api/auth/sessions` and
+`/api/auth/sessions/revoke` themselves: listing or revoking sessions is exactly the kind of
+thing that must not be reachable by an unauthenticated caller, so those two do not get the
+same free pass as the other four `/api/auth/*` endpoints.
 
 Responses are JSON. A Satellite entry contains its manifest information, its type, whether it is enabled, the commands it contributes and the state it publishes:
 
@@ -184,14 +190,16 @@ not-yet-configured StarCore beyond localhost is a decision for whoever deploys i
 deliberately, not something the API alone makes safe.
 
 Once an administrator account exists (`GET /api/auth/status` reports `"bootstrapped": true`),
-every endpoint above other than `/api/auth/*` itself requires a valid session, checked by one
-generic gate before any dispatch happens - there is no per-endpoint special-casing, and this
-is also why File Explorer, Photo, Music and Console shutdown/restart are all protected for
-free the moment they're reachable under `/api/`.
+every endpoint above other than the four always-open auth endpoints (`AUTH_OPEN_ENDPOINTS` in
+`starcore/api/server.py`) requires a valid session, checked by one generic gate before any
+dispatch happens - there is no per-endpoint special-casing, and this is also why File
+Explorer, Photo, Music, Locked Folder and Console shutdown/restart are all protected for free
+the moment they're reachable under `/api/`.
 
 ```
 POST /api/auth/setup   { "username": "...", "password": "..." }  -> 200 + session, or 409 if already set up
-POST /api/auth/login    { "username": "...", "password": "..." } -> 200 + session, or 401
+POST /api/auth/login    { "username": "...", "password": "...",
+                          "kind": "web"|"mobile", "device_name": "..." } -> 200 + session, or 401
 POST /api/auth/logout   (no body)                                -> 200, ends the current session
 GET  /api/auth/status   (no body)                                -> { "bootstrapped": bool, "authenticated": bool }
 ```
@@ -202,10 +210,43 @@ and `Secure` automatically when HTTPS is enabled - see below). A client that isn
 `Authorization: Bearer <token>` - both are checked by the same `AuthStore.validate_session()`,
 so nothing about session handling assumes a browser.
 
+`login`'s `kind` and `device_name` are optional labels, not a second authentication mechanism:
+a future mobile client logs in through this exact endpoint like any other client, just passing
+`"kind": "mobile"` and a human-readable `device_name` (e.g. `"Nathan's iPhone"`) so the session
+can be told apart later. Omitted, both default to a plain `"web"` session with no device name,
+so every existing caller is unaffected. See "Locked Folder and mobile authentication" in
+`docs/locked_folder.md` for the full design.
+
+```
+GET  /api/auth/sessions          (no body) -> { "sessions": [ { "session_id", "kind",
+                                                 "device_name", "created", "expires",
+                                                 "current" }, ... ] }
+POST /api/auth/sessions/revoke   { "session_id": "..." } -> { "revoked": "<session_id>" },
+                                                             or 404 if unknown
+```
+
+`GET /api/auth/sessions` lists every still-valid session for the single administrator
+account - never the raw session token itself, only the opaque `session_id` used to revoke it -
+sorted newest first, with `current` marking the session the caller is making the request with.
+This is what lets the Mission Control "Active sessions" panel (and, later, a mobile app's own
+"manage devices" screen) show and end sessions, including ones started from a different
+device. Revoking the caller's own current session ends it immediately, exactly like
+`/api/auth/logout`.
+
 Passwords are hashed with `hashlib.pbkdf2_hmac` (260,000 iterations, a random 16-byte salt
-per account) - never stored, logged, or returned anywhere. Sessions expire after 7 days.
-Nothing about the credential store depends on a third-party package; see "Dependencies" in
-`docs/deployment.md`.
+per account) via the shared `hash_secret()` helper in `starcore/auth.py` - never stored,
+logged, or returned anywhere. The Locked Folder Satellite's PIN (see `docs/locked_folder.md`)
+reuses this exact same function rather than a second hashing implementation. Sessions expire
+after 7 days. Nothing about the credential store depends on a third-party package; see
+"Dependencies" in `docs/deployment.md`.
+
+Every satellite route handler also receives the caller's already-validated session token as
+`request.token` (see `Request` in `starcore/api/response.py`) - set by `_authorized()` once,
+threaded through `_handle_satellite()`, and empty only when the API is still in its
+pre-bootstrap open state. This is what lets a Satellite implement its own, session-aware
+authorization on top of the Core's session check without re-validating anything itself or
+touching `starcore/auth.py` - the Locked Folder Satellite (`docs/locked_folder.md`) is the
+first and so far only Satellite that needs this.
 
 Photo Sync (`satellites/native/photo/sync.py`) is a separate, deliberately unauthenticated
 HTTP listener on its own port, protected by its own device token instead - it is not part of

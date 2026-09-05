@@ -9,6 +9,15 @@ Nothing here assumes a browser. A session token works identically whether
 it arrives as a cookie (the web UI) or an `Authorization: Bearer` header (a
 future API/mobile client) - see AuthStore.token_from_request() and
 docs/api.md.
+
+A session also carries a `kind` ("web" by default, "mobile" for a future
+native client) and an optional `device_name` - free-form labels, not a
+second authentication mechanism: a mobile client authenticates exactly the
+same way a browser does, by calling login() with the user's password, and
+`kind`/`device_name` exist purely so the account owner can later see which
+sessions exist and revoke one by name (see list_sessions()/revoke_session(),
+and docs/locked_folder.md for how a Satellite - the Locked Folder - builds
+on this rather than inventing its own notion of "is this really the user").
 """
 
 from pathlib import Path
@@ -32,8 +41,13 @@ class AuthError(Exception):
     designed" cases like a first-time, not-yet-bootstrapped store."""
 
 
-def _hash_password(password: str, salt: bytes) -> str:
-    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PBKDF2_ITERATIONS).hex()
+def hash_secret(secret: str, salt: bytes) -> str:
+    """PBKDF2-HMAC-SHA256, the one password/PIN hashing routine StarCore
+    uses everywhere a human-chosen secret needs to be stored - the account
+    password here, and the Locked Folder's PIN (satellites/native/
+    locked_folder/pin_store.py), which imports this directly rather than
+    re-implementing it, per "do not duplicate security-sensitive logic"."""
+    return hashlib.pbkdf2_hmac("sha256", secret.encode("utf-8"), salt, PBKDF2_ITERATIONS).hex()
 
 
 class AuthStore:
@@ -97,7 +111,7 @@ class AuthStore:
         self._data["user"] = {
             "username": username.strip(),
             "salt": salt.hex(),
-            "password_hash": _hash_password(password, salt),
+            "password_hash": hash_secret(password, salt),
         }
         self._save()
         return self.create_session(username.strip())
@@ -107,22 +121,37 @@ class AuthStore:
         if user is None or username != user["username"]:
             # still hashes something even on an unknown username, so a caller
             # timing the response can't use it to discover valid usernames
-            _hash_password(password, secrets.token_bytes(16))
+            hash_secret(password, secrets.token_bytes(16))
             return False
 
         salt = bytes.fromhex(user["salt"])
         # constant-time comparison - a plain == leaks how many leading bytes
         # matched through response timing
-        return secrets.compare_digest(_hash_password(password, salt), user["password_hash"])
+        return secrets.compare_digest(hash_secret(password, salt), user["password_hash"])
 
-    def login(self, username: str, password: str) -> str:
+    def login(self, username: str, password: str, kind: str = "web", device_name: str = None) -> str:
         if not self.verify(username, password):
             raise AuthError("invalid username or password")
-        return self.create_session(username)
+        return self.create_session(username, kind=kind, device_name=device_name)
 
-    def create_session(self, username: str) -> str:
+    def create_session(self, username: str, kind: str = "web", device_name: str = None) -> str:
+        """Issues a new session token.
+
+        `kind`/`device_name` are labels only - see the module docstring. A
+        mobile client is expected to pass kind="mobile" (and, ideally, a
+        device_name) purely so list_sessions()/revoke_session() below can
+        show and let the owner individually revoke it later; the actual
+        authentication is identical to a browser login either way.
+        """
         token = secrets.token_urlsafe(32)
-        self._data["sessions"][token] = {"username": username, "expires": time.time() + SESSION_TTL_SECONDS}
+        self._data["sessions"][token] = {
+            "username": username,
+            "expires": time.time() + SESSION_TTL_SECONDS,
+            "kind": kind if kind in ("web", "mobile") else "web",
+            "device_name": (str(device_name).strip()[:80] or None) if device_name else None,
+            "session_id": secrets.token_hex(8),
+            "created": time.time(),
+        }
         self._save()
         return token
 
@@ -140,9 +169,58 @@ class AuthStore:
             return False
         return True
 
+    def session_kind(self, token: str) -> str:
+        """"web", "mobile", or "" for a token that doesn't (or no longer)
+        validates - lets a Satellite (the Locked Folder, specifically) treat
+        a mobile session differently without re-implementing any part of
+        session validation itself. Never raises - an invalid token is simply
+        reported as no kind at all, the same as validate_session() reports
+        it as simply not valid."""
+        if not self.validate_session(token):
+            return ""
+        return self._data["sessions"][token].get("kind", "web")
+
     def logout(self, token: str):
         if token and self._data["sessions"].pop(token, None) is not None:
             self._save()
+
+    def list_sessions(self, current_token: str = None) -> list:
+        """Every live (non-expired) session, for a "your devices" view in
+        Mission Control - never the token itself, only the opaque
+        `session_id` created alongside it, which is all revoke_session()
+        below needs. Exposing the real bearer token back through an API
+        response would be handing out a working credential a second time,
+        exactly what "never expose ... through ... API responses" (see
+        docs/locked_folder.md's security model) forbids for a PIN, and is
+        just as wrong here.
+        """
+        now = time.time()
+        sessions = []
+        for token, session in self._data["sessions"].items():
+            if session["expires"] < now:
+                continue
+            sessions.append({
+                "session_id": session.get("session_id", ""),
+                "kind": session.get("kind", "web"),
+                "device_name": session.get("device_name"),
+                "created": session.get("created"),
+                "expires": session["expires"],
+                "current": token == current_token,
+            })
+        sessions.sort(key=lambda entry: entry["created"] or 0, reverse=True)
+        return sessions
+
+    def revoke_session(self, session_id: str) -> bool:
+        """Revokes one session by its opaque id (from list_sessions()), not
+        by its token - the API never receives a token to revoke by, since
+        the caller only ever gets the session_id back. Returns True if a
+        session was actually found and removed."""
+        for token, session in list(self._data["sessions"].items()):
+            if session.get("session_id") == session_id:
+                del self._data["sessions"][token]
+                self._save()
+                return True
+        return False
 
     def purge_expired_sessions(self):
         now = time.time()

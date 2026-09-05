@@ -140,6 +140,13 @@ button.fe-name:hover {
     text-decoration: none;
 }
 
+.fe-locked-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex: none;
+}
+
 .icon-button.confirm {
     color: var(--alert);
     background: rgba(228, 96, 109, 0.14);

@@ -228,6 +228,7 @@ function showRoute() {
         setText("page-title", CORE_PAGES[route.name]);
         if (route.name === "configuration") {
             loadConfiguration();
+            loadSessions();
         }
     }
 
@@ -705,6 +706,86 @@ async function handleConfigurationSubmit(event) {
     }
 
     button.disabled = false;
+}
+
+/* ---------- active sessions ----------
+ *
+ * Every session AuthStore currently considers valid (see starcore/auth.py) -
+ * a browser's own "web" session and, once a StarCore mobile app exists,
+ * whatever "mobile" sessions it has established by logging in the same way
+ * a browser does (see docs/locked_folder.md). This never sees a token, only
+ * the opaque session_id list_sessions() reports - revoking asks for that id,
+ * never the token itself. */
+
+function formatSessionTime(epochSeconds) {
+    if (!epochSeconds) {
+        return "—";
+    }
+    return new Date(epochSeconds * 1000).toLocaleString();
+}
+
+async function loadSessions() {
+    const errorBox = document.getElementById("sessions-error");
+    errorBox.hidden = true;
+
+    try {
+        const payload = await getJson("/api/auth/sessions");
+        renderSessions(payload.sessions);
+    } catch (error) {
+        errorBox.textContent = `Sessions could not be loaded: ${error.message}`;
+        errorBox.hidden = false;
+    }
+}
+
+function renderSessions(sessions) {
+    const container = document.getElementById("sessions-list");
+    container.replaceChildren();
+
+    if (!sessions.length) {
+        container.appendChild(element("p", "muted", "No active sessions."));
+        return;
+    }
+
+    for (const session of sessions) {
+        const row = element("div", "session-row");
+
+        const info = element("div", "session-info");
+        const title = session.device_name || (session.kind === "mobile" ? "Mobile device" : "Browser");
+        info.appendChild(element("span", "session-title", title));
+        info.appendChild(element("span", `badge badge-type`, session.kind));
+        if (session.current) {
+            info.appendChild(element("span", "badge badge-up", "this device"));
+        }
+        row.appendChild(info);
+
+        row.appendChild(element("span", "session-meta", `Signed in ${formatSessionTime(session.created)}`));
+
+        const revoke = element("button", "button button-stop", session.current ? "Sign out" : "Revoke");
+        revoke.type = "button";
+        revoke.addEventListener("click", () => handleRevokeSession(session.session_id, revoke, session.current));
+        row.appendChild(revoke);
+
+        container.appendChild(row);
+    }
+}
+
+async function handleRevokeSession(sessionId, button, isCurrent) {
+    button.disabled = true;
+    try {
+        await postJson("/api/auth/sessions/revoke", { session_id: sessionId });
+        if (isCurrent) {
+            // the same session this browser is using - reloading lands back
+            // on the login screen, exactly like the Logout button does
+            location.reload();
+            return;
+        }
+        await loadSessions();
+    } catch (error) {
+        const errorBox = document.getElementById("sessions-error");
+        errorBox.textContent = error.message;
+        errorBox.hidden = false;
+        button.disabled = false;
+    }
 }
 
 /* ---------- satellite lifecycle: enable, disable, reload ----------

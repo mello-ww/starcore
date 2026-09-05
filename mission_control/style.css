@@ -1239,6 +1239,40 @@ button.chip:hover {
     white-space: nowrap;
 }
 
+/* ---------- active sessions ---------- */
+
+.session-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--raised);
+}
+
+.session-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 220px;
+    min-width: 0;
+}
+
+.session-title {
+    font-size: 0.9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.session-meta {
+    flex: none;
+    color: var(--text-faint);
+    font-size: 0.78rem;
+}
+
 /* ---------- directory picker ----------
  *
  * A generic filesystem directory picker, opened from any "path"-typed

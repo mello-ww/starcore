@@ -118,6 +118,103 @@ class AuthStoreTest(unittest.TestCase):
     def test_token_from_request_with_neither_is_empty(self):
         self.assertEqual(AuthStore.token_from_request("", ""), "")
 
+    # ---------- sessions: kind/device_name, listing, revocation ----------
+    # (see the module docstring at the top of auth.py - this is the
+    # foundation a future StarCore mobile app authenticates through: an
+    # ordinary login, labeled "mobile" purely so it can be shown and
+    # individually revoked here, never a second auth mechanism)
+
+    def test_a_session_defaults_to_kind_web_with_no_device_name(self):
+        auth = self.store()
+        token = auth.bootstrap("admin", "a very good password")
+
+        sessions = auth.list_sessions()
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(sessions[0]["kind"], "web")
+        self.assertIsNone(sessions[0]["device_name"])
+
+    def test_login_can_label_a_session_as_mobile_with_a_device_name(self):
+        auth = self.store()
+        auth.bootstrap("admin", "a very good password")
+
+        auth.login("admin", "a very good password", kind="mobile", device_name="Nathan's iPhone")
+
+        sessions = auth.list_sessions()
+        mobile = next(session for session in sessions if session["kind"] == "mobile")
+        self.assertEqual(mobile["device_name"], "Nathan's iPhone")
+
+    def test_an_unrecognized_kind_falls_back_to_web(self):
+        auth = self.store()
+        auth.bootstrap("admin", "a very good password")
+
+        auth.login("admin", "a very good password", kind="not-a-real-kind")
+
+        sessions = auth.list_sessions()
+        self.assertTrue(all(session["kind"] in ("web", "mobile") for session in sessions))
+
+    def test_session_kind_reports_the_kind_of_a_valid_token(self):
+        auth = self.store()
+        auth.bootstrap("admin", "a very good password")
+        mobile_token = auth.login("admin", "a very good password", kind="mobile")
+
+        self.assertEqual(auth.session_kind(mobile_token), "mobile")
+
+    def test_session_kind_is_empty_for_an_invalid_token(self):
+        auth = self.store()
+        self.assertEqual(auth.session_kind("not-a-real-token"), "")
+
+    def test_list_sessions_marks_the_given_token_as_current(self):
+        auth = self.store()
+        token = auth.bootstrap("admin", "a very good password")
+        other = auth.create_session("admin")
+
+        sessions = {session["session_id"]: session for session in auth.list_sessions(current_token=token)}
+        current_flags = [session["current"] for session in sessions.values()]
+        self.assertEqual(current_flags.count(True), 1)
+
+    def test_list_sessions_never_includes_the_raw_token(self):
+        auth = self.store()
+        token = auth.bootstrap("admin", "a very good password")
+
+        for session in auth.list_sessions():
+            self.assertNotIn(token, session.values())
+
+    def test_list_sessions_excludes_expired_sessions(self):
+        auth = self.store()
+        token = auth.bootstrap("admin", "a very good password")
+        auth._data["sessions"][token]["expires"] = time.time() - 1
+
+        self.assertEqual(auth.list_sessions(), [])
+
+    def test_revoke_session_by_id_invalidates_that_token(self):
+        auth = self.store()
+        token = auth.bootstrap("admin", "a very good password")
+        session_id = auth.list_sessions()[0]["session_id"]
+
+        revoked = auth.revoke_session(session_id)
+        self.assertTrue(revoked)
+        self.assertFalse(auth.validate_session(token))
+
+    def test_revoking_one_session_does_not_touch_another(self):
+        auth = self.store()
+        token = auth.bootstrap("admin", "a very good password")
+        other_token = auth.create_session("admin")
+
+        # list_sessions() deliberately never exposes which token a session_id
+        # belongs to (see its docstring) - revoke the first one found and
+        # confirm exactly one of the two tokens survives, whichever it was
+        first_id = auth.list_sessions()[0]["session_id"]
+        auth.revoke_session(first_id)
+
+        survivors = [auth.validate_session(token), auth.validate_session(other_token)]
+        self.assertEqual(survivors.count(True), 1)
+
+    def test_revoke_unknown_session_id_returns_false(self):
+        auth = self.store()
+        auth.bootstrap("admin", "a very good password")
+
+        self.assertFalse(auth.revoke_session("not-a-real-session-id"))
+
 
 class AuthApiTest(unittest.TestCase):
     """Each test starts its own engine - a bootstrapped admin account changes
@@ -336,6 +433,127 @@ class AuthApiTest(unittest.TestCase):
                 engine, "/api/auth/login", method="POST",
                 payload={"username": "admin", "password": "wrong"})
             self.assertEqual(status, 401)  # rejected on credentials, not on missing auth
+        finally:
+            stop_engine(engine)
+
+    def test_login_accepts_an_optional_kind_and_device_name(self):
+        engine = start_engine(mission_control=True)
+        try:
+            self.request(engine, "/api/auth/setup", method="POST",
+                         payload={"username": "admin", "password": "a very good password"})
+
+            status, payload, cookies = self.request(
+                engine, "/api/auth/login", method="POST",
+                payload={"username": "admin", "password": "a very good password",
+                         "kind": "mobile", "device_name": "Nathan's iPhone"})
+            self.assertEqual(status, 200)
+            token = self.token_from_set_cookie(cookies)
+
+            status, payload = self.get_json(engine, "/api/auth/sessions", token)
+            self.assertEqual(status, 200)
+            mobile = next(session for session in payload["sessions"] if session["kind"] == "mobile")
+            self.assertEqual(mobile["device_name"], "Nathan's iPhone")
+        finally:
+            stop_engine(engine)
+
+    def get_json(self, engine, path, token):
+        status, payload, _ = self.request(engine, path, bearer=token)
+        return status, payload
+
+    def test_sessions_endpoint_lists_every_active_session(self):
+        engine = start_engine(mission_control=True)
+        try:
+            _, _, cookies = self.request(
+                engine, "/api/auth/setup", method="POST",
+                payload={"username": "admin", "password": "a very good password"})
+            token = self.token_from_set_cookie(cookies)
+            self.request(engine, "/api/auth/login", method="POST",
+                         payload={"username": "admin", "password": "a very good password", "kind": "mobile"})
+
+            status, payload = self.get_json(engine, "/api/auth/sessions", token)
+            self.assertEqual(status, 200)
+            self.assertEqual(len(payload["sessions"]), 2)
+        finally:
+            stop_engine(engine)
+
+    def test_sessions_endpoint_marks_the_callers_own_session_current(self):
+        engine = start_engine(mission_control=True)
+        try:
+            _, _, cookies = self.request(
+                engine, "/api/auth/setup", method="POST",
+                payload={"username": "admin", "password": "a very good password"})
+            token = self.token_from_set_cookie(cookies)
+
+            status, payload = self.get_json(engine, "/api/auth/sessions", token)
+            self.assertEqual(status, 200)
+            self.assertEqual(len(payload["sessions"]), 1)
+            self.assertTrue(payload["sessions"][0]["current"])
+        finally:
+            stop_engine(engine)
+
+    def test_sessions_endpoint_requires_a_session_itself(self):
+        engine = start_engine(mission_control=True)
+        try:
+            self.request(engine, "/api/auth/setup", method="POST",
+                         payload={"username": "admin", "password": "a very good password"})
+
+            status, _, _ = self.request(engine, "/api/auth/sessions")
+            self.assertEqual(status, 401)
+        finally:
+            stop_engine(engine)
+
+    def test_revoking_a_session_by_id_invalidates_it(self):
+        engine = start_engine(mission_control=True)
+        try:
+            _, _, cookies = self.request(
+                engine, "/api/auth/setup", method="POST",
+                payload={"username": "admin", "password": "a very good password"})
+            token = self.token_from_set_cookie(cookies)
+            _, _, other_cookies = self.request(
+                engine, "/api/auth/login", method="POST",
+                payload={"username": "admin", "password": "a very good password", "kind": "mobile"})
+            other_token = self.token_from_set_cookie(other_cookies)
+
+            _, payload = self.get_json(engine, "/api/auth/sessions", token)
+            mobile_id = next(s["session_id"] for s in payload["sessions"] if s["kind"] == "mobile")
+
+            status, revoke_payload, _ = self.request(
+                engine, "/api/auth/sessions/revoke", method="POST",
+                payload={"session_id": mobile_id}, cookie=token)
+            self.assertEqual(status, 200)
+
+            status, _, _ = self.request(engine, "/api/status", bearer=other_token)
+            self.assertEqual(status, 401)
+            # the caller's own session is untouched
+            status, _, _ = self.request(engine, "/api/status", bearer=token)
+            self.assertEqual(status, 200)
+        finally:
+            stop_engine(engine)
+
+    def test_revoking_an_unknown_session_id_is_a_clean_404(self):
+        engine = start_engine(mission_control=True)
+        try:
+            _, _, cookies = self.request(
+                engine, "/api/auth/setup", method="POST",
+                payload={"username": "admin", "password": "a very good password"})
+            token = self.token_from_set_cookie(cookies)
+
+            status, payload, _ = self.request(
+                engine, "/api/auth/sessions/revoke", method="POST",
+                payload={"session_id": "not-a-real-id"}, cookie=token)
+            self.assertEqual(status, 404)
+        finally:
+            stop_engine(engine)
+
+    def test_revoke_session_endpoint_requires_a_session_itself(self):
+        engine = start_engine(mission_control=True)
+        try:
+            self.request(engine, "/api/auth/setup", method="POST",
+                         payload={"username": "admin", "password": "a very good password"})
+
+            status, _, _ = self.request(
+                engine, "/api/auth/sessions/revoke", method="POST", payload={"session_id": "anything"})
+            self.assertEqual(status, 401)
         finally:
             stop_engine(engine)
 

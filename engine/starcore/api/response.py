@@ -4,7 +4,7 @@ from pathlib import Path
 class Request:
     """What a satellite route handler receives."""
 
-    def __init__(self, engine, satellite, method: str, path: tuple, query: dict, body=None, raw=None):
+    def __init__(self, engine, satellite, method: str, path: tuple, query: dict, body=None, raw=None, token: str = ""):
         self.engine = engine
         self.satellite = satellite
         self.method = method
@@ -14,6 +14,15 @@ class Request:
         # set instead of `body` for a POST whose Content-Type isn't JSON (a
         # file upload, in practice) - a RawBody the handler reads in chunks
         self.raw = raw
+        # the caller's already-validated session token (see AuthStore), so a
+        # Satellite route can recognize *which* session this is - session-aware
+        # authorization of its own, on top of the Core's own "is there a valid
+        # session at all" gate - without re-implementing any part of session
+        # validation itself. Empty when the Core hasn't required a session for
+        # this request at all (StarCore not yet bootstrapped). The Locked
+        # Folder Satellite is what actually uses this (see docs/locked_folder.md);
+        # every other existing route ignores it exactly as before.
+        self.token = token
 
 
 class Response:

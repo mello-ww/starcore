@@ -1,0 +1,168 @@
+.lf-status .facts,
+.lf-status h3,
+.lf-pin h3,
+.lf-browser h3 {
+    margin-top: 0;
+}
+
+.lf-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+}
+
+.lf-pin form.stack {
+    max-width: 320px;
+    gap: 0.6rem;
+}
+
+/* the protected browser - the same row/breadcrumb visual language as File
+   Explorer's own page (satellites/native/file_explorer/mission_control/
+   page.css), under its own class names since each satellite's page.css is
+   loaded independently - see docs/satellites.md, "Contributing a Mission
+   Control page" */
+
+.lf-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+}
+
+.lf-toolbar label.button {
+    cursor: pointer;
+}
+
+.lf-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.5rem 0.7rem;
+    margin-bottom: 0.6rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--raised);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    overflow-x: auto;
+}
+
+.lf-crumb {
+    padding: 0.1rem 0.3rem;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--azure);
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.lf-crumb:hover {
+    background: rgba(43, 91, 215, 0.12);
+    color: var(--ice);
+}
+
+.lf-crumb-sep {
+    color: var(--text-faint);
+}
+
+.lf-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.lf-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+    min-width: 0;
+}
+
+.lf-row:last-child {
+    border-bottom: 0;
+}
+
+.lf-row:hover {
+    background: var(--raised);
+}
+
+.lf-row-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    flex: 1 1 220px;
+}
+
+.lf-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.88rem;
+}
+
+button.lf-name {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+button.lf-name:hover {
+    color: var(--azure);
+}
+
+.lf-meta {
+    flex: none;
+    min-width: 72px;
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    text-align: right;
+}
+
+.lf-row-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.3rem;
+    margin-left: auto;
+}
+
+.lf-row-actions a.icon-button {
+    text-decoration: none;
+    padding: 0.2rem 0.5rem;
+}
+
+@media (max-width: 560px) {
+    .lf-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .lf-row-info {
+        flex: 1 1 auto;
+    }
+
+    .lf-meta {
+        text-align: left;
+        min-width: 0;
+    }
+
+    .lf-row-actions {
+        margin-left: 0;
+    }
+}

@@ -254,14 +254,66 @@ deployment:
 - Once the account exists, every API endpoint other than `/api/auth/*` requires a valid
   session, enforced entirely server-side (`ApiServer._authorized()`) - Mission Control hiding
   a button never was, and still isn't, the actual protection.
-- Sessions last 7 days and are stored in `engine/data/auth.json` (created on first use,
-  already covered by `.gitignore` - see "What's covered" below). Deleting that file forgets
-  every session and the administrator account itself, which is the supported way to reset
-  a lost password: stop StarCore, delete `engine/data/auth.json`, start it again, and the
-  setup screen reappears.
+- Sessions last 7 days and are stored in `auth.json`, under StarCore's application-data
+  directory (see "Runtime data location" below) - created on first use, and never inside the
+  Git checkout by default. Deleting that file forgets every session and the administrator
+  account itself, which is the supported way to reset a lost password: stop StarCore, delete
+  `auth.json` from the application-data directory, start it again, and the setup screen
+  reappears.
 - Photo Sync (`satellites/native/photo/sync.py`) keeps its own separate device-token
   authentication on its own port - see "Photo Sync and authentication" in `docs/photo.md` -
   and is unaffected by any of this.
+
+## Runtime data location
+
+StarCore's own credentials, sessions, and a Satellite's own generated secrets (the Locked
+Folder's PIN hash - see `docs/locked_folder.md`) are machine-specific runtime state, not
+source code, and by default live entirely outside the Git checkout - the same way a desktop
+application's user data never lives inside its own installation directory. `starcore.
+runtime_paths.data_dir()` is the one place that decides where:
+
+```
+Windows:      %APPDATA%\StarCore
+Linux/macOS:  $XDG_DATA_HOME/starcore   (defaults to ~/.local/share/starcore)
+```
+
+Set the `STARCORE_DATA_DIR` environment variable to override this - a fixed path for a
+shared/service install (`/var/lib/starcore`, say), or anything else a particular deployment
+needs. It always wins, on every platform. The directory (and everything under it) is created
+lazily, only once something actually needs to be written there - nothing is created just by
+starting StarCore or checking its status.
+
+What actually lives there:
+
+```
+<data_dir>/auth.json                                  the administrator account and sessions
+<data_dir>/satellites/LockedFolder/pin.json            the Locked Folder's PIN hash
+```
+
+Only the Locked Folder's own generated secret moves here - Photo's and Music's libraries stay
+exactly where they've always been (`satellites/native/<name>/data/`, inside the checkout, but
+already excluded by `.gitignore`): that content is the user's own photos and music, not a
+credential, and moving potentially large existing libraries around automatically was
+deliberately out of scope for this.
+
+### Migrating an existing installation
+
+An installation from before this was introduced had `engine/data/auth.json` (inside the
+checkout) and, if a Locked Folder PIN had been set, `satellites/native/locked_folder/data/
+pin.json` (also inside the checkout, and also already covered by `.gitignore` either way -
+this was never actually reaching a commit, just living somewhere less appropriate than it
+should have). The very first time a new StarCore build runs, each of these is moved
+automatically - not copied - to its new location: the administrator account, every existing
+session, and any configured Locked Folder PIN all keep working exactly as they did before,
+with nothing to reconfigure.
+
+This is safe to run repeatedly and is never destructive: if the new location already has its
+own file (a second install pointed at the same checkout, for instance), the old one is simply
+left exactly where it was rather than being overwritten or deleted, and migration is retried
+(a no-op, at that point) on every subsequent start. If the move itself fails for some reason
+(a permissions problem, e.g.), StarCore logs a `[WARNING]` and keeps working from the old
+location for that run rather than losing anything or refusing to start - migration is simply
+retried the next time.
 
 ## HTTPS
 
@@ -332,7 +384,19 @@ Windows) as good practice regardless.
 
 ## What's covered by `.gitignore`
 
-Alongside the usual Python/OS/editor noise, `.gitignore` excludes everything this milestone
-added that must never be committed: `engine/data/` (the authentication store and any other
-Engine-level runtime data) and any `*.pem`/`*.key`/`*.crt`/`*.p12`/`*.pfx` file, wherever it
-lives in the checkout.
+Runtime data and secrets live outside the checkout by default (see "Runtime data location"
+above), so there is normally nothing here to accidentally commit at all. `.gitignore` still
+excludes, as a backstop:
+
+- `engine/data/` - the historical, pre-migration location of the authentication store, kept
+  ignored in case migration ever falls back to it (see "Migrating an existing installation"
+  above) or an advanced setup points `STARCORE_DATA_DIR` back inside the checkout on purpose;
+- `satellites/*/*/data/` - every Satellite's own storage directory (Photo's and Music's
+  libraries, which are deliberately unaffected by this milestone and still live here; the
+  Locked Folder's PIN hash too, if explicitly configured to live inside the checkout rather
+  than the application-data directory);
+- any `*.pem`/`*.key`/`*.crt`/`*.p12`/`*.pfx` file, wherever it lives in the checkout.
+
+None of this is a substitute for the application-data directory being the default in the
+first place - it is exactly the "defense in depth" a `.gitignore` rule is: a backstop for the
+exception, not the mechanism the common case relies on.

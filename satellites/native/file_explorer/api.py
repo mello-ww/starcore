@@ -15,7 +15,7 @@ import shutil
 
 from starcore.api.response import error_response, file_response, json_response
 
-from . import paths
+from . import locked_folder_guard, paths
 
 # a deliberately small, generic guess at content type for inline viewing -
 # anything not listed here still downloads fine, just without a preview
@@ -73,6 +73,10 @@ def entries(request):
     except paths.PathError as error:
         return error_response(str(error), status=400)
 
+    blocked = locked_folder_guard.guard(request, target)
+    if blocked is not None:
+        return blocked
+
     status, failure = _stat(target)
     if failure is not None:
         return failure
@@ -99,6 +103,12 @@ def entries(request):
             "type": "dir" if item.is_dir() else "file",
             "size": None if item.is_dir() else info.st_size,
             "modified": datetime.fromtimestamp(info.st_mtime, tz=timezone.utc).isoformat(timespec="seconds"),
+            # flags the Locked Folder itself (or, in principle, anything
+            # nested under it, though a listing never descends into a
+            # locked directory in the first place - see guard() above) so
+            # the frontend can show a lock icon; this is a visibility hint
+            # only, never itself what keeps the contents inaccessible
+            "locked": locked_folder_guard.is_protected(request, item),
         })
 
     return json_response({
@@ -126,6 +136,10 @@ def content(request):
     except paths.PathError as error:
         return error_response(str(error), status=400)
 
+    blocked = locked_folder_guard.guard(request, target)
+    if blocked is not None:
+        return blocked
+
     status, failure = _stat(target)
     if failure is not None:
         return failure
@@ -142,14 +156,23 @@ def content(request):
 def upload(request):
     if request.method != "POST":
         return error_response("only POST is supported here", status=405)
-    if request.raw is None:
-        return error_response("expected a raw file body, not JSON", status=400)
 
     try:
         directory = paths.resolve_path(request.query.get("path", ""))
         name = paths.safe_name(request.query.get("name", ""))
     except paths.PathError as error:
         return error_response(str(error), status=400)
+
+    # checked before even looking at the body, so a Locked Folder that isn't
+    # unlocked refuses an upload attempt the same way it refuses anything
+    # else here - never distinguishable from "the request was also malformed
+    # some other way"
+    blocked = locked_folder_guard.guard(request, directory)
+    if blocked is not None:
+        return blocked
+
+    if request.raw is None:
+        return error_response("expected a raw file body, not JSON", status=400)
 
     status, failure = _stat(directory)
     if failure is not None:
@@ -215,6 +238,10 @@ def mkdir(request):
     except paths.PathError as error:
         return error_response(str(error), status=400)
 
+    blocked = locked_folder_guard.guard(request, directory)
+    if blocked is not None:
+        return blocked
+
     status, failure = _stat(directory)
     if failure is not None:
         return failure
@@ -251,6 +278,10 @@ def rename(request):
     if paths.is_filesystem_root(source):
         return error_response("a filesystem root cannot be renamed", status=400)
 
+    blocked = locked_folder_guard.guard(request, source)
+    if blocked is not None:
+        return blocked
+
     _, failure = _stat(source)
     if failure is not None:
         return failure
@@ -285,6 +316,10 @@ def delete(request):
 
     if paths.is_filesystem_root(target):
         return error_response("a filesystem root cannot be deleted", status=400)
+
+    blocked = locked_folder_guard.guard(request, target)
+    if blocked is not None:
+        return blocked
 
     _, failure = _stat(target)
     if failure is not None:

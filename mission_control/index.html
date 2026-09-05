@@ -312,6 +312,15 @@
                 <button id="configuration-save" class="button button-primary" type="submit">Save</button>
             </div>
         </form>
+
+        <section class="panel">
+            <p class="eyebrow">Active sessions</p>
+            <p class="muted">Every device currently signed in to StarCore - a browser, or a future StarCore
+                mobile app, once one exists (see Locked Folder for how a mobile session authorizes it).
+                Revoking one signs that device out immediately.</p>
+            <p id="sessions-error" class="banner error" hidden></p>
+            <div id="sessions-list" class="stack"></div>
+        </section>
     </section>
 
     <section id="view-satellite" class="view" hidden>

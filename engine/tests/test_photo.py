@@ -780,6 +780,335 @@ class PhotoSatelliteTest(unittest.TestCase):
         self.assertIsNone(self.engine.registry.get("Status").page)
 
 
+class PhotoAlbumsTest(unittest.TestCase):
+    """The Photo Library's Albums resource: CRUD on custom albums, addressed by
+    the library's own stable photo ids - plus the GPS/location data the Map
+    tab and photo-details location map are built on, exercised through the
+    same HTTP API the Mission Control page itself calls."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = start_engine(mission_control=True)
+        if not cls.engine.api.running:
+            stop_engine(cls.engine)
+            raise unittest.SkipTest("Mission Control could not be started")
+
+        cls.satellite = cls.engine.registry.get("Photo")
+
+    @classmethod
+    def tearDownClass(cls):
+        stop_engine(cls.engine)
+
+    def setUp(self):
+        # a fresh library and a fresh album store for every test, same as
+        # PhotoSatelliteTest - the real one is never touched
+        self.directory = Path(tempfile.mkdtemp(prefix="starcore-photo-albums-"))
+        self.source = self.directory / "source"
+        self.source.mkdir()
+        self.satellite.config.data["storage"] = str(self.directory / "library")
+        self.satellite.config.data["photo_directory"] = ""
+
+    def tearDown(self):
+        shutil.rmtree(self.directory, ignore_errors=True)
+
+    def request(self, path, method="GET", payload=None):
+        connection = HTTPConnection("127.0.0.1", self.engine.api.port, timeout=5)
+        body = json.dumps(payload).encode("utf-8") if payload is not None else None
+        headers = {"Content-Type": "application/json"} if body is not None else {}
+
+        try:
+            connection.request(method, path, body=body, headers=headers)
+            response = connection.getresponse()
+            return response.status, response.headers.get("Content-Type", ""), response.read()
+        finally:
+            connection.close()
+
+    def json_request(self, path, method="GET", payload=None):
+        status, content_type, body = self.request(path, method, payload)
+        self.assertIn("application/json", content_type)
+        return status, json.loads(body.decode("utf-8"))
+
+    def albums_url(self, *segments):
+        return "/".join(["/api/satellites/photo/albums", *segments])
+
+    def import_photo(self, name: str, data: bytes) -> dict:
+        (self.source / name).write_bytes(data)
+        status, payload = self.json_request(
+            "/api/satellites/photo/import", "POST", {"source": str(self.source)})
+        self.assertEqual(status, 200)
+        photo = next(photo for photo in payload["photos"] if photo["filename"] == name)
+        (self.source / name).unlink()  # so the next import_photo() call only picks up its own file
+        return photo
+
+    # ---------- creation, listing, rename, deletion ----------
+
+    def test_a_new_library_has_no_albums(self):
+        status, payload = self.json_request(self.albums_url())
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["albums"], [])
+
+    def test_an_album_can_be_created(self):
+        status, payload = self.json_request(self.albums_url(), "POST", {"name": "Summer trip"})
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["name"], "Summer trip")
+        self.assertEqual(payload["photo_ids"], [])
+        self.assertTrue(payload["id"])
+        self.assertIn("created_at", payload)
+        self.assertIn("updated_at", payload)
+
+    def test_creating_an_album_requires_a_name(self):
+        for name in (None, "", "   "):
+            status, payload = self.json_request(self.albums_url(), "POST", {"name": name})
+            self.assertEqual(status, 400)
+            self.assertIn("error", payload)
+
+    def test_an_album_name_has_a_maximum_length(self):
+        status, payload = self.json_request(self.albums_url(), "POST", {"name": "x" * 200})
+
+        self.assertEqual(status, 400)
+        self.assertIn("error", payload)
+
+    def test_created_albums_are_listed(self):
+        self.json_request(self.albums_url(), "POST", {"name": "Beach"})
+        self.json_request(self.albums_url(), "POST", {"name": "Mountains"})
+
+        status, payload = self.json_request(self.albums_url())
+
+        self.assertEqual(status, 200)
+        names = sorted(album["name"] for album in payload["albums"])
+        self.assertEqual(names, ["Beach", "Mountains"])
+        # a freshly created album has no photos yet
+        self.assertTrue(all(album["photo_count"] == 0 for album in payload["albums"]))
+        self.assertTrue(all(album["cover_photo_id"] is None for album in payload["albums"]))
+
+    def test_an_album_can_be_renamed(self):
+        album = self.json_request(self.albums_url(), "POST", {"name": "Old name"})[1]
+
+        status, payload = self.json_request(self.albums_url(album["id"]), "POST", {"name": "New name"})
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["name"], "New name")
+        self.assertEqual(self.json_request(self.albums_url(album["id"]))[1]["name"], "New name")
+
+    def test_renaming_an_unknown_album_is_a_404(self):
+        status, payload = self.json_request(self.albums_url("does-not-exist"), "POST", {"name": "New name"})
+
+        self.assertEqual(status, 404)
+        self.assertIn("error", payload)
+
+    def test_renaming_requires_a_valid_name(self):
+        album = self.json_request(self.albums_url(), "POST", {"name": "Keeps its name"})[1]
+
+        status, payload = self.json_request(self.albums_url(album["id"]), "POST", {"name": ""})
+
+        self.assertEqual(status, 400)
+        self.assertEqual(self.json_request(self.albums_url(album["id"]))[1]["name"], "Keeps its name")
+
+    def test_an_album_can_be_deleted(self):
+        album = self.json_request(self.albums_url(), "POST", {"name": "Temporary"})[1]
+
+        status, payload = self.json_request(self.albums_url(album["id"], "delete"), "POST")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["deleted"], album["id"])
+        self.assertEqual(self.json_request(self.albums_url())[1]["albums"], [])
+
+    def test_deleting_an_unknown_album_is_a_404(self):
+        status, payload = self.json_request(self.albums_url("does-not-exist", "delete"), "POST")
+
+        self.assertEqual(status, 404)
+        self.assertIn("error", payload)
+
+    def test_fetching_an_unknown_album_is_a_404(self):
+        status, payload = self.json_request(self.albums_url("does-not-exist"))
+
+        self.assertEqual(status, 404)
+        self.assertIn("error", payload)
+
+    # ---------- adding / removing photos ----------
+
+    def test_a_photo_can_be_added_to_an_album(self):
+        photo = self.import_photo("a.png", png(4, 3))
+        album = self.json_request(self.albums_url(), "POST", {"name": "Trip"})[1]
+
+        status, payload = self.json_request(self.albums_url(album["id"], "photos"), "POST", {"photo_id": photo["id"]})
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["photo_ids"], [photo["id"]])
+
+        detail = self.json_request(self.albums_url(album["id"]))[1]
+        self.assertEqual(len(detail["photos"]), 1)
+        self.assertEqual(detail["photos"][0]["id"], photo["id"])
+
+        listing = self.json_request(self.albums_url())[1]["albums"][0]
+        self.assertEqual(listing["photo_count"], 1)
+        self.assertEqual(listing["cover_photo_id"], photo["id"])
+
+    def test_adding_the_same_photo_twice_does_not_duplicate_it(self):
+        photo = self.import_photo("a.png", png(4, 3))
+        album = self.json_request(self.albums_url(), "POST", {"name": "Trip"})[1]
+
+        self.json_request(self.albums_url(album["id"], "photos"), "POST", {"photo_id": photo["id"]})
+        status, payload = self.json_request(self.albums_url(album["id"], "photos"), "POST", {"photo_id": photo["id"]})
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["photo_ids"], [photo["id"]])
+
+    def test_adding_an_unknown_photo_is_rejected(self):
+        album = self.json_request(self.albums_url(), "POST", {"name": "Trip"})[1]
+
+        status, payload = self.json_request(
+            self.albums_url(album["id"], "photos"), "POST", {"photo_id": "deadbeefdeadbeef"})
+
+        self.assertEqual(status, 400)
+        self.assertIn("error", payload)
+        self.assertEqual(self.json_request(self.albums_url(album["id"]))[1]["photo_ids"], [])
+
+    def test_adding_a_photo_to_an_unknown_album_is_a_404(self):
+        photo = self.import_photo("a.png", png(4, 3))
+
+        status, payload = self.json_request(
+            self.albums_url("does-not-exist", "photos"), "POST", {"photo_id": photo["id"]})
+
+        self.assertEqual(status, 404)
+        self.assertIn("error", payload)
+
+    def test_a_photo_can_be_removed_from_an_album(self):
+        photo = self.import_photo("a.png", png(4, 3))
+        album = self.json_request(self.albums_url(), "POST", {"name": "Trip"})[1]
+        self.json_request(self.albums_url(album["id"], "photos"), "POST", {"photo_id": photo["id"]})
+
+        status, payload = self.json_request(
+            self.albums_url(album["id"], "photos", "remove"), "POST", {"photo_id": photo["id"]})
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["photo_ids"], [])
+        self.assertEqual(self.json_request(self.albums_url(album["id"]))[1]["photos"], [])
+
+    def test_removing_a_photo_not_in_the_album_is_a_no_op(self):
+        album = self.json_request(self.albums_url(), "POST", {"name": "Trip"})[1]
+
+        status, payload = self.json_request(
+            self.albums_url(album["id"], "photos", "remove"), "POST", {"photo_id": "deadbeefdeadbeef"})
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["photo_ids"], [])
+
+    def test_an_album_can_hold_several_photos_and_is_ordered_by_addition(self):
+        first = self.import_photo("a.png", png(4, 3))
+        second = self.import_photo("b.png", png(5, 3))
+        album = self.json_request(self.albums_url(), "POST", {"name": "Trip"})[1]
+
+        self.json_request(self.albums_url(album["id"], "photos"), "POST", {"photo_id": first["id"]})
+        self.json_request(self.albums_url(album["id"], "photos"), "POST", {"photo_id": second["id"]})
+
+        detail = self.json_request(self.albums_url(album["id"]))[1]
+        self.assertEqual(detail["photo_ids"], [first["id"], second["id"]])
+        self.assertEqual(len(detail["photos"]), 2)
+
+    # ---------- validation / method errors ----------
+
+    def test_albums_route_rejects_other_methods(self):
+        connection = HTTPConnection("127.0.0.1", self.engine.api.port, timeout=5)
+        try:
+            connection.request("DELETE", self.albums_url())
+            response = connection.getresponse()
+            # the Core itself refuses PUT/PATCH/DELETE before any satellite
+            # route is ever reached - see starcore.api.server.RequestHandler
+            self.assertEqual(response.status, 405)
+        finally:
+            connection.close()
+
+    def test_creating_an_album_requires_json_object_semantics(self):
+        # a body without a 'name' key at all behaves the same as an empty one
+        status, payload = self.json_request(self.albums_url(), "POST", {})
+
+        self.assertEqual(status, 400)
+        self.assertIn("error", payload)
+
+    # ---------- GPS / location data, for the Map tab and photo-details map ----------
+
+    def test_a_photo_without_gps_metadata_has_no_location(self):
+        photo = self.import_photo("no-gps.png", png(6, 4))
+
+        self.assertIsNone(photo["metadata"]["gps_latitude"])
+        self.assertIsNone(photo["metadata"]["gps_longitude"])
+        self.assertIsNone(photo["metadata"]["gps_coordinates"])
+
+    def test_a_photo_with_gps_metadata_is_locatable_through_the_api(self):
+        gps = {
+            GPS_LATITUDE_REF: text_field("N"),
+            GPS_LATITUDE: rational_field((48, 1), (51, 1), (29, 1)),
+            GPS_LONGITUDE_REF: text_field("E"),
+            GPS_LONGITUDE: rational_field((2, 1), (17, 1), (40, 1)),
+        }
+        tiff = build_exif(gps=gps)
+        (self.source / "paris.jpg").write_bytes(jpeg_with_exif(64, 48, tiff))
+
+        status, payload = self.json_request(
+            "/api/satellites/photo/import", "POST", {"source": str(self.source)})
+        self.assertEqual(status, 200)
+        photo = payload["photos"][0]
+
+        self.assertAlmostEqual(photo["metadata"]["gps_latitude"], 48.858056, places=4)
+        self.assertAlmostEqual(photo["metadata"]["gps_longitude"], 2.294444, places=4)
+        self.assertIsNotNone(photo["metadata"]["gps_coordinates"])
+
+        # the same data reachable the way the Map tab and the photo-details
+        # location map both fetch it: the plain /photos listing and a single
+        # photo lookup, with nothing map-specific needed on the backend
+        listing = self.json_request("/api/satellites/photo/photos")[1]["photos"]
+        located = next(entry for entry in listing if entry["id"] == photo["id"])
+        self.assertAlmostEqual(located["metadata"]["gps_latitude"], 48.858056, places=4)
+
+        single = self.json_request(f"/api/satellites/photo/photos/{photo['id']}")[1]
+        self.assertAlmostEqual(single["metadata"]["gps_longitude"], 2.294444, places=4)
+
+    def test_a_mix_of_located_and_unlocated_photos_can_be_filtered_client_side(self):
+        located_gps = {
+            GPS_LATITUDE_REF: text_field("N"),
+            GPS_LATITUDE: rational_field((10, 1), (0, 1), (0, 1)),
+            GPS_LONGITUDE_REF: text_field("E"),
+            GPS_LONGITUDE: rational_field((20, 1), (0, 1), (0, 1)),
+        }
+        (self.source / "located.jpg").write_bytes(jpeg_with_exif(10, 10, build_exif(gps=located_gps)))
+        (self.source / "unlocated.png").write_bytes(png(10, 10))
+
+        status, payload = self.json_request(
+            "/api/satellites/photo/import", "POST", {"source": str(self.source)})
+        self.assertEqual(status, 200)
+
+        listing = self.json_request("/api/satellites/photo/photos")[1]["photos"]
+        located = [entry for entry in listing if entry["metadata"]["gps_latitude"] is not None]
+        unlocated = [entry for entry in listing if entry["metadata"]["gps_latitude"] is None]
+
+        self.assertEqual(len(located), 1)
+        self.assertEqual(len(unlocated), 1)
+        self.assertEqual(located[0]["filename"], "located.jpg")
+        self.assertEqual(unlocated[0]["filename"], "unlocated.png")
+
+    def test_camera_metadata_is_available_for_device_grouping(self):
+        root = {EXIF_MAKE: text_field("Canon"), EXIF_MODEL: text_field("Canon EOS R5")}
+        tiff = build_exif(root)
+        (self.source / "camera.jpg").write_bytes(jpeg_with_exif(20, 20, tiff))
+        (self.source / "unknown.png").write_bytes(png(6, 6))
+
+        status, payload = self.json_request(
+            "/api/satellites/photo/import", "POST", {"source": str(self.source)})
+        self.assertEqual(status, 200)
+
+        listing = self.json_request("/api/satellites/photo/photos")[1]["photos"]
+        with_camera = next(entry for entry in listing if entry["filename"] == "camera.jpg")
+        without_camera = next(entry for entry in listing if entry["filename"] == "unknown.png")
+
+        self.assertEqual(with_camera["metadata"]["camera_make"], "Canon")
+        self.assertEqual(with_camera["metadata"]["camera_model"], "Canon EOS R5")
+        self.assertIsNone(without_camera["metadata"]["camera_make"])
+        self.assertIsNone(without_camera["metadata"]["camera_model"])
+
+
 class PhotoCommandTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

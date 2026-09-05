@@ -17,6 +17,7 @@ satellites/native/photo/
         photos/<xx>/<id>.<ext>       imported originals, never modified
         thumbnails/<xx>/<id>.jpg     derived, safe to delete at any time
         library.json                 the metadata index
+        albums.json                  custom albums (see "Albums" below)
 ```
 
 A photo's identifier is the first 16 characters of the SHA-256 of its content, and the
@@ -134,6 +135,13 @@ POST /api/satellites/photo/scan               preview a directory  {"source": ".
 POST /api/satellites/photo/import             import a directory   {"source": "..."} (optional - see below)
 GET  /api/satellites/photo/configuration      current settings (sync_host, sync_port, photo_directory)
 POST /api/satellites/photo/configuration      change one            {"key": ..., "value": ...}
+GET  /api/satellites/photo/albums                       every album, with a photo count and cover photo
+GET  /api/satellites/photo/albums/<id>                  one album, with its photos in full
+POST /api/satellites/photo/albums                       create one             {"name": "..."}
+POST /api/satellites/photo/albums/<id>                  rename it              {"name": "..."}
+POST /api/satellites/photo/albums/<id>/delete           delete it
+POST /api/satellites/photo/albums/<id>/photos           add a photo            {"photo_id": "..."}
+POST /api/satellites/photo/albums/<id>/photos/remove    remove a photo         {"photo_id": "..."}
 ```
 
 Photos are only ever addressed by identifier. An identifier that is not in the index is a
@@ -142,11 +150,28 @@ through these routes. Import is the one route that accepts a path from the calle
 validated as an existing directory, it may not point inside the library itself, and it only
 ever reads. There is no endpoint that browses or serves arbitrary files.
 
+The album routes are all `GET`/`POST` - never `PUT`, `PATCH` or `DELETE` - because that is
+all the Core's own request handler ever routes to a Satellite (see `docs/satellites.md`);
+rename, delete and remove-photo are expressed as `POST` sub-paths rather than idiomatic REST
+verbs for exactly that reason, the same way Photo's own `"configuration"` route already
+updates settings with a `POST`. There is no separate endpoint for the Map tab or the
+photo-details location panel: both are built entirely client-side from the `gps_latitude`/
+`gps_longitude`/`gps_coordinates` fields already present on every photo returned by
+`/photos` and `/photos/<id>`, so no new backend endpoint was needed for either.
+
 ## Mission Control
 
-The Photo page shows the library summary, a gallery of thumbnails and an import panel.
-Selecting a photo opens a viewer with the full image, its metadata, and keyboard navigation
-(left, right, escape).
+The Photo page is a Photo Library with three tabs - **Photos**, **Albums** and **Map** -
+sharing one topbar, one summary and the same Config (gear) button described in
+"Configuring Photo Sync" below; switching tabs never touches sync or import state, and the
+existing photo viewer (full image, metadata, keyboard navigation) opens from a photo in any
+of the three.
+
+### Photos
+
+The library summary, a gallery of thumbnails and the import panel, same as before. Selecting
+a photo opens the viewer with the full image, its metadata, and keyboard navigation (left,
+right, escape).
 
 Because a browser cannot read a folder on the machine running StarCore, the import panel
 asks for a path on that machine rather than pretending to open a local folder picker. The
@@ -154,6 +179,39 @@ panel scans first, so the folder can be previewed before anything is copied. Whe
 `photo_directory` is configured (see below) and the field hasn't been typed into yet, the
 panel pre-fills it so importing from the usual place doesn't mean retyping the same path
 every time - typing a different path always overrides the default for that one import.
+
+When at least one photo carries camera/device EXIF metadata (`camera_make`/`camera_model`),
+an "All / By camera" toggle appears above the gallery to group photos by device; a photo with
+no camera metadata still appears, grouped under "Unknown camera", rather than being hidden.
+The toggle stays hidden entirely when no photo in the library has that metadata at all - it
+is never shown just to sit empty, and nothing is fabricated for a photo that lacks it.
+
+### Albums
+
+User-created groupings of photos, entirely separate from the library index (see "Albums"
+below for the storage and API this is built on). "New album" creates one; each album card
+can be renamed or deleted from a hover action; opening a card shows its photos and an "Add
+photos" picker that toggles membership for any photo in the library, live, without leaving
+the picker. Deleting an album, or removing a photo from one, never touches the photo itself
+or anything under `data/photos/`.
+
+### Map
+
+An interactive map of every photo that carries GPS metadata, built with
+[Leaflet](https://leafletjs.com/) (see "Map" below for why this is the one satellite that
+depends on an external library, and how). Photos without location data are simply left off
+the map - there is no requirement that every photo have one, and the tab shows a plain
+notice instead of an empty or broken map when nothing in the library has a location yet.
+Close-together photos are grouped into a single cluster marker (with a count badge) that
+splits apart on zoom, rather than piling up unreadable overlapping pins. Selecting a marker
+opens the photo viewer for the photo(s) at that location.
+
+### Photo details - location
+
+The existing photo viewer's info panel now also shows the photo's location: a small map with
+a marker when the photo has GPS coordinates (visually consistent with the Map tab, using the
+same Leaflet integration), or "Location unavailable" - never a blank or broken map - when it
+does not.
 
 ## Command
 
@@ -280,3 +338,63 @@ re-sending a photo is always safe.
 it: everything that enters the library goes through the same storage layout, identifiers,
 deduplication and metadata. A future dedicated phone client only has to reach the same
 endpoint, or call `add_file()` directly.
+
+## Albums
+
+Albums are a second, independent index (`albums.py`, `data/albums.json`) alongside the
+library's own `library.json` - a deliberate second module within the same Satellite package
+(see `docs/satellites.md`, "Satellites with several modules") rather than a new Satellite or
+a new database system, since an album is nothing but metadata: a name and an ordered list of
+photo ids.
+
+An album never stores a copy of a photo, and never stores a filename - only the same stable,
+content-addressed identifier the library already assigns each photo (see "Storage" above).
+That means an album keeps pointing at the right photo even if its filename metadata changes,
+and deleting an album, or removing a photo from one, never touches anything under
+`data/photos/` or `data/thumbnails/`. If a photo id an album still lists is no longer in the
+library (nothing currently deletes a photo from the library itself, but a future release
+might), it is simply skipped wherever that album's photos are resolved, and quietly dropped
+from the album the next time it is fetched through the API - the index on disk is never
+rewritten just for being read, the same tolerant-loading convention `library.json` already
+uses.
+
+`albums.json` is written the same way `library.json` is: a new version is written to a
+`.part` file and only then atomically moved into place, so an interrupted write can never
+leave a half-written index behind.
+
+## Map
+
+The Map tab and the photo-details location panel are the first (and so far only) part of
+Photo, and of StarCore's Mission Control generally, to depend on an external
+JavaScript library rather than the zero-dependency plain HTML/CSS/JS the rest of Mission
+Control is built from (see `docs/mission_control.md`) - client-side interactive maps are
+not something that can reasonably be built from scratch, and no mapping library already
+existed anywhere in the repository (the previous Photo page only ever linked out to
+OpenStreetMap for a single photo).
+
+[Leaflet](https://leafletjs.com/) is loaded lazily, only when the Map tab is opened or a
+photo with GPS metadata is viewed, from a CDN (`unpkg.com/leaflet@1.9.4`) in the end user's
+own browser - not vendored into the repository, and not fetched by anything running on the
+server. Map tiles come from the public OpenStreetMap tile servers the same way. This means:
+
+- both require the browser to have internet access; StarCore itself needs none for any of
+  its own functionality, and nothing else in Photo or elsewhere depends on this
+- if the load fails (no internet access, the CDN or tile servers unreachable, etc.), the Map
+  tab and the location panel both show a plain, clearly worded notice explaining that the
+  map library could not be loaded, rather than an empty panel, a broken layout or a crash
+- once loaded, Leaflet is reused for the rest of the session rather than reloaded per photo
+  or per tab switch
+
+No Leaflet plugin is used for marker clustering; it is a small amount of first-party code
+that groups nearby photos by rounding their coordinates to a zoom-dependent precision and
+drawing one marker at the group's centroid, redrawn as the map is panned or zoomed - kept
+this way specifically to avoid adding a second external dependency for what a few dozen
+lines of arithmetic already does. Markers are custom-drawn (`L.divIcon`) rather than
+Leaflet's default marker images, for the same reason: it avoids depending on - and needing to
+host or reference - Leaflet's default marker image assets at all.
+
+The map's dark, deep-space appearance is a CSS filter (invert, hue-rotate, reduced brightness
+and saturation) applied only to the tile layer, recolouring the same standard OpenStreetMap
+tiles everyone else uses rather than depending on a separate, often paid, dark-tile provider.
+Markers, popups and Leaflet's own controls are left in their normal colours on top of the
+recoloured tiles, so they stay clearly visible against it.
