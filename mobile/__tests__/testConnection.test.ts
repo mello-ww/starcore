@@ -42,10 +42,36 @@ describe('testConnection', () => {
   it('succeeds against a real StarCore server', async () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       status: 200,
+      url: 'http://192.168.1.20:8090/api/auth/status',
       text: async () => JSON.stringify({bootstrapped: true, authenticated: false}),
     }) as any;
 
-    expect(await testConnection('http://192.168.1.20:8090')).toEqual({ok: true});
+    expect(await testConnection('http://192.168.1.20:8090')).toEqual({
+      ok: true,
+      resolvedBaseUrl: 'http://192.168.1.20:8090',
+    });
+  });
+
+  /**
+   * A reverse proxy (duckdns.org and similar deployments commonly do this)
+   * that redirects plain http:// to https:// - GET follows it transparently
+   * (this check succeeds), but a POST can come back downgraded to a GET on
+   * some HTTP clients, which is what a login's "requires POST" server error
+   * actually means. Storing the *resolved* origin instead of what the user
+   * typed means login never touches the redirect in the first place - see
+   * testConnection's own doc comment.
+   */
+  it('resolves to the address actually served, after a redirect', async () => {
+    globalThis.fetch = jest.fn().mockResolvedValue({
+      status: 200,
+      url: 'https://starcore-panel.duckdns.org/api/auth/status',
+      text: async () => JSON.stringify({bootstrapped: true, authenticated: false}),
+    }) as any;
+
+    expect(await testConnection('http://starcore-panel.duckdns.org')).toEqual({
+      ok: true,
+      resolvedBaseUrl: 'https://starcore-panel.duckdns.org',
+    });
   });
 
   it('fails with a clear message when the server is unreachable', async () => {

@@ -7,15 +7,15 @@ import {Starfield} from '../components/Starfield';
 import {colors, spacing, typography} from '../theme';
 
 /**
- * `onBack` is only ever passed when this screen is the third step of the
- * first-launch onboarding wizard - i.e. the server that's about to be
- * signed into was just created by that wizard, not added via the separate
- * Settings "Add Server" flow (see App.tsx's ServersGate, which tracks
- * this). When present, both a visible back button (styled and positioned
- * exactly like ServerAddressStep's - see onboarding/ServerAddressStep.tsx)
- * and Android hardware back use it. An ordinary sign-in (after a normal
- * logout, or a server added from Settings) gets neither, unchanged from
- * before.
+ * `onBack` is only ever passed when the server about to be signed into was
+ * just added and not yet authenticated - via the first-launch wizard or
+ * the Settings "Add Server" screen, either one (see ServersContext's
+ * `pendingAdd`, which App.tsx's ServersGate reads to decide this). When
+ * present, both a visible back button (styled and positioned exactly like
+ * ServerAddressStep's - see onboarding/ServerAddressStep.tsx) and Android
+ * hardware back use it. An ordinary sign-in (after a normal logout, or
+ * reopening a server that's already been signed into before) gets
+ * neither, unchanged from before.
  */
 export function LoginScreen({onBack}: {onBack?: () => void}) {
   const {login, loginError} = useAuth();

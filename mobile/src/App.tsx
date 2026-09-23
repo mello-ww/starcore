@@ -5,6 +5,8 @@ import {OnboardingNavigator} from './navigation/OnboardingNavigator';
 import {RootNavigator} from './navigation/RootNavigator';
 import {ServersProvider, useServers} from './servers/ServersContext';
 
+type ResumeInfo = {name: string; address: string};
+
 /**
  * Top-level composition. `ServersProvider` resolves which server (if any)
  * is active before anything else runs, since `AuthProvider` needs one to
@@ -24,22 +26,15 @@ export default function App() {
 }
 
 function ServersGate() {
-  const {loading, activeServer, addAndActivate, remove} = useServers();
+  const {loading, activeServer, addAndActivate, pendingAdd, cancelPendingAdd, clearPendingAdd} = useServers();
 
-  // What's already been typed into the onboarding wizard, kept here (the
-  // one component that survives switching between the OnboardingNavigator
-  // and RootNavigator trees below) purely so it can be handed back to
-  // OnboardingNavigator if the user backs out of the Account/Auth
-  // (LoginScreen) step it hands off to - see "Add a visible back button on
-  // the third page" in the task brief.
-  const [pendingName, setPendingName] = useState('');
-  const [pendingAddress, setPendingAddress] = useState('');
-  // The id of the server onboarding itself just created, so RootNavigator
-  // only gets a "back to address" handler for that server - never for one
-  // reached through the separate Settings "Add Server" flow (MainTabs.tsx),
-  // and never once the user has actually signed in.
-  const [onboardingServerId, setOnboardingServerId] = useState<string | null>(null);
-  const [resumeOnAddressStep, setResumeOnAddressStep] = useState(false);
+  // What was typed for whichever server is currently mid-add (see
+  // ServersContext's `pendingAdd`), kept here - the one component that
+  // survives switching between the OnboardingNavigator and RootNavigator
+  // trees below - so it can be handed back to whichever screen the user
+  // backed out of: OnboardingNavigator's address step for the very first
+  // server, or MainTabs' "Add Server" screen for every one after that.
+  const [resumeInfo, setResumeInfo] = useState<ResumeInfo | null>(null);
 
   if (loading) {
     return null; // one frame of nothing while AsyncStorage resolves - not worth a spinner for
@@ -52,16 +47,10 @@ function ServersGate() {
     // this, since it's the very first thing the app shows
     return (
       <OnboardingNavigator
-        initialName={pendingName}
-        initialAddress={pendingAddress}
-        startOnAddressStep={resumeOnAddressStep}
-        onConnect={async (name, url) => {
-          setPendingName(name);
-          setPendingAddress(url);
-          const server = await addAndActivate(name, url);
-          setOnboardingServerId(server.id);
-          setResumeOnAddressStep(false);
-        }}
+        initialName={resumeInfo?.name ?? ''}
+        initialAddress={resumeInfo?.address ?? ''}
+        startOnAddressStep={resumeInfo !== null}
+        onConnect={(name, url) => addAndActivate(name, url)}
       />
     );
   }
@@ -73,24 +62,16 @@ function ServersGate() {
   return (
     <AuthProvider key={activeServer.id} baseUrl={activeServer.baseUrl} serverId={activeServer.id}>
       <RootNavigator
+        resumeAddServerParams={resumeInfo ?? undefined}
         onBackToServerAddress={
-          activeServer.id === onboardingServerId
-            ? async () => {
-                // Not yet signed in to this just-created server - treat
-                // "back" as if it was never added, rather than leaving an
-                // orphaned, unauthenticated ServerProfile behind (storage
-                // always appends on addServer, it never updates in place).
-                // Removing the active server drops ServersGate back into
-                // the `!activeServer` branch above on the next render,
-                // straight onto the address step with what was typed still
-                // filled in.
-                setResumeOnAddressStep(true);
-                setOnboardingServerId(null);
-                await remove(activeServer.id);
-              }
+          pendingAdd?.serverId === activeServer.id
+            ? async () => setResumeInfo(await cancelPendingAdd())
             : undefined
         }
-        onSignedIn={() => setOnboardingServerId(null)}
+        onSignedIn={() => {
+          clearPendingAdd();
+          setResumeInfo(null);
+        }}
       />
     </AuthProvider>
   );

@@ -44,7 +44,7 @@ export function ServerAddressStep({navigation, route, onConnect}: Props) {
       setError(result.message);
       return;
     }
-    onConnect(route.params.name, normalized);
+    onConnect(route.params.name, result.resolvedBaseUrl);
   };
 
   return (

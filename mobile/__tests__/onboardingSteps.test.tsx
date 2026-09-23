@@ -100,7 +100,7 @@ describe('ServerAddressStep (onboarding, step 2)', () => {
   });
 
   it('connects once the server is verified reachable, normalizing a bare address, using the name from step one', async () => {
-    (testConnection as jest.Mock).mockResolvedValue({ok: true});
+    (testConnection as jest.Mock).mockResolvedValue({ok: true, resolvedBaseUrl: 'http://192.168.1.20:8090'});
     const {tree, onConnect} = renderStep('Home');
 
     act(() => prop(tree, 'onboarding-address-input').onChangeText('192.168.1.20:8090'));

@@ -25,19 +25,28 @@ const navigationTheme = {
  * into storage itself.
  *
  * `onBackToServerAddress` is passed through unchanged to LoginScreen - see
- * its own doc comment - only when this server was just created by the
- * onboarding wizard (App.tsx's ServersGate decides that, not this
- * component). `onSignedIn` fires once, the moment sign-in succeeds, purely
- * so ServersGate can stop treating this server as "still mid-onboarding"
- * afterwards; it's read here from AuthContext's own state rather than
- * duplicating any login logic.
+ * its own doc comment - only when this server was just created and not yet
+ * signed into (App.tsx's ServersGate decides that via ServersContext's
+ * `pendingAdd`, not this component). `onSignedIn` fires once, the moment
+ * sign-in succeeds, purely so ServersGate can stop treating this server as
+ * "still mid-add" afterwards; it's read here from AuthContext's own state
+ * rather than duplicating any login logic.
+ *
+ * `resumeAddServerParams` is only set when a server added via the Settings
+ * "Add Server" screen was just backed out of: that server is already
+ * signed in (it was active before the add was attempted), so MainTabs
+ * renders straight away, and `initialState` seeds it to open directly on
+ * Settings > Servers > Add Server with what was typed still filled in,
+ * instead of its usual Overview tab.
  */
 export function RootNavigator({
   onBackToServerAddress,
   onSignedIn,
+  resumeAddServerParams,
 }: {
   onBackToServerAddress?: () => void;
   onSignedIn?: () => void;
+  resumeAddServerParams?: {name: string; address: string};
 }) {
   const {state} = useAuth();
 
@@ -56,8 +65,31 @@ export function RootNavigator({
     );
   }
 
+  const initialState = resumeAddServerParams
+    ? {
+        index: 4,
+        routes: [
+          {name: 'Overview' as const},
+          {name: 'Satellites' as const},
+          {name: 'Console' as const},
+          {name: 'Config' as const},
+          {
+            name: 'Settings' as const,
+            state: {
+              index: 2,
+              routes: [
+                {name: 'SettingsHome' as const},
+                {name: 'Servers' as const},
+                {name: 'AddServer' as const, params: resumeAddServerParams},
+              ],
+            },
+          },
+        ],
+      }
+    : undefined;
+
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer theme={navigationTheme} initialState={initialState}>
       {state.status === 'signed-in' ? <MainTabs /> : <LoginScreen onBack={onBackToServerAddress} />}
     </NavigationContainer>
   );

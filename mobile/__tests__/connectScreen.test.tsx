@@ -54,7 +54,7 @@ describe('ConnectScreen ("Add Server" flow)', () => {
   });
 
   it('connects once verified, normalizing a bare address', async () => {
-    (testConnection as jest.Mock).mockResolvedValue({ok: true});
+    (testConnection as jest.Mock).mockResolvedValue({ok: true, resolvedBaseUrl: 'http://192.168.1.30:8090'});
     const onConnect = jest.fn();
     const tree = renderer.create(<ConnectScreen onConnect={onConnect} onBack={() => {}} />);
 
@@ -67,5 +67,30 @@ describe('ConnectScreen ("Add Server" flow)', () => {
     });
 
     expect(onConnect).toHaveBeenCalledWith('Office', 'http://192.168.1.30:8090');
+  });
+
+  it('connects using the resolved address, not the typed one, when they differ (e.g. after a redirect)', async () => {
+    (testConnection as jest.Mock).mockResolvedValue({
+      ok: true,
+      resolvedBaseUrl: 'https://starcore-panel.duckdns.org',
+    });
+    const onConnect = jest.fn();
+    const tree = renderer.create(<ConnectScreen onConnect={onConnect} onBack={() => {}} />);
+
+    act(() => tree.root.findByProps({testID: 'connect-url-input'}).props.onChangeText('starcore-panel.duckdns.org'));
+    await act(async () => {
+      tree.root.findByProps({title: 'Continue'}).props.onPress();
+    });
+
+    expect(onConnect).toHaveBeenCalledWith('', 'https://starcore-panel.duckdns.org');
+  });
+
+  it('resumes with the name/address already filled in, when given', () => {
+    const tree = renderer.create(
+      <ConnectScreen onConnect={() => {}} onBack={() => {}} initialName="Office" initialAddress="192.168.1.30:8090" />,
+    );
+
+    expect(tree.root.findByProps({testID: 'connect-name-input'}).props.value).toBe('Office');
+    expect(tree.root.findByProps({testID: 'connect-url-input'}).props.value).toBe('192.168.1.30:8090');
   });
 });

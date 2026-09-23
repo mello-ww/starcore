@@ -2,6 +2,20 @@ import React, {createContext, useCallback, useContext, useEffect, useMemo, useSt
 import * as store from '../storage/preferences';
 import type {ServerProfile} from './types';
 
+/** A server `addAndActivate` just created and switched to, not yet
+ * authenticated against - tracked here (rather than by each caller) so
+ * both the onboarding wizard and the Settings "Add Server" flow get
+ * back-out-and-resume support for free, without either needing to know
+ * about the other. See `cancelPendingAdd`. */
+interface PendingAdd {
+  serverId: string;
+  /** Whatever was active before this add - null only for the very first
+   * server (onboarding), since there's nothing to switch back to. */
+  previousServerId: string | null;
+  name: string;
+  baseUrl: string;
+}
+
 interface ServersContextValue {
   loading: boolean;
   servers: ServerProfile[];
@@ -11,11 +25,23 @@ interface ServersContextValue {
   /** Adds a server and makes it the active one in a single step - the
    * common case (the "Connect to StarCore" flow, first-run or "add
    * another server"). Resolves to the created server so a caller that
-   * needs its id (e.g. App.tsx, tracking which server onboarding just
-   * created) doesn't have to re-derive it from `servers`. */
+   * needs its id doesn't have to re-derive it from `servers`. Also records
+   * it as `pendingAdd` - see `cancelPendingAdd`. */
   addAndActivate: (name: string, baseUrl: string) => Promise<ServerProfile>;
   switchTo: (id: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
+  /** The server currently mid-add (not yet authenticated), if any. */
+  pendingAdd: PendingAdd | null;
+  /** Backs out of `pendingAdd`: removes that just-added server (it was
+   * never signed into, so keeping it would leave an orphaned duplicate
+   * profile behind - `addServer` always appends, never updates in place)
+   * and switches back to whatever was active before it, if anything.
+   * Resolves to the name/address that were typed, so the caller can hand
+   * them back to whichever screen it resumes on. */
+  cancelPendingAdd: () => Promise<{name: string; address: string} | null>;
+  /** Call once a pending add's server has actually been signed into, so a
+   * later, unrelated sign-out doesn't still show a "back" option for it. */
+  clearPendingAdd: () => void;
 }
 
 const ServersContext = createContext<ServersContextValue | null>(null);
@@ -33,6 +59,7 @@ export function ServersProvider({children}: {children: React.ReactNode}) {
   const [loading, setLoading] = useState(true);
   const [servers, setServers] = useState<ServerProfile[]>([]);
   const [activeServerId, setActiveServerIdState] = useState<string | null>(null);
+  const [pendingAdd, setPendingAdd] = useState<PendingAdd | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -46,13 +73,18 @@ export function ServersProvider({children}: {children: React.ReactNode}) {
     })();
   }, []);
 
-  const addAndActivate = useCallback(async (name: string, baseUrl: string) => {
-    const server = await store.addServer(name, baseUrl);
-    await store.setActiveServerId(server.id);
-    setServers(await store.getServers());
-    setActiveServerIdState(server.id);
-    return server;
-  }, []);
+  const addAndActivate = useCallback(
+    async (name: string, baseUrl: string) => {
+      const previousServerId = activeServerId;
+      const server = await store.addServer(name, baseUrl);
+      await store.setActiveServerId(server.id);
+      setServers(await store.getServers());
+      setActiveServerIdState(server.id);
+      setPendingAdd({serverId: server.id, previousServerId, name: server.name, baseUrl: server.baseUrl});
+      return server;
+    },
+    [activeServerId],
+  );
 
   const switchTo = useCallback(async (id: string) => {
     await store.setActiveServerId(id);
@@ -73,12 +105,37 @@ export function ServersProvider({children}: {children: React.ReactNode}) {
     [activeServerId],
   );
 
+  const cancelPendingAdd = useCallback(async () => {
+    if (!pendingAdd) {
+      return null;
+    }
+    const {serverId, previousServerId, name, baseUrl} = pendingAdd;
+    setPendingAdd(null);
+    await remove(serverId);
+    if (previousServerId) {
+      await switchTo(previousServerId);
+    }
+    return {name, address: baseUrl};
+  }, [pendingAdd, remove, switchTo]);
+
+  const clearPendingAdd = useCallback(() => setPendingAdd(null), []);
+
   const activeServer = useMemo(
     () => servers.find(server => server.id === activeServerId) ?? null,
     [servers, activeServerId],
   );
 
-  const value: ServersContextValue = {loading, servers, activeServer, addAndActivate, switchTo, remove};
+  const value: ServersContextValue = {
+    loading,
+    servers,
+    activeServer,
+    addAndActivate,
+    switchTo,
+    remove,
+    pendingAdd,
+    cancelPendingAdd,
+    clearPendingAdd,
+  };
 
   return <ServersContext.Provider value={value}>{children}</ServersContext.Provider>;
 }

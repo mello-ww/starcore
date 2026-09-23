@@ -28,7 +28,7 @@ export type SatellitesStackParamList = {
 export type SettingsStackParamList = {
   SettingsHome: undefined;
   Servers: undefined;
-  AddServer: undefined;
+  AddServer: {name?: string; address?: string} | undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -63,15 +63,20 @@ function SettingsStack() {
       <SettingsStackNav.Screen name="SettingsHome" component={SettingsScreen} options={{title: 'Settings'}} />
       <SettingsStackNav.Screen name="Servers" component={ServersScreen} options={{title: 'Servers'}} />
       <SettingsStackNav.Screen name="AddServer" options={{headerShown: false}}>
-        {({navigation}) => (
+        {({navigation, route}) => (
           <ConnectScreen
+            initialName={route.params?.name}
+            initialAddress={route.params?.address}
             onBack={() => navigation.goBack()}
             onConnect={async (name, url) => {
               await addAndActivate(name, url);
               // addAndActivate makes the new server active, which remounts
               // AuthProvider/RootNavigator above this whole tab bar (see
               // App.tsx) - there is deliberately nothing left to navigate
-              // back to once that happens.
+              // back to once that happens. If this add is later backed out
+              // of from the Auth page, App.tsx's ServersGate resumes this
+              // exact screen (via `resumeAddServerParams`/`route.params`
+              // above) with what was typed still filled in.
             }}
           />
         )}

@@ -23,12 +23,16 @@ import {colors, spacing, typography} from '../theme';
 export function ConnectScreen({
   onConnect,
   onBack,
+  initialName = '',
+  initialAddress = '',
 }: {
   onConnect: (name: string, url: string) => void;
   onBack?: () => void;
+  initialName?: string;
+  initialAddress?: string;
 }) {
-  const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
+  const [name, setName] = useState(initialName);
+  const [url, setUrl] = useState(initialAddress);
   const [touched, setTouched] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +50,7 @@ export function ConnectScreen({
       setError(result.message);
       return;
     }
-    onConnect(name, normalized);
+    onConnect(name, result.resolvedBaseUrl);
   };
 
   return (

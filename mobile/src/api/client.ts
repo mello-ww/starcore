@@ -27,11 +27,15 @@ export class StarCoreClient {
     private getToken: TokenProvider = async () => null,
   ) {}
 
-  get(path: string): Promise<{status: number; body: any}> {
+  get(path: string): Promise<{status: number; body: any; finalUrl: string}> {
     return this.request('GET', path, undefined, true);
   }
 
-  post(path: string, body?: unknown, options: {authenticate?: boolean} = {}): Promise<{status: number; body: any}> {
+  post(
+    path: string,
+    body?: unknown,
+    options: {authenticate?: boolean} = {},
+  ): Promise<{status: number; body: any; finalUrl: string}> {
     return this.request('POST', path, body, options.authenticate ?? true);
   }
 
@@ -67,7 +71,11 @@ export class StarCoreClient {
         // proxy error page) - callers only ever look at `status` in that case
         parsed = {};
       }
-      return {status: response.status, body: parsed};
+      // `response.url` is the URL actually served, after following any
+      // redirects (e.g. a reverse proxy forcing http -> https) - see
+      // servers/testConnection.ts, which uses this to stop pointing later
+      // requests at an address that just redirects them.
+      return {status: response.status, body: parsed, finalUrl: response.url};
     } catch (error: any) {
       if (error?.name === 'AbortError') {
         throw new ApiError('The request to StarCore timed out.', 0);
