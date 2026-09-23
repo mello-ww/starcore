@@ -1,0 +1,9 @@
+<resources>
+    <!-- A dark launch/root theme matching StarCore's own aesthetic
+         (see src/theme/colors.ts's `void`/`text`) so the moment between the
+         OS splash and React rendering its first frame doesn't flash white. -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:editTextBackground">@android:color/transparent</item>
+        <item name="android:windowBackground">@color/app_background</item>
+    </style>
+</resources>

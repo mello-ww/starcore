@@ -14,6 +14,20 @@ env/
 .DS_Store
 Thumbs.db
 
+# JVM crash diagnostics - hs_err_pid<N>.log and its matching replay_pid<N>.log
+# are dumped wherever the crashing JVM's working directory happened to be
+# (seen both at the repo root and under mobile/android/, depending on
+# whether it was a Gradle daemon or Android Studio's own JVM that crashed).
+# Always local debugging noise, never something to commit.
+hs_err_pid*.log
+replay_pid*.log
+
+# Scratch files from AI coding assistants / remote computer-use tooling -
+# never intended to be committed, just a defensive backstop in case one is
+# ever left behind in the working tree.
+_claude_*.bat
+_claude_*.txt
+
 # Satellite storage - Photo's and Music's own library data, and the Locked
 # Folder's PIN hash when explicitly configured to live inside the checkout
 # rather than StarCore's application-data directory (the default location
@@ -48,3 +62,52 @@ engine/data/
 # `git rm --cached` to stop tracking them - see that same section for the
 # exact command.
 config.toml
+
+# ---------- mobile/ (the React Native app - see mobile/README.md) ----------
+
+# JS/Node
+mobile/node_modules/
+mobile/npm-debug.log*
+mobile/yarn-error.log*
+mobile/.env
+mobile/.env.local
+
+# Android build output and local, machine-specific Gradle/SDK settings -
+# never anything the app's own source or configuration, all of which stays
+# under mobile/android/*/src/ and is unaffected by any of this.
+mobile/android/local.properties
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/*.iml
+mobile/android/.idea/
+
+# Android signing - a release keystore and its passwords/store are exactly
+# the kind of server-specific-equivalent secret this repository must never
+# hold (see README.md, "Release builds"); debug builds need no keystore of
+# their own at all (see android/app/build.gradle), so nothing legitimate is
+# ever named like this.
+mobile/android/**/*.keystore
+mobile/android/**/*.jks
+mobile/android/keystore.properties
+
+# iOS - not part of this block (Android-first; see mobile/README.md), but
+# ignored ahead of time so adding the platform later never risks a signing
+# certificate, provisioning profile, or Xcode's own local user state
+# landing in a commit by accident.
+mobile/ios/build/
+mobile/ios/Pods/
+mobile/ios/*.xcworkspace/xcuserdata/
+mobile/ios/*.xcodeproj/xcuserdata/
+mobile/ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+mobile/**/*.mobileprovision
+mobile/**/*.p8
+mobile/**/*.p12
+mobile/**/*.cer
+
+# Metro/React Native caches and editor state - regenerated on demand, never
+# something to commit or to diff against.
+mobile/.metro-health-check*
+mobile/*.log
+mobile/.vscode/
+mobile/.idea/

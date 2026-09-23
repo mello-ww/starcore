@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+StarCore's own default is plain HTTP on a private LAN (see
+docs/deployment.md, "Private LAN access", in the main repository) - Android
+blocks cleartext (non-HTTPS) traffic by default from API 28 onward, which
+would make the app unable to reach a large fraction of real StarCore
+installs out of the box. This allows cleartext for any domain, which is
+appropriate here specifically because StarCore's own server address is
+always something the *user* entered themselves on the Connect screen (see
+src/screens/ConnectScreen.tsx) - never a fixed, publicly-routable hostname
+this manifest could instead pin cleartext access to. An installation using
+HTTPS (docs/deployment.md, "HTTPS") is unaffected either way.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

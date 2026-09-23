@@ -1,3 +1,39 @@
+// the storage dashboard's visual theme is a purely local display
+// preference (see mount()'s own docstring below) - persisted per-browser,
+// never sent to the server and never round-tripped through satellite
+// configuration, since it changes nothing about what File Explorer does
+const STORAGE_THEME_KEY = "starcore.fileExplorer.storageTheme";
+const STORAGE_THEMES = ["classic", "bar", "donut", "orbital"];
+const STORAGE_THEME_LABELS = {
+    classic: "Classic StarCore",
+    bar: "Bar graph",
+    donut: "Donut",
+    orbital: "Orbital map",
+};
+// shared color sequence for anything that needs to color-code drives
+// consistently across themes (donut segments/legend, orbital nodes)
+const DRIVE_COLOR_VARS = [
+    "var(--azure)", "var(--sapphire)", "var(--ice)",
+    "var(--royal)", "var(--klein)", "var(--line-bright)",
+];
+
+function readStoredTheme() {
+    try {
+        const stored = window.localStorage.getItem(STORAGE_THEME_KEY);
+        return STORAGE_THEMES.includes(stored) ? stored : "classic";
+    } catch {
+        return "classic"; // storage disabled/unavailable (private browsing, ...) - just don't persist
+    }
+}
+
+function storeTheme(value) {
+    try {
+        window.localStorage.setItem(STORAGE_THEME_KEY, value);
+    } catch {
+        // best-effort only, see readStoredTheme() above
+    }
+}
+
 export function mount(context) {
     const { element: root, satellite, api } = context;
 
@@ -7,6 +43,7 @@ export function mount(context) {
     let busy = false;
     let selected = null; // name of the entry a confirm-delete is pending on
     let upButton = null;
+    let storageTheme = readStoredTheme();
 
     const head = el("div", "page-head");
     head.append(
@@ -20,6 +57,11 @@ export function mount(context) {
     const toolbar = buildToolbar();
     const error = el("p", "banner error", "");
     error.hidden = true;
+    // the storage dashboard shown only at the roots/drives level (see
+    // render()) - everywhere else this stays hidden and the ordinary
+    // list/empty pair below behaves exactly as it always has
+    const dashboard = el("div", "fe-dashboard");
+    dashboard.hidden = true;
     const list = el("div", "fe-list");
     const empty = el("p", "muted", "This is empty.");
     empty.hidden = true;
@@ -27,7 +69,7 @@ export function mount(context) {
     progress.hidden = true;
 
     const body = el("div", "stack");
-    body.append(head, toolbar, breadcrumb, error, progress, list, empty);
+    body.append(head, toolbar, breadcrumb, error, progress, dashboard, list, empty);
     root.replaceChildren(body);
 
     load(path);
@@ -125,9 +167,344 @@ export function mount(context) {
             }
         });
 
+        // the storage dashboard REPLACES the plain drive list only at the
+        // roots level - navigating into a drive/directory (atRoots false)
+        // renders exactly the same list this always has, untouched below
+        if (atRoots) {
+            dashboard.hidden = false;
+            list.hidden = true;
+            empty.hidden = true;
+            // belt-and-suspenders: the [hidden] CSS rule above is what
+            // actually hides `list`, but drop its old rows too so a CSS
+            // regression can never again leave a stale directory listing
+            // sitting underneath the home dashboard
+            list.replaceChildren();
+            dashboard.replaceChildren(buildDashboard(listing));
+            return;
+        }
+
+        dashboard.hidden = true;
+        list.hidden = false;
         const entries = listing.entries;
         empty.hidden = entries.length > 0;
         list.replaceChildren(...entries.map((item) => buildRow(item, atRoots)));
+    }
+
+    /* ---------- storage dashboard (roots/drives level only) ----------
+     *
+     * Every figure here comes straight from the server's own
+     * shutil.disk_usage() call (see api.py's _disk_usage()/_machine_storage())
+     * - nothing is computed from the browser/device running Mission
+     * Control. Clicking any drive's representation, in any theme, calls the
+     * exact same load(name) a directory click already uses elsewhere in
+     * this file - there is no second navigation path.
+     */
+
+    function buildDashboard(listingData) {
+        const container = el("div", "fe-dashboard-inner");
+        container.appendChild(buildMachineHero(listingData.machine));
+        container.appendChild(buildThemeSelector());
+        const themeBody = el("div", "fe-dashboard-body");
+        themeBody.appendChild(buildDriveVisualization(listingData.entries, listingData.machine));
+        container.appendChild(themeBody);
+        return container;
+    }
+
+    function buildMachineHero(machine) {
+        const hero = el("div", "fe-hero");
+        hero.appendChild(el("span", "fe-hero-label", "Entire system"));
+        if (!machine) {
+            hero.appendChild(el("p", "muted", "Machine-wide storage totals aren't available right now."));
+            return hero;
+        }
+
+        const percent = storagePercent(machine);
+        hero.appendChild(el("span", "fe-hero-figures", `${formatBytes(machine.used)} / ${formatBytes(machine.total)}`));
+        const track = el("div", "fe-hero-track");
+        const fill = el("div", "fe-hero-fill");
+        fill.style.width = `${percent}%`;
+        track.appendChild(fill);
+        hero.appendChild(track);
+        hero.appendChild(el("span", "fe-hero-note",
+            `${percent}% used · ${formatBytes(machine.free)} free across ${machine.volumes} volume${machine.volumes === 1 ? "" : "s"}`));
+        return hero;
+    }
+
+    function buildThemeSelector() {
+        const row = el("div", "fe-theme-row");
+        const labelText = el("label", "fe-theme-label", "Storage view");
+        labelText.htmlFor = "fe-theme-select";
+        row.appendChild(labelText);
+
+        const select = document.createElement("select");
+        select.id = "fe-theme-select";
+        select.className = "fe-theme-select";
+        for (const value of STORAGE_THEMES) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = STORAGE_THEME_LABELS[value];
+            option.selected = value === storageTheme;
+            select.appendChild(option);
+        }
+        select.addEventListener("change", () => {
+            storageTheme = select.value;
+            storeTheme(storageTheme);
+            render();
+        });
+        row.appendChild(select);
+        return row;
+    }
+
+    function buildDriveVisualization(items, machine) {
+        const drives = items.map((item) => ({ name: item.name, storage: item.storage || null }));
+        switch (storageTheme) {
+            case "bar":
+                return buildBarTheme(drives);
+            case "donut":
+                return buildDonutTheme(drives, machine);
+            case "orbital":
+                return buildOrbitalTheme(drives, machine);
+            default:
+                return buildClassicTheme(drives);
+        }
+    }
+
+    // a drive's clickable representation is always a real <button> -
+    // focusable and Enter/Space-activatable for free, and reuses the exact
+    // same load(name) every other navigation in this file goes through
+    function driveButton(className, name) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = className;
+        button.title = `Open ${name}`;
+        button.addEventListener("click", () => load(name));
+        return button;
+    }
+
+    function buildClassicTheme(drives) {
+        const grid = el("div", "fe-classic-grid");
+        for (const drive of drives) {
+            const card = driveButton("fe-classic-card", drive.name);
+            card.appendChild(el("span", "fe-drive-name", drive.name));
+            if (drive.storage) {
+                const percent = storagePercent(drive.storage);
+                const track = el("div", "fe-classic-track");
+                const fill = el("div", "fe-classic-fill");
+                fill.style.width = `${percent}%`;
+                track.appendChild(fill);
+                card.appendChild(track);
+                card.appendChild(el("span", "fe-drive-figures",
+                    `${formatBytes(drive.storage.used)} / ${formatBytes(drive.storage.total)}`));
+                card.appendChild(el("span", "fe-drive-free", `${formatBytes(drive.storage.free)} free`));
+            } else {
+                card.appendChild(el("span", "fe-drive-figures muted", "Storage information unavailable"));
+            }
+            grid.appendChild(card);
+        }
+        return grid;
+    }
+
+    function buildBarTheme(drives) {
+        const container = el("div", "fe-bar-list");
+        for (const drive of drives) {
+            const row = driveButton("fe-bar-row", drive.name);
+            row.appendChild(el("span", "fe-bar-name", drive.name));
+            const track = el("div", "fe-bar-track");
+            const fill = el("div", "fe-bar-fill");
+            const percent = drive.storage ? storagePercent(drive.storage) : 0;
+            fill.style.width = `${percent}%`;
+            track.appendChild(fill);
+            row.appendChild(track);
+            row.appendChild(el("span", "fe-bar-percent", drive.storage ? `${percent}%` : "—"));
+            container.appendChild(row);
+        }
+        return container;
+    }
+
+    // orbital storage map - the machine is the central hub, each drive an
+    // orbiting node placed at an even angle around it. A node's size
+    // reflects its share of capacity among the drives shown; the
+    // conic-gradient ring around its face reflects its own percent used.
+    // Full names and exact figures live in the legend below, so the map
+    // itself never has to squeeze text onto a small circle to stay useful.
+    function buildOrbitalTheme(drives, machine) {
+        const wrap = el("div", "fe-orbital-wrap");
+        const withStorage = drives.filter((drive) => drive.storage && drive.storage.total > 0);
+        const withoutStorage = drives.filter((drive) => !(drive.storage && drive.storage.total > 0));
+
+        const orbit = el("div", "fe-orbital-orbit");
+        const guide = el("div", "fe-orbital-ring-guide");
+        guide.setAttribute("aria-hidden", "true");
+        orbit.appendChild(guide);
+
+        const hub = el("div", "fe-orbital-hub");
+        hub.appendChild(el("span", "fe-orbital-hub-label", "System"));
+        if (machine) {
+            const percent = storagePercent(machine);
+            hub.appendChild(el("span", "fe-orbital-hub-figures", `${formatBytes(machine.used)} / ${formatBytes(machine.total)}`));
+            hub.appendChild(el("span", "fe-orbital-hub-percent", `${percent}% used`));
+        } else {
+            hub.appendChild(el("span", "fe-orbital-hub-figures muted", "—"));
+        }
+        orbit.appendChild(hub);
+
+        if (withStorage.length > 0) {
+            const maxCapacity = Math.max(...withStorage.map((drive) => drive.storage.total));
+            const minNodeSize = 3.1;   // rem
+            const maxNodeSize = 5.4;   // rem
+            const orbitRadiusPct = 38; // % from center, matches .fe-orbital-ring-guide
+            const angleStep = (2 * Math.PI) / withStorage.length;
+
+            withStorage.forEach((drive, index) => {
+                const angle = -Math.PI / 2 + angleStep * index; // first node at 12 o'clock
+                const left = 50 + orbitRadiusPct * Math.cos(angle);
+                const top = 50 + orbitRadiusPct * Math.sin(angle);
+                const sizeShare = Math.sqrt(drive.storage.total / maxCapacity);
+                const size = minNodeSize + (maxNodeSize - minNodeSize) * sizeShare;
+                const percent = storagePercent(drive.storage);
+                const color = DRIVE_COLOR_VARS[index % DRIVE_COLOR_VARS.length];
+
+                const node = driveButton("fe-orbital-node", drive.name);
+                node.style.left = `${left}%`;
+                node.style.top = `${top}%`;
+                node.style.width = `${size}rem`;
+                node.style.height = `${size}rem`;
+                node.style.background = `conic-gradient(${color} ${percent}%, var(--line) ${percent}% 100%)`;
+                node.title = `${drive.name} — ${formatBytes(drive.storage.used)} used of ${formatBytes(drive.storage.total)} ` +
+                    `(${formatBytes(drive.storage.free)} free, ${percent}%)`;
+
+                const face = el("span", "fe-orbital-node-face", `${percent}%`);
+                node.appendChild(face);
+                orbit.appendChild(node);
+            });
+        }
+        wrap.appendChild(orbit);
+
+        if (withStorage.length > 0) {
+            const legend = el("div", "fe-donut-legend");
+            withStorage.forEach((drive, index) => {
+                const item = driveButton(`fe-donut-legend-item fe-donut-color-${index % 6}`, drive.name);
+                item.appendChild(el("span", "fe-donut-swatch"));
+                item.appendChild(el("span", "fe-donut-legend-name", drive.name));
+                item.appendChild(el("span", "fe-donut-legend-figures",
+                    `${formatBytes(drive.storage.used)} / ${formatBytes(drive.storage.total)}`));
+                legend.appendChild(item);
+            });
+            wrap.appendChild(legend);
+        } else {
+            wrap.appendChild(el("p", "muted", "No drives report usable storage information."));
+        }
+
+        if (withoutStorage.length > 0) {
+            const leftover = el("div", "fe-orbital-leftover");
+            leftover.appendChild(el("span", "muted", "Also available:"));
+            withoutStorage.forEach((drive) => {
+                const chip = driveButton("fe-orbital-leftover-chip", drive.name);
+                chip.textContent = drive.name;
+                leftover.appendChild(chip);
+            });
+            wrap.appendChild(leftover);
+        }
+
+        return wrap;
+    }
+
+    function buildDonutTheme(drives, machine) {
+        const wrap = el("div", "fe-donut-wrap");
+        const withStorage = drives.filter((drive) => drive.storage && drive.storage.total > 0);
+        const withoutStorage = drives.filter((drive) => !(drive.storage && drive.storage.total > 0));
+
+        if (withStorage.length > 0) {
+            // each drive's segment is proportional to its own capacity
+            // (total), out of the sum of capacities actually shown here -
+            // the center figure is the deduplicated machine-wide total, not
+            // just a sum of these segments (see api.py's _machine_storage())
+            const totalCapacity = withStorage.reduce((sum, drive) => sum + drive.storage.total, 0);
+            const size = 200;
+            const donutRadius = 78;
+            const circumference = 2 * Math.PI * donutRadius;
+
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+            svg.setAttribute("class", "fe-donut-svg");
+            svg.appendChild(shape("circle", { cx: size / 2, cy: size / 2, r: donutRadius, class: "fe-donut-track" }));
+
+            const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            group.setAttribute("class", "fe-donut-segments");
+            let cumulative = 0;
+            withStorage.forEach((drive, index) => {
+                const length = (drive.storage.total / totalCapacity) * circumference;
+                const segment = shape("circle", {
+                    cx: size / 2, cy: size / 2, r: donutRadius,
+                    class: `fe-donut-segment fe-donut-color-${index % 6}`,
+                    "stroke-dasharray": `${length} ${circumference - length}`,
+                    "stroke-dashoffset": `${-cumulative}`,
+                });
+                segment.setAttribute("tabindex", "0");
+                segment.setAttribute("role", "button");
+                segment.setAttribute("aria-label", `Open ${drive.name}`);
+                segment.addEventListener("click", () => load(drive.name));
+                segment.addEventListener("keydown", (event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        load(drive.name);
+                    }
+                });
+                group.appendChild(segment);
+                cumulative += length;
+            });
+            svg.appendChild(group);
+
+            const center = el("div", "fe-donut-center");
+            center.appendChild(el("span", "fe-donut-center-label", "Total"));
+            if (machine) {
+                const percent = storagePercent(machine);
+                center.appendChild(el("span", "fe-donut-center-figures", `${formatBytes(machine.used)} / ${formatBytes(machine.total)}`));
+                center.appendChild(el("span", "fe-donut-center-percent", `${percent}% used`));
+            } else {
+                center.appendChild(el("span", "fe-donut-center-figures muted", "—"));
+            }
+
+            // svg and center share one grid cell (see .fe-donut-ring) so the
+            // readout stays exactly centered on the ring at any size,
+            // rather than depending on a fixed pixel offset
+            const ring = el("div", "fe-donut-ring");
+            ring.append(svg, center);
+            wrap.appendChild(ring);
+
+            const legend = el("div", "fe-donut-legend");
+            withStorage.forEach((drive, index) => {
+                const item = driveButton(`fe-donut-legend-item fe-donut-color-${index % 6}`, drive.name);
+                item.appendChild(el("span", "fe-donut-swatch"));
+                item.appendChild(el("span", "fe-donut-legend-name", drive.name));
+                item.appendChild(el("span", "fe-donut-legend-figures",
+                    `${formatBytes(drive.storage.used)} / ${formatBytes(drive.storage.total)}`));
+                legend.appendChild(item);
+            });
+            wrap.appendChild(legend);
+        } else {
+            wrap.appendChild(el("p", "muted", "No drives report usable storage information."));
+        }
+
+        if (withoutStorage.length > 0) {
+            const leftover = el("div", "fe-donut-leftover");
+            leftover.appendChild(el("span", "muted", "Also available:"));
+            withoutStorage.forEach((drive) => {
+                const chip = driveButton("fe-donut-leftover-chip", drive.name);
+                chip.textContent = drive.name;
+                leftover.appendChild(chip);
+            });
+            wrap.appendChild(leftover);
+        }
+
+        return wrap;
+    }
+
+    function storagePercent(storage) {
+        if (!storage || storage.total <= 0) {
+            return 0;
+        }
+        return Math.min(100, Math.round((storage.used / storage.total) * 100));
     }
 
     function buildBreadcrumb() {

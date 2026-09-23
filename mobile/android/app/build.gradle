@@ -1,0 +1,64 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+react {
+    // standard RN 0.73 defaults - no StarCore-specific overrides needed.
+    //
+    // If Gradle sync fails with "Cannot run program 'node' - CreateProcess
+    // error=2", it's because whatever launched Gradle (e.g. Android Studio
+    // opened from the Start Menu, not a shell) didn't inherit a PATH that
+    // includes node - `npm run android` / a terminal-launched `gradlew`
+    // already have node on PATH and are unaffected. Rather than hardcoding
+    // this machine's own node.exe path into the project, set a NODE_BINARY
+    // environment variable (full path to node.exe) before launching Android
+    // Studio; this picks it up automatically and falls back to plain "node"
+    // otherwise.
+    nodeExecutableAndArgs = [System.getenv("NODE_BINARY") ?: "node"]
+}
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "com.starcore.mobile"
+
+    defaultConfig {
+        applicationId "com.starcore.mobile"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "0.1.0"
+    }
+
+    // Debug builds use the Android Gradle Plugin's own automatic debug
+    // signing config (a key it generates locally at `~/.android/debug.keystore`
+    // the first time it's needed) - deliberately not overridden here, so
+    // there is no keystore file of any kind for this project to ship or
+    // gitignore just to run `npm run android` locally.
+    //
+    // A release build needs its own real keystore, generated locally by
+    // whoever builds it, and its own signingConfig pointed at it - never
+    // committed to this repository. See README.md, "Release builds", and
+    // the Android section of the repository's own .gitignore.
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
+
+dependencies {
+    implementation("com.facebook.react:react-android")
+    implementation("com.facebook.react:hermes-android")
+}
+
+// This project uses the OLD-style autolinking (settings.gradle calls
+// applyNativeModulesSettingsGradle), which also requires this matching call
+// here - without it, `generatePackageList` (and PackageList.java itself,
+// under app/build/generated/rncli/...) never gets created, so MainApplication.kt's
+// `import com.facebook.react.PackageList` fails to resolve. This line was
+// missing; it's copied verbatim from react-native's own 0.73.6 template
+// (node_modules/react-native/template/android/app/build.gradle).
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)

@@ -217,6 +217,18 @@ can be told apart later. Omitted, both default to a plain `"web"` session with n
 so every existing caller is unaffected. See "Locked Folder and mobile authentication" in
 `docs/locked_folder.md` for the full design.
 
+`POST /api/auth/login` with `"kind": "mobile"` also returns the issued token in the JSON body
+(`{"message": "Logged in.", "token": "..."}`), in addition to the same `Set-Cookie` a web login
+gets. This is the one deliberate difference between the two: a browser's `fetch()` can't read
+`Set-Cookie` from script anyway (nor would it need to - the cookie jar handles it), but a native
+mobile HTTP stack (OkHttp on Android, NSURLSession on iOS) does not expose that header to
+application code either, and has no cookie jar of its own to fall back on - so without this,
+`mobile/` would have no way to learn the token it was just issued. A plain (`"kind": "web"` or
+omitted) login's body is completely unchanged - no `token` key at all - so this is additive and
+opt-in, never a change to the browser flow. See `mobile/src/api/auth.ts` and
+`test_a_mobile_login_also_returns_the_token_in_the_response_body` / `test_a_web_login_does_not_return_a_token_in_the_body`
+in `test_auth.py`.
+
 ```
 GET  /api/auth/sessions          (no body) -> { "sessions": [ { "session_id", "kind",
                                                  "device_name", "created", "expires",

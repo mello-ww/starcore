@@ -87,6 +87,27 @@ class GitignoreProtectsRuntimeDataTest(unittest.TestCase):
         ]
         self.assertEqual(_ignored(paths), set(paths))
 
+    def test_mobile_build_artifacts_and_signing_secrets_are_ignored(self):
+        # see mobile/README.md, "Project data and .gitignore" - the mobile
+        # app is a separate project with its own build/dependency tooling,
+        # so it needs its own set of generated-output and secret patterns
+        # alongside the engine's.
+        paths = [
+            "mobile/node_modules/react-native/package.json",
+            "mobile/android/app/build/outputs/apk/debug/app-debug.apk",
+            "mobile/android/build/generated/foo",
+            "mobile/android/local.properties",
+            "mobile/android/app/release.keystore",
+            "mobile/android/app/release.jks",
+            "mobile/android/keystore.properties",
+            "mobile/ios/Pods/Podfile.lock",
+            "mobile/ios/build/output",
+            "mobile/some.mobileprovision",
+            "mobile/certs/distribution.p12",
+            "mobile/.env",
+        ]
+        self.assertEqual(_ignored(paths), set(paths))
+
 
 class GitignoreDoesNotHideSourceTest(unittest.TestCase):
     """What must always be trackable - the rules above must not be so broad
@@ -109,6 +130,13 @@ class GitignoreDoesNotHideSourceTest(unittest.TestCase):
             "docs/locked_folder.md",
             "mission_control/index.html",
             "mission_control/app.js",
+            "mobile/package.json",
+            "mobile/src/App.tsx",
+            "mobile/src/auth/session.ts",
+            "mobile/android/app/build.gradle",
+            "mobile/android/app/src/main/AndroidManifest.xml",
+            "mobile/android/app/src/main/java/com/starcore/mobile/MainActivity.kt",
+            "mobile/README.md",
         ]
         self.assertEqual(_ignored(paths), set())
 

@@ -63,6 +63,15 @@
     overflow: hidden;
 }
 
+/* [hidden] and this rule's own "display: flex" tie on specificity, so the
+   author rule above would otherwise win and leave an empty, still-bordered
+   box (and any stale rows still inside it) visible under the storage
+   dashboard on the File Explorer home - see the matching fix pattern already
+   used for .icon-button/.modal-overlay/.view/.banner/.auth-overlay above */
+.fe-list[hidden] {
+    display: none;
+}
+
 .fe-list.fe-busy {
     opacity: 0.6;
 }
@@ -173,5 +182,515 @@ button.fe-name:hover {
 
     .fe-row-actions {
         margin-left: 0;
+    }
+}
+
+/* ==========================================================================
+   Storage dashboard - the roots/drives level's home presentation (see
+   render()/buildDashboard() in page.js). Everything below is scoped under
+   .fe-dashboard so none of it can leak onto the ordinary directory listing.
+   ========================================================================== */
+
+.fe-dashboard-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* the machine-wide "entire system" figure - deliberately the most prominent
+   element on the page, styled like a status panel rather than a chart */
+.fe-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--line-bright);
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, var(--raised), var(--surface));
+    box-shadow: 0 0 24px rgba(108, 155, 240, 0.08);
+}
+
+.fe-hero-label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.fe-hero-figures {
+    font-family: var(--mono);
+    font-size: 1.3rem;
+    color: var(--text);
+}
+
+.fe-hero-track {
+    height: 10px;
+    border-radius: 999px;
+    background: var(--line);
+    overflow: hidden;
+}
+
+.fe-hero-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--sapphire), var(--azure));
+    transition: width 0.4s ease;
+}
+
+.fe-hero-note {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+}
+
+/* theme selector */
+.fe-theme-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.fe-theme-label {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+}
+
+.fe-theme-select {
+    background: var(--raised);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.82rem;
+    font-family: inherit;
+}
+
+.fe-theme-select:hover {
+    border-color: var(--line-bright);
+}
+
+.fe-dashboard-body {
+    min-width: 0;
+}
+
+/* a drive's clickable representation is always a real <button> - reset the
+   default button chrome, keep a subtle hover/focus glow consistent across
+   every theme below */
+.fe-classic-card,
+.fe-bar-row,
+.fe-donut-legend-item,
+.fe-donut-leftover-chip,
+.fe-orbital-leftover-chip {
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fe-classic-card:hover,
+.fe-bar-row:hover,
+.fe-donut-legend-item:hover,
+.fe-donut-leftover-chip:hover,
+.fe-orbital-leftover-chip:hover,
+.fe-classic-card:focus-visible,
+.fe-bar-row:focus-visible,
+.fe-donut-legend-item:focus-visible,
+.fe-donut-leftover-chip:focus-visible,
+.fe-orbital-leftover-chip:focus-visible {
+    border-color: var(--azure);
+    box-shadow: 0 0 0 1px rgba(108, 155, 240, 0.15), 0 0 10px rgba(108, 155, 240, 0.18);
+    outline: none;
+}
+
+/* classic StarCore theme (default) */
+.fe-classic-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.75rem;
+}
+
+.fe-classic-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.85rem;
+    min-width: 0;
+}
+
+.fe-drive-name {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fe-classic-track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--line);
+    overflow: hidden;
+}
+
+.fe-classic-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--royal), var(--azure));
+}
+
+.fe-drive-figures {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--text-dim);
+}
+
+.fe-drive-free {
+    font-size: 0.74rem;
+    color: var(--text-faint);
+}
+
+/* bar/horizontal graph theme */
+.fe-bar-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.fe-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    width: 100%;
+}
+
+.fe-bar-name {
+    flex: 0 0 auto;
+    min-width: 3.5rem;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fe-bar-track {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--line);
+    overflow: hidden;
+}
+
+.fe-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--sapphire), var(--azure));
+}
+
+.fe-bar-percent {
+    flex: 0 0 auto;
+    min-width: 2.6rem;
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--text-dim);
+}
+
+/* donut theme */
+.fe-donut-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* svg and the center readout occupy the same grid cell and are both
+   centered within it - this keeps the readout exactly centered on the ring
+   at any width, instead of a fixed-pixel offset that only lines up at one
+   size */
+.fe-donut-ring {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    max-width: 220px;
+}
+
+.fe-donut-ring > * {
+    grid-area: 1 / 1;
+}
+
+.fe-donut-svg {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    display: block;
+    transform: rotate(-90deg);
+    overflow: visible;
+}
+
+.fe-donut-track {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 16;
+}
+
+.fe-donut-segment {
+    fill: none;
+    stroke-width: 16;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+
+.fe-donut-segment:hover,
+.fe-donut-segment:focus-visible {
+    opacity: 0.82;
+    outline: none;
+}
+
+.fe-donut-color-0 { stroke: var(--azure); }
+.fe-donut-color-1 { stroke: var(--sapphire); }
+.fe-donut-color-2 { stroke: var(--ice); }
+.fe-donut-color-3 { stroke: var(--royal); }
+.fe-donut-color-4 { stroke: var(--klein); }
+.fe-donut-color-5 { stroke: var(--line-bright); }
+
+.fe-donut-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    pointer-events: none;
+    text-align: center;
+}
+
+.fe-donut-center-label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.fe-donut-center-figures {
+    font-family: var(--mono);
+    font-size: 1.05rem;
+    color: var(--text);
+}
+
+.fe-donut-center-percent {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+}
+
+.fe-donut-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.fe-donut-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.6rem;
+}
+
+.fe-donut-swatch {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.fe-donut-legend-item.fe-donut-color-0 { color: var(--azure); }
+.fe-donut-legend-item.fe-donut-color-1 { color: var(--sapphire); }
+.fe-donut-legend-item.fe-donut-color-2 { color: var(--ice); }
+.fe-donut-legend-item.fe-donut-color-3 { color: var(--royal); }
+.fe-donut-legend-item.fe-donut-color-4 { color: var(--klein); }
+.fe-donut-legend-item.fe-donut-color-5 { color: var(--line-bright); }
+
+.fe-donut-legend-name,
+.fe-donut-legend-figures {
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 0.76rem;
+}
+
+.fe-donut-leftover {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.fe-donut-leftover-chip {
+    padding: 0.3rem 0.55rem;
+    font-family: var(--mono);
+    font-size: 0.76rem;
+}
+
+/* orbital theme - the system as a central hub, each drive an orbiting node
+   sized by capacity and ringed by its own used-percent indicator. Names and
+   exact figures live in the legend below rather than squeezed onto the
+   orbit itself, so the map stays readable regardless of how many drives
+   or how long their names/mount paths are */
+.fe-orbital-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.fe-orbital-orbit {
+    position: relative;
+    width: 100%;
+    max-width: 320px;
+    aspect-ratio: 1 / 1;
+    margin: 0 auto;
+}
+
+/* a purely decorative orbit path - subtle, not interactive */
+.fe-orbital-ring-guide {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 76%;
+    height: 76%;
+    transform: translate(-50%, -50%);
+    border: 1px dashed var(--line);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.fe-orbital-hub {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 40%;
+    height: 40%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0.4rem;
+    border: 1px solid var(--line-bright);
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--raised), var(--surface));
+    box-shadow: 0 0 18px rgba(108, 155, 240, 0.1);
+    text-align: center;
+}
+
+.fe-orbital-hub-label {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.fe-orbital-hub-figures {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    color: var(--text);
+}
+
+.fe-orbital-hub-percent {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+
+.fe-orbital-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.fe-orbital-node:hover,
+.fe-orbital-node:focus-visible {
+    box-shadow: 0 0 0 1px rgba(108, 155, 240, 0.2), 0 0 12px rgba(108, 155, 240, 0.25);
+    outline: none;
+    transform: translate(-50%, -50%) scale(1.05);
+}
+
+.fe-orbital-node-face {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--surface);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text);
+}
+
+.fe-orbital-leftover {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.fe-orbital-leftover-chip {
+    padding: 0.3rem 0.55rem;
+    font-family: var(--mono);
+    font-size: 0.76rem;
+}
+
+/* responsive - keep every theme readable and free of overflow down to a
+   phone's width, including StarCore's existing mobile sidebar behavior */
+@media (max-width: 560px) {
+    .fe-hero-figures {
+        font-size: 1.05rem;
+    }
+
+    .fe-classic-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .fe-bar-name {
+        min-width: 2.6rem;
+    }
+
+    .fe-donut-ring {
+        max-width: 170px;
+    }
+
+    .fe-orbital-orbit {
+        max-width: 220px;
+    }
+
+    .fe-orbital-hub-figures {
+        font-size: 0.72rem;
+    }
+
+    .fe-theme-row {
+        width: 100%;
+    }
+
+    .fe-theme-select {
+        flex: 1 1 auto;
     }
 }

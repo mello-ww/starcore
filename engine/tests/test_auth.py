@@ -456,6 +456,50 @@ class AuthApiTest(unittest.TestCase):
         finally:
             stop_engine(engine)
 
+    def test_a_mobile_login_also_returns_the_token_in_the_response_body(self):
+        # a native HTTP client (Android/iOS) does not expose Set-Cookie to
+        # application code the way a browser's fetch() does, so it has no
+        # other reliable way to learn the token it was just issued - see
+        # docs/api.md, "Authentication", and mobile/src/api/auth.ts
+        engine = start_engine(mission_control=True)
+        try:
+            self.request(engine, "/api/auth/setup", method="POST",
+                         payload={"username": "admin", "password": "a very good password"})
+
+            status, payload, cookies = self.request(
+                engine, "/api/auth/login", method="POST",
+                payload={"username": "admin", "password": "a very good password", "kind": "mobile"})
+            self.assertEqual(status, 200)
+            self.assertIn("token", payload)
+
+            # the returned token is a real, usable bearer token - not just
+            # some opaque or truncated value
+            status, _, _ = self.request(engine, "/api/status", bearer=payload["token"])
+            self.assertEqual(status, 200)
+
+            # and it's exactly the same token the cookie carries, not a
+            # second, independent session
+            self.assertEqual(payload["token"], self.token_from_set_cookie(cookies))
+        finally:
+            stop_engine(engine)
+
+    def test_a_web_login_does_not_return_a_token_in_the_body(self):
+        # the browser flow is completely unchanged by the mobile addition
+        # above - the token stays only in the HttpOnly cookie, never handed
+        # to page script that a stored XSS payload could read
+        engine = start_engine(mission_control=True)
+        try:
+            self.request(engine, "/api/auth/setup", method="POST",
+                         payload={"username": "admin", "password": "a very good password"})
+
+            status, payload, _ = self.request(
+                engine, "/api/auth/login", method="POST",
+                payload={"username": "admin", "password": "a very good password"})
+            self.assertEqual(status, 200)
+            self.assertNotIn("token", payload)
+        finally:
+            stop_engine(engine)
+
     def get_json(self, engine, path, token):
         status, payload, _ = self.request(engine, path, bearer=token)
         return status, payload

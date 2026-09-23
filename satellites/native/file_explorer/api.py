@@ -115,16 +115,89 @@ def entries(request):
         "path": str(target),
         "parent": paths.parent_of(target),
         "entries": items,
+        "storage": _disk_usage(target),
     })
+
+
+def _disk_usage(path: Path):
+    """total/used/free bytes for the filesystem/drive containing `path`, or
+    None if that can't be determined right now.
+
+    shutil.disk_usage() already does exactly what's needed here on both
+    platforms - given any path (not just a mount point or drive root) it
+    resolves to the containing filesystem via statvfs() on POSIX or
+    GetDiskFreeSpaceExW() on Windows, so nothing here has to guess at mount
+    points or special-case drive letters itself. Never raises: a filesystem
+    that vanished mid-request, a network mount that's timed out, or any
+    other OSError all just mean "not available right now" rather than a
+    failed listing - the frontend hides storage figures it doesn't have
+    instead of showing something misleading.
+    """
+    try:
+        usage = shutil.disk_usage(path)
+    except OSError:
+        return None
+    return {"total": usage.total, "used": usage.used, "free": usage.free}
+
+
+def _volume_id(path: Path):
+    """A best-effort identifier for the physical/logical volume `path` sits
+    on - used only to avoid double-counting the same volume twice in
+    _machine_storage() below, never exposed to the frontend. os.stat()'s
+    st_dev is already exactly this on both platforms (a POSIX device
+    number, or Windows' equivalent per-volume identifier), so there's no
+    need to special-case drive letters vs. mount points here either."""
+    try:
+        return path.stat().st_dev
+    except OSError:
+        return None
+
+
+def _machine_storage(roots) -> dict:
+    """Total/used/free across every distinct volume `roots` touches, each
+    counted exactly once - the whole point being that simply summing every
+    root's own disk_usage() would double-count a volume File Explorer can
+    reach from more than one root (e.g. a Windows drive that is also
+    mount-pointed somewhere else). Returns None if none of the roots could
+    report usable storage information at all."""
+    seen_volumes = set()
+    total = used = free = 0
+    counted = 0
+    for root in roots:
+        volume_id = _volume_id(root)
+        if volume_id is not None and volume_id in seen_volumes:
+            continue
+        usage = _disk_usage(root)
+        if usage is None:
+            continue
+        if volume_id is not None:
+            seen_volumes.add(volume_id)
+        total += usage["total"]
+        used += usage["used"]
+        free += usage["free"]
+        counted += 1
+    if counted == 0:
+        return None
+    return {"total": total, "used": used, "free": free, "volumes": counted}
 
 
 def _roots_listing() -> dict:
     """The virtual top level: every root File Explorer offers to browse
     from ('/' on Linux/macOS, every present drive letter on Windows) - not
-    itself a real directory, so it has no parent to go up to."""
-    items = [{"name": str(root), "type": "dir", "size": None, "modified": None}
-             for root in paths.list_roots()]
-    return {"path": "", "parent": None, "entries": items}
+    itself a real directory, so it has no parent to go up to.
+
+    Also carries the storage dashboard's two other figures: each root's own
+    total/used/free (`storage`, per entry - None if unavailable), and the
+    machine-wide total across every distinct volume (`machine`, deduplicated -
+    see _machine_storage()). Neither changes what browsing into a root does;
+    both are additive fields an older frontend would simply ignore.
+    """
+    roots = paths.list_roots()
+    items = [{"name": str(root), "type": "dir", "size": None, "modified": None,
+              "storage": _disk_usage(root)}
+             for root in roots]
+    return {"path": "", "parent": None, "entries": items, "storage": None,
+            "machine": _machine_storage(roots)}
 
 
 def content(request):

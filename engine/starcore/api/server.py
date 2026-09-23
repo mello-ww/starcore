@@ -469,7 +469,19 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": str(error)}, status=401)
             return
 
-        self._send_json({"message": "Logged in."}, headers={"Set-Cookie": self._session_cookie(token)})
+        # A browser gets the token exactly as before - only via the
+        # Set-Cookie header, never in the body it can hand to page script.
+        # A "mobile" login also gets it back in the JSON body: native HTTP
+        # stacks (OkHttp on Android, NSURLSession on iOS) do not expose
+        # Set-Cookie to application code the way a browser's fetch() does,
+        # so a mobile client has no other reliable way to read the token it
+        # was just issued - see docs/api.md, "Authentication", and
+        # mobile/src/api/auth.ts. This is additive and opt-in per `kind`;
+        # a web login's response body is completely unchanged.
+        payload = {"message": "Logged in."}
+        if kind == "mobile":
+            payload["token"] = token
+        self._send_json(payload, headers={"Set-Cookie": self._session_cookie(token)})
 
     def _handle_auth_logout(self):
         engine = self.server.engine

@@ -25,6 +25,13 @@ It communicates exclusively with the Engine through its public API.
 
 The Engine starts it as part of its own lifecycle and serves both the API and the interface over HTTP.
 
+### Mobile
+
+`mobile/` is StarCore's native mobile client (Android first, with an architecture that adds iOS
+later) - a separate application that speaks to the Engine's existing public API exactly like
+Mission Control does, over the same `/api/...` endpoints and the same session system, rather than
+a second backend of its own. See `mobile/README.md`.
+
 ## Design
 
 The Engine remains generic while functionality is added through Satellites.
@@ -40,6 +47,7 @@ flowchart TB
 
 subgraph Clients
     MC["Mission Control"]
+    Mobile["Mobile app"]
     CLI["CLI"]
     Third["Third-party Applications"]
 end
@@ -61,6 +69,7 @@ subgraph Satellites
 end
 
 MC --> Engine
+Mobile --> Engine
 CLI --> Engine
 Third --> Engine
 

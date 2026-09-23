@@ -1,0 +1,5 @@
+<resources>
+    <!-- Mirrors colors.void in src/theme/colors.ts - see that file's own
+         comment on why this is a hand-kept second copy, not generated. -->
+    <color name="app_background">#04060d</color>
+</resources>

@@ -1,0 +1,14 @@
+rootProject.name = 'StarCoreMobile'
+
+apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle")
+applyNativeModulesSettingsGradle(settings)
+
+include ':app'
+// root build.gradle's classpath deps (AGP, the RN Gradle plugin, the Kotlin
+// plugin) are all declared without a version - this included build is what
+// actually supplies them, via Gradle's own composite-build substitution.
+// Without it those three `classpath(...)` lines fail to resolve at all -
+// this line was missing, which is why the project couldn't build even once
+// the Gradle Wrapper itself was restored. Matches the version react-native's
+// own template ships for 0.73.6 (node_modules/react-native/template/android/settings.gradle).
+includeBuild('../node_modules/@react-native/gradle-plugin')

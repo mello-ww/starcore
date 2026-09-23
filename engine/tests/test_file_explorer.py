@@ -104,6 +104,105 @@ class FileExplorerApiTest(unittest.TestCase):
         else:
             self.assertEqual(names, ["/"])
 
+    # ---------- storage dashboard (Part 4/7 of the "Home Storage
+    # Visualization" block) - per-root/per-directory disk usage, and the
+    # deduplicated machine-wide total the roots listing carries alongside it ----------
+
+    def test_the_roots_listing_has_no_top_level_storage_figure_but_a_machine_total(self):
+        # the roots list isn't itself one filesystem - "storage" stays None
+        # there; "machine" is the deduplicated total across every root
+        # (see _machine_storage() in api.py)
+        status, payload = self.json_request(self.base("entries"))
+        self.assertEqual(status, 200)
+        self.assertIsNone(payload["storage"])
+        self._assert_storage_shape_or_none(payload["machine"], extra_keys={"volumes"})
+
+    def test_each_root_reports_its_own_storage_or_none(self):
+        status, payload = self.json_request(self.base("entries"))
+        self.assertEqual(status, 200)
+        for entry in payload["entries"]:
+            self.assertIn("storage", entry)
+            self._assert_storage_shape_or_none(entry["storage"])
+
+    def test_a_real_directory_listing_includes_storage_totals(self):
+        status, payload = self.json_request(self.with_path("entries", self.directory))
+        self.assertEqual(status, 200)
+        self.assertIn("storage", payload)
+        self._assert_storage_shape_or_none(payload["storage"])
+
+    def test_storage_totals_are_internally_consistent_when_available(self):
+        status, payload = self.json_request(self.with_path("entries", self.directory))
+        self.assertEqual(status, 200)
+        info = payload["storage"]
+        if info is None:
+            self.skipTest("this platform/mount could not report disk usage")
+        self.assertGreaterEqual(info["total"], 0)
+        self.assertGreaterEqual(info["used"], 0)
+        self.assertGreaterEqual(info["free"], 0)
+        # shutil.disk_usage doesn't promise used+free == total to the byte
+        # (reserved blocks, concurrent writes elsewhere on the same
+        # filesystem), just that neither figure can exceed the whole
+        self.assertLessEqual(info["used"], info["total"])
+        self.assertLessEqual(info["free"], info["total"])
+
+    def test_the_machine_total_is_at_least_as_large_as_any_single_root(self):
+        status, payload = self.json_request(self.base("entries"))
+        self.assertEqual(status, 200)
+        machine = payload["machine"]
+        if machine is None:
+            self.skipTest("no root on this platform could report disk usage")
+        for entry in payload["entries"]:
+            if entry["storage"] is not None:
+                self.assertGreaterEqual(machine["total"], entry["storage"]["total"])
+
+    def test_a_volume_reachable_from_two_roots_is_only_counted_once_in_the_machine_total(self):
+        from importlib import import_module
+        from unittest.mock import patch
+
+        fe_api = import_module("satellites.native.file_explorer.api")
+        fe_paths = import_module("satellites.native.file_explorer.paths")
+
+        # two distinct roots that happen to sit on the very same volume (the
+        # realistic case being, e.g., a Windows drive also reachable through
+        # a mounted junction) - _machine_storage() must count that volume's
+        # capacity exactly once, not twice
+        duplicate_roots = [self.directory, self.directory.parent]
+        with patch.object(fe_paths, "list_roots", return_value=duplicate_roots):
+            status, payload = self.json_request(self.base("entries"))
+        self.assertEqual(status, 200)
+        machine = payload["machine"]
+        self.assertIsNotNone(machine)
+        self.assertEqual(machine["volumes"], 1)
+
+        import shutil as shutil_module
+        real_usage = shutil_module.disk_usage(self.directory)
+        self.assertEqual(machine["total"], real_usage.total)
+
+    def test_missing_disk_usage_is_reported_as_a_null_storage_field_not_a_failure(self):
+        from importlib import import_module
+        from unittest.mock import patch
+
+        fe_api = import_module("satellites.native.file_explorer.api")
+        with patch.object(fe_api.shutil, "disk_usage", side_effect=OSError("no such device")):
+            status, payload = self.json_request(self.with_path("entries", self.directory))
+            status_roots, payload_roots = self.json_request(self.base("entries"))
+        # File Explorer otherwise keeps listing and browsing just fine even
+        # when disk-usage reporting itself fails everywhere
+        self.assertEqual(status, 200)
+        self.assertIsNone(payload["storage"])
+        self.assertEqual(status_roots, 200)
+        self.assertIsNone(payload_roots["machine"])
+        for entry in payload_roots["entries"]:
+            self.assertIsNone(entry["storage"])
+
+    def _assert_storage_shape_or_none(self, info, extra_keys=frozenset()):
+        if info is None:
+            return
+        self.assertEqual(set(info.keys()), {"total", "used", "free"} | set(extra_keys))
+        for key in ("total", "used", "free"):
+            self.assertIsInstance(info[key], int)
+            self.assertGreaterEqual(info[key], 0)
+
     def test_files_and_directories_are_listed_with_metadata(self):
         (self.directory / "notes.txt").write_text("hello", encoding="utf-8")
         (self.directory / "sub").mkdir()
