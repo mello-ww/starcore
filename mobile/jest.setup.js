@@ -29,3 +29,25 @@ jest.mock('react-native-biometrics', () => {
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
+
+// This project's react-native-screens (3.31.1) predates that package's own
+// `/mock` entry point, so it's stubbed by hand instead - a real
+// NativeStackNavigator (see navigation/OnboardingNavigator.tsx,
+// navigation/MainTabs.tsx) only ever reaches react-native-screens for its
+// `Screen`/`ScreenStack` components (see
+// @react-navigation/native-stack/.../NativeStackView.native.js), so plain
+// Views stand in for both under Jest - there is no real native screen host
+// to render against here anyway.
+jest.mock('react-native-screens', () => {
+  const {View} = require('react-native');
+  return {
+    enableScreens: () => {},
+    screensEnabled: () => false,
+    Screen: View,
+    ScreenStack: View,
+    ScreenStackHeaderConfig: View,
+    ScreenStackHeaderSubview: View,
+    NativeScreen: View,
+    NativeScreenContainer: View,
+  };
+});

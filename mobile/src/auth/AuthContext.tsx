@@ -4,7 +4,7 @@ import {StarCoreClient} from '../api/client';
 import {biometrics} from '../platform/biometrics';
 import {deviceInfo} from '../platform/device';
 import {secureStorage} from '../platform/secureStorage';
-import {Session, SessionManager, TOKEN_KEY} from './session';
+import {BIOMETRIC_ENABLED_KEY, Session, SessionManager, TOKEN_KEY} from './session';
 
 type AuthState =
   | {status: 'loading'}
@@ -20,6 +20,12 @@ interface AuthContextValue {
   biometricUnlockEnabled: boolean;
   enableBiometricUnlock: () => Promise<boolean>;
   disableBiometricUnlock: () => Promise<void>;
+  /** The StarCore client for the server this provider was created for -
+   * shared so every screen that needs to call the API (Overview, the
+   * Satellites screen, Console, Config, ...) uses the exact same request
+   * plumbing and token as auth itself, rather than each constructing its
+   * own StarCoreClient. */
+  client: StarCoreClient;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -30,13 +36,31 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  * created once here and shared through context, so every screen asks the
  * same source of truth for "am I logged in" rather than each keeping its
  * own copy of that answer.
+ *
+ * `serverId` namespaces this provider's session storage (see
+ * src/auth/session.ts) so multiple StarCore servers on the same device
+ * never share or collide over a session token. App.tsx remounts this
+ * component (via a React `key`) whenever the active server changes, so a
+ * server switch always starts that server's own SessionManager fresh
+ * rather than reusing state built for a different server.
  */
-export function AuthProvider({baseUrl, children}: {baseUrl: string; children: React.ReactNode}) {
-  const client = useMemo(() => new StarCoreClient(baseUrl, () => secureStorage.getItem(TOKEN_KEY)), [baseUrl]);
+export function AuthProvider({
+  baseUrl,
+  serverId,
+  children,
+}: {
+  baseUrl: string;
+  serverId: string;
+  children: React.ReactNode;
+}) {
+  const tokenKey = `${TOKEN_KEY}:${serverId}`;
+  const biometricEnabledKey = `${BIOMETRIC_ENABLED_KEY}:${serverId}`;
+
+  const client = useMemo(() => new StarCoreClient(baseUrl, () => secureStorage.getItem(tokenKey)), [baseUrl, tokenKey]);
   const api = useMemo(() => new AuthApi(client), [client]);
   const sessionManager = useMemo(
-    () => new SessionManager(api, secureStorage, biometrics, deviceInfo),
-    [api],
+    () => new SessionManager(api, secureStorage, biometrics, deviceInfo, tokenKey, biometricEnabledKey),
+    [api, tokenKey, biometricEnabledKey],
   );
 
   const [state, setState] = useState<AuthState>({status: 'loading'});
@@ -114,6 +138,7 @@ export function AuthProvider({baseUrl, children}: {baseUrl: string; children: Re
     biometricUnlockEnabled,
     enableBiometricUnlock,
     disableBiometricUnlock,
+    client,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

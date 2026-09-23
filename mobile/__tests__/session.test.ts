@@ -1,4 +1,4 @@
-import {SessionManager, TOKEN_KEY} from '../src/auth/session';
+import {BIOMETRIC_ENABLED_KEY, SessionManager, TOKEN_KEY} from '../src/auth/session';
 import {FakeAuthApi, FakeBiometrics, FakeDeviceInfo, FakeSecureStore} from './fakes';
 
 /**
@@ -190,6 +190,46 @@ describe('SessionManager', () => {
 
       expect(secureStore.isGated(TOKEN_KEY)).toBe(false);
       expect(await manager.biometricUnlockEnabled()).toBe(false);
+    });
+  });
+
+  describe('multiple servers (namespaced storage keys)', () => {
+    /** AuthContext gives each server's SessionManager its own tokenKey/
+     * biometricEnabledKey (see AuthProvider) so two servers' sessions on
+     * the same device - sharing the same SecureStore - can never collide.
+     * This is what that isolation actually rests on. */
+    it('keeps two servers backed by the same SecureStore from reading or clearing each other', async () => {
+      const secureStore = new FakeSecureStore();
+      const apiA = new FakeAuthApi();
+      const apiB = new FakeAuthApi();
+      const managerA = new SessionManager(
+        apiA, secureStore, new FakeBiometrics(), new FakeDeviceInfo(), `${TOKEN_KEY}:server-a`, `${BIOMETRIC_ENABLED_KEY}:server-a`,
+      );
+      const managerB = new SessionManager(
+        apiB, secureStore, new FakeBiometrics(), new FakeDeviceInfo(), `${TOKEN_KEY}:server-b`, `${BIOMETRIC_ENABLED_KEY}:server-b`,
+      );
+
+      const sessionA = await managerA.login(apiA.correctUsername, apiA.correctPassword);
+      const sessionB = await managerB.login(apiB.correctUsername, apiB.correctPassword);
+
+      // separate FakeAuthApi instances (one per server, like the real
+      // AuthApi/StarCoreClient pair AuthProvider builds per server) - their
+      // tokens may coincide in value, which is exactly why storage
+      // isolation (not token uniqueness) is what has to hold up
+      expect(await managerA.restore()).toEqual(sessionA);
+      expect(await managerB.restore()).toEqual(sessionB);
+
+      await managerA.logout();
+
+      expect(await managerA.restore()).toBeNull(); // server A signed out...
+      expect(await managerB.restore()).toEqual(sessionB); // ...server B is untouched
+    });
+
+    it('defaults to the plain, single-server keys when none are given', async () => {
+      const {api, manager, secureStore} = setUp();
+      const session = await manager.login(api.correctUsername, api.correctPassword);
+
+      expect(await secureStore.getItem(TOKEN_KEY)).toBe(session.token);
     });
   });
 });

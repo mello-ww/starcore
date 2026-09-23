@@ -22,6 +22,12 @@ def describe_satellite(engine, satellite) -> dict:
         # checks for that name, so it never needs to know what any satellite's
         # settings actually are
         "configurable": "configuration" in satellite.routes,
+        # same convention, for a mobile interface instead of a settings panel -
+        # see "Exposing a mobile interface" in docs/satellites.md. This is the
+        # entire signal the mobile app uses to decide whether a satellite gets
+        # an entry it can open on the Satellites screen, or is listed with no
+        # interface of its own yet.
+        "mobile_ui": "mobile" in satellite.routes,
     }
 
 

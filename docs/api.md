@@ -55,7 +55,8 @@ Responses are JSON. A Satellite entry contains its manifest information, its typ
   "status": "running",
   "commands": [{ "name": "status", "source": "Status", "description": "..." }],
   "state": { "refresh_rate": 1 },
-  "configurable": false
+  "configurable": false,
+  "mobile_ui": false
 }
 ```
 
@@ -74,6 +75,13 @@ falls back to a generic icon in that case.
 `"configuration"` - it is the entire signal Mission Control uses to decide whether to show
 that Satellite a Config button, and the only thing the Core itself knows about a Satellite's
 settings. See "Exposing configuration" in the Satellites documentation.
+
+`mobile_ui` is the same convention for a route named `"mobile"` instead: `true` when the
+Satellite offers a declarative screen for StarCore's mobile app, which is the one thing the
+mobile app's Satellites screen uses to decide whether opening that Satellite shows a real
+screen or just its name and status. See "Exposing a mobile interface" in the Satellites
+documentation for the declarative UI schema itself (`GET /api/satellites/<name>/mobile`) -
+it is a Satellite endpoint like any other, not a second API.
 
 `POST /api/commands/execute` takes `{"command": "<name> [args...]"}` and runs it through `StarCore.execute_command()` - the same call the terminal CLI makes - so behavior and output match the terminal exactly. It responds with the captured output and, if the command raised, an error:
 

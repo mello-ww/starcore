@@ -217,6 +217,56 @@ up to date automatically the same way the Core's own `[server]` settings do: dis
 any key an installation's `config.toml` is missing from it, and never touches a key that's
 already there - see `docs/deployment.md`, "Keeping configuration up to date".
 
+## Exposing a mobile interface
+
+A Satellite that wants a screen in StarCore's mobile app names one of its `api.py` routes
+`"mobile"`, the same way `"configuration"` gets it a Config button in Mission Control:
+
+```
+satellites/native/status/api.py
+    -> def routes() -> {..., "mobile": handler, ...}
+```
+
+That name is the entire contract with the Core, exactly like `"configuration"`.
+`describe_satellite()` reports `"mobile_ui": true` for any Satellite with a `"mobile"` route -
+the one thing the mobile app's Satellites screen uses to decide whether tapping a Satellite
+opens a screen or simply shows it as not yet supported on mobile. The Core does not otherwise
+know or care what a Satellite's mobile screen contains.
+
+The mobile app never downloads or executes a Satellite's own code - unlike
+`mission_control/page.js` (see "Contributing a Mission Control page" above), which is fine to
+run inside a browser tab but not something a phone app should be asked to `eval`. Instead, a
+Satellite's `"mobile"` route answers with a small, declarative description of what to show,
+and the mobile app's own code decides how to render each piece:
+
+```
+GET /api/satellites/<name>/mobile
+    -> {"screen": {"title": "...", "sections": [
+          {"type": "card", "title": "...", "items": [
+            {"type": "text", "value": "...", "style": "body"|"heading"|"caption"},
+            {"type": "status", "label": "...", "value": "..."},
+            {"type": "list", "items": [{"title": "...", "subtitle": "..."}]},
+            {"type": "button", "label": "...",
+             "action": {"route": "<route beneath this satellite, or an absolute /api/... path>",
+                        "method": "GET"|"POST", "confirm": "optional confirmation text"}}
+          ]}
+        ]}}
+```
+
+This is deliberately the smallest set of primitives that covers a status-style screen like
+Status's own (`satellites/native/status/api.py` - a worked example, reusing `state.py`'s data
+rather than a second copy of it), not a general-purpose UI framework; a future block can add
+more item types (an input, a chart, a toggle bound to a satellite's own state) the same way -
+by teaching the mobile app's renderer one more `"type"`, never by changing this contract or the
+Core. A `"type"` the mobile app doesn't recognize yet is simply skipped, so an older mobile
+build never breaks against a newer Satellite. A `"button"`'s `action.route` is resolved the same
+way any other Satellite route is - relative to `/api/satellites/<name>/`, or, if it starts with
+`/`, as an absolute path for the rare case of pointing at a Core endpoint instead.
+
+A Satellite with no `"mobile"` route simply isn't offered on the mobile app's Satellites screen
+as anything more than a name and a status - the same graceful fallback a Satellite without
+`mission_control/page.js` already gets on the desktop.
+
 ## Satellites with several modules
 
 A Satellite directory is importable as a package, so a Satellite that outgrows a single

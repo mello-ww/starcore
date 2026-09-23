@@ -1,5 +1,5 @@
 import {NavigationContainer, DarkTheme} from '@react-navigation/native';
-import React from 'react';
+import React, {useEffect} from 'react';
 import {ActivityIndicator, View} from 'react-native';
 import {useAuth} from '../auth/AuthContext';
 import {LoginScreen} from '../screens/LoginScreen';
@@ -18,12 +18,35 @@ const navigationTheme = {
   },
 };
 
-/** Everything *after* a server address is known (see App.tsx) - login vs.
+/**
+ * Everything *after* a server address is known (see App.tsx) - login vs.
  * the main tab shell, switched purely on `AuthContext`'s state. Neither
  * branch ever needs to be told which one to show by a screen reaching
- * into storage itself. */
-export function RootNavigator() {
+ * into storage itself.
+ *
+ * `onBackToServerAddress` is passed through unchanged to LoginScreen - see
+ * its own doc comment - only when this server was just created by the
+ * onboarding wizard (App.tsx's ServersGate decides that, not this
+ * component). `onSignedIn` fires once, the moment sign-in succeeds, purely
+ * so ServersGate can stop treating this server as "still mid-onboarding"
+ * afterwards; it's read here from AuthContext's own state rather than
+ * duplicating any login logic.
+ */
+export function RootNavigator({
+  onBackToServerAddress,
+  onSignedIn,
+}: {
+  onBackToServerAddress?: () => void;
+  onSignedIn?: () => void;
+}) {
   const {state} = useAuth();
+
+  useEffect(() => {
+    if (state.status === 'signed-in') {
+      onSignedIn?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.status]);
 
   if (state.status === 'loading') {
     return (
@@ -35,7 +58,7 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      {state.status === 'signed-in' ? <MainTabs /> : <LoginScreen />}
+      {state.status === 'signed-in' ? <MainTabs /> : <LoginScreen onBack={onBackToServerAddress} />}
     </NavigationContainer>
   );
 }

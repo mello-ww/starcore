@@ -1,12 +1,16 @@
 import type {AuthApiClient} from '../api/auth';
 import type {BiometricAuthenticator, DeviceInfo, SecureStore} from '../platform/types';
 
-/** Exported so App.tsx can wire `StarCoreClient`'s token provider to read
- * from the exact same SecureStore entry `SessionManager` writes to,
- * without a second, independent notion of "where is the token" existing
- * anywhere in the app. */
+/** Exported so App.tsx/AuthContext can wire `StarCoreClient`'s token
+ * provider to read from the exact same SecureStore entry `SessionManager`
+ * writes to, without a second, independent notion of "where is the token"
+ * existing anywhere in the app. This is the *default* key, used as-is by
+ * anything that only ever talks to one server; multi-server support
+ * (AuthContext) instead passes SessionManager a key namespaced with the
+ * server's own id, so two servers' sessions on the same device can never
+ * collide or be read as each other's. */
 export const TOKEN_KEY = 'starcore_session_token';
-const BIOMETRIC_ENABLED_KEY = 'starcore_biometric_unlock_enabled';
+export const BIOMETRIC_ENABLED_KEY = 'starcore_biometric_unlock_enabled';
 
 export interface Session {
   token: string;
@@ -40,12 +44,19 @@ export class SessionManager {
     private secureStore: SecureStore,
     private biometrics: BiometricAuthenticator,
     private deviceInfo: DeviceInfo,
+    /** Which SecureStore entry holds this manager's token - defaults to
+     * the plain, single-server key so every existing caller/test is
+     * unaffected. Multi-server support (AuthContext) passes one
+     * namespaced with the active server's id instead, so switching
+     * servers can never read or clear another server's session. */
+    private tokenKey: string = TOKEN_KEY,
+    private biometricEnabledKey: string = BIOMETRIC_ENABLED_KEY,
   ) {}
 
   /** Called once at app start. Never throws - a network error or missing
    * token both simply mean "start at the login screen". */
   async restore(): Promise<Session | null> {
-    const token = await this.secureStore.getItem(TOKEN_KEY);
+    const token = await this.secureStore.getItem(this.tokenKey);
     if (!token) {
       return null;
     }
@@ -74,7 +85,7 @@ export class SessionManager {
 
   async login(username: string, password: string): Promise<Session> {
     const token = await this.api.login(username, password, this.deviceInfo.displayName());
-    await this.secureStore.setItem(TOKEN_KEY, token);
+    await this.secureStore.setItem(this.tokenKey, token);
     return {token};
   }
 
@@ -86,7 +97,7 @@ export class SessionManager {
       // regardless of whether StarCore could be reached just now
     }
     await this.clearStoredToken();
-    await this.secureStore.removeItem(BIOMETRIC_ENABLED_KEY);
+    await this.secureStore.removeItem(this.biometricEnabledKey);
   }
 
   /** Whether biometric unlock has been turned on for the *currently
@@ -94,7 +105,7 @@ export class SessionManager {
    * `biometricsAvailable()` for that, used to decide whether to even show
    * the toggle). */
   async biometricUnlockEnabled(): Promise<boolean> {
-    return (await this.secureStore.getItem(BIOMETRIC_ENABLED_KEY)) === 'true';
+    return (await this.secureStore.getItem(this.biometricEnabledKey)) === 'true';
   }
 
   async biometricsAvailable(): Promise<boolean> {
@@ -115,17 +126,17 @@ export class SessionManager {
     if (!confirmed) {
       return false;
     }
-    await this.secureStore.setItem(TOKEN_KEY, session.token, {requireAuthentication: true});
-    await this.secureStore.setItem(BIOMETRIC_ENABLED_KEY, 'true');
+    await this.secureStore.setItem(this.tokenKey, session.token, {requireAuthentication: true});
+    await this.secureStore.setItem(this.biometricEnabledKey, 'true');
     return true;
   }
 
   async disableBiometricUnlock(session: Session): Promise<void> {
-    await this.secureStore.setItem(TOKEN_KEY, session.token, {requireAuthentication: false});
-    await this.secureStore.removeItem(BIOMETRIC_ENABLED_KEY);
+    await this.secureStore.setItem(this.tokenKey, session.token, {requireAuthentication: false});
+    await this.secureStore.removeItem(this.biometricEnabledKey);
   }
 
   private async clearStoredToken(): Promise<void> {
-    await this.secureStore.removeItem(TOKEN_KEY);
+    await this.secureStore.removeItem(this.tokenKey);
   }
 }

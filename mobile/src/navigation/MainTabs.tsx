@@ -1,29 +1,89 @@
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import React from 'react';
-import {ComingSoonScreen} from '../screens/ComingSoonScreen';
-import {HomeScreen} from '../screens/HomeScreen';
+import {ConfigScreen} from '../screens/ConfigScreen';
+import {ConnectScreen} from '../screens/ConnectScreen';
+import {ConsoleScreen} from '../screens/ConsoleScreen';
+import {OverviewScreen} from '../screens/OverviewScreen';
+import {SatelliteDetailScreen} from '../screens/SatelliteDetailScreen';
+import {SatellitesListScreen} from '../screens/SatellitesListScreen';
+import {ServersScreen} from '../screens/ServersScreen';
 import {SettingsScreen} from '../screens/SettingsScreen';
+import {useServers} from '../servers/ServersContext';
 import {colors} from '../theme';
 
 export type MainTabParamList = {
-  Home: undefined;
-  LockedFolder: undefined;
-  Files: undefined;
-  Photos: undefined;
+  Overview: undefined;
+  Satellites: undefined;
+  Console: undefined;
+  Config: undefined;
   Settings: undefined;
 };
 
+export type SatellitesStackParamList = {
+  SatellitesList: undefined;
+  SatelliteDetail: {name: string};
+};
+
+export type SettingsStackParamList = {
+  SettingsHome: undefined;
+  Servers: undefined;
+  AddServer: undefined;
+};
+
 const Tab = createBottomTabNavigator<MainTabParamList>();
+const SatellitesStackNav = createNativeStackNavigator<SatellitesStackParamList>();
+const SettingsStackNav = createNativeStackNavigator<SettingsStackParamList>();
+
+const stackScreenOptions = {
+  headerStyle: {backgroundColor: colors.surface},
+  headerTintColor: colors.text,
+  headerShadowVisible: false,
+};
+
+/** "Satellites" tab's own stack: the list, then whichever Satellite the
+ * user opens - see "Fully modular satellite mobile architecture" in the
+ * task brief. Nothing here names a specific Satellite. */
+function SatellitesStack() {
+  return (
+    <SatellitesStackNav.Navigator screenOptions={stackScreenOptions}>
+      <SatellitesStackNav.Screen name="SatellitesList" component={SatellitesListScreen} options={{title: 'Satellites'}} />
+      <SatellitesStackNav.Screen name="SatelliteDetail" component={SatelliteDetailScreen} />
+    </SatellitesStackNav.Navigator>
+  );
+}
+
+/** "Settings" tab's own stack: app settings, then server management and
+ * (reached from there) adding a server - with a real back button, per
+ * "Server address screen" in the task brief. */
+function SettingsStack() {
+  const {addAndActivate} = useServers();
+  return (
+    <SettingsStackNav.Navigator screenOptions={stackScreenOptions}>
+      <SettingsStackNav.Screen name="SettingsHome" component={SettingsScreen} options={{title: 'Settings'}} />
+      <SettingsStackNav.Screen name="Servers" component={ServersScreen} options={{title: 'Servers'}} />
+      <SettingsStackNav.Screen name="AddServer" options={{headerShown: false}}>
+        {({navigation}) => (
+          <ConnectScreen
+            onBack={() => navigation.goBack()}
+            onConnect={async (name, url) => {
+              await addAndActivate(name, url);
+              // addAndActivate makes the new server active, which remounts
+              // AuthProvider/RootNavigator above this whole tab bar (see
+              // App.tsx) - there is deliberately nothing left to navigate
+              // back to once that happens.
+            }}
+          />
+        )}
+      </SettingsStackNav.Screen>
+    </SettingsStackNav.Navigator>
+  );
+}
 
 /**
- * Bottom tabs - the mobile navigation pattern the task brief calls for in
- * place of Mission Control's desktop sidebar (see `.sidebar` in
- * mission_control/style.css); a sidebar doesn't fit a phone's width, and a
- * bottom bar is the platform-idiomatic Android/iOS equivalent for a small,
- * fixed set of top-level destinations. Every tab exists now, even the ones
- * this block doesn't implement (Locked Folder, Files, Photos) - see
- * ComingSoonScreen - so later blocks add a screen's *content*, never a new
- * navigation entry.
+ * Bottom tabs - exactly the five destinations in "New mobile bottom
+ * navigation" in the task brief. Individual Satellites are never their own
+ * tab; they live inside the Satellites tab's own stack.
  */
 export function MainTabs() {
   return (
@@ -34,32 +94,11 @@ export function MainTabs() {
         tabBarActiveTintColor: colors.azure,
         tabBarInactiveTintColor: colors.textFaint,
       }}>
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="LockedFolder" options={{title: 'Locked Folder'}}>
-        {() => (
-          <ComingSoonScreen
-            title="Locked Folder"
-            description="Locked Folder access is coming to the mobile app in a future update - unlock will use your fingerprint or face locally, then the same server-side unlock Mission Control uses."
-          />
-        )}
-      </Tab.Screen>
-      <Tab.Screen name="Files" options={{title: 'Files'}}>
-        {() => (
-          <ComingSoonScreen
-            title="Files"
-            description="Browsing, uploading and downloading files through File Explorer is coming to the mobile app in a future update."
-          />
-        )}
-      </Tab.Screen>
-      <Tab.Screen name="Photos" options={{title: 'Photos'}}>
-        {() => (
-          <ComingSoonScreen
-            title="Photos"
-            description="Your Photo Library, albums and map view are coming to the mobile app in a future update."
-          />
-        )}
-      </Tab.Screen>
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen name="Overview" component={OverviewScreen} />
+      <Tab.Screen name="Satellites" component={SatellitesStack} />
+      <Tab.Screen name="Console" component={ConsoleScreen} />
+      <Tab.Screen name="Config" component={ConfigScreen} />
+      <Tab.Screen name="Settings" component={SettingsStack} />
     </Tab.Navigator>
   );
 }
