@@ -1,0 +1,109 @@
+import React from 'react';
+import renderer, {act} from 'react-test-renderer';
+import {Switch, Text} from 'react-native';
+import {SettingsScreen} from '../src/screens/SettingsScreen';
+
+// Factory-mocked (not auto-mocked) so requiring this module never pulls in
+// its real platform/biometrics or platform/secureStorage imports, which
+// Jest (unlike Metro) can't resolve for a bare, unsuffixed import - see
+// src/platform/README.md.
+jest.mock('../src/auth/AuthContext', () => ({useAuth: jest.fn()}));
+jest.mock('../src/servers/ServersContext', () => ({useServers: jest.fn()}));
+
+import {useAuth} from '../src/auth/AuthContext';
+import {useServers} from '../src/servers/ServersContext';
+
+const navigation = {navigate: jest.fn()} as any;
+const route = {} as any;
+
+/**
+ * Covers the "Possible Unhandled Promise Rejection" bug: enableBiometricUnlock/
+ * disableBiometricUnlock are documented (session.ts) to resolve rather than
+ * reject for every expected outcome, but the Switch's fire-and-forget
+ * onValueChange handler is the last line of defense if that contract is ever
+ * violated, so it needs its own coverage independent of session.ts's tests.
+ */
+describe('SettingsScreen biometric toggle', () => {
+  function setUp(overrides?: Partial<ReturnType<typeof useAuth>>) {
+    const enableBiometricUnlock = jest.fn().mockResolvedValue(true);
+    const disableBiometricUnlock = jest.fn().mockResolvedValue(undefined);
+    (useAuth as jest.Mock).mockReturnValue({
+      logout: jest.fn(),
+      biometricsAvailable: true,
+      biometricUnlockEnabled: false,
+      enableBiometricUnlock,
+      disableBiometricUnlock,
+      ...overrides,
+    });
+    (useServers as jest.Mock).mockReturnValue({activeServer: {id: 's1', name: 'Home'}});
+    const tree = renderer.create(<SettingsScreen navigation={navigation} route={route} />);
+    return {tree, enableBiometricUnlock, disableBiometricUnlock};
+  }
+
+  it('enables biometric unlock on success with no error shown', async () => {
+    const {tree, enableBiometricUnlock} = setUp();
+
+    await act(async () => {
+      tree.root.findByType(Switch).props.onValueChange(true);
+    });
+
+    expect(enableBiometricUnlock).toHaveBeenCalled();
+    const texts = tree.root.findAllByType(Text).map((node: any) => node.props.children).flat().filter(Boolean);
+    expect(texts.join(' ')).not.toMatch(/wrong|fail/i);
+  });
+
+  it('does not crash or leave an unhandled rejection when the prompt is cancelled (resolves false)', async () => {
+    const enableBiometricUnlock = jest.fn().mockResolvedValue(false);
+    const {tree} = setUp({enableBiometricUnlock});
+
+    await act(async () => {
+      await tree.root.findByType(Switch).props.onValueChange(true);
+    });
+
+    expect(enableBiometricUnlock).toHaveBeenCalled();
+    // cancelling is not an error - no error text should appear
+    const texts = tree.root.findAllByType(Text).map((node: any) => node.props.children).flat().filter(Boolean);
+    expect(texts.join(' ')).not.toMatch(/wrong|fail/i);
+  });
+
+  it('shows an error and recovers cleanly if enabling unexpectedly rejects', async () => {
+    const enableBiometricUnlock = jest.fn().mockRejectedValue(new Error('Keystore write failed'));
+    const {tree} = setUp({enableBiometricUnlock});
+
+    await act(async () => {
+      await tree.root.findByType(Switch).props.onValueChange(true);
+    });
+
+    const texts = tree.root.findAllByType(Text).map((node: any) => node.props.children).flat().filter(Boolean);
+    expect(texts).toEqual(expect.arrayContaining(['Keystore write failed']));
+    expect(tree.root.findByType(Switch).props.disabled).toBe(false);
+  });
+
+  it('disables biometric unlock cleanly', async () => {
+    const {tree, disableBiometricUnlock} = setUp({biometricUnlockEnabled: true});
+
+    await act(async () => {
+      await tree.root.findByType(Switch).props.onValueChange(false);
+    });
+
+    expect(disableBiometricUnlock).toHaveBeenCalled();
+  });
+
+  it('shows an error and recovers cleanly if disabling unexpectedly rejects', async () => {
+    const disableBiometricUnlock = jest.fn().mockRejectedValue(new Error('boom'));
+    const {tree} = setUp({biometricUnlockEnabled: true, disableBiometricUnlock});
+
+    await act(async () => {
+      await tree.root.findByType(Switch).props.onValueChange(false);
+    });
+
+    const texts = tree.root.findAllByType(Text).map((node: any) => node.props.children).flat().filter(Boolean);
+    expect(texts).toEqual(expect.arrayContaining(['boom']));
+  });
+
+  it('does not render the biometric card when biometrics are unavailable', () => {
+    const {tree} = setUp({biometricsAvailable: false});
+
+    expect(tree.root.findAllByType(Switch)).toHaveLength(0);
+  });
+});

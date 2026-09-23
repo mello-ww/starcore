@@ -19,7 +19,15 @@ export class FakeSecureStore implements SecureStore {
    * next biometric-gated read succeeds or is cancelled/fails. */
   biometricReadWillSucceed = true;
 
+  /** Test control: simulates the Keystore rejecting a write - e.g. binding
+   * a `requireAuthentication` entry fails even after the OS prompt itself
+   * already succeeded (see session.ts's enableBiometricUnlock docstring). */
+  setItemWillFail = false;
+
   async setItem(key: string, value: string, options?: {requireAuthentication?: boolean}): Promise<void> {
+    if (this.setItemWillFail) {
+      throw new Error('Keystore write failed');
+    }
     this.values.set(key, value);
     if (options?.requireAuthentication) {
       this.gated.add(key);

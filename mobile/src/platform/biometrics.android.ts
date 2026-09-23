@@ -25,8 +25,12 @@ function mapBiometryType(type?: string): BiometryType {
  */
 class AndroidBiometricAuthenticator implements BiometricAuthenticator {
   async isAvailable(): Promise<{available: boolean; biometryType: BiometryType}> {
-    const {available, biometryType} = await rnBiometrics.isSensorAvailable();
-    return {available, biometryType: mapBiometryType(biometryType)};
+    try {
+      const {available, biometryType} = await rnBiometrics.isSensorAvailable();
+      return {available, biometryType: mapBiometryType(biometryType)};
+    } catch {
+      return {available: false, biometryType: 'none'};
+    }
   }
 
   async authenticate(promptMessage: string): Promise<boolean> {

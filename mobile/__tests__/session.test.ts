@@ -181,6 +181,36 @@ describe('SessionManager', () => {
       expect(restored).toBeNull();
     });
 
+    it('resolves false, not a rejection, when the Keystore write fails after a successful prompt', async () => {
+      const {api, secureStore, manager} = setUp();
+      const session = await manager.login(api.correctUsername, api.correctPassword);
+      secureStore.setItemWillFail = true;
+
+      await expect(manager.enableBiometricUnlock(session)).resolves.toBe(false);
+      expect(await manager.biometricUnlockEnabled()).toBe(false);
+    });
+
+    it('leaves password sign-in working after a Keystore write failure', async () => {
+      const {api, secureStore, manager} = setUp();
+      const session = await manager.login(api.correctUsername, api.correctPassword);
+      secureStore.setItemWillFail = true;
+      await manager.enableBiometricUnlock(session);
+      secureStore.setItemWillFail = false;
+
+      expect(await manager.restore()).toEqual({token: session.token});
+    });
+
+    it('disabling never rejects even if the Keystore write fails', async () => {
+      const {api, secureStore, manager} = setUp();
+      const session = await manager.login(api.correctUsername, api.correctPassword);
+      await manager.enableBiometricUnlock(session);
+      secureStore.setItemWillFail = true;
+
+      await expect(manager.disableBiometricUnlock(session)).resolves.toBeUndefined();
+      // biometricEnabledKey is cleared regardless, so the UI reflects "off"
+      expect(await manager.biometricUnlockEnabled()).toBe(false);
+    });
+
     it('disable moves the token back to a plain, non-gated entry', async () => {
       const {api, secureStore, manager} = setUp();
       const session = await manager.login(api.correctUsername, api.correctPassword);

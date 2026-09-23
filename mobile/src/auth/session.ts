@@ -124,15 +124,30 @@ export class SessionManager {
   async enableBiometricUnlock(session: Session): Promise<boolean> {
     const confirmed = await this.biometrics.authenticate('Confirm biometric unlock for StarCore');
     if (!confirmed) {
+      return false; // user cancelled, or the sensor rejected them - not an error
+    }
+    try {
+      await this.secureStore.setItem(this.tokenKey, session.token, {requireAuthentication: true});
+      await this.secureStore.setItem(this.biometricEnabledKey, 'true');
+      return true;
+    } catch {
+      // The OS-level prompt above succeeded, but binding the Keystore
+      // entry to it can still fail on its own (enrollment changed
+      // mid-flow, device policy, ...). Same "never throws" contract as
+      // the rest of this class - the un-gated token from login() is left
+      // exactly as it was, so password sign-in is unaffected.
       return false;
     }
-    await this.secureStore.setItem(this.tokenKey, session.token, {requireAuthentication: true});
-    await this.secureStore.setItem(this.biometricEnabledKey, 'true');
-    return true;
   }
 
   async disableBiometricUnlock(session: Session): Promise<void> {
-    await this.secureStore.setItem(this.tokenKey, session.token, {requireAuthentication: false});
+    try {
+      await this.secureStore.setItem(this.tokenKey, session.token, {requireAuthentication: false});
+    } catch {
+      // best effort - biometricEnabledKey is still cleared below so the
+      // UI reflects "off" regardless of whether the ungated re-write
+      // landed
+    }
     await this.secureStore.removeItem(this.biometricEnabledKey);
   }
 

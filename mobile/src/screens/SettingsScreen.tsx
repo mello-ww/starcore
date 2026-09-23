@@ -28,15 +28,24 @@ export function SettingsScreen({navigation}: Props) {
   } = useAuth();
   const {activeServer} = useServers();
   const [busy, setBusy] = useState(false);
+  const [bioError, setBioError] = useState<string | null>(null);
 
   const toggleBiometrics = async (next: boolean) => {
     setBusy(true);
+    setBioError(null);
     try {
       if (next) {
         await enableBiometricUnlock();
       } else {
         await disableBiometricUnlock();
       }
+    } catch (err: any) {
+      // enableBiometricUnlock/disableBiometricUnlock are documented to
+      // resolve rather than reject for every expected outcome (cancelled
+      // prompt, Keystore write failure) - this only guards against
+      // something genuinely unexpected, so the Switch's fire-and-forget
+      // handler can never produce an unhandled promise rejection.
+      setBioError(err?.message || 'Something went wrong with biometric unlock.');
     } finally {
       setBusy(false);
     }
@@ -79,6 +88,7 @@ export function SettingsScreen({navigation}: Props) {
                 testID="biometric-unlock-switch"
               />
             </View>
+            {bioError && <Text style={styles.error}>{bioError}</Text>}
           </Card>
         )}
 
@@ -96,4 +106,5 @@ const styles = StyleSheet.create({
   rowText: {flex: 1, gap: spacing.xs},
   caption: {},
   chevron: {color: colors.textFaint, fontSize: 20},
+  error: {color: colors.alert, fontSize: 13},
 });

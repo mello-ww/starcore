@@ -4,7 +4,12 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
-    }
+    },
+    // Lets tsc resolve a plain import like './secureStorage' to
+    // './secureStorage.android.ts' the same way Metro does at build time
+    // (see src/platform/README.md) - without this, tsc can't see past its
+    // own platform-suffixed implementation files.
+    "moduleSuffixes": ["", ".android", ".ios", ".native"]
   },
   "include": ["src/**/*", "__tests__/**/*", "index.js"]
 }
