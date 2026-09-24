@@ -4,7 +4,7 @@
 // around File Explorer's own /entries, /content, /upload, /mkdir, /rename
 // and /delete routes (see satellites/native/file_explorer/api.py and
 // locked_folder_guard.py): it never re-implements file handling, it simply
-// never lets the user navigate above the vault root - see docs/locked_folder.md,
+// never lets the user navigate above the vault root - see docs/satellites/locked_folder.md,
 // "Protected file access through the existing File Explorer".
 
 export function mount(context) {

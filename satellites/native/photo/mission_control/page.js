@@ -1,5 +1,15 @@
 const SKELETONS = 12;
-const TABS = ["photos", "albums", "map"];
+const TABS = ["photos", "albums", "trash", "map"];
+
+function tabLabel(name) {
+    if (name === "map") {
+        return "Map";
+    }
+    if (name === "trash") {
+        return "Recycle bin";
+    }
+    return name[0].toUpperCase() + name.slice(1);
+}
 
 // loaded lazily, at most once per browser session, and only when a map is
 // actually about to be shown (the Map tab, or a photo's location panel) -
@@ -46,6 +56,8 @@ export function mount(context) {
 
     let photos = [];
     let albums = [];
+    let trash = [];             // photos currently in the recycle bin (see loadTrash/renderTrash)
+    let retentionDays = null;   // from the satellite's own configuration - how long the bin keeps a photo
     let tab = "photos";
     let groupByCamera = false;
     let openAlbum = null;       // full album detail (with resolved .photos), or null
@@ -60,12 +72,13 @@ export function mount(context) {
     const tabBar = buildTabBar();
     const photosPanel = buildPhotosPanel();
     const albumsPanel = buildAlbumsPanel();
+    const trashPanel = buildTrashPanel();
     const mapPanel = buildMapPanel();
     const notice = el("p", "photo-notice");
     notice.hidden = true;
 
     const body = el("div", "stack");
-    body.append(summary, tabBar, notice, photosPanel.element, albumsPanel.element, mapPanel.element);
+    body.append(summary, tabBar, notice, photosPanel.element, albumsPanel.element, trashPanel.element, mapPanel.element);
     root.replaceChildren(buildHead(), body);
 
     setTab("photos");
@@ -100,7 +113,7 @@ export function mount(context) {
     function buildTabBar() {
         const group = el("div", "photo-tabs");
         for (const name of TABS) {
-            const button = el("button", "photo-tab", name === "map" ? "Map" : name[0].toUpperCase() + name.slice(1));
+            const button = el("button", "photo-tab", tabLabel(name));
             button.type = "button";
             button.dataset.tab = name;
             button.addEventListener("click", () => setTab(name));
@@ -117,10 +130,13 @@ export function mount(context) {
 
         photosPanel.element.hidden = name !== "photos";
         albumsPanel.element.hidden = name !== "albums";
+        trashPanel.element.hidden = name !== "trash";
         mapPanel.element.hidden = name !== "map";
 
         if (name === "albums") {
             renderAlbums();
+        } else if (name === "trash") {
+            loadTrash();
         } else if (name === "map") {
             renderMap();
         }
@@ -368,8 +384,16 @@ export function mount(context) {
     /* ---------- rendering: summary + gallery ---------- */
 
     function renderSummary(libraryInfo, status) {
+        // "images"/"videos" are only reported once the library actually holds
+        // a video - a library that predates video support, or one with none
+        // yet, still just says "N photos" rather than "N photos · 0 videos"
+        const label = libraryInfo.videos
+            ? `${libraryInfo.images} photo${libraryInfo.images === 1 ? "" : "s"} · `
+              + `${libraryInfo.videos} video${libraryInfo.videos === 1 ? "" : "s"}`
+            : String(libraryInfo.photos);
+
         summary.replaceChildren(
-            tile("Photos", String(libraryInfo.photos)),
+            tile("Photos", label),
             tile("Library size", readableSize(libraryInfo.size_bytes)),
             tile("Thumbnails", libraryInfo.thumbnails ? "cached" : "originals", libraryInfo.thumbnails),
             tile("Phone sync", status.running ? "listening" : "off", status.running),
@@ -443,8 +467,32 @@ export function mount(context) {
 
     function buildGrid(list) {
         const grid = el("div", "photo-gallery");
-        list.forEach((photo, position) => grid.appendChild(buildTile(photo, () => openViewer(list, position))));
+        list.forEach((photo, position) =>
+            grid.appendChild(buildTile(photo, () => openViewer(list, position), buildDeleteBadge(photo, refresh))));
         return grid;
+    }
+
+    // Moves a photo to the recycle bin (see docs/photo.md#recycle-bin) - the
+    // same "trash" endpoint the mobile app and the bin itself use, never a
+    // separate delete path. `onDeleted` decides how the caller's own view
+    // catches up (a full refresh from the main gallery, a narrower re-fetch
+    // from inside an open album).
+    function buildDeleteBadge(photo, onDeleted) {
+        const button = el("button", "photo-tile-remove", "");
+        button.type = "button";
+        button.title = "Move to Recycle Bin";
+        button.innerHTML = DELETE_ICON;
+        button.addEventListener("click", async (event) => {
+            event.stopPropagation();
+            button.disabled = true;
+            try {
+                await api.post(`/trash/${photo.id}`, {});
+                await onDeleted();
+            } catch (error) {
+                button.disabled = false;
+            }
+        });
+        return button;
     }
 
     function buildEmpty() {
@@ -468,7 +516,8 @@ export function mount(context) {
     }
 
     function buildTile(photo, onOpen, badge) {
-        const tileEl = el("button", "photo-tile");
+        const isVideo = photo.media_type === "video";
+        const tileEl = el("button", isVideo ? "photo-tile photo-tile-video" : "photo-tile");
         tileEl.type = "button";
         tileEl.title = photo.filename;
 
@@ -481,6 +530,21 @@ export function mount(context) {
 
         const caption = el("span", "photo-caption", photo.filename);
         tileEl.append(image, caption);
+
+        // a video without a renderable thumbnail (no ffmpeg on this server -
+        // see PhotoLibrary.thumbnail_path) still needs *something* recognizable
+        // in the grid rather than a broken-image icon, so the play badge and
+        // duration always show, whether or not the poster frame itself loaded
+        if (isVideo) {
+            const play = el("span", "photo-tile-play");
+            play.innerHTML = PLAY_ICON;
+            tileEl.appendChild(play);
+            const duration = durationLabel(photo.duration);
+            if (duration) {
+                tileEl.appendChild(el("span", "photo-tile-duration", duration));
+            }
+        }
+
         if (badge) {
             tileEl.appendChild(badge);
         }
@@ -849,6 +913,163 @@ export function mount(context) {
         return button;
     }
 
+    /* ---------- Recycle bin tab ---------- */
+
+    function buildTrashPanel() {
+        const element = el("div", "photo-tab-panel");
+        element.hidden = true;
+
+        const toolbar = el("div", "photo-toolbar");
+        toolbar.append(el("p", "eyebrow", "Recycle bin"));
+
+        const retentionNote = el("p", "muted photo-trash-retention");
+        const notice = el("p", "photo-notice");
+        notice.hidden = true;
+        const content = el("div", "photo-trash-content");
+
+        element.append(toolbar, retentionNote, notice, content);
+        return { element, retentionNote, notice, content };
+    }
+
+    async function loadTrash() {
+        try {
+            const data = await api.get("/trash");
+            trash = data.photos;
+            retentionDays = data.retention_days;
+            trashPanel.notice.hidden = true;
+        } catch (error) {
+            trash = [];
+            trashPanel.notice.textContent = `The recycle bin could not be read: ${error.message}`;
+            trashPanel.notice.hidden = false;
+        }
+        renderTrash();
+    }
+
+    function renderTrash() {
+        const { content, retentionNote } = trashPanel;
+
+        retentionNote.textContent = retentionDays != null
+            ? `Deleted photos stay here for ${retentionDays} day${retentionDays === 1 ? "" : "s"}, then are ` +
+              "permanently erased. Restore a photo any time before then, or erase it yourself right away."
+            : "";
+
+        content.replaceChildren();
+        if (trash.length === 0) {
+            content.appendChild(buildTrashEmpty());
+            return;
+        }
+
+        const grid = el("div", "photo-gallery");
+        for (const photo of trash) {
+            grid.appendChild(buildTrashTile(photo));
+        }
+        content.appendChild(grid);
+    }
+
+    function buildTrashEmpty() {
+        const empty = el("div", "photo-empty");
+        empty.innerHTML = `
+            <svg width="46" height="46" viewBox="0 0 46 46" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+                <path d="M11 15.5h24M18 15.5V11a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v4.5M14.5 15.5l1.6 21a2 2 0 0 0 2 1.85h9.8a2 2 0 0 0 2-1.85l1.6-21"/>
+            </svg>`;
+        empty.append(
+            el("p", null, "The recycle bin is empty."),
+            el("p", "muted", "Deleted photos stay here, restorable, until their retention period runs out."),
+        );
+        return empty;
+    }
+
+    function buildTrashTile(photo) {
+        const tileEl = el("div", "photo-tile photo-trash-tile");
+        tileEl.title = photo.filename;
+
+        const image = el("img");
+        image.src = api.url(`/trash/${photo.id}/thumbnail`);
+        image.alt = photo.filename;
+        image.loading = "lazy";
+        image.decoding = "async";
+        image.addEventListener("error", () => tileEl.classList.add("unavailable"));
+
+        const remaining = daysRemaining(photo.trashed_at);
+        const caption = el("span", "photo-caption", remaining ? `${photo.filename} · ${remaining}` : photo.filename);
+
+        const actions = el("div", "photo-trash-actions");
+        const restore = iconButton("Restore", RESTORE_ICON);
+        const erase = iconButton("Erase permanently", DELETE_ICON);
+        restore.addEventListener("click", () => restorePhoto(photo));
+        erase.addEventListener("click", () => confirmErasePhoto(photo));
+        actions.append(restore, erase);
+
+        tileEl.append(image, caption, actions);
+        return tileEl;
+    }
+
+    function daysRemaining(trashedAt) {
+        if (!trashedAt || retentionDays == null) {
+            return "";
+        }
+        const trashedDate = new Date(trashedAt);
+        if (Number.isNaN(trashedDate.getTime())) {
+            return "";
+        }
+        const elapsedDays = (Date.now() - trashedDate.getTime()) / 86400000;
+        const remaining = Math.max(0, Math.ceil(retentionDays - elapsedDays));
+        return remaining <= 0 ? "erasing soon" : `${remaining} day${remaining === 1 ? "" : "s"} left`;
+    }
+
+    async function restorePhoto(photo) {
+        try {
+            await api.post(`/trash/${photo.id}/restore`, {});
+        } catch (error) {
+            return;
+        }
+        trash = trash.filter((candidate) => candidate.id !== photo.id);
+        renderTrash();
+        await refresh();
+    }
+
+    function confirmErasePhoto(photo) {
+        const overlay = el("div", "modal-overlay");
+        const modal = el("div", "modal");
+        const head = el("div", "modal-head");
+        head.append(el("h2", null, "Permanently erase photo"));
+        const close = el("button", "modal-close", "✕");
+        close.type = "button";
+        close.addEventListener("click", () => overlay.remove());
+        head.appendChild(close);
+
+        const body = el("div", "stack");
+        body.append(el("p", null, `Permanently erase "${photo.filename}"? This cannot be undone.`));
+        const actions = el("div", "photo-actions");
+        const cancel = el("button", "button", "Cancel");
+        const confirm = el("button", "button button-stop", "Erase permanently");
+        cancel.type = "button";
+        confirm.type = "button";
+        cancel.addEventListener("click", () => overlay.remove());
+        confirm.addEventListener("click", async () => {
+            confirm.disabled = true;
+            try {
+                await api.post(`/trash/${photo.id}/erase`, {});
+                trash = trash.filter((candidate) => candidate.id !== photo.id);
+                renderTrash();
+                overlay.remove();
+            } catch (error) {
+                confirm.disabled = false;
+            }
+        });
+        actions.append(cancel, confirm);
+        body.appendChild(actions);
+
+        modal.append(head, body);
+        overlay.appendChild(modal);
+        overlay.addEventListener("click", (event) => {
+            if (event.target === overlay) {
+                overlay.remove();
+            }
+        });
+        document.body.appendChild(overlay);
+    }
+
     /* ---------- Map tab ---------- */
 
     function buildMapPanel() {
@@ -1013,6 +1234,8 @@ export function mount(context) {
 
     function closeViewer() {
         if (viewer !== null) {
+            viewer.video.pause();
+            viewer.video.removeAttribute("src");  // stop it from continuing to buffer once removed
             viewer.element.remove();
             viewer = null;
         }
@@ -1037,8 +1260,21 @@ export function mount(context) {
         }
 
         const metadata = photo.metadata || {};
+        const isVideo = photo.media_type === "video";
 
-        viewer.image.src = api.url(`/originals/${photo.id}`);
+        // the previous item's video (if any) must stop before this one shows -
+        // otherwise it keeps playing, off-screen, behind whatever comes next
+        viewer.video.pause();
+
+        viewer.image.hidden = isVideo;
+        viewer.video.hidden = !isVideo;
+        if (isVideo) {
+            viewer.video.poster = api.url(`/thumbnails/${photo.id}`);
+            viewer.video.src = api.url(`/originals/${photo.id}`);
+        } else {
+            viewer.video.removeAttribute("src");
+            viewer.image.src = api.url(`/originals/${photo.id}`);
+        }
         viewer.image.alt = photo.filename;
         viewer.title.textContent = photo.filename;
         viewer.position.textContent = `${index + 1} / ${viewerList.length}`;
@@ -1050,9 +1286,12 @@ export function mount(context) {
         // present fields only - most photos have no EXIF at all, or only some of
         // it, and a wall of "—" is worse than not showing the row. Ordered as a
         // reader would want it: when and where, then the gear, then exposure,
-        // then the file itself.
+        // then the file itself. A video has none of the EXIF-derived rows (no
+        // camera/GPS metadata is read from one - see library.py's add_file()),
+        // but does get its own Duration row in their place.
         const rows = [
             ["Captured", formatDate(photo.captured_at) || "unknown"],
+            ["Duration", isVideo ? durationLabel(photo.duration) : null],
             ["Location", metadata.gps_coordinates, mapLink(metadata)],
             ["Camera", cameraLabel(metadata)],
             ["Lens", metadata.lens_model],
@@ -1060,7 +1299,7 @@ export function mount(context) {
             ["Aperture", metadata.aperture ? `f/${metadata.aperture}` : null],
             ["Shutter speed", metadata.shutter_speed],
             ["ISO", metadata.iso ? String(metadata.iso) : null],
-            ["Dimensions", `${photo.width} × ${photo.height}`],
+            ["Dimensions", photo.width && photo.height ? `${photo.width} × ${photo.height}` : null],
             ["Megapixels", metadata.megapixels ? `${metadata.megapixels} MP` : null],
             ["Size", readableSize(photo.size)],
             ["Format", photo.format.toUpperCase()],
@@ -1140,6 +1379,10 @@ export function mount(context) {
         const title = el("p", "photo-viewer-title");
         const position = el("p", "photo-viewer-position");
         const image = el("img", "photo-viewer-image");
+        const video = el("video", "photo-viewer-image photo-viewer-video");
+        video.controls = true;
+        video.playsInline = true;
+        video.hidden = true;
         const meta = el("dl", "facts photo-viewer-meta");
 
         const locationUnavailable = el("p", "photo-location-unavailable", "Location unavailable");
@@ -1156,20 +1399,24 @@ export function mount(context) {
                 <path d="M8 7.3v4"/>
                 <circle cx="8" cy="4.9" r="0.8" fill="currentColor" stroke="none"/>
             </svg>`;
+        const deleteButton = el("button", "photo-viewer-delete");
+        deleteButton.innerHTML = DELETE_ICON;
         const closeButton = el("button", "photo-viewer-close", "✕");
         const previous = el("button", "photo-viewer-step previous", "‹");
         const next = el("button", "photo-viewer-step next", "›");
 
-        for (const button of [infoButton, closeButton, previous, next]) {
+        for (const button of [infoButton, deleteButton, closeButton, previous, next]) {
             button.type = "button";
         }
         infoButton.title = "Details";
         infoButton.setAttribute("aria-expanded", "false");
+        deleteButton.title = "Move to Recycle Bin";
         closeButton.title = "Close";
         previous.title = "Previous";
         next.title = "Next";
 
         infoButton.addEventListener("click", () => toggleInfo());
+        deleteButton.addEventListener("click", () => deleteViewedPhoto());
         closeButton.addEventListener("click", closeViewer);
         previous.addEventListener("click", () => step(-1));
         next.addEventListener("click", () => step(1));
@@ -1183,11 +1430,11 @@ export function mount(context) {
         const identity = el("div", "photo-viewer-identity");
         identity.append(el("p", "eyebrow", "StarCore · Photo"), title);
         const actions = el("div", "photo-viewer-bar-actions");
-        actions.append(position, infoButton, closeButton);
+        actions.append(position, infoButton, deleteButton, closeButton);
         bar.append(identity, actions);
 
         const stage = el("div", "photo-viewer-stage");
-        stage.append(previous, image, next);
+        stage.append(previous, image, video, next);
         attachSwipe(stage);
 
         const panelBody = el("div", "photo-viewer-panel-body");
@@ -1197,9 +1444,48 @@ export function mount(context) {
 
         element.append(bar, stage, panel);
         return {
-            element, image, title, position, meta, panel, infoButton, previous, next,
+            element, image, video, title, position, meta, panel, infoButton, deleteButton, previous, next,
             locationUnavailable, locationMapEl,
         };
+    }
+
+    // Moves the photo currently on screen to the recycle bin, then steps to
+    // the next one (or closes the viewer if that was the last one) - the same
+    // trash endpoint the gallery's own delete badge and the mobile app use.
+    async function deleteViewedPhoto() {
+        const photo = viewerList[index];
+        if (!photo) {
+            return;
+        }
+
+        viewer.deleteButton.disabled = true;
+        try {
+            await api.post(`/trash/${photo.id}`, {});
+        } catch (error) {
+            viewer.deleteButton.disabled = false;
+            return;
+        }
+        viewer.deleteButton.disabled = false;
+
+        viewerList = viewerList.filter((candidate) => candidate.id !== photo.id);
+        photos = photos.filter((candidate) => candidate.id !== photo.id);
+        if (openAlbum) {
+            openAlbum.photos = openAlbum.photos.filter((candidate) => candidate.id !== photo.id);
+            openAlbum.photo_ids = openAlbum.photo_ids.filter((id) => id !== photo.id);
+        }
+
+        renderGallery();
+        await reloadAlbums();
+        if (tab === "albums") {
+            renderAlbums();
+        }
+
+        if (viewerList.length === 0) {
+            closeViewer();
+        } else {
+            index = Math.min(index, viewerList.length - 1);
+            show();
+        }
     }
 
     function attachSwipe(stage) {
@@ -1283,6 +1569,15 @@ const DELETE_ICON = `
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M3.5 4.5h9M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4.5 4.5l.6 8a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.6-8"/>
     </svg>`;
+const RESTORE_ICON = `
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3.2 8a4.8 4.8 0 1 1 1.5 3.5"/>
+        <path d="M3.2 4.6V8h3.4"/>
+    </svg>`;
+const PLAY_ICON = `
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M4.5 3.3a.8.8 0 0 1 1.22-.68l7 4.7a.8.8 0 0 1 0 1.36l-7 4.7a.8.8 0 0 1-1.22-.68V3.3z"/>
+    </svg>`;
 
 function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -1307,6 +1602,24 @@ function readableSize(bytes) {
             return `${value.toFixed(1)} ${unit}`;
         }
     }
+}
+
+// mirrors videos.py's own duration_label() - the one other place this
+// mm:ss/h:mm:ss formatting is written, so both agree on how a video's length
+// reads (though the server never actually calls this one; each video's
+// "duration" already arrives from the API as a number of seconds)
+function durationLabel(seconds) {
+    if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds < 0) {
+        return "";
+    }
+
+    const total = Math.round(seconds);
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    const pad = (value) => String(value).padStart(2, "0");
+
+    return hours ? `${hours}:${pad(minutes)}:${pad(secs)}` : `${minutes}:${pad(secs)}`;
 }
 
 const ORIENTATIONS = {

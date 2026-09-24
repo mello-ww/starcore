@@ -1,0 +1,291 @@
+import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import React, {useMemo, useRef, useState} from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import Video from 'react-native-video';
+import {colors, spacing, typography} from '../theme';
+import type {SatellitesStackParamList} from '../navigation/MainTabs';
+import {durationLabel} from './duration';
+import type {Photo} from './types';
+import {usePhotoApi} from './usePhotoApi';
+
+type Props = NativeStackScreenProps<SatellitesStackParamList, 'PhotoViewer'>;
+type MediaItem = SatellitesStackParamList['PhotoViewer']['media'][number];
+
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
+
+function formatBytes(size: number): string {
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = size;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
+/**
+ * The full-screen viewer: swipe between photos and videos alike (a paging
+ * FlatList - this build doesn't yet have a gesture/zoom library installed,
+ * so pinch-to-zoom isn't wired up here yet even though the horizontal swipe
+ * is), Share, Delete (moves to the recycle bin, with confirmation - never a
+ * direct permanent delete) and a Details panel. Closing returns to exactly
+ * the grid position it was opened from, since the caller never remounts
+ * the grid underneath - this screen is simply popped off the stack.
+ *
+ * A video page (media_type === 'video') renders react-native-video instead
+ * of Image, with its own tap-to-play/pause controls; only the page that's
+ * actually on screen is ever mounted with a real player (see
+ * `renderItem`/`viewableIndex` below) so swiping away always stops playback
+ * rather than leaving audio running behind the next page.
+ */
+export function PhotoViewerScreen({route, navigation}: Props) {
+  const {media: initialMedia, startIndex} = route.params;
+  const {api, imageSource} = usePhotoApi();
+  const [media, setMedia] = useState<MediaItem[]>(initialMedia);
+  const [details, setDetails] = useState(false);
+  const [photoDetail, setPhotoDetail] = useState<Photo | null>(null);
+  const [viewableIndex, setViewableIndex] = useState(startIndex);
+  const listRef = useRef<FlatList<MediaItem>>(null);
+  const currentIndexRef = useRef(startIndex);
+
+  const getItemLayout = (_: unknown, index: number) => ({length: SCREEN_WIDTH, offset: SCREEN_WIDTH * index, index});
+
+  const current = media[currentIndexRef.current] ?? media[0];
+
+  const loadDetails = async (photoId: string) => {
+    try {
+      // the id is already known-good (it came from a list this app just
+      // loaded), so this is only ever fetching the fuller record, never
+      // discovering whether the photo exists
+      const list = await api.list();
+      setPhotoDetail(list.find(photo => photo.id === photoId) ?? null);
+    } catch {
+      setPhotoDetail(null);
+    }
+  };
+
+  const onDelete = () => {
+    Alert.alert('Delete?', 'It will move to the recycle bin and can be restored from there.', [
+      {text: 'Cancel', style: 'cancel'},
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const deleting = current;
+          try {
+            await api.trash(deleting.id);
+          } catch (err: any) {
+            Alert.alert('Could not delete this', err?.message || 'Please try again.');
+            return;
+          }
+          const remaining = media.filter(item => item.id !== deleting.id);
+          if (remaining.length === 0) {
+            navigation.goBack();
+            return;
+          }
+          setMedia(remaining);
+          const nextIndex = Math.min(currentIndexRef.current, remaining.length - 1);
+          currentIndexRef.current = nextIndex;
+          setViewableIndex(nextIndex);
+        },
+      },
+    ]);
+  };
+
+  const onShare = async (photoId: string) => {
+    try {
+      await Share.share({message: imageSource(photoId, 'original').uri});
+    } catch {
+      // the user cancelled the share sheet - nothing to report
+    }
+  };
+
+  const toggleDetails = () => {
+    if (!details) {
+      loadDetails(current.id);
+    }
+    setDetails(!details);
+  };
+
+  return (
+    <View style={styles.screen}>
+      <FlatList
+        ref={listRef}
+        data={media}
+        keyExtractor={item => item.id}
+        horizontal
+        pagingEnabled
+        initialScrollIndex={startIndex}
+        getItemLayout={getItemLayout}
+        initialNumToRender={1}
+        windowSize={3}
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={event => {
+          const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+          currentIndexRef.current = index;
+          setViewableIndex(index);
+          if (details) {
+            loadDetails(media[index].id);
+          }
+        }}
+        renderItem={({item, index}) => <ViewerPage item={item} active={index === viewableIndex} />}
+      />
+
+      <View style={styles.topBar} pointerEvents="box-none">
+        <Pressable onPress={() => navigation.goBack()} style={styles.iconButton} hitSlop={12}>
+          <Text style={styles.iconText}>✕</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.bottomBar}>
+        <ViewerAction label="Share" onPress={() => onShare(current.id)} />
+        <ViewerAction label="Details" onPress={toggleDetails} />
+        <ViewerAction label="Delete" onPress={onDelete} destructive />
+      </View>
+
+      {details && (
+        <View style={styles.detailsPanel}>
+          {photoDetail ? (
+            <>
+              <Text style={typography.heading}>{photoDetail.filename}</Text>
+              {photoDetail.media_type === 'video' ? (
+                <DetailRow label="Duration" value={durationLabel(photoDetail.duration) || 'unknown'} />
+              ) : (
+                photoDetail.width && photoDetail.height && (
+                  <DetailRow label="Dimensions" value={`${photoDetail.width} × ${photoDetail.height}`} />
+                )
+              )}
+              <DetailRow label="Size" value={formatBytes(photoDetail.size)} />
+              <DetailRow label="Format" value={photoDetail.format.toUpperCase()} />
+              {photoDetail.captured_at && <DetailRow label="Taken" value={photoDetail.captured_at} />}
+              {photoDetail.metadata.camera_model && (
+                <DetailRow
+                  label="Camera"
+                  value={[photoDetail.metadata.camera_make, photoDetail.metadata.camera_model].filter(Boolean).join(' ')}
+                />
+              )}
+              {photoDetail.metadata.lens_model && <DetailRow label="Lens" value={photoDetail.metadata.lens_model} />}
+              {photoDetail.metadata.gps_coordinates && (
+                <DetailRow label="Location" value={photoDetail.metadata.gps_coordinates} />
+              )}
+            </>
+          ) : (
+            <ActivityIndicator color={colors.azure} />
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function ViewerPage({item, active}: {item: MediaItem; active: boolean}) {
+  const {imageSource} = usePhotoApi();
+  const [loading, setLoading] = useState(true);
+  const [paused, setPaused] = useState(false);
+
+  if (item.mediaType === 'video') {
+    return (
+      <Pressable style={styles.page} onPress={() => setPaused(current => !current)}>
+        {/* only the active page actually mounts a player with a source, so
+            swiping away stops playback/decoding rather than leaving it
+            running off-screen behind whichever page is now showing */}
+        {active ? (
+          <Video
+            source={imageSource(item.id, 'original')}
+            style={styles.image}
+            resizeMode="contain"
+            controls
+            paused={paused}
+            onLoadStart={() => setLoading(true)}
+            onLoad={() => setLoading(false)}
+            onError={() => setLoading(false)}
+          />
+        ) : (
+          <Image source={imageSource(item.id, 'thumbnail')} style={styles.image} resizeMode="contain" />
+        )}
+        {loading && active && <ActivityIndicator color={colors.azure} style={StyleSheet.absoluteFill} />}
+      </Pressable>
+    );
+  }
+
+  return (
+    <View style={styles.page}>
+      <Image
+        source={imageSource(item.id, 'original')}
+        style={styles.image}
+        resizeMode="contain"
+        onLoadEnd={() => setLoading(false)}
+      />
+      {loading && <ActivityIndicator color={colors.azure} style={StyleSheet.absoluteFill} />}
+    </View>
+  );
+}
+
+function ViewerAction({label, onPress, destructive}: {label: string; onPress: () => void; destructive?: boolean}) {
+  return (
+    <Pressable onPress={onPress} style={styles.action} hitSlop={8}>
+      <Text style={[typography.body, destructive && styles.destructive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function DetailRow({label, value}: {label: string; value: string}) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={typography.label}>{label}</Text>
+      <Text style={typography.body}>{value}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {flex: 1, backgroundColor: '#000'},
+  page: {width: SCREEN_WIDTH, alignItems: 'center', justifyContent: 'center'},
+  image: {width: SCREEN_WIDTH, height: '100%'},
+  topBar: {position: 'absolute', top: spacing.lg, left: spacing.lg},
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(4,6,13,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconText: {color: colors.text, fontSize: 18},
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    paddingVertical: spacing.md,
+    paddingBottom: spacing.lg,
+    backgroundColor: 'rgba(4,6,13,0.75)',
+  },
+  action: {paddingHorizontal: spacing.md, paddingVertical: spacing.xs},
+  destructive: {color: colors.alert},
+  detailsPanel: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    bottom: 96,
+    backgroundColor: 'rgba(10,15,30,0.92)',
+    borderRadius: 12,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  detailRow: {flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md},
+});

@@ -2,9 +2,10 @@ enabled = true
 storage = "data" # relative paths are resolved inside the satellite
 thumbnail_size = 480 # longest edge, in pixels
 photo_directory = "" # default directory 'scan'/'import' use when none is given; must be absolute (or start with ~)
+trash_retention_days = 30 # days a deleted photo stays in the recycle bin before being permanently erased
 
 sync_enabled = true
 sync_host = "127.0.0.1" # set to "0.0.0.0" to let phones on the local network reach it
 sync_port = 8081
 sync_token = "" # generated and stored in the library on first start when empty
-sync_max_bytes = 67108864 # 64 MB per upload
+sync_max_bytes = 536870912 # 512 MB per upload - phone video needs more headroom than photos ever did

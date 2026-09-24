@@ -20,3 +20,10 @@ export const SESSION_KIND = 'mobile' as const;
  * large File Explorer listing, a Photo Library scan trigger) can
  * legitimately take a while on a modest home server. */
 export const REQUEST_TIMEOUT_MS = 20_000;
+
+/** Timeout for a single background-sync file upload (see api/client.ts's
+ * `postFile`) - much longer than REQUEST_TIMEOUT_MS above, since a phone
+ * video can be well over 100MB and a home server's upload bandwidth is
+ * often modest. A stuck upload still eventually gives up rather than
+ * blocking a sync run forever. */
+export const UPLOAD_TIMEOUT_MS = 5 * 60_000;

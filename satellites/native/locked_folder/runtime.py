@@ -8,7 +8,7 @@ unlocked, and failed-PIN attempt counters - lives in memory only and is
 lost on restart. That is deliberate, not an oversight: it means a StarCore
 restart always starts every session locked out again, which is the safer
 default, and it means a session token (a bearer secret) is never written to
-disk a second time anywhere - see docs/locked_folder.md, "Why unlock state
+disk a second time anywhere - see docs/satellites/locked_folder.md, "Why unlock state
 is memory-only".
 """
 
@@ -40,7 +40,7 @@ def runtime(satellite):
     Satellites are otherwise decoupled from one another (see
     docs/satellites.md); this is the one, narrow exception, no different in
     spirit from Mission Control's own configuration picker reaching into
-    FileExplorer's `entries` route by name - see docs/locked_folder.md,
+    FileExplorer's `entries` route by name - see docs/satellites/locked_folder.md,
     "How File Explorer recognizes the Locked Folder".
     """
     root = _storage_root(satellite)

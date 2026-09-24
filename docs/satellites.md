@@ -184,7 +184,7 @@ POST /api/satellites/<name>/configuration  {"key": ..., "value": ...}
 
 A setting descriptor may also carry an optional `"type"`. The only value defined so far is
 `"path"`, meaning the setting is a filesystem directory (Photo's `photo_directory` and
-Music's `library` both use it - see `docs/photo.md`); Mission Control's generic modal reacts
+Music's `library` both use it - see `docs/satellites/photo.md`); Mission Control's generic modal reacts
 to it by adding a "Browse…" button next to the field, backed by the FileExplorer
 Satellite's own `entries` route, so a directory can be picked instead of typed. This is the
 one, narrow exception to Mission Control never hardcoding a Satellite's name into its
@@ -301,7 +301,7 @@ Both categories share the same lifecycle and extension model. The only differenc
 
 ## Worked examples
 
-- **Photo** (`satellites/native/photo/`, `docs/photo.md`) - state, routes, a Mission Control
+- **Photo** (`satellites/native/photo/`, `docs/satellites/photo.md`) - state, routes, a Mission Control
   page, a background service (its phone-sync listener) and Satellite configuration, all
   together.
 - **FileExplorer** (`satellites/native/file_explorer/`) - a Satellite with routes and a

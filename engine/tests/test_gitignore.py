@@ -127,7 +127,7 @@ class GitignoreDoesNotHideSourceTest(unittest.TestCase):
             "satellites/native/locked_folder/mission_control/page.js",
             "satellites/native/photo/config.default.toml",
             "docs/deployment.md",
-            "docs/locked_folder.md",
+            "docs/satellites/locked_folder.md",
             "mission_control/index.html",
             "mission_control/app.js",
             "mobile/package.json",

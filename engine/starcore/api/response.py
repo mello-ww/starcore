@@ -20,7 +20,7 @@ class Request:
         # session at all" gate - without re-implementing any part of session
         # validation itself. Empty when the Core hasn't required a session for
         # this request at all (StarCore not yet bootstrapped). The Locked
-        # Folder Satellite is what actually uses this (see docs/locked_folder.md);
+        # Folder Satellite is what actually uses this (see docs/satellites/locked_folder.md);
         # every other existing route ignores it exactly as before.
         self.token = token
 

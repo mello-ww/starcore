@@ -1,8 +1,20 @@
 """Phone synchronization: a small upload listener owned by the Photo satellite.
 
-It is deliberately separate from Mission Control's API server. Reaching StarCore
-from a phone means binding to the local network, and this way that exposes one
-token-protected upload endpoint instead of the whole Core.
+The standalone listener below is deliberately separate from Mission Control's
+API server: reaching StarCore from a phone on the local network this way
+exposes one token-protected upload endpoint instead of the whole Core. It is
+still the ingestion path a browser on the phone can be pointed at directly
+(SyncHandler's own upload page).
+
+The mobile app's automatic background sync (see "Real automatic phone sync"
+in docs/satellites/photo.md) goes through a second, authenticated way to
+reach the exact same ingestion logic instead: api.py's `sync_upload` route,
+served over the main StarCore API the app already logs into for everything
+else - so a phone only ever needs the one server address, and the upload is
+covered by whatever HTTPS/Nginx setup already fronts that API, with no
+separate port or token to expose. `accept_authenticated_upload()` below is
+that second path; it calls the very same `SyncService.accept()` the
+standalone listener uses, never a second ingestion implementation.
 """
 
 from collections import deque
@@ -38,12 +50,21 @@ def start(engine, satellite):
         satellite.config.get("sync_host", "127.0.0.1"),
         int(satellite.config.get("sync_port", 8081)),
         _token(satellite),
-        int(satellite.config.get("sync_max_bytes", 64 * 1024 * 1024)),
+        int(satellite.config.get("sync_max_bytes", 512 * 1024 * 1024)),
     )
+    # registered regardless of whether the standalone local-network listener
+    # below actually manages to bind a socket: accept() needs nothing from
+    # that socket, and this is what the authenticated main-API upload route
+    # (api.py's sync_upload, via accept_authenticated_upload() below) goes
+    # through - so the mobile app's background sync keeps working even on a
+    # machine where the standalone listener's own port can't be bound.
+    _services[storage_root(satellite)] = service
 
     if service.start():
-        _services[storage_root(satellite)] = service
         print(f"Photo sync listening on {service.url}")
+    else:
+        print("Photo sync's standalone local-network listener could not start; uploads through "
+              "the authenticated StarCore API are still accepted.")
 
 
 def stop(engine, satellite):
@@ -87,6 +108,54 @@ def _token(satellite) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(token, encoding="utf-8")
     return token
+
+
+class UploadTooLarge(Exception):
+    """Raised by accept_authenticated_upload() - mirrors SyncHandler's own
+    413 check for the standalone listener below, for the exact same
+    sync_max_bytes limit."""
+
+
+def accept_authenticated_upload(satellite, raw, filename: str) -> dict:
+    """The ingestion path api.py's sync_upload route uses: the exact same
+    SyncService.accept() the standalone local-network listener below uses
+    (never a second implementation), reached instead through the main
+    StarCore API - authenticated by the Core's own session mechanism rather
+    than this module's own per-phone token, and therefore reachable wherever
+    Mission Control itself is, including through whatever HTTPS/Nginx setup
+    already fronts it. See "Real automatic phone sync" in
+    docs/satellites/photo.md.
+
+    `raw` is a starcore.api.response.RawBody - read here in chunks, exactly
+    like SyncHandler._read_body() below, so a large video upload is never
+    buffered whole before its size is even known to be within bounds.
+    """
+    running = service(satellite)
+    if running is None:
+        raise RuntimeError("photo sync is disabled on this server")
+
+    # recorded here, not by the caller (api.py), so a failure counts toward
+    # the same activity/counts the standalone listener's SyncHandler records
+    # into for its own failures - Mission Control's Sync section shouldn't
+    # have to know there are two upload paths at all
+    try:
+        if raw.length <= 0:
+            raise ValueError("the upload was empty")
+        if raw.length > running.max_bytes:
+            raise UploadTooLarge(f"the upload is larger than {running.max_bytes} bytes")
+
+        chunks = []
+        total = 0
+        for chunk in raw:
+            total += len(chunk)
+            if total > running.max_bytes:
+                raise UploadTooLarge(f"the upload is larger than {running.max_bytes} bytes")
+            chunks.append(chunk)
+
+        return running.accept(b"".join(chunks), filename)
+    except (UploadTooLarge, ValueError, UnsupportedImage) as error:
+        running.activity.record(filename, "failed", str(error))
+        raise
 
 
 def local_address() -> str:
@@ -226,7 +295,7 @@ class SyncHandler(BaseHTTPRequestHandler):
 
         service = self.server.service
         length = self.headers.get("Content-Length")
-        filename = _safe_filename(self.headers.get(FILENAME_HEADER) or self._query().get("filename"))
+        filename = safe_filename(self.headers.get(FILENAME_HEADER) or self._query().get("filename"))
 
         if length is None or not length.isdigit():
             self._failure(filename, 411, "a Content-Length is required")
@@ -305,7 +374,7 @@ class SyncHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-def _safe_filename(name) -> str:
+def safe_filename(name) -> str:
     """Only ever used as metadata - the stored name comes from the content digest."""
     if not name:
         return "upload"
@@ -365,8 +434,8 @@ li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: no
 </header>
 
 <div class="card">
-    <label class="pick">Select photos<input id="pick" type="file" accept="image/*" multiple></label>
-    <p class="muted" id="hint">Photos are copied into your StarCore library. Nothing is deleted from this device.</p>
+    <label class="pick">Select photos or videos<input id="pick" type="file" accept="image/*,video/*" multiple></label>
+    <p class="muted" id="hint">Photos and videos are copied into your StarCore library. Nothing is deleted from this device.</p>
     <ul id="log"></ul>
 </div>
 

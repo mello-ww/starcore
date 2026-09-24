@@ -247,11 +247,24 @@ class PhotoLibraryTest(unittest.TestCase):
 
     def test_unsupported_files_are_ignored(self):
         self.write("notes.txt", b"hello")
-        self.write("clip.mp4", b"\x00\x00\x00\x18ftyp")
+        self.write("readme.pdf", b"%PDF-1.4")
 
         result = self.library.import_directory(self.source)
 
         self.assertEqual(result["found"], 0)
+        self.assertEqual(self.library.count, 0)
+
+    def test_a_corrupt_video_is_reported_as_failed_not_silently_skipped(self):
+        # .mp4 is a recognized extension (see test_photo_video.py), so unlike
+        # the genuinely-unsupported files above, this one *is* a candidate -
+        # it just can't actually be read, and has to fail loudly rather than
+        # disappear the way an unrelated file type does
+        self.write("clip.mp4", b"\x00\x00\x00\x08ftyp")
+
+        result = self.library.import_directory(self.source)
+
+        self.assertEqual(result["found"], 1)
+        self.assertEqual(len(result["failed"]), 1)
         self.assertEqual(self.library.count, 0)
 
     def test_jpeg_headers_are_understood(self):
@@ -624,6 +637,32 @@ class PhotoSatelliteTest(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertEqual(payload["page"], {"module": "page.js", "stylesheet": "page.css"})
+
+    def test_the_satellite_exposes_a_mobile_route(self):
+        from starcore.api import payloads
+
+        described = payloads.describe_satellite(self.engine, self.satellite)
+
+        self.assertTrue(described["mobile_ui"])
+        self.assertIn("mobile", self.satellite.routes)
+
+    def test_the_mobile_route_reports_the_library_state(self):
+        self.fill(2)
+
+        status, payload = self.json_request("/api/satellites/photo/mobile")
+
+        self.assertEqual(status, 200)
+        screen = payload["screen"]
+        self.assertEqual(screen["title"], "Photo")
+        labels = {item["label"]: item["value"] for item in screen["sections"][0]["items"]}
+        self.assertEqual(labels["Photos"], "2")
+        self.assertEqual(labels["Phone sync"], "off")
+
+    def test_the_mobile_route_rejects_other_methods(self):
+        status, payload = self.json_request("/api/satellites/photo/mobile", "POST", {})
+
+        self.assertEqual(status, 405)
+        self.assertIn("error", payload)
 
     def test_page_assets_are_served(self):
         for asset, expected in (("page.js", "javascript"), ("page.css", "text/css")):

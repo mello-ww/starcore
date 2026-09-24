@@ -107,6 +107,20 @@ describe('SatellitesListScreen', () => {
     expect(texts(tree)).toEqual(expect.arrayContaining(['status', 'Showing cached data - offline']));
   });
 
+  it('opens the dedicated Photo screens instead of the generic satellite detail screen', async () => {
+    const photoSatellite = {...satelliteA, name: 'Photo', description: 'Photo library'};
+    __mocks.list.mockResolvedValue([photoSatellite]);
+    let tree!: ReturnType<typeof renderer.create>;
+    await act(async () => {
+      tree = renderer.create(<SatellitesListScreen navigation={navigation} route={route} />);
+    });
+
+    act(() => tree.root.findByProps({disabled: false}).props.onPress());
+
+    expect(navigation.navigate).toHaveBeenCalledWith('PhotoHome');
+    expect(navigation.navigate).not.toHaveBeenCalledWith('SatelliteDetail', expect.anything());
+  });
+
   it('shows an empty state when the server reports no satellites', async () => {
     __mocks.list.mockResolvedValue([]);
     let tree!: ReturnType<typeof renderer.create>;

@@ -8,6 +8,8 @@ import socket
 import tempfile
 import unittest
 
+from starcore.api.response import RawBody
+
 from tests.support import start_engine, stop_engine
 from tests.test_photo import png, photo_library
 
@@ -19,9 +21,28 @@ def sync_module():
     return import_module("satellites.native.photo.sync")
 
 
+def api_module():
+    from importlib import import_module
+    return import_module("satellites.native.photo.api")
+
+
+def library_module():
+    from importlib import import_module
+    return import_module("satellites.native.photo.library")
+
+
 def configuration_module():
     from importlib import import_module
     return import_module("satellites.native.photo.configuration")
+
+
+def fake_request(method: str, satellite, query: dict = None, raw=None, body=None):
+    """A minimal stand-in for starcore.api.response.Request - only the
+    attributes api.py's route handlers actually read, the same pattern
+    PhotoConfigurationTest already uses above for the configuration route."""
+    return type("Request", (), {
+        "method": method, "satellite": satellite, "query": query or {}, "raw": raw, "body": body, "path": (),
+    })()
 
 
 class SyncServiceTest(unittest.TestCase):
@@ -314,6 +335,114 @@ class SyncIntegrationTest(unittest.TestCase):
 
         self.assertIn("[WARNING]", output.getvalue())
         self.assertTrue(self.engine.status()["running"])
+
+
+class AuthenticatedUploadTest(unittest.TestCase):
+    """api.py's `sync_upload` route: the authenticated counterpart to
+    SyncServiceTest's standalone listener above, reached through the main
+    StarCore API instead of a second port - see sync.py's module docstring
+    and "Real automatic phone sync" in docs/satellites/photo.md. Every test
+    here drives the actual route handler, not sync.accept_authenticated_upload()
+    directly, so a regression in routes()'s wiring would be caught too."""
+
+    def setUp(self):
+        self.directory = Path(tempfile.mkdtemp(prefix="starcore-sync-auth-"))
+        self.engine = start_engine()
+        self.satellite = self.engine.registry.get("Photo")
+        self.satellite.config.data["storage"] = str(self.directory / "library")
+        self.satellite.config.data.update({"sync_port": 0, "sync_token": TOKEN})
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.satellite.start(self.engine)
+        self.route = api_module().routes()["sync_upload"]
+        self.library = library_module().library(self.satellite)
+
+    def tearDown(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.satellite.stop(self.engine)
+        stop_engine(self.engine)
+        shutil.rmtree(self.directory, ignore_errors=True)
+
+    def upload(self, data: bytes, filename="beach.png"):
+        response = self.route(fake_request(
+            "POST", self.satellite, query={"filename": filename}, raw=RawBody(io.BytesIO(data), len(data)),
+        ))
+        return response.status, response.payload
+
+    def test_a_valid_photo_is_imported(self):
+        status, payload = self.upload(png(8, 6), filename="beach.png")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "imported")
+        self.assertEqual(payload["photo"]["filename"], "beach.png")
+        self.assertEqual(self.library.count, 1)
+
+    def test_the_same_photo_twice_is_a_duplicate(self):
+        self.upload(png(8, 6))
+        status, payload = self.upload(png(8, 6))
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "duplicate")
+        self.assertIsNone(payload["photo"])
+        self.assertEqual(self.library.count, 1)
+
+    def test_it_shares_activity_counts_with_the_standalone_listener(self):
+        """Both upload paths go through the same SyncService, so Mission
+        Control's Sync section reflects uploads made either way."""
+        self.upload(png(8, 6), filename="one.png")
+        self.upload(b"nonsense", filename="bad.png")
+
+        described = sync_module().describe(self.satellite)
+        self.assertEqual(described["counts"], {"received": 2, "imported": 1, "duplicates": 0, "failed": 1})
+
+    def test_a_file_that_is_not_an_image_is_refused(self):
+        status, payload = self.upload(b"just some text", filename="notes.txt")
+
+        self.assertEqual(status, 415)
+        self.assertEqual(self.library.count, 0)
+
+    def test_an_upload_larger_than_the_limit_is_refused(self):
+        sync_module().service(self.satellite).max_bytes = 16
+        status, payload = self.upload(png(8, 6))
+
+        self.assertEqual(status, 413)
+        self.assertEqual(self.library.count, 0)
+
+    def test_an_empty_upload_is_refused(self):
+        status, payload = self.upload(b"", filename="empty.png")
+
+        self.assertEqual(status, 400)
+        self.assertIn("empty", payload["error"])
+
+    def test_a_json_body_instead_of_a_raw_upload_is_refused(self):
+        response = self.route(fake_request("POST", self.satellite, body={}, raw=None))
+
+        self.assertEqual(response.status, 400)
+
+    def test_get_is_not_supported(self):
+        response = self.route(fake_request("GET", self.satellite))
+
+        self.assertEqual(response.status, 405)
+
+    def test_it_is_unavailable_when_sync_is_disabled(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.satellite.stop(self.engine)
+            self.satellite.config.data["sync_enabled"] = False
+            self.satellite.start(self.engine)
+
+        status, payload = self.upload(png(8, 6))
+
+        self.assertEqual(status, 503)
+
+    def test_a_filename_is_taken_from_the_query_string(self):
+        status, payload = self.upload(png(8, 6), filename="holiday.png")
+
+        self.assertEqual(payload["photo"]["filename"], "holiday.png")
+
+    def test_an_unnamed_upload_still_works(self):
+        status, payload = self.upload(png(8, 6), filename="")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["photo"]["filename"], "upload")
 
 
 class PhotoConfigurationTest(unittest.TestCase):

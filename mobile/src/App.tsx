@@ -1,7 +1,8 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {AuthProvider} from './auth/AuthContext';
 import {OnboardingNavigator} from './navigation/OnboardingNavigator';
+import {configureBackgroundFetch, triggerForegroundSync} from './photo/backgroundSyncTask';
 import {RootNavigator} from './navigation/RootNavigator';
 import {ServersProvider, useServers} from './servers/ServersContext';
 
@@ -16,6 +17,18 @@ type ResumeInfo = {name: string; address: string};
  * server and a session state already exist.
  */
 export default function App() {
+  useEffect(() => {
+    // Configures react-native-background-fetch's periodic schedule (see
+    // photo/backgroundSyncTask.ts) and immediately runs one sync pass -
+    // "immediate sync also triggered on app foreground" in the approved
+    // design. Runs once per app start, independent of which server is
+    // active or even whether one is configured yet (runBackgroundSync
+    // iterates every server that has sync turned on), so this belongs above
+    // ServersProvider/ServersGate rather than inside either.
+    configureBackgroundFetch();
+    triggerForegroundSync();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <ServersProvider>

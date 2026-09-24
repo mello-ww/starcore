@@ -2,7 +2,7 @@
 
 Deliberately narrow: the PIN itself is never a setting here (it has no
 "value" that could ever be safely echoed back through a GET - see
-docs/locked_folder.md) and is instead configured through the satellite's
+docs/satellites/locked_folder.md) and is instead configured through the satellite's
 dedicated "pin" route (api.py). This module only covers what File Explorer's
 guard and the unlock/lock routes need to know: where the protected root is,
 and the two timing knobs that shape how forgiving or strict it is.

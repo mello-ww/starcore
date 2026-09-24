@@ -304,13 +304,13 @@ deployment:
   `auth.json` from the application-data directory, start it again, and the setup screen
   reappears.
 - Photo Sync (`satellites/native/photo/sync.py`) keeps its own separate device-token
-  authentication on its own port - see "Photo Sync and authentication" in `docs/photo.md` -
+  authentication on its own port - see "Photo Sync and authentication" in `docs/satellites/photo.md` -
   and is unaffected by any of this.
 
 ## Runtime data location
 
 StarCore's own credentials, sessions, and a Satellite's own generated secrets (the Locked
-Folder's PIN hash - see `docs/locked_folder.md`) are machine-specific runtime state, not
+Folder's PIN hash - see `docs/satellites/locked_folder.md`) are machine-specific runtime state, not
 source code, and by default live entirely outside the Git checkout - the same way a desktop
 application's user data never lives inside its own installation directory. `starcore.
 runtime_paths.data_dir()` is the one place that decides where:

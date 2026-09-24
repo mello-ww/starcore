@@ -7,18 +7,28 @@ import json
 import os
 import shutil
 
-from . import images
+from . import images, videos
 
 SATELLITE_NAME = "Photo"
 INDEX_VERSION = 1
 ID_LENGTH = 16
 READ_SIZE = 1024 * 1024
 
+# the extensions a directory scan bothers opening at all - a fast filename
+# prefilter only. What a file actually *is* is always decided by content, in
+# add_file() below (see its own docstring), never by this set alone.
+_CANDIDATE_SUFFIXES = set(images.FORMATS) | set(videos.FORMATS)
+
 _libraries = {}
 
 
 class PhotoImportError(Exception):
     """Raised when a caller asks for something the library cannot import."""
+
+
+class PhotoNotFound(Exception):
+    """Raised when a caller names a photo id the library doesn't have - or,
+    for restore/erase, one that isn't currently in the recycle bin."""
 
 
 def library(satellite):
@@ -56,25 +66,50 @@ class PhotoLibrary:
 
     @property
     def count(self) -> int:
-        return len(self._photos)
+        """Active photos only - one sitting in the recycle bin is logically
+        gone, awaiting either restore or the retention period running out."""
+        return sum(1 for photo in self._photos.values() if not photo.get("trashed_at"))
 
     @property
     def size(self) -> int:
-        return sum(photo["size"] for photo in self._photos.values())
+        return sum(photo["size"] for photo in self._photos.values() if not photo.get("trashed_at"))
 
     def summary(self) -> dict:
+        active = [photo for photo in self._photos.values() if not photo.get("trashed_at")]
         return {
-            "photos": self.count,
+            "photos": len(active),
+            "images": sum(1 for photo in active if photo.get("media_type", "photo") == "photo"),
+            "videos": sum(1 for photo in active if photo.get("media_type") == "video"),
             "size_bytes": self.size,
             "storage": str(self.root),
-            "formats": sorted(set(images.EXTENSIONS)),
+            "formats": sorted(set(images.EXTENSIONS) | set(videos.EXTENSIONS)),
             "thumbnails": images.thumbnails_available(),
+            "video_thumbnails": videos.thumbnails_available(),
         }
 
     def all(self) -> list:
-        return sorted(self._photos.values(), key=_taken_at, reverse=True)
+        """Every active photo or video, newest first - one in the recycle bin
+        is excluded, exactly as if it had actually been deleted (see trash())."""
+        return sorted((photo for photo in self._photos.values() if not photo.get("trashed_at")),
+                      key=_taken_at, reverse=True)
+
+    def all_ids(self) -> set:
+        """Every id the library still physically holds, active or trashed -
+        what album membership is pruned against (AlbumStore.prune_missing),
+        so moving a photo to the recycle bin never silently drops it from an
+        album; only actually erasing it does."""
+        return set(self._photos)
 
     def get(self, photo_id):
+        """A photo, or None if it doesn't exist - or is currently in the
+        recycle bin, which behaves as "doesn't exist" everywhere except the
+        dedicated recycle-bin endpoints (see get_any() and the trash routes)."""
+        photo = self._photos.get(photo_id)
+        return photo if photo is not None and not photo.get("trashed_at") else None
+
+    def get_any(self, photo_id):
+        """A photo whether active or trashed - only for the recycle-bin
+        routes themselves (previewing, restoring, permanently erasing)."""
         return self._photos.get(photo_id)
 
     def original_path(self, photo: dict) -> Path:
@@ -84,10 +119,26 @@ class PhotoLibrary:
 
         return path
 
+    def _thumbnail_file(self, photo: dict) -> Path:
+        return self.thumbnails_dir / photo["id"][:2] / f"{photo['id']}.jpg"
+
+    def content_type(self, photo: dict) -> str:
+        """The original file's own content type - images.py/videos.py each
+        own their half of the format-to-content-type mapping, so this is the
+        one place a caller (the API's file-serving routes) needs to know
+        about media_type at all."""
+        if photo.get("media_type") == "video":
+            return videos.CONTENT_TYPES[photo["format"]]
+        return images.CONTENT_TYPES[photo["format"]]
+
     def thumbnail_path(self, photo: dict) -> Path:
-        """A cached thumbnail, rendered on first use, falling back to the original."""
+        """A cached thumbnail, rendered on first use. A photo falls back to
+        serving the original when no thumbnail could be rendered (no Pillow);
+        a video has no such fallback (nothing can display a raw video file as
+        a thumbnail image) and instead reports having none - see api.py's
+        `thumbnails` route."""
         original = self.original_path(photo)
-        thumbnail = self.thumbnails_dir / photo["id"][:2] / f"{photo['id']}.jpg"
+        thumbnail = self._thumbnail_file(photo)
 
         if thumbnail.is_file():
             return thumbnail
@@ -97,12 +148,18 @@ class PhotoLibrary:
         thumbnail.parent.mkdir(parents=True, exist_ok=True)
         partial = thumbnail.with_name(f".{photo['id']}.{os.getpid()}.part")
 
-        if images.thumbnail(original, partial, self.thumbnail_size):
+        is_video = photo.get("media_type") == "video"
+        rendered = (
+            videos.thumbnail(original, partial, self.thumbnail_size, duration=photo.get("duration"))
+            if is_video else images.thumbnail(original, partial, self.thumbnail_size)
+        )
+
+        if rendered:
             os.replace(partial, thumbnail)
             return thumbnail
 
         partial.unlink(missing_ok=True)
-        return original
+        return None if is_video else original
 
     # ---------- import ----------
 
@@ -119,9 +176,31 @@ class PhotoLibrary:
         if photo_id in self._photos:
             return None
 
-        information = images.probe(source)
-        exif = images.exif_metadata(source)
-        relative = Path("photos") / photo_id[:2] / f"{photo_id}{images.EXTENSIONS[information['format']]}"
+        # recognized by content, never by filename - the same reason
+        # images.probe() already sniffs magic bytes instead of trusting an
+        # extension: a phone sync upload arrives under a generic temp name
+        # (see sync.py's SyncService.accept()), extension-less and all
+        try:
+            information = images.probe(source)
+            media_type = "photo"
+        except images.UnsupportedImage as image_error:
+            try:
+                information = videos.probe(source)
+                media_type = "video"
+            except videos.UnsupportedVideo:
+                raise image_error from None
+
+        if media_type == "video":
+            # a video carries no EXIF-style metadata this library reads yet
+            # (no camera/GPS tags parsed from MP4 boxes) - every field here
+            # simply stays None, same as a photo none of these applied to
+            exif = dict.fromkeys(images.METADATA_FIELDS)
+            extension = videos.EXTENSIONS[information["format"]]
+        else:
+            exif = images.exif_metadata(source)
+            extension = images.EXTENSIONS[information["format"]]
+
+        relative = Path("photos") / photo_id[:2] / f"{photo_id}{extension}"
         destination = self.root / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
 
@@ -139,12 +218,15 @@ class PhotoLibrary:
             "width": information["width"],
             "height": information["height"],
             "format": information["format"],
+            "media_type": media_type,
+            "duration": information.get("duration") if media_type == "video" else None,
             "imported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "captured_at": exif["captured_at"],
             "metadata": {
                 "megapixels": images.megapixels(information["width"], information["height"]),
                 **{key: value for key, value in exif.items() if key != "captured_at"},
             },
+            "trashed_at": None,
         }
 
         self._photos[photo_id] = photo
@@ -204,6 +286,71 @@ class PhotoLibrary:
             "photos": imported,
         }
 
+    # ---------- recycle bin ----------
+
+    def trashed(self, retention_days: int) -> list:
+        """Everything currently in the recycle bin, newest-trashed first.
+        Purges anything past its retention period first, so a caller never
+        sees - or can restore - a photo that has already been erased."""
+        self._purge_expired(retention_days)
+        return sorted(
+            (photo for photo in self._photos.values() if photo.get("trashed_at")),
+            key=lambda photo: photo["trashed_at"], reverse=True,
+        )
+
+    def trash(self, photo_id: str) -> dict:
+        """Soft-deletes an active photo: it disappears from the library (all(),
+        get(), albums) but its file is untouched until it is either restored
+        or its retention period runs out - see docs/photo.md."""
+        photo = self._photos.get(photo_id)
+        if photo is None or photo.get("trashed_at"):
+            raise PhotoNotFound(f"unknown photo '{photo_id}'")
+
+        photo["trashed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        self._save()
+        return photo
+
+    def restore(self, photo_id: str) -> dict:
+        photo = self._photos.get(photo_id)
+        if photo is None or not photo.get("trashed_at"):
+            raise PhotoNotFound(f"'{photo_id}' is not in the recycle bin")
+
+        photo["trashed_at"] = None
+        self._save()
+        return photo
+
+    def erase(self, photo_id: str) -> None:
+        """Permanently removes a photo that is already in the recycle bin -
+        its stored original and thumbnail are deleted, and it leaves the
+        index entirely. Only ever reachable from the recycle bin, never
+        directly from an active photo, so a permanent delete always has to
+        go through trash() first."""
+        photo = self._photos.get(photo_id)
+        if photo is None or not photo.get("trashed_at"):
+            raise PhotoNotFound(f"'{photo_id}' is not in the recycle bin")
+
+        self._delete_stored_files(photo)
+        del self._photos[photo_id]
+        self._save()
+
+    def _purge_expired(self, retention_days: int) -> None:
+        cutoff = datetime.now(timezone.utc).timestamp() - retention_days * 86400
+        expired = [
+            photo_id for photo_id, photo in self._photos.items()
+            if photo.get("trashed_at") and _iso_timestamp(photo["trashed_at"]) <= cutoff
+        ]
+
+        for photo_id in expired:
+            self._delete_stored_files(self._photos[photo_id])
+            del self._photos[photo_id]
+
+        if expired:
+            self._save()
+
+    def _delete_stored_files(self, photo: dict) -> None:
+        self.original_path(photo).unlink(missing_ok=True)
+        self._thumbnail_file(photo).unlink(missing_ok=True)
+
     def _source(self, source) -> Path:
         if not str(source).strip():
             raise PhotoImportError("no source directory was given")
@@ -225,7 +372,7 @@ class PhotoLibrary:
 
     def _candidates(self, source: Path):
         for path in sorted(source.rglob("*")):
-            if not path.is_file() or path.suffix.lower() not in images.FORMATS:
+            if not path.is_file() or path.suffix.lower() not in _CANDIDATE_SUFFIXES:
                 continue
             if path == self.root or self.root in path.parents:
                 continue
@@ -248,6 +395,11 @@ class PhotoLibrary:
         if isinstance(photos, dict):
             for photo in photos.values():
                 _backfill_metadata(photo)
+                photo.setdefault("trashed_at", None)
+                # every photo imported before video support existed is, by
+                # definition, a photo - never re-probed just to learn that
+                photo.setdefault("media_type", "photo")
+                photo.setdefault("duration", None)
             self._photos = photos
 
     def _save(self):
@@ -292,3 +444,7 @@ def _digest(path: Path) -> str:
 
 def _taken_at(photo: dict) -> str:
     return photo.get("captured_at") or photo.get("imported_at") or ""
+
+
+def _iso_timestamp(value: str) -> float:
+    return datetime.fromisoformat(value).timestamp()

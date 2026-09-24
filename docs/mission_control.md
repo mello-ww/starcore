@@ -115,11 +115,11 @@ generically to any Satellite.
 Which settings exist, their defaults, validation and persistence all belong to the
 Satellite; Mission Control and the Core only provide the button, the modal, and the generic
 request plumbing. Photo Sync's `sync_host`/`sync_port` are the first Satellite to use this -
-see `docs/photo.md` - and the underlying mechanism is documented for Satellite authors in
+see `docs/satellites/photo.md` - and the underlying mechanism is documented for Satellite authors in
 `docs/satellites.md` under "Exposing configuration".
 
 A setting a Satellite describes with `"type": "path"` (Photo's `photo_directory` and Music's
-`library` - see `docs/photo.md` and `docs/music.md`) gets a "Browse…" button next to its
+`library` - see `docs/satellites/photo.md` and `docs/satellites/music.md`) gets a "Browse…" button next to its
 field in the modal, opening a small directory picker. The picker is itself completely
 generic: it browses through the FileExplorer Satellite's own `entries` route - the same one
 its own Mission Control page uses - and simply hands back whatever absolute path was chosen.

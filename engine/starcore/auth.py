@@ -16,7 +16,7 @@ second authentication mechanism: a mobile client authenticates exactly the
 same way a browser does, by calling login() with the user's password, and
 `kind`/`device_name` exist purely so the account owner can later see which
 sessions exist and revoke one by name (see list_sessions()/revoke_session(),
-and docs/locked_folder.md for how a Satellite - the Locked Folder - builds
+and docs/satellites/locked_folder.md for how a Satellite - the Locked Folder - builds
 on this rather than inventing its own notion of "is this really the user").
 """
 
@@ -191,7 +191,7 @@ class AuthStore:
         below needs. Exposing the real bearer token back through an API
         response would be handing out a working credential a second time,
         exactly what "never expose ... through ... API responses" (see
-        docs/locked_folder.md's security model) forbids for a PIN, and is
+        docs/satellites/locked_folder.md's security model) forbids for a PIN, and is
         just as wrong here.
         """
         now = time.time()

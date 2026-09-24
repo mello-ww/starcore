@@ -16,6 +16,28 @@
         android:name="android.hardware.fingerprint"
         android:required="false" />
 
+    <!-- Photo's automatic background sync (see docs/satellites/photo.md,
+         "Real automatic phone sync") reads the camera roll via
+         @react-native-camera-roll/camera-roll - requested at runtime too
+         (see photo/mediaPermission.ts), this is just the manifest
+         declaration Android requires before that runtime prompt can even
+         be shown. READ_MEDIA_IMAGES/READ_MEDIA_VIDEO are Android 13+'s
+         replacement for READ_EXTERNAL_STORAGE, which is still declared
+         (capped at API 32) for older devices. None of this grants write or
+         delete access - sync only ever reads from the camera roll, never
+         removes anything from it. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- react-native-background-fetch's periodic scheduling (WAKE_LOCK) and
+         resuming it after a reboot (startOnBoot in
+         photo/backgroundSyncTask.ts's configureBackgroundFetch). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- allowBackup=false: no app data (including anything AsyncStorage
          writes, like the server address) goes into Android's auto backup -->
     <application

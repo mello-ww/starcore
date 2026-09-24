@@ -3,7 +3,7 @@ configured, so none of File Explorer's own routes can ever be used to reach
 it without that session having unlocked it first - including by navigating
 straight to its filesystem path, since every check here is a structural
 "is this path inside the protected root", not "did the request come through
-some particular UI flow". See docs/locked_folder.md.
+some particular UI flow". See docs/satellites/locked_folder.md.
 
 File Explorer works exactly as it always has - unbounded, no configured
 root of its own (see paths.py) - when no LockedFolder satellite is present,

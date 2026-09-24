@@ -71,7 +71,18 @@ export function SatellitesListScreen({navigation}: Props) {
           renderItem={({item}) => (
             <Pressable
               disabled={!item.mobile_ui}
-              onPress={() => navigation.navigate('SatelliteDetail', {name: item.name})}>
+              onPress={() =>
+                // "Photo" gets its own dedicated screens (grid, folders,
+                // search, a full-screen viewer) instead of the generic
+                // DeclarativeScreen every other Satellite renders through -
+                // see PhotoHomeScreen's docstring. Still gated on
+                // item.mobile_ui like everything else: Photo only reaches
+                // here at all because it now answers a "mobile" route too
+                // (see satellites/native/photo/api.py).
+                item.name === 'Photo'
+                  ? navigation.navigate('PhotoHome')
+                  : navigation.navigate('SatelliteDetail', {name: item.name})
+              }>
               <Card style={styles.card}>
                 <View style={styles.row}>
                   <Text style={typography.heading}>{item.name}</Text>

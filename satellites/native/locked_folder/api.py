@@ -7,7 +7,7 @@ satellites/native/file_explorer/locked_folder_guard.py), which now refuse
 every one of those routes for a path inside the configured root unless this
 session has unlocked it. This satellite owns exactly the parts that are
 specific to *being locked*: where the root is, whether a PIN is set, and
-whether *this* session currently has it open - see docs/locked_folder.md.
+whether *this* session currently has it open - see docs/satellites/locked_folder.md.
 """
 
 from starcore.api.response import error_response, json_response
@@ -63,7 +63,7 @@ def status(request):
         # File Explorer, `rm -rf`, ...) does not un-configure the Locked
         # Folder by itself, so this is how Mission Control tells "configured
         # and fine" apart from "configured, but the directory is gone" - see
-        # docs/locked_folder.md, "The configured directory can disappear"
+        # docs/satellites/locked_folder.md, "The configured directory can disappear"
         "path_exists": root.is_dir() if root is not None else None,
         "pin_set": live.pin_set,
         "unlocked": unlocked,
@@ -152,7 +152,7 @@ def delink(request):
     for a directory that was deleted (or moved) outside StarCore, which
     would otherwise leave Mission Control reporting a location that no
     longer exists as if it were still safely protected. See
-    docs/locked_folder.md, "Delinking".
+    docs/satellites/locked_folder.md, "Delinking".
 
     Deliberately just a thin wrapper around the same configuration.update()
     every other change to locked_folder_path already goes through (the

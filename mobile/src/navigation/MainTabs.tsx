@@ -11,6 +11,9 @@ import {ServersScreen} from '../screens/ServersScreen';
 import {SettingsScreen} from '../screens/SettingsScreen';
 import {useServers} from '../servers/ServersContext';
 import {colors} from '../theme';
+import {PhotoAlbumScreen} from '../photo/PhotoAlbumScreen';
+import {PhotoHomeScreen} from '../photo/PhotoHomeScreen';
+import {PhotoViewerScreen} from '../photo/PhotoViewerScreen';
 
 export type MainTabParamList = {
   Overview: undefined;
@@ -23,6 +26,12 @@ export type MainTabParamList = {
 export type SatellitesStackParamList = {
   SatellitesList: undefined;
   SatelliteDetail: {name: string};
+  /** The "Photo" Satellite is special-cased here rather than going through
+   * SatelliteDetail's generic DeclarativeScreen - see PhotoHomeScreen's own
+   * docstring and "Exposing a mobile interface" in docs/satellites.md. */
+  PhotoHome: undefined;
+  PhotoAlbum: {albumId: string; name: string};
+  PhotoViewer: {photoIds: string[]; startIndex: number};
 };
 
 export type SettingsStackParamList = {
@@ -49,6 +58,13 @@ function SatellitesStack() {
     <SatellitesStackNav.Navigator screenOptions={stackScreenOptions}>
       <SatellitesStackNav.Screen name="SatellitesList" component={SatellitesListScreen} options={{title: 'Satellites'}} />
       <SatellitesStackNav.Screen name="SatelliteDetail" component={SatelliteDetailScreen} />
+      <SatellitesStackNav.Screen name="PhotoHome" component={PhotoHomeScreen} options={{title: 'Photos'}} />
+      <SatellitesStackNav.Screen name="PhotoAlbum" component={PhotoAlbumScreen} />
+      <SatellitesStackNav.Screen
+        name="PhotoViewer"
+        component={PhotoViewerScreen}
+        options={{headerShown: false, presentation: 'fullScreenModal'}}
+      />
     </SatellitesStackNav.Navigator>
   );
 }

@@ -1,7 +1,19 @@
-import {REQUEST_TIMEOUT_MS} from '../config';
+import {REQUEST_TIMEOUT_MS, UPLOAD_TIMEOUT_MS} from '../config';
 import {ApiError} from './types';
 
 export type TokenProvider = () => Promise<string | null>;
+
+/** A local file to upload as-is, from its own URI - never read into JS
+ * memory first. React Native's fetch treats this shape specially and
+ * streams it from disk/the content provider itself, which matters for a
+ * phone video that can be well over 100MB. Used only by Photo's background
+ * sync (see photo/backgroundSync.ts); every other write in this app is
+ * small enough for the normal JSON post() below. */
+export interface UploadableFile {
+  uri: string;
+  name: string;
+  type: string;
+}
 
 /**
  * A thin wrapper around `fetch`, talking to the exact same `/api/...`
@@ -37,6 +49,50 @@ export class StarCoreClient {
     options: {authenticate?: boolean} = {},
   ): Promise<{status: number; body: any; finalUrl: string}> {
     return this.request('POST', path, body, options.authenticate ?? true);
+  }
+
+  /** Posts a local file's raw bytes (never JSON) - used by Photo's
+   * background sync to reach api.py's `sync_upload` route. A generous,
+   * separate timeout from ordinary JSON calls: a phone video upload over a
+   * slow connection can legitimately take minutes, where every other
+   * request in this app should fail fast (see REQUEST_TIMEOUT_MS). */
+  async postFile(path: string, file: UploadableFile): Promise<{status: number; body: any}> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+    try {
+      const headers: Record<string, string> = {};
+      const token = await this.getToken();
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        headers,
+        // React Native's fetch accepts a {uri, name, type} object as a body
+        // and streams it from disk itself - not part of the standard
+        // BodyInit type, hence the cast.
+        body: file as unknown as BodyInit,
+        signal: controller.signal,
+      });
+
+      const text = await response.text();
+      let parsed: any = {};
+      try {
+        parsed = text ? JSON.parse(text) : {};
+      } catch {
+        parsed = {};
+      }
+      return {status: response.status, body: parsed};
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        throw new ApiError('The upload to StarCore timed out.', 0);
+      }
+      throw new ApiError('Could not reach StarCore. Check the server address and your connection.', 0);
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private async request(method: 'GET' | 'POST', path: string, body: unknown, authenticate: boolean) {

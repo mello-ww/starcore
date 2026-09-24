@@ -287,6 +287,43 @@
     font-size: 0.7rem;
 }
 
+/* a video's own play badge + duration already say "there's a video here" even
+   with no poster frame (no ffmpeg on this server) - the generic "unavailable"
+   label would just be confusing next to them */
+.photo-tile-video.unavailable::after {
+    content: none;
+}
+
+.photo-tile-play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding-left: 2px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: rgba(4, 6, 13, 0.55);
+    color: #fff;
+    pointer-events: none;
+}
+
+.photo-tile-duration {
+    position: absolute;
+    right: 0.4rem;
+    bottom: 0.4rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    background: rgba(4, 6, 13, 0.72);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    pointer-events: none;
+}
+
 .photo-caption {
     position: absolute;
     right: 0;
@@ -408,6 +445,7 @@
 }
 
 .photo-viewer-info,
+.photo-viewer-delete,
 .photo-viewer-close {
     display: flex;
     align-items: center;
@@ -427,6 +465,11 @@
 .photo-viewer-close:hover {
     border-color: var(--sapphire);
     color: var(--text);
+}
+
+.photo-viewer-delete:hover {
+    border-color: var(--alert);
+    color: var(--alert);
 }
 
 .photo-viewer-info.active {
@@ -458,6 +501,10 @@
     object-fit: contain;
     border: 1px solid var(--line);
     border-radius: 4px;
+}
+
+.photo-viewer-video {
+    background: #000;
 }
 
 /* overlaid on the image edges rather than beside it, so the photo itself gets
@@ -705,6 +752,46 @@
 }
 
 .photo-tile-remove:hover {
+    border-color: var(--alert);
+    color: var(--alert);
+}
+
+/* ---------- recycle bin ---------- */
+
+.photo-trash-retention {
+    margin: 0.35rem 0 1rem;
+    font-size: 0.85rem;
+}
+
+.photo-trash-tile {
+    position: relative;
+    cursor: default;
+}
+
+.photo-trash-tile .photo-caption {
+    opacity: 1;
+}
+
+.photo-trash-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    gap: 0.3rem;
+    opacity: 0;
+    transition: opacity 140ms ease;
+}
+
+.photo-trash-tile:hover .photo-trash-actions,
+.photo-trash-tile:focus-within .photo-trash-actions {
+    opacity: 1;
+}
+
+.photo-trash-actions .photo-icon-button:hover {
+    border-color: var(--sapphire);
+}
+
+.photo-trash-actions .photo-icon-button:last-child:hover {
     border-color: var(--alert);
     color: var(--alert);
 }

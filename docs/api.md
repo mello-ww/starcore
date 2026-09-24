@@ -165,7 +165,7 @@ way every other write endpoint is.
 it is the one route name Mission Control treats specially, purely by name (see
 `configurable` above): a Satellite that wants a Config button in Mission Control names one
 of its own routes `configuration` and answers `GET`/`POST` on it following the convention in
-`docs/satellites.md`. Photo's `GET|POST /api/satellites/photo/configuration` (`docs/photo.md`)
+`docs/satellites.md`. Photo's `GET|POST /api/satellites/photo/configuration` (`docs/satellites/photo.md`)
 is the first Satellite to do this.
 
 A file a Satellite returns is streamed rather than read into memory, and a `Range` request
@@ -223,7 +223,7 @@ a future mobile client logs in through this exact endpoint like any other client
 `"kind": "mobile"` and a human-readable `device_name` (e.g. `"Nathan's iPhone"`) so the session
 can be told apart later. Omitted, both default to a plain `"web"` session with no device name,
 so every existing caller is unaffected. See "Locked Folder and mobile authentication" in
-`docs/locked_folder.md` for the full design.
+`docs/satellites/locked_folder.md` for the full design.
 
 `POST /api/auth/login` with `"kind": "mobile"` also returns the issued token in the JSON body
 (`{"message": "Logged in.", "token": "..."}`), in addition to the same `Set-Cookie` a web login
@@ -255,7 +255,7 @@ device. Revoking the caller's own current session ends it immediately, exactly l
 
 Passwords are hashed with `hashlib.pbkdf2_hmac` (260,000 iterations, a random 16-byte salt
 per account) via the shared `hash_secret()` helper in `starcore/auth.py` - never stored,
-logged, or returned anywhere. The Locked Folder Satellite's PIN (see `docs/locked_folder.md`)
+logged, or returned anywhere. The Locked Folder Satellite's PIN (see `docs/satellites/locked_folder.md`)
 reuses this exact same function rather than a second hashing implementation. Sessions expire
 after 7 days. Nothing about the credential store depends on a third-party package; see
 "Dependencies" in `docs/deployment.md`.
@@ -265,13 +265,13 @@ Every satellite route handler also receives the caller's already-validated sessi
 threaded through `_handle_satellite()`, and empty only when the API is still in its
 pre-bootstrap open state. This is what lets a Satellite implement its own, session-aware
 authorization on top of the Core's session check without re-validating anything itself or
-touching `starcore/auth.py` - the Locked Folder Satellite (`docs/locked_folder.md`) is the
+touching `starcore/auth.py` - the Locked Folder Satellite (`docs/satellites/locked_folder.md`) is the
 first and so far only Satellite that needs this.
 
 Photo Sync (`satellites/native/photo/sync.py`) is a separate, deliberately unauthenticated
 HTTP listener on its own port, protected by its own device token instead - it is not part of
 Mission Control's API server and this authentication system does not apply to it. See
-"Photo Sync and authentication" in `docs/photo.md` for why that separation stays as it is.
+"Photo Sync and authentication" in `docs/satellites/photo.md` for why that separation stays as it is.
 
 ## HTTPS
 

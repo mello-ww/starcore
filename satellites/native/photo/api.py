@@ -2,9 +2,11 @@
 
 from starcore.api.response import error_response, file_response, json_response
 
-from . import configuration, images, sync
+from . import configuration, sync
+from . import state as state_module
 from .albums import AlbumError, AlbumNotFound, albums
-from .library import PhotoImportError, library
+from .images import UnsupportedImage
+from .library import PhotoImportError, PhotoNotFound, library
 
 # photos are addressed by the digest of their content, so a stored file can be
 # cached by the browser for as long as it likes
@@ -20,10 +22,26 @@ def routes() -> dict:
         "scan": scan,
         "import": import_directory,
         "sync": sync_status,
+        # the mobile app's automatic background sync uploads through this -
+        # see "Real automatic phone sync" in docs/satellites/photo.md and
+        # sync.accept_authenticated_upload(). The standalone local-network
+        # listener sync.py itself runs (its own token, its own port) is
+        # untouched and still what a phone browser can be pointed at
+        # directly; this route is a second, authenticated way to reach the
+        # exact same ingestion, never a second implementation of it.
+        "sync_upload": sync_upload_route,
         "albums": albums_route,
+        "trash": trash_route,
         # naming a route "configuration" is the whole contract with the Core's
         # generic satellite configuration mechanism - see docs/satellites.md
         "configuration": configuration_route,
+        # same convention, for a mobile interface - see "Exposing a mobile
+        # interface" in docs/satellites.md. StarCore's own mobile app
+        # recognizes "Photo" by name and opens its own dedicated gallery
+        # screens instead (grid, folders, search, a full-screen viewer) - this
+        # is the generic fallback any *other* client gets, the same
+        # status-style declarative screen Status's worked example uses.
+        "mobile": mobile,
     }
 
 
@@ -32,6 +50,38 @@ def sync_status(request):
         return error_response("only GET is supported here", status=405)
 
     return json_response(sync.describe(request.satellite))
+
+
+def sync_upload_route(request):
+    """One photo or video, uploaded from the mobile app's background sync -
+    the authenticated counterpart to sync.py's own standalone listener (see
+    module docstrings there and "Real automatic phone sync" in
+    docs/satellites/photo.md). The filename travels as a query parameter
+    (`?filename=...`), the same fallback sync.py's own handler supports,
+    since a satellite Request carries no raw headers to read one from
+    otherwise; the upload body itself is never JSON, so it arrives as
+    request.raw (see starcore.api.response.RawBody) rather than
+    request.body.
+    """
+    if request.method != "POST":
+        return error_response("only POST is supported here", status=405)
+    if request.raw is None:
+        return error_response("expected a raw file upload, not a JSON body", status=400)
+
+    filename = sync.safe_filename(request.query.get("filename"))
+
+    try:
+        result = sync.accept_authenticated_upload(request.satellite, request.raw, filename)
+    except sync.UploadTooLarge as error:
+        return error_response(str(error), status=413)
+    except ValueError as error:
+        return error_response(str(error), status=400)
+    except UnsupportedImage as error:
+        return error_response(str(error), status=415)
+    except RuntimeError as error:
+        return error_response(str(error), status=503)
+
+    return json_response(result)
 
 
 def configuration_route(request):
@@ -50,6 +100,34 @@ def configuration_route(request):
         return json_response(configuration.update(request.engine, request.satellite, key, value))
     except configuration.ConfigurationError as error:
         return error_response(str(error), status=400)
+
+
+def mobile(request):
+    """The generic declarative fallback screen (see "Exposing a mobile
+    interface" in docs/satellites.md) - reused only by a client that doesn't
+    know Photo specifically. StarCore's own mobile app never calls this: it
+    recognizes "Photo" by name and opens its own dedicated screens instead,
+    built on the same photos/albums/trash routes as everything else here."""
+    if request.method != "GET":
+        return error_response("only GET is supported here", status=405)
+
+    data = state_module.state(request.engine, request.satellite)
+
+    return json_response({
+        "screen": {
+            "title": request.satellite.manifest.name,
+            "sections": [
+                {
+                    "type": "card",
+                    "items": [
+                        {"type": "status", "label": "Photos", "value": str(data.get("photos", "-"))},
+                        {"type": "status", "label": "Library size", "value": str(data.get("library_size", "-"))},
+                        {"type": "status", "label": "Phone sync", "value": str(data.get("sync", "-"))},
+                    ],
+                },
+            ],
+        },
+    })
 
 
 def summary(request):
@@ -148,7 +226,10 @@ def _albums_get(request, store):
         return error_response(f"unknown album '{request.path[0]}'")
 
     photo_library = library(request.satellite)
-    known_ids = {photo["id"] for photo in photo_library.all()}
+    # all_ids(), not all() - a photo the recycle bin is holding is still
+    # physically in the library, so it must not be pruned from its albums;
+    # it just doesn't show up in "photos" below until restored or erased
+    known_ids = photo_library.all_ids()
     album = store.prune_missing(album["id"], known_ids)
     photos_in_album = [photo_library.get(photo_id) for photo_id in album["photo_ids"]]
     return json_response({**album, "photos": [photo for photo in photos_in_album if photo is not None]})
@@ -227,9 +308,82 @@ def _serve(request, thumbnail: bool):
     if photo is None:
         return error_response(f"unknown photo '{request.path[0]}'")
 
+    return _serve_media(photo_library, photo, thumbnail)
+
+
+def _serve_media(photo_library, photo, thumbnail: bool):
+    """Shared by the normal originals/thumbnails routes and the recycle
+    bin's own preview routes - one place that knows a rendered thumbnail is
+    always a JPEG regardless of the source's own format, and that a video
+    with no thumbnail available (see PhotoLibrary.thumbnail_path) has
+    nothing to fall back to the way an un-thumbnailed photo falls back to
+    its own original."""
     if not thumbnail:
-        return file_response(photo_library.original_path(photo), images.CONTENT_TYPES[photo["format"]], IMMUTABLE)
+        return file_response(photo_library.original_path(photo), photo_library.content_type(photo), IMMUTABLE)
 
     path = photo_library.thumbnail_path(photo)
-    served = "jpeg" if path.suffix == ".jpg" else photo["format"]
-    return file_response(path, images.CONTENT_TYPES[served], IMMUTABLE)
+    if path is None:
+        return error_response(f"no thumbnail is available for '{photo['id']}' "
+                               "(ffmpeg isn't installed on this StarCore server)", status=404)
+
+    served_type = "image/jpeg" if path.suffix == ".jpg" else photo_library.content_type(photo)
+    return file_response(path, served_type, IMMUTABLE)
+
+
+def trash_route(request):
+    """The recycle bin: GET lists what's in it (and previews a trashed
+    photo's thumbnail/original); POST moves a photo in, restores one, or
+    permanently erases one. A photo already in the bin is otherwise invisible
+    everywhere else in the API - see PhotoLibrary.get()."""
+    if request.method == "GET":
+        return _trash_get(request)
+    if request.method == "POST":
+        return _trash_post(request)
+
+    return error_response("only GET and POST are supported here", status=405)
+
+
+def _trash_get(request):
+    photo_library = library(request.satellite)
+
+    if not request.path:
+        retention_days = configuration.trash_retention_days(request.satellite)
+        return json_response({
+            "photos": photo_library.trashed(retention_days),
+            "retention_days": retention_days,
+        })
+
+    if len(request.path) == 2 and request.path[1] in ("thumbnail", "original"):
+        photo = photo_library.get_any(request.path[0])
+        if photo is None or not photo.get("trashed_at"):
+            return error_response(f"unknown photo '{request.path[0]}' in the recycle bin", status=404)
+
+        return _serve_media(photo_library, photo, thumbnail=request.path[1] == "thumbnail")
+
+    return error_response(f"unknown endpoint 'trash/{'/'.join(request.path)}'")
+
+
+def _trash_post(request):
+    if not request.path:
+        return error_response("no photo id was given")
+
+    photo_library = library(request.satellite)
+    photo_id = request.path[0]
+    action = tuple(request.path[1:])
+
+    try:
+        if action == ():
+            if photo_library.get(photo_id) is None:
+                return error_response(f"unknown photo '{photo_id}'", status=404)
+            return json_response(photo_library.trash(photo_id))
+
+        if action == ("restore",):
+            return json_response(photo_library.restore(photo_id))
+
+        if action == ("erase",):
+            photo_library.erase(photo_id)
+            return json_response({"erased": photo_id})
+    except PhotoNotFound as error:
+        return error_response(str(error), status=404)
+
+    return error_response(f"unknown endpoint 'trash/{'/'.join(request.path)}'")

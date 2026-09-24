@@ -11,11 +11,11 @@ from pathlib import Path
 
 from . import sync
 
-DEFAULTS = {"sync_host": "127.0.0.1", "sync_port": 8081, "photo_directory": ""}
+DEFAULTS = {"sync_host": "127.0.0.1", "sync_port": 8081, "photo_directory": "", "trash_retention_days": 30}
 
 # settings with nothing running to fall out of sync with (unlike sync_host/
 # sync_port, which describe a live listener - see describe()/update() below)
-_STATIC_SETTINGS = {"photo_directory"}
+_STATIC_SETTINGS = {"photo_directory", "trash_retention_days"}
 
 
 class ConfigurationError(Exception):
@@ -49,6 +49,16 @@ def _validate_directory(value) -> str:
     return text
 
 
+def _validate_retention_days(value) -> int:
+    try:
+        days = int(str(value).strip())
+    except (TypeError, ValueError):
+        raise ConfigurationError(f"trash_retention_days must be a whole number, got '{value}'")
+    if days < 1:
+        raise ConfigurationError("trash_retention_days must be at least 1")
+    return days
+
+
 SETTINGS = {
     "sync_host": {
         "validate": _validate_host,
@@ -65,6 +75,10 @@ SETTINGS = {
                         "require one explicitly.",
         "type": "path",
     },
+    "trash_retention_days": {
+        "validate": _validate_retention_days,
+        "description": "How many days a deleted photo stays in the recycle bin before it is permanently erased.",
+    },
 }
 
 
@@ -74,6 +88,12 @@ def validate(key: str, value):
         raise ConfigurationError(f"'{key}' is not a configurable Photo setting")
 
     return setting["validate"](value)
+
+
+def trash_retention_days(satellite) -> int:
+    """Photo-owned: the recycle bin's own purge routine reads this rather than
+    the Core ever knowing the setting exists, same as sync_host/sync_port."""
+    return int(satellite.config.get("trash_retention_days", DEFAULTS["trash_retention_days"]))
 
 
 def describe(satellite) -> dict:
@@ -127,10 +147,12 @@ def update(engine, satellite, key: str, value) -> dict:
     saved = validate(key, value)
     satellite.config.set(key, saved)
 
-    if key in _STATIC_SETTINGS:
+    if key == "photo_directory":
         note = (f"Saved. Photo will use '{saved}' as the default directory to scan and import from."
                 if saved else "Saved. No default directory is configured - scan and import will "
                                "require one explicitly.")
+    elif key == "trash_retention_days":
+        note = f"Saved. A deleted photo now stays in the recycle bin for {saved} day(s) before being erased."
     else:
         note = _apply(engine, satellite)
 

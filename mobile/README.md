@@ -60,6 +60,25 @@ If Metro's bundler needs restarting on its own: `npm start`.
 > step after `npm install` on a real machine, before attempting the full
 > Android build.
 
+### A pinned dependency: react-native-video
+
+`package.json` pins `react-native-video` to an exact `6.16.0`, not a caret
+range, on purpose: this project's `android/build.gradle` deliberately stays
+on `compileSdkVersion 34` (see that file's own `ext` block), and
+`react-native-video` 6.17.0 raised its own default `compileSdk`/`minSdk` to
+35/24 - and every later 6.x release inherits that. `6.16.0` is the newest
+release still built against `compileSdk 34` (`android/gradle.properties` in
+the package itself pins `RNVideo_compileSdkVersion=34` and
+`RNVideo_media3Version=1.4.1`), so it's the one that matches the app's
+existing Android setup without also raising `compileSdk`, the Android
+Gradle Plugin, or anything else project-wide just to add video playback.
+
+If a future upgrade of `react-native-video` is wanted, raising
+`compileSdkVersion` (and everything that implies - AGP, `targetSdkVersion`,
+possibly `minSdkVersion`) across the whole Android project has to be a
+deliberate, separate decision, not a side effect of `npm update` quietly
+picking up a newer 6.x release.
+
 ## Connecting to a server
 
 The first screen asks for your StarCore server's address (e.g.
