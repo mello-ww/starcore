@@ -40,6 +40,22 @@ thumbnail_size = 480  # longest edge, in pixels
 
 `storage` may be an absolute path, which is how the library is moved to another disk.
 
+`source_paths` and `sync_default_path` (see "Albums" below) map a phone's own folder structure
+onto the library:
+
+```toml
+source_paths = [
+    { id = "d551af858188", phone_path = "/Pictures/Screenshots", server_path = "screenshots", name = "Screenshots" },
+]
+sync_default_path = "camera"  # where a synced file lands when no source_paths entry matches its phone folder
+```
+
+The phone path and the server path are never assumed to be the same string - a phone folder is
+whatever the phone's own camera-roll grouping calls it (`/Pictures/Screenshots`,
+`/Pictures/Snapchat`, ...); the server path is always relative to the library's own storage and
+becomes that mapping's physical album (see "Albums"). `id` is generated the first time a mapping
+is saved if not given.
+
 ## Supported formats
 
 Photos: JPEG, PNG and WEBP. Format, width and height are read from the file header by the
@@ -156,9 +172,16 @@ GET  /api/satellites/photo/thumbnails/<id>    cached thumbnail
 GET  /api/satellites/photo/originals/<id>     the stored original
 POST /api/satellites/photo/scan               preview a directory  {"source": "..."}
 POST /api/satellites/photo/import             import a directory   {"source": "..."}
-GET  /api/satellites/photo/configuration      current sync_host/sync_port/trash_retention_days settings
+GET  /api/satellites/photo/configuration      current sync_host/sync_port/trash_retention_days/source_paths/... settings
 POST /api/satellites/photo/configuration      change one            {"key": ..., "value": ...}
 POST /api/satellites/photo/sync_upload        upload one photo/video, authenticated (see "Real automatic phone sync")
+GET  /api/satellites/photo/albums             every physical album, Favorites, and every custom album
+GET  /api/satellites/photo/albums/<id>        one album's photos ("physical:<id>" for a physical album)
+POST /api/satellites/photo/albums             create a custom album  {"name": ...}
+POST /api/satellites/photo/albums/<id>        rename a custom album  {"name": ...} (rejected for Favorites/physical)
+POST /api/satellites/photo/albums/<id>/delete    delete a custom album (rejected for Favorites/physical)
+POST /api/satellites/photo/albums/<id>/photos           add a photo   {"photo_id": ...}
+POST /api/satellites/photo/albums/<id>/photos/remove    remove a photo {"photo_id": ...}
 GET  /api/satellites/photo/trash              what's in the recycle bin, and its retention period
 POST /api/satellites/photo/trash/<id>         move an active photo to the recycle bin
 GET  /api/satellites/photo/trash/<id>/thumbnail   preview a trashed photo's thumbnail
@@ -197,19 +220,25 @@ dimensions, plus duration) as a photo.
 
 StarCore's own mobile app recognizes "Photo" by name (rather than falling back to the generic
 declarative screen every other Satellite gets - see "Exposing a mobile interface" in
-`docs/satellites.md`) and gives it a dedicated gallery: Library, Folders, Search, Bin (the
-recycle bin) and Sync, as segments of one screen. All five are built on exactly the routes
-above - there is no second implementation of the library, the recycle bin, or ingestion for
-mobile.
+`docs/satellites.md`) and gives it a dedicated gallery: Library, Albums, Map and Search, as
+segments of one screen, with Photo configuration reached separately (see below) rather than as
+a segment of its own. All of it is built on exactly the routes above and the same Albums model
+documented there - there is no second implementation of the library, albums, the recycle bin,
+or ingestion for mobile.
 
 Videos are unified with photos throughout: the same grid (with a play badge and duration on a
-video's thumbnail), the same full-screen viewer (swiping between photos and videos alike),
-and the same recycle bin. The viewer plays a video in place with its own tap-to-pause
-controls; only the page actually on screen ever has a real player mounted, so swiping away
-always stops playback.
+video's thumbnail, grouped by month and, on mobile, pinch-to-zoom to change how many columns
+show), the same full-screen viewer (swiping between photos and videos alike, with pinch-to-zoom
+on a still image), and the same recycle bin. The viewer plays a video in place with its own
+tap-to-pause controls; only the page actually on screen ever has a real player mounted, so
+swiping away always stops playback. A photo or video's details panel (web and mobile alike)
+shows its stored filename and - when it has one - its physical album's server path, so where a
+file actually came from is never a mystery.
 
-The "Sync" segment is where automatic phone sync (below) is turned on and configured - see
-"Real automatic phone sync".
+Automatic phone sync (below) has no segment of its own: its enable/disable, Wi-Fi-only, "Sync
+now" and status live inside the Photo configuration screen, alongside `source_paths`,
+`sync_default_path` and every other Photo setting - see "Real automatic phone sync" and
+"Configuration" above.
 
 ## Command
 
@@ -326,13 +355,16 @@ counts) reflect uploads made either way, and this authenticated route is always 
 whenever `sync_enabled = true`, whether or not the standalone listener's own local-network
 socket happened to bind.
 
-On the phone, turning "Automatic sync" on (from Photo's Sync segment - see "Mobile app" above)
-does three things:
+On the phone, turning "Automatic sync" on (from the Photo configuration screen - see "Mobile
+app" above) does three things:
 
 - **Periodic background check.** Roughly every 15 minutes (the shortest interval Android's
   WorkManager honors reliably), via `react-native-background-fetch`, the app looks for photos
   and videos newer than the last one it already offered this server and uploads them. This
-  runs even if the app isn't open, and even after a reboot.
+  runs even if the app isn't open (swiped away, or closed by the system), and even after a
+  reboot. It does not run after an explicit "Force stop" from Android's app settings: Android
+  then blocks all of the app's background work until the app is opened again, which also
+  resumes the schedule.
 - **Immediate sync on open.** The same check also runs right away whenever the app is opened,
   so there's no waiting for the next periodic tick after taking a photo and immediately
   checking the app.
@@ -357,6 +389,37 @@ A few things are true regardless of which of the above triggered a given sync:
 - **Per-server.** A phone with more than one StarCore server configured tracks sync
   independently for each one (its own on/off, Wi-Fi-only setting, and cursor), the same way
   the app's offline cache and session are already kept per server.
+
+## Albums
+
+The Albums section shows three different kinds of grouping side by side, visually
+distinguished but backed by the one album model below - there is no separate "physical album"
+or "favorites" system, just a `kind` field on the same shape every album already had.
+
+- **Physical.** One per `source_paths` mapping (see "Configuration" above) - created the moment
+  that mapping is saved, even before any photo has landed in it. Membership is never stored:
+  it's computed from each photo's own `physical_path` (set once, at import time, by
+  `sync.accept_authenticated_upload()` resolving the phone folder against `source_paths`/
+  `sync_default_path` - see `configuration.resolve_physical_path()`). The path is the source of
+  truth, so nothing here can drift out of sync with it, and there is nothing to add or remove a
+  photo from directly (`POST /albums/physical:<id>/...` is rejected - edit the source path
+  instead). A photo synced with a phone folder that matches no mapping still gets a physical
+  album: `sync_default_path`. Only a photo imported some other way (a directory scan/import, or
+  the standalone local-network listener) has no physical album at all - the same as before this
+  existed. `GET /albums/physical:unsorted` is a standing catch-all for a physical_path whose
+  mapping was since removed; it disappears when nothing needs it.
+- **Favorites.** A fixed, always-present virtual album (`id: "favorites"`) - the same
+  add/remove-photo routes as any other album, just protected from rename and delete. Favoriting
+  a photo is `POST /albums/favorites/photos {"photo_id": ...}`; never moves or copies the file.
+- **Custom (virtual).** What "Albums" already meant before this: a plain reference list a
+  person creates and names themselves (`POST /albums {"name": ...}`). Independent of any
+  physical album - a photo keeps belonging to its physical album (if it has one) no matter how
+  many custom albums it's also added to, and being in a custom album never changes where the
+  file is stored.
+
+The Recycle bin is presented in the same Albums section on both web and mobile, but it is not
+part of this album model at all - it's still the separate `trash` resource described below,
+included in the Albums screen purely as a UI convenience so all four kinds live in one place.
 
 ## Ingestion
 
