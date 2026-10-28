@@ -98,6 +98,16 @@ def _format_scalar(value) -> str:
         return "true" if value else "false"
     if isinstance(value, int):
         return str(value)
+    if isinstance(value, list):
+        # a TOML inline array - needed the moment any satellite ships a
+        # list-typed config default for reconcile() to write out; every
+        # element is itself formatted the same way, so a list of inline
+        # tables (see the dict case below) works too
+        return "[" + ", ".join(_format_scalar(item) for item in value) + "]"
+    if isinstance(value, dict):
+        # a TOML inline table - {} formats to the empty inline table "{ }"
+        # (empty tables aren't otherwise reachable through a scalar default)
+        return "{ " + ", ".join(f"{key} = {_format_scalar(inner)}" for key, inner in value.items()) + " }"
 
     escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
