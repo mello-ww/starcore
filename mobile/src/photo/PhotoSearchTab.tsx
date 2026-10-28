@@ -84,7 +84,7 @@ export function PhotoSearchTab({onOpenPhoto, onOpenAlbum}: Props) {
         <>
           {matchingAlbums.length > 0 && (
             <View style={styles.albumResults}>
-              <Text style={[typography.label, styles.sectionLabel]}>Folders</Text>
+              <Text style={[typography.label, styles.sectionLabel]}>Albums</Text>
               {matchingAlbums.map(album => (
                 <Text key={album.id} style={[typography.body, styles.albumRow]} onPress={() => onOpenAlbum(album)}>
                   {album.name} · {album.photo_count} {album.photo_count === 1 ? 'photo' : 'photos'}

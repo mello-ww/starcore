@@ -43,20 +43,65 @@ export interface Photo {
    * as anything but null/absent, so `!!photo.trashed_at` is enough to tell
    * the two apart wherever both can occur. */
   trashed_at?: string | null;
+  /** The physical album (a source_paths mapping's server_path) this photo
+   * landed in when it was synced from a phone - see library.py's add_file()
+   * docstring. Null for anything imported from a desktop directory, or for
+   * the standalone local-network listener's own uploads - neither of those
+   * ever resolves a physical album at all, which is a deliberate design
+   * choice, not a gap (see docs/satellites/photo.md, "Albums"). */
+  physical_path: string | null;
 }
+
+/** A physical album's id always carries this prefix - see albums.py's own
+ * PHYSICAL_ID_PREFIX, which this mirrors exactly so a client never has to
+ * ask the server which store an id came from. */
+export const PHYSICAL_ALBUM_PREFIX = 'physical:';
+/** Favorites' own fixed id - see albums.py's FAVORITES_ID. Always present,
+ * even with zero photos, and can't be renamed or deleted. */
+export const FAVORITES_ALBUM_ID = 'favorites';
+
+export type AlbumKind = 'physical' | 'virtual' | 'favorites';
 
 export interface AlbumSummary {
   id: string;
   name: string;
-  created_at: string;
-  updated_at: string;
+  kind: AlbumKind;
+  /** Only present on a physical album - the source_paths mapping's own
+   * server-side path (see albums.py's physical_albums()). Absent for
+   * virtual/Favorites albums, which have no filesystem path at all. */
+  server_path?: string | null;
+  created_at?: string;
+  updated_at?: string;
   photo_count: number;
   cover_photo_id: string | null;
 }
 
 export interface AlbumDetail extends AlbumSummary {
-  photo_ids: string[];
+  /** Absent for a physical album - its membership is computed from every
+   * photo's own physical_path, never stored as an id list (see albums.py's
+   * physical_albums()/physical_album_detail()). */
+  photo_ids?: string[];
   photos: Photo[];
+}
+
+export interface ConfigurationSetting {
+  key: string;
+  value: unknown;
+  label?: string;
+  description?: string;
+}
+
+export interface ConfigurationResponse {
+  settings: ConfigurationSetting[];
+}
+
+/** One phone-folder -> server-path mapping, exactly as configuration.py's
+ * `source_paths` setting stores it - see _validate_source_paths(). */
+export interface SourcePathMapping {
+  id?: string;
+  phone_path: string;
+  server_path: string;
+  name?: string;
 }
 
 export interface TrashListing {

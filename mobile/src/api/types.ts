@@ -22,3 +22,13 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 }
+
+/** A file already living on the device, ready to upload as a raw request
+ * body (see StarCoreClient.postFile) - a local `uri`, never bytes read into
+ * JS memory here. Used by Photo's background sync (photo/api.ts's
+ * uploadSync) to send a phone photo/video straight from the camera roll. */
+export interface UploadableFile {
+  uri: string;
+  name: string;
+  type: string;
+}

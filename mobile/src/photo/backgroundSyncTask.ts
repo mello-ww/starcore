@@ -42,7 +42,7 @@ const cameraRollSource: CameraRollSource = {
         first: 100,
         after,
         assetType: 'All',
-        include: ['filename', 'playableDuration'],
+        include: ['filename', 'playableDuration', 'albums'],
       });
 
       let reachedCursor = false;
@@ -58,12 +58,24 @@ const cameraRollSource: CameraRollSource = {
         }
         const isVideo = (node.type || '').startsWith('video') || Boolean(node.image.playableDuration);
         const extension = isVideo ? 'mp4' : node.type?.includes('png') ? 'png' : 'jpg';
+        // Best-effort only - the camera roll's own album/folder membership,
+        // requested via `include: ['albums']` above. Different OS versions
+        // and library versions have reported this as either `albums`
+        // (an array of names) or the older `group_name`; either is a
+        // reasonable stand-in for "phone folder" to match against Photo
+        // configuration's source_paths (see uploadSync's own docstring) -
+        // undefined here just means the server falls back to
+        // sync_default_path, exactly as if this asset had no folder at all.
+        const albums = (node as any).albums as string[] | undefined;
+        const groupName = (node as any).group_name as string | undefined;
+        const folder = albums && albums.length ? albums[0] : groupName || undefined;
         collected.push({
           id: node.id,
           uri: node.image.uri,
           filename: node.image.filename || `${node.id}.${extension}`,
           mimeType: node.type || (isVideo ? 'video/mp4' : 'image/jpeg'),
           timestamp: timestampMs,
+          folder,
         });
       }
 
@@ -122,9 +134,10 @@ export async function runBackgroundSync(): Promise<void> {
 
 /** react-native-background-fetch's headless entry point: Android can start
  * the JS engine solely to run this, with no app UI ever mounted (e.g. the
- * app was force-stopped or hasn't been opened since a reboot) - see
- * index.js's `BackgroundFetch.registerHeadlessTask` and "enableHeadless"
- * below. */
+ * app was swiped away or killed by the system, or hasn't been opened since
+ * a reboot) - see index.js's `BackgroundFetch.registerHeadlessTask` and
+ * "enableHeadless" below. Never after an explicit "Force stop" from
+ * Android's app settings: nothing runs until the user opens the app again. */
 export async function backgroundFetchHeadlessTask(event: {taskId: string}): Promise<void> {
   try {
     await runBackgroundSync();

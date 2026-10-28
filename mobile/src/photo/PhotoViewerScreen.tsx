@@ -12,11 +12,14 @@ import {
   Text,
   View,
 } from 'react-native';
+import {Gesture, GestureDetector} from 'react-native-gesture-handler';
+import Animated, {useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
 import Video from 'react-native-video';
 import {colors, spacing, typography} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
 import {durationLabel} from './duration';
 import type {Photo} from './types';
+import {useFavorites} from './useFavorites';
 import {usePhotoApi} from './usePhotoApi';
 
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'PhotoViewer'>;
@@ -37,12 +40,13 @@ function formatBytes(size: number): string {
 
 /**
  * The full-screen viewer: swipe between photos and videos alike (a paging
- * FlatList - this build doesn't yet have a gesture/zoom library installed,
- * so pinch-to-zoom isn't wired up here yet even though the horizontal swipe
- * is), Share, Delete (moves to the recycle bin, with confirmation - never a
- * direct permanent delete) and a Details panel. Closing returns to exactly
- * the grid position it was opened from, since the caller never remounts
- * the grid underneath - this screen is simply popped off the stack.
+ * FlatList), pinch-to-zoom on a still image (see ZoomableImage below),
+ * Favorite (the same heart every grid uses - see useFavorites.ts), Share,
+ * Delete (moves to the recycle bin, with confirmation - never a direct
+ * permanent delete) and a Details panel, which also shows the photo's
+ * physical album path when it has one. Closing returns to exactly the grid
+ * position it was opened from, since the caller never remounts the grid
+ * underneath - this screen is simply popped off the stack.
  *
  * A video page (media_type === 'video') renders react-native-video instead
  * of Image, with its own tap-to-play/pause controls; only the page that's
@@ -59,6 +63,7 @@ export function PhotoViewerScreen({route, navigation}: Props) {
   const [viewableIndex, setViewableIndex] = useState(startIndex);
   const listRef = useRef<FlatList<MediaItem>>(null);
   const currentIndexRef = useRef(startIndex);
+  const {favoriteIds, toggle: toggleFavorite} = useFavorites();
 
   const getItemLayout = (_: unknown, index: number) => ({length: SCREEN_WIDTH, offset: SCREEN_WIDTH * index, index});
 
@@ -102,6 +107,14 @@ export function PhotoViewerScreen({route, navigation}: Props) {
         },
       },
     ]);
+  };
+
+  const onToggleFavorite = async (photoId: string) => {
+    try {
+      await toggleFavorite(photoId);
+    } catch (err: any) {
+      Alert.alert('Could not update Favorites', err?.message || 'Please try again.');
+    }
   };
 
   const onShare = async (photoId: string) => {
@@ -150,6 +163,10 @@ export function PhotoViewerScreen({route, navigation}: Props) {
       </View>
 
       <View style={styles.bottomBar}>
+        <ViewerAction
+          label={favoriteIds.has(current.id) ? '♥ Favorited' : '♡ Favorite'}
+          onPress={() => onToggleFavorite(current.id)}
+        />
         <ViewerAction label="Share" onPress={() => onShare(current.id)} />
         <ViewerAction label="Details" onPress={toggleDetails} />
         <ViewerAction label="Delete" onPress={onDelete} destructive />
@@ -180,6 +197,7 @@ export function PhotoViewerScreen({route, navigation}: Props) {
               {photoDetail.metadata.gps_coordinates && (
                 <DetailRow label="Location" value={photoDetail.metadata.gps_coordinates} />
               )}
+              {photoDetail.physical_path && <DetailRow label="Path" value={photoDetail.physical_path} />}
             </>
           ) : (
             <ActivityIndicator color={colors.azure} />
@@ -221,13 +239,94 @@ function ViewerPage({item, active}: {item: MediaItem; active: boolean}) {
   }
 
   return (
+    <ZoomableImage source={imageSource(item.id, 'original')} onLoadEnd={() => setLoading(false)} loading={loading} />
+  );
+}
+
+/** The photo page's own pinch-to-zoom - "swipe is here but pinch-to-zoom
+ * isn't wired up here yet" from this screen's old docstring, now that
+ * react-native-gesture-handler + react-native-reanimated are both approved
+ * dependencies (see PhotoLibraryTab's usePinchColumns for the other use of
+ * that same pair). Pinching zooms in around the gesture's own focal point;
+ * releasing below the original size springs back to it rather than leaving
+ * the image stuck smaller than the frame. This never touches horizontal
+ * swiping between photos - the pinch gesture and the FlatList's own paging
+ * gesture are independent, since a two-finger pinch never triggers a
+ * single-finger horizontal pan. */
+function ZoomableImage({
+  source,
+  onLoadEnd,
+  loading,
+}: {
+  source: {uri: string; headers?: Record<string, string>};
+  onLoadEnd: () => void;
+  loading: boolean;
+}) {
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
+
+  const reset = () => {
+    'worklet';
+    scale.value = withTiming(1);
+    translateX.value = withTiming(0);
+    translateY.value = withTiming(0);
+    savedScale.value = 1;
+    savedTranslateX.value = 0;
+    savedTranslateY.value = 0;
+  };
+
+  const pinch = Gesture.Pinch()
+    .onUpdate(event => {
+      scale.value = Math.max(1, savedScale.value * event.scale);
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+      if (scale.value <= 1) {
+        reset();
+      }
+    });
+
+  // two fingers only (matching the pinch above) - a single-finger drag is
+  // deliberately left entirely to the FlatList's own native horizontal
+  // paging (swipe between photos), so zooming in never steals that gesture
+  const pan = Gesture.Pan()
+    .minPointers(2)
+    .onUpdate(event => {
+      if (scale.value <= 1) {
+        return;
+      }
+      translateX.value = savedTranslateX.value + event.translationX;
+      translateY.value = savedTranslateY.value + event.translationY;
+    })
+    .onEnd(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    });
+
+  const gesture = Gesture.Simultaneous(pinch, pan);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      {translateX: translateX.value},
+      {translateY: translateY.value},
+      {scale: scale.value},
+    ],
+  }));
+
+  return (
     <View style={styles.page}>
-      <Image
-        source={imageSource(item.id, 'original')}
-        style={styles.image}
-        resizeMode="contain"
-        onLoadEnd={() => setLoading(false)}
-      />
+      <GestureDetector gesture={gesture}>
+        <Animated.Image
+          source={source}
+          style={[styles.image, animatedStyle]}
+          resizeMode="contain"
+          onLoadEnd={onLoadEnd}
+        />
+      </GestureDetector>
       {loading && <ActivityIndicator color={colors.azure} style={StyleSheet.absoluteFill} />}
     </View>
   );

@@ -1,6 +1,7 @@
 import {StarCoreClient, UploadableFile} from '../api/client';
 import {ApiError} from '../api/types';
-import type {AlbumDetail, AlbumSummary, Photo, TrashListing} from './types';
+import {FAVORITES_ALBUM_ID} from './types';
+import type {AlbumDetail, AlbumSummary, ConfigurationResponse, Photo, TrashListing} from './types';
 
 const BASE = '/api/satellites/photo';
 
@@ -37,6 +38,83 @@ export class PhotoApi {
       throw new ApiError(body?.error || 'Could not load this folder.', status);
     }
     return body as AlbumDetail;
+  }
+
+  /** Creates a new custom (virtual) album - never valid for a physical
+   * album, which api.py rejects for exactly this reason (see
+   * albums.py/api.py's PHYSICAL_ID_PREFIX handling). */
+  async createAlbum(name: string): Promise<AlbumSummary> {
+    const {status, body} = await this.client.post(`${BASE}/albums`, {name});
+    if (status !== 200) {
+      throw new ApiError(body?.error || 'Could not create this album.', status);
+    }
+    return body as AlbumSummary;
+  }
+
+  async renameAlbum(albumId: string, name: string): Promise<AlbumSummary> {
+    const {status, body} = await this.client.post(`${BASE}/albums/${encodeURIComponent(albumId)}`, {name});
+    if (status !== 200) {
+      throw new ApiError(body?.error || 'Could not rename this album.', status);
+    }
+    return body as AlbumSummary;
+  }
+
+  async deleteAlbum(albumId: string): Promise<void> {
+    const {status, body} = await this.client.post(`${BASE}/albums/${encodeURIComponent(albumId)}/delete`);
+    if (status !== 200) {
+      throw new ApiError(body?.error || 'Could not delete this album.', status);
+    }
+  }
+
+  async addPhotoToAlbum(albumId: string, photoId: string): Promise<AlbumSummary> {
+    const {status, body} = await this.client.post(`${BASE}/albums/${encodeURIComponent(albumId)}/photos`, {
+      photo_id: photoId,
+    });
+    if (status !== 200) {
+      throw new ApiError(body?.error || 'Could not add this photo to the album.', status);
+    }
+    return body as AlbumSummary;
+  }
+
+  async removePhotoFromAlbum(albumId: string, photoId: string): Promise<AlbumSummary> {
+    const {status, body} = await this.client.post(`${BASE}/albums/${encodeURIComponent(albumId)}/photos/remove`, {
+      photo_id: photoId,
+    });
+    if (status !== 200) {
+      throw new ApiError(body?.error || 'Could not remove this photo from the album.', status);
+    }
+    return body as AlbumSummary;
+  }
+
+  /** Favorites is just a regular album under a fixed id (see albums.py's
+   * FAVORITES_ID) - these two are thin, self-documenting wrappers around
+   * the same add/removePhotoFromAlbum calls above, never a second favorite-
+   * specific backend mechanism. */
+  async favorite(photoId: string): Promise<AlbumSummary> {
+    return this.addPhotoToAlbum(FAVORITES_ALBUM_ID, photoId);
+  }
+
+  async unfavorite(photoId: string): Promise<AlbumSummary> {
+    return this.removePhotoFromAlbum(FAVORITES_ALBUM_ID, photoId);
+  }
+
+  /** The satellite's own settings - same generic /configuration route the
+   * web panel's Configuration tab uses (see configuration.py), so mobile
+   * never becomes a second settings mechanism. */
+  async configuration(): Promise<ConfigurationResponse> {
+    const {status, body} = await this.client.get(`${BASE}/configuration`);
+    if (status !== 200) {
+      throw new ApiError(body?.error || 'Could not load configuration.', status);
+    }
+    return body as ConfigurationResponse;
+  }
+
+  async updateConfiguration(key: string, value: unknown): Promise<ConfigurationResponse & {note?: string}> {
+    const {status, body} = await this.client.post(`${BASE}/configuration`, {key, value});
+    if (status !== 200) {
+      throw new ApiError(body?.error || 'Could not save this setting.', status);
+    }
+    return body as ConfigurationResponse & {note?: string};
   }
 
   async trashList(): Promise<TrashListing> {
@@ -81,11 +159,24 @@ export class PhotoApi {
    * automatic phone sync" in docs/satellites/photo.md. Used only by
    * background sync (see photo/backgroundSync.ts); nothing else in the app
    * uploads a file from the phone. */
-  async uploadSync(file: UploadableFile): Promise<{status: 'imported' | 'duplicate'; photo: Photo | null}> {
-    const {status, body} = await this.client.postFile(
-      `${BASE}/sync_upload?filename=${encodeURIComponent(file.name)}`,
-      file,
-    );
+  async uploadSync(
+    file: UploadableFile,
+    folder?: string,
+  ): Promise<{status: 'imported' | 'duplicate'; photo: Photo | null}> {
+    // `folder` is the phone-side folder this asset came from (best-effort -
+    // see backgroundSyncTask.ts's cameraRollSource) - passed straight
+    // through as the same `folder` query param the legacy sync.py upload
+    // page and api.py's sync_upload_route both already accept, so the
+    // server can resolve a physical album via configuration.resolve_
+    // physical_path() exactly as it does for any other authenticated
+    // upload. Omitted entirely (not sent as an empty string) when unknown,
+    // so the server falls back to sync_default_path the same way it would
+    // for a client that never sends this at all.
+    let query = `filename=${encodeURIComponent(file.name)}`;
+    if (folder) {
+      query += `&folder=${encodeURIComponent(folder)}`;
+    }
+    const {status, body} = await this.client.postFile(`${BASE}/sync_upload?${query}`, file);
     if (status !== 200) {
       throw new ApiError(body?.error || 'Could not upload this file.', status);
     }

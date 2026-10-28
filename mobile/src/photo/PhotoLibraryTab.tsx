@@ -1,11 +1,14 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {Alert, StyleSheet, Text, View} from 'react-native';
+import {GestureDetector} from 'react-native-gesture-handler';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {colors, spacing, typography} from '../theme';
 import {getCachedPhotos, setCachedPhotos} from './cache';
 import {PhotoGrid} from './PhotoGrid';
 import type {Photo} from './types';
+import {useFavorites} from './useFavorites';
 import {usePhotoApi} from './usePhotoApi';
+import {usePinchColumns} from './usePinchColumns';
 
 interface Props {
   onOpenPhoto: (photos: Photo[], index: number) => void;
@@ -23,6 +26,8 @@ export function PhotoLibraryTab({onOpenPhoto}: Props) {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [selection, setSelection] = useState<Set<string> | null>(null);
+  const {favoriteIds, toggle: toggleFavorite} = useFavorites();
+  const {columns, gesture} = usePinchColumns();
 
   const load = useCallback(async () => {
     if (!serverId) {
@@ -95,22 +100,29 @@ export function PhotoLibraryTab({onOpenPhoto}: Props) {
     <View style={styles.container}>
       {isCache && <Text style={[typography.caption, styles.offline]}>Showing cached photos - offline</Text>}
       {error && <Text style={styles.error}>{error}</Text>}
-      <PhotoGrid
-        photos={photos ?? []}
-        groupByDate
-        refreshing={refreshing}
-        onRefresh={onRefresh}
-        selectedIds={selection ?? undefined}
-        onPressPhoto={(photo, index) => {
-          if (selection) {
-            toggleSelected(photo);
-          } else {
-            onOpenPhoto(photos ?? [], index);
-          }
-        }}
-        onLongPressPhoto={toggleSelected}
-        emptyMessage={photos === null ? 'Loading your photos…' : 'No photos yet. Import some from your Folders tab.'}
-      />
+      <GestureDetector gesture={gesture}>
+        <View style={styles.grid}>
+          <PhotoGrid
+            photos={photos ?? []}
+            groupByDate
+            columns={columns}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            selectedIds={selection ?? undefined}
+            favoriteIds={selection ? undefined : favoriteIds}
+            onToggleFavorite={selection ? undefined : photo => toggleFavorite(photo.id).catch(() => {})}
+            onPressPhoto={(photo, index) => {
+              if (selection) {
+                toggleSelected(photo);
+              } else {
+                onOpenPhoto(photos ?? [], index);
+              }
+            }}
+            onLongPressPhoto={toggleSelected}
+            emptyMessage={photos === null ? 'Loading your photos…' : 'No photos yet. Import some from your Albums tab.'}
+          />
+        </View>
+      </GestureDetector>
       {selection && (
         <View style={styles.selectionBar}>
           <Text style={typography.body}>{selection.size} selected</Text>
@@ -123,6 +135,7 @@ export function PhotoLibraryTab({onOpenPhoto}: Props) {
 
 const styles = StyleSheet.create({
   container: {flex: 1},
+  grid: {flex: 1},
   offline: {color: colors.textFaint, paddingHorizontal: spacing.md, paddingTop: spacing.sm},
   error: {color: colors.alert, fontSize: 13, paddingHorizontal: spacing.md, paddingTop: spacing.sm},
   selectionBar: {

@@ -14,6 +14,7 @@ function photo(id: string, captured_at: string | null, imported_at = captured_at
     duration: null,
     imported_at,
     captured_at,
+    physical_path: null,
     metadata: {
       camera_make: null,
       camera_model: null,

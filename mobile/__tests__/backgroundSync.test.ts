@@ -34,7 +34,10 @@ function fakeState(initial: {enabled: boolean; lastSyncedAt: number}) {
 }
 
 function fakeUploader(
-  behavior: (file: {uri: string; name: string; type: string}) => Promise<{status: 'imported' | 'duplicate'; photo: any}>,
+  behavior: (
+    file: {uri: string; name: string; type: string},
+    folder?: string,
+  ) => Promise<{status: 'imported' | 'duplicate'; photo: any}>,
 ): SyncUploader {
   return {uploadSync: behavior};
 }
@@ -124,6 +127,23 @@ describe('syncOneServer', () => {
     const outcome = await syncOneServer('server-1', camera, uploader, store);
 
     expect(outcome).toEqual({scanned: 0, uploaded: 0, duplicates: 0, failed: 0});
+  });
+
+  it('forwards each asset\'s own phone folder to the uploader, so a source_paths mapping can resolve it', async () => {
+    const {store} = fakeState({enabled: true, lastSyncedAt: 0});
+    const assets = [
+      asset({id: 'a', timestamp: 100, folder: 'Screenshots'}),
+      asset({id: 'b', timestamp: 200}), // no folder at all - a legitimate case, not an error
+    ];
+    const forwarded: (string | undefined)[] = [];
+    const uploader = fakeUploader(async (_file, folder) => {
+      forwarded.push(folder);
+      return {status: 'imported', photo: null};
+    });
+
+    await syncOneServer('server-1', fakeCamera(assets), uploader, store);
+
+    expect(forwarded).toEqual(['Screenshots', undefined]);
   });
 
   it('never deletes or mutates camera roll assets - only ever reads and uploads', async () => {

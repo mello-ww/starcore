@@ -17,6 +17,10 @@ interface Props {
    * fallback tile, exactly like the web panel's own gallery. */
   isVideo?: boolean;
   duration?: number | null;
+  /** Undefined hides the heart entirely (e.g. the recycle bin's own tiles,
+   * where favoriting doesn't apply) - present (even false) shows it. */
+  favorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
 /** One grid cell: a cached, authenticated thumbnail - never the full
@@ -24,7 +28,18 @@ interface Props {
  * necessary" in the task brief). Loads its own image so PhotoGrid never has
  * to know anything about auth headers or the recycle-bin's separate
  * preview routes. */
-export function PhotoThumbnail({photoId, trashed, size, onPress, onLongPress, selected, isVideo, duration}: Props) {
+export function PhotoThumbnail({
+  photoId,
+  trashed,
+  size,
+  onPress,
+  onLongPress,
+  selected,
+  isVideo,
+  duration,
+  favorite,
+  onToggleFavorite,
+}: Props) {
   const {imageSource} = usePhotoApi();
   const [failed, setFailed] = useState(false);
   const label = isVideo ? durationLabel(duration) : '';
@@ -53,6 +68,14 @@ export function PhotoThumbnail({photoId, trashed, size, onPress, onLongPress, se
       {selected !== undefined && (
         <View style={[styles.selectionDot, selected && styles.selectionDotActive]} />
       )}
+      {favorite !== undefined && onToggleFavorite && (
+        <Pressable
+          onPress={onToggleFavorite}
+          hitSlop={8}
+          style={[styles.favoriteBadge, favorite && styles.favoriteBadgeActive]}>
+          <Text style={[styles.favoriteIcon, favorite && styles.favoriteIconActive]}>{favorite ? '♥' : '♡'}</Text>
+        </Pressable>
+      )}
     </Pressable>
   );
 }
@@ -75,6 +98,28 @@ const styles = StyleSheet.create({
   selectionDotActive: {
     backgroundColor: colors.azure,
     borderColor: colors.azure,
+  },
+  favoriteBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(4,6,13,0.45)',
+  },
+  favoriteBadgeActive: {
+    backgroundColor: 'rgba(228,96,109,0.28)',
+  },
+  favoriteIcon: {
+    color: '#fff',
+    fontSize: 14,
+    lineHeight: 16,
+  },
+  favoriteIconActive: {
+    color: colors.alert,
   },
   playBadge: {
     position: 'absolute',

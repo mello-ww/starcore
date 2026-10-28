@@ -1,6 +1,7 @@
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import React from 'react';
+import Icon from 'react-native-vector-icons/Feather';
 import {ConfigScreen} from '../screens/ConfigScreen';
 import {ConnectScreen} from '../screens/ConnectScreen';
 import {ConsoleScreen} from '../screens/ConsoleScreen';
@@ -12,7 +13,9 @@ import {SettingsScreen} from '../screens/SettingsScreen';
 import {useServers} from '../servers/ServersContext';
 import {colors} from '../theme';
 import {PhotoAlbumScreen} from '../photo/PhotoAlbumScreen';
+import {PhotoConfigurationScreen} from '../photo/PhotoConfigurationScreen';
 import {PhotoHomeScreen} from '../photo/PhotoHomeScreen';
+import {PhotoTrashTab} from '../photo/PhotoTrashTab';
 import {PhotoViewerScreen} from '../photo/PhotoViewerScreen';
 
 export type MainTabParamList = {
@@ -31,7 +34,14 @@ export type SatellitesStackParamList = {
    * docstring and "Exposing a mobile interface" in docs/satellites.md. */
   PhotoHome: undefined;
   PhotoAlbum: {albumId: string; name: string};
-  PhotoViewer: {photoIds: string[]; startIndex: number};
+  /** Reached from PhotoHomeScreen's gear icon, never a bottom-tab segment of
+   * its own - see "Photo configuration... reachable via a settings entry"
+   * in the task brief. */
+  PhotoConfiguration: undefined;
+  /** The Recycle bin, reached from inside the Albums section - see
+   * PhotoAlbumsTab's own "Recycle bin" card. */
+  PhotoTrash: undefined;
+  PhotoViewer: {media: {id: string; mediaType: 'photo' | 'video'; duration: number | null}[]; startIndex: number};
 };
 
 export type SettingsStackParamList = {
@@ -60,6 +70,12 @@ function SatellitesStack() {
       <SatellitesStackNav.Screen name="SatelliteDetail" component={SatelliteDetailScreen} />
       <SatellitesStackNav.Screen name="PhotoHome" component={PhotoHomeScreen} options={{title: 'Photos'}} />
       <SatellitesStackNav.Screen name="PhotoAlbum" component={PhotoAlbumScreen} />
+      <SatellitesStackNav.Screen
+        name="PhotoConfiguration"
+        component={PhotoConfigurationScreen}
+        options={{title: 'Photo configuration'}}
+      />
+      <SatellitesStackNav.Screen name="PhotoTrash" component={PhotoTrashTab} options={{title: 'Recycle bin'}} />
       <SatellitesStackNav.Screen
         name="PhotoViewer"
         component={PhotoViewerScreen}
@@ -101,6 +117,24 @@ function SettingsStack() {
   );
 }
 
+// One Feather icon name per tab - "polish the 5 main mobile nav icons"
+// without restructuring navigation, per the task brief. Feather was chosen
+// (over Ionicons/MaterialIcons/etc, all bundled with react-native-vector-
+// icons) purely for a consistent, thin-stroke look that matches Mission
+// Control's own thin-line SVG icon set (see mission_control/page.js's
+// RENAME_ICON/DELETE_ICON/etc, all stroke-only outlines).
+const TAB_ICONS: Record<keyof MainTabParamList, string> = {
+  Overview: 'home',
+  Satellites: 'radio',
+  Console: 'terminal',
+  Config: 'sliders',
+  Settings: 'settings',
+};
+
+function tabIcon(name: keyof MainTabParamList) {
+  return ({color, size}: {color: string; size: number}) => <Icon name={TAB_ICONS[name]} color={color} size={size} />;
+}
+
 /**
  * Bottom tabs - exactly the five destinations in "New mobile bottom
  * navigation" in the task brief. Individual Satellites are never their own
@@ -115,11 +149,11 @@ export function MainTabs() {
         tabBarActiveTintColor: colors.azure,
         tabBarInactiveTintColor: colors.textFaint,
       }}>
-      <Tab.Screen name="Overview" component={OverviewScreen} />
-      <Tab.Screen name="Satellites" component={SatellitesStack} />
-      <Tab.Screen name="Console" component={ConsoleScreen} />
-      <Tab.Screen name="Config" component={ConfigScreen} />
-      <Tab.Screen name="Settings" component={SettingsStack} />
+      <Tab.Screen name="Overview" component={OverviewScreen} options={{tabBarIcon: tabIcon('Overview')}} />
+      <Tab.Screen name="Satellites" component={SatellitesStack} options={{tabBarIcon: tabIcon('Satellites')}} />
+      <Tab.Screen name="Console" component={ConsoleScreen} options={{tabBarIcon: tabIcon('Console')}} />
+      <Tab.Screen name="Config" component={ConfigScreen} options={{tabBarIcon: tabIcon('Config')}} />
+      <Tab.Screen name="Settings" component={SettingsStack} options={{tabBarIcon: tabIcon('Settings')}} />
     </Tab.Navigator>
   );
 }

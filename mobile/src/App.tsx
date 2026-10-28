@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {AuthProvider} from './auth/AuthContext';
 import {OnboardingNavigator} from './navigation/OnboardingNavigator';
@@ -15,6 +16,11 @@ type ResumeInfo = {name: string; address: string};
  * src/config.ts for why there's no compiled-in default. Everything below
  * `AuthProvider` (RootNavigator, every screen) can then assume both a
  * server and a session state already exist.
+ *
+ * `GestureHandlerRootView` wraps everything - react-native-gesture-handler's
+ * own docs require it at the true root for its gestures (PhotoViewerScreen's
+ * pinch-to-zoom, PhotoLibraryTab's pinch-to-zoom grid density) to work
+ * reliably on Android, not just wherever a gesture happens to be used.
  */
 export default function App() {
   useEffect(() => {
@@ -30,11 +36,13 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <ServersProvider>
-        <ServersGate />
-      </ServersProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{flex: 1}}>
+      <SafeAreaProvider>
+        <ServersProvider>
+          <ServersGate />
+        </ServersProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

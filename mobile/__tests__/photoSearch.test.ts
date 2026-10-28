@@ -14,6 +14,7 @@ function photo(overrides: Partial<Photo> = {}): Photo {
     duration: null,
     imported_at: '2024-01-01T00:00:00',
     captured_at: '2024-01-01T00:00:00',
+    physical_path: null,
     metadata: {
       camera_make: null,
       camera_model: null,

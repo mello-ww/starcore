@@ -15,6 +15,14 @@ export interface CameraAsset {
   mimeType: string;
   /** Epoch milliseconds this asset was created on the phone. */
   timestamp: number;
+  /** Best-effort phone-side folder/album name (see backgroundSyncTask.ts's
+   * cameraRollSource) - sent to the server as the same `folder` query param
+   * a manual sync_upload call already accepts, so a phone folder configured
+   * in Photo configuration's source_paths resolves to its physical album
+   * exactly as it would for any other authenticated upload. Undefined when
+   * the camera roll doesn't report one; the server then falls back to
+   * sync_default_path, same as if this field didn't exist at all. */
+  folder?: string;
 }
 
 /** What backgroundSync.ts needs from the camera roll - narrowed to exactly
@@ -32,7 +40,10 @@ export interface SyncStateStore {
 }
 
 export interface SyncUploader {
-  uploadSync(file: {uri: string; name: string; type: string}): Promise<{status: 'imported' | 'duplicate'; photo: Photo | null}>;
+  uploadSync(
+    file: {uri: string; name: string; type: string},
+    folder?: string,
+  ): Promise<{status: 'imported' | 'duplicate'; photo: Photo | null}>;
 }
 
 export interface SyncOutcome {
@@ -93,7 +104,10 @@ export async function syncOneServer(
 
   for (const asset of assets) {
     try {
-      const result = await uploader.uploadSync({uri: asset.uri, name: asset.filename, type: asset.mimeType});
+      const result = await uploader.uploadSync(
+        {uri: asset.uri, name: asset.filename, type: asset.mimeType},
+        asset.folder,
+      );
       if (result.status === 'duplicate') {
         outcome.duplicates += 1;
       } else {

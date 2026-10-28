@@ -4,7 +4,9 @@ import {colors, spacing, typography} from '../theme';
 import type {Photo} from './types';
 import {PhotoThumbnail} from './PhotoThumbnail';
 
-const COLUMNS = 3;
+export const DEFAULT_COLUMNS = 3;
+export const MIN_COLUMNS = 2;
+export const MAX_COLUMNS = 6;
 const GUTTER = spacing.md * 2;
 
 /** captured_at/imported_at is an ISO timestamp; the group only ever needs
@@ -33,12 +35,12 @@ interface Section {
 
 /** Groups already-sorted photos into date sections, then chunks each
  * section into fixed-width rows - SectionList has no numColumns of its own,
- * so each "item" it renders is actually one row of up to COLUMNS photos.
+ * so each "item" it renders is actually one row of up to `columns` photos.
  * `groupByDate: false` (Folders, Search) still uses the same row-chunking,
  * just under a single untitled section. */
-export function toSections(photos: Photo[], groupByDate: boolean): Section[] {
+export function toSections(photos: Photo[], groupByDate: boolean, columns: number = DEFAULT_COLUMNS): Section[] {
   if (!groupByDate) {
-    return [{title: '', data: chunk(photos, COLUMNS)}];
+    return [{title: '', data: chunk(photos, columns)}];
   }
 
   const sections: Section[] = [];
@@ -49,7 +51,7 @@ export function toSections(photos: Photo[], groupByDate: boolean): Section[] {
     const label = dateLabel(photo.captured_at || photo.imported_at);
     if (label !== currentLabel) {
       if (current.length) {
-        sections.push({title: currentLabel!, data: chunk(current, COLUMNS)});
+        sections.push({title: currentLabel!, data: chunk(current, columns)});
       }
       currentLabel = label;
       current = [];
@@ -57,7 +59,7 @@ export function toSections(photos: Photo[], groupByDate: boolean): Section[] {
     current.push(photo);
   }
   if (current.length) {
-    sections.push({title: currentLabel!, data: chunk(current, COLUMNS)});
+    sections.push({title: currentLabel!, data: chunk(current, columns)});
   }
   return sections;
 }
@@ -66,11 +68,19 @@ interface Props {
   photos: Photo[];
   trashed?: boolean;
   groupByDate?: boolean;
+  /** Grid density - how many photos per row. Defaults to DEFAULT_COLUMNS;
+   * PhotoLibraryTab drives this from a pinch gesture (see its own
+   * usePinchColumns hook), everyone else just takes the default. */
+  columns?: number;
   refreshing?: boolean;
   onRefresh?: () => void;
   onPressPhoto: (photo: Photo, index: number) => void;
   onLongPressPhoto?: (photo: Photo) => void;
   selectedIds?: Set<string>;
+  /** Undefined hides every tile's heart entirely - only Library and Album
+   * views pass this, never the recycle bin. */
+  favoriteIds?: Set<string>;
+  onToggleFavorite?: (photo: Photo) => void;
   emptyMessage: string;
 }
 
@@ -78,15 +88,18 @@ export function PhotoGrid({
   photos,
   trashed,
   groupByDate = false,
+  columns = DEFAULT_COLUMNS,
   refreshing,
   onRefresh,
   onPressPhoto,
   onLongPressPhoto,
   selectedIds,
+  favoriteIds,
+  onToggleFavorite,
   emptyMessage,
 }: Props) {
-  const sections = useMemo(() => toSections(photos, groupByDate), [photos, groupByDate]);
-  const cellSize = (Dimensions.get('window').width - GUTTER) / COLUMNS;
+  const sections = useMemo(() => toSections(photos, groupByDate, columns), [photos, groupByDate, columns]);
+  const cellSize = (Dimensions.get('window').width - GUTTER) / columns;
 
   if (photos.length === 0) {
     return (
@@ -117,6 +130,8 @@ export function PhotoGrid({
                 isVideo={photo.media_type === 'video'}
                 duration={photo.duration}
                 selected={selectedIds ? selectedIds.has(photo.id) : undefined}
+                favorite={favoriteIds ? favoriteIds.has(photo.id) : undefined}
+                onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(photo) : undefined}
                 onPress={() => onPressPhoto(photo, sectionStart + columnIndex)}
                 onLongPress={onLongPressPhoto ? () => onLongPressPhoto(photo) : undefined}
               />
