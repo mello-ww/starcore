@@ -8,14 +8,24 @@ Core never sees sync_host or sync_port by name.
 """
 
 from pathlib import Path
+import secrets
 
 from . import sync
 
-DEFAULTS = {"sync_host": "127.0.0.1", "sync_port": 8081, "photo_directory": "", "trash_retention_days": 30}
+DEFAULTS = {
+    "sync_host": "127.0.0.1",
+    "sync_port": 8081,
+    "photo_directory": "",
+    "trash_retention_days": 30,
+    "source_paths": [],
+    "sync_default_path": "camera",
+}
 
 # settings with nothing running to fall out of sync with (unlike sync_host/
 # sync_port, which describe a live listener - see describe()/update() below)
-_STATIC_SETTINGS = {"photo_directory", "trash_retention_days"}
+_STATIC_SETTINGS = {"photo_directory", "trash_retention_days", "source_paths", "sync_default_path"}
+
+SOURCE_PATH_ID_BYTES = 6  # -> 12 hex characters; only needs to be unique among this satellite's own mappings
 
 
 class ConfigurationError(Exception):
@@ -49,6 +59,61 @@ def _validate_directory(value) -> str:
     return text
 
 
+def _validate_server_relative_path(value, setting_name: str) -> str:
+    """A path *inside* the library's own storage - never absolute, never
+    escaping it with '..' - the same "path is the source of truth" rule
+    physical albums rely on (see albums.physical_albums()). Distinct from
+    photo_directory above, which names a directory on the machine running
+    StarCore, not a location inside the managed library."""
+    text = str(value).strip() if value is not None else ""
+    if not text:
+        raise ConfigurationError(f"{setting_name} must not be empty")
+    if text.startswith("/") or text.startswith("~") or (len(text) > 1 and text[1] == ":"):
+        raise ConfigurationError(f"{setting_name} must be relative to the library, not an absolute path")
+
+    normalized = text.strip("/")
+    segments = normalized.split("/")
+    if not normalized or ".." in segments or "." in segments or "" in segments:
+        raise ConfigurationError(f"{setting_name} must be a relative path inside the library, without '..'")
+
+    return normalized
+
+
+def _validate_source_paths(value) -> list:
+    if not isinstance(value, list):
+        raise ConfigurationError("source_paths must be a list of {phone_path, server_path} mappings")
+
+    seen_ids, seen_phone_paths, seen_server_paths = set(), set(), set()
+    validated = []
+
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise ConfigurationError("each source_paths entry must be an object")
+
+        phone_path = str(entry.get("phone_path", "")).strip()
+        if not phone_path:
+            raise ConfigurationError("each source_paths entry needs a non-empty 'phone_path'")
+
+        server_path = _validate_server_relative_path(entry.get("server_path"), "each source_paths entry's server_path")
+
+        entry_id = str(entry.get("id") or "").strip()
+        while not entry_id or entry_id in seen_ids:
+            entry_id = secrets.token_hex(SOURCE_PATH_ID_BYTES)
+
+        if phone_path in seen_phone_paths:
+            raise ConfigurationError(f"phone path '{phone_path}' is mapped more than once")
+        if server_path in seen_server_paths:
+            raise ConfigurationError(f"server path '{server_path}' is mapped more than once")
+        seen_ids.add(entry_id)
+        seen_phone_paths.add(phone_path)
+        seen_server_paths.add(server_path)
+
+        name = str(entry.get("name", "")).strip() or server_path.rsplit("/", 1)[-1]
+        validated.append({"id": entry_id, "phone_path": phone_path, "server_path": server_path, "name": name})
+
+    return validated
+
+
 def _validate_retention_days(value) -> int:
     try:
         days = int(str(value).strip())
@@ -79,7 +144,35 @@ SETTINGS = {
         "validate": _validate_retention_days,
         "description": "How many days a deleted photo stays in the recycle bin before it is permanently erased.",
     },
+    "source_paths": {
+        "validate": _validate_source_paths,
+        "description": "Explicit phone folder -> server path mappings (e.g. '/Pictures/Screenshots' -> "
+                        "'screenshots'). Each one becomes its own physical album; the server path is never "
+                        "assumed to match the phone path.",
+        "type": "source_paths",
+    },
+    "sync_default_path": {
+        "validate": lambda value: _validate_server_relative_path(value, "sync_default_path"),
+        "description": "Where a phone-synced photo or video lands (and which physical album it joins) when "
+                        "its phone folder doesn't match any configured source path.",
+    },
 }
+
+
+def resolve_physical_path(satellite, phone_folder) -> str:
+    """The server-side physical-album path an incoming phone-synced file
+    belongs under: whichever configured source_paths entry's phone_path
+    matches, or sync_default_path when none does (including when the phone
+    didn't say what folder it came from at all - the standalone sync.py
+    listener never does). Used only by sync.accept_authenticated_upload();
+    a directory scan/import never calls this."""
+    phone_folder = str(phone_folder or "").strip()
+
+    for entry in satellite.config.get("source_paths", DEFAULTS["source_paths"]):
+        if entry.get("phone_path") == phone_folder:
+            return entry["server_path"]
+
+    return str(satellite.config.get("sync_default_path", DEFAULTS["sync_default_path"]))
 
 
 def validate(key: str, value):
@@ -153,6 +246,10 @@ def update(engine, satellite, key: str, value) -> dict:
                                "require one explicitly.")
     elif key == "trash_retention_days":
         note = f"Saved. A deleted photo now stays in the recycle bin for {saved} day(s) before being erased."
+    elif key == "source_paths":
+        note = f"Saved {len(saved)} phone -> server path mapping(s)." if saved else "Saved. No phone -> server path mappings are configured - synced media all lands under sync_default_path."
+    elif key == "sync_default_path":
+        note = f"Saved. Phone-synced media with no matching source path now lands under '{saved}'."
     else:
         note = _apply(engine, satellite)
 

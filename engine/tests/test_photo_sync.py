@@ -444,6 +444,51 @@ class AuthenticatedUploadTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["photo"]["filename"], "upload")
 
+    # ---------- phone folder -> physical album resolution ----------
+
+    def upload_from(self, data: bytes, folder: str, filename="beach.png"):
+        response = self.route(fake_request(
+            "POST", self.satellite, query={"filename": filename, "folder": folder},
+            raw=RawBody(io.BytesIO(data), len(data)),
+        ))
+        return response.status, response.payload
+
+    def test_a_matching_phone_folder_joins_its_configured_physical_album(self):
+        self.satellite.config.data["source_paths"] = [
+            {"id": "s1", "phone_path": "/Pictures/Screenshots", "server_path": "screenshots", "name": "Screenshots"},
+        ]
+
+        status, payload = self.upload_from(png(8, 6), folder="/Pictures/Screenshots")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["photo"]["physical_path"], "screenshots")
+
+    def test_an_unmatched_phone_folder_falls_back_to_sync_default_path(self):
+        self.satellite.config.data["source_paths"] = []
+        self.satellite.config.data["sync_default_path"] = "camera"
+
+        status, payload = self.upload_from(png(8, 6), folder="/Pictures/Unmapped")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["photo"]["physical_path"], "camera")
+
+    def test_no_folder_at_all_still_falls_back_to_sync_default_path(self):
+        self.satellite.config.data["sync_default_path"] = "camera"
+
+        status, payload = self.upload(png(8, 6))  # the plain upload() helper sends no 'folder'
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["photo"]["physical_path"], "camera")
+
+    def test_the_standalone_listener_never_assigns_a_physical_album(self):
+        """Unlike the authenticated route above - see accept_authenticated_upload()'s
+        own docstring: the standalone local-network listener has no
+        satellite/configuration reference to resolve a mapping against."""
+        service = sync_module().service(self.satellite)
+        result = service.accept(png(8, 6), "beach.png")
+
+        self.assertIsNone(result["photo"]["physical_path"])
+
 
 class PhotoConfigurationTest(unittest.TestCase):
     """Photo Sync's own sync_host/sync_port, through the generic satellite

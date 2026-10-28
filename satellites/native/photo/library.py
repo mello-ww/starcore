@@ -163,12 +163,22 @@ class PhotoLibrary:
 
     # ---------- import ----------
 
-    def add_file(self, source, filename: str = None, save: bool = True):
+    def add_file(self, source, filename: str = None, save: bool = True, physical_path: str = None):
         """Takes a single file into the library.
 
         Returns the new record, or None when that exact image is already stored.
         Every import path goes through here, so a future synchronization endpoint
         can hand over an uploaded file without touching the storage layout.
+
+        `physical_path` is metadata only - it never changes where the file is
+        actually stored (still the content-addressed photos/<id> layout below).
+        It is the resolved server-side "physical album" path (see
+        configuration.py's `source_paths`) for a phone-synced upload whose
+        phone folder matched a configured mapping, or the satellite's
+        `sync_default_path` when it didn't - see sync.accept_authenticated_upload().
+        A directory scan/import (scan()/import_directory()) never sets this;
+        those photos simply have no physical album, exactly like a photo
+        imported before this concept existed.
         """
         source = Path(source)
         photo_id = _digest(source)[:ID_LENGTH]
@@ -227,6 +237,7 @@ class PhotoLibrary:
                 **{key: value for key, value in exif.items() if key != "captured_at"},
             },
             "trashed_at": None,
+            "physical_path": physical_path,
         }
 
         self._photos[photo_id] = photo
@@ -400,6 +411,10 @@ class PhotoLibrary:
                 # definition, a photo - never re-probed just to learn that
                 photo.setdefault("media_type", "photo")
                 photo.setdefault("duration", None)
+                # every photo imported before physical albums existed simply
+                # has no physical album, exactly like it has no media_type
+                # override above - never re-resolved just for being read
+                photo.setdefault("physical_path", None)
             self._photos = photos
 
     def _save(self):

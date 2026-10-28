@@ -116,7 +116,7 @@ class UploadTooLarge(Exception):
     sync_max_bytes limit."""
 
 
-def accept_authenticated_upload(satellite, raw, filename: str) -> dict:
+def accept_authenticated_upload(satellite, raw, filename: str, phone_folder: str = None) -> dict:
     """The ingestion path api.py's sync_upload route uses: the exact same
     SyncService.accept() the standalone local-network listener below uses
     (never a second implementation), reached instead through the main
@@ -129,10 +129,22 @@ def accept_authenticated_upload(satellite, raw, filename: str) -> dict:
     `raw` is a starcore.api.response.RawBody - read here in chunks, exactly
     like SyncHandler._read_body() below, so a large video upload is never
     buffered whole before its size is even known to be within bounds.
+
+    `phone_folder` (e.g. "/Pictures/Screenshots", from the mobile app's own
+    camera-roll asset grouping - see mobile/src/photo/backgroundSyncTask.ts)
+    is resolved against the satellite's configured source_paths to decide
+    which physical album the file joins - see
+    configuration.resolve_physical_path(). Never given by the standalone
+    local-network listener below, whose uploads simply have no physical
+    album (the same as a photo imported before this concept existed).
     """
+    from . import configuration  # deferred: configuration.py imports this module at load time
+
     running = service(satellite)
     if running is None:
         raise RuntimeError("photo sync is disabled on this server")
+
+    physical_path = configuration.resolve_physical_path(satellite, phone_folder)
 
     # recorded here, not by the caller (api.py), so a failure counts toward
     # the same activity/counts the standalone listener's SyncHandler records
@@ -152,7 +164,7 @@ def accept_authenticated_upload(satellite, raw, filename: str) -> dict:
                 raise UploadTooLarge(f"the upload is larger than {running.max_bytes} bytes")
             chunks.append(chunk)
 
-        return running.accept(b"".join(chunks), filename)
+        return running.accept(b"".join(chunks), filename, physical_path=physical_path)
     except (UploadTooLarge, ValueError, UnsupportedImage) as error:
         running.activity.record(filename, "failed", str(error))
         raise
@@ -252,7 +264,7 @@ class SyncService:
             "events": self.activity.events(),
         }
 
-    def accept(self, data: bytes, filename: str) -> dict:
+    def accept(self, data: bytes, filename: str, physical_path: str = None) -> dict:
         """Takes an uploaded image into the library through the normal ingestion path."""
         self.incoming.mkdir(parents=True, exist_ok=True)
         # written aside first: nothing reaches the library until the whole upload
@@ -261,7 +273,7 @@ class SyncService:
 
         try:
             partial.write_bytes(data)
-            photo = self.library.add_file(partial, filename=filename)
+            photo = self.library.add_file(partial, filename=filename, physical_path=physical_path)
         finally:
             partial.unlink(missing_ok=True)
 
@@ -315,6 +327,10 @@ class SyncHandler(BaseHTTPRequestHandler):
             return
 
         try:
+            # the standalone listener never resolves a physical album for its
+            # uploads (see accept_authenticated_upload()'s own docstring) -
+            # it has no satellite/configuration reference to resolve one
+            # against, only the SyncService itself
             result = service.accept(data, filename)
         except UnsupportedImage as error:
             self._failure(filename, 415, str(error))

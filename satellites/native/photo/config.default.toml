@@ -4,6 +4,14 @@ thumbnail_size = 480 # longest edge, in pixels
 photo_directory = "" # default directory 'scan'/'import' use when none is given; must be absolute (or start with ~)
 trash_retention_days = 30 # days a deleted photo stays in the recycle bin before being permanently erased
 
+# source_paths maps a phone folder to a path inside the library, e.g.:
+#   source_paths = [{ id = "a1b2c3d4e5f6", phone_path = "/Pictures/Screenshots", server_path = "screenshots", name = "Screenshots" }]
+# Each entry becomes its own physical album (see docs/satellites/photo.md,
+# "Physical albums"). Never assumed to match the phone path - leave empty to
+# route every synced file to sync_default_path below.
+source_paths = []
+sync_default_path = "camera" # physical album a synced file joins when no source_paths entry matches its phone folder
+
 sync_enabled = true
 sync_host = "127.0.0.1" # set to "0.0.0.0" to let phones on the local network reach it
 sync_port = 8081

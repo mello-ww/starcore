@@ -2,6 +2,7 @@
 
 from starcore.api.response import error_response, file_response, json_response
 
+from . import albums as albums_module
 from . import configuration, sync
 from . import state as state_module
 from .albums import AlbumError, AlbumNotFound, albums
@@ -69,9 +70,10 @@ def sync_upload_route(request):
         return error_response("expected a raw file upload, not a JSON body", status=400)
 
     filename = sync.safe_filename(request.query.get("filename"))
+    phone_folder = request.query.get("folder")
 
     try:
-        result = sync.accept_authenticated_upload(request.satellite, request.raw, filename)
+        result = sync.accept_authenticated_upload(request.satellite, request.raw, filename, phone_folder=phone_folder)
     except sync.UploadTooLarge as error:
         return error_response(str(error), status=413)
     except ValueError as error:
@@ -214,18 +216,31 @@ def albums_route(request):
 
 
 def _albums_get(request, store):
+    photo_library = library(request.satellite)
+
     if not request.path:
-        photo_library = library(request.satellite)
-        return json_response({"albums": [_album_summary(album, photo_library) for album in store.all()]})
+        # physical albums first, then virtual/Favorites - see
+        # docs/satellites/photo.md, "Albums": the UI groups by "kind" itself,
+        # but listing physical ones first keeps the common case (a phone's
+        # own folder structure) at the top
+        physical = albums_module.physical_albums(request.satellite, photo_library)
+        virtual = [_album_summary(album, photo_library) for album in store.all()]
+        return json_response({"albums": physical + virtual})
 
     if len(request.path) != 1:
         return error_response(f"unknown endpoint 'albums/{'/'.join(request.path)}'")
 
-    album = store.get(request.path[0])
-    if album is None:
-        return error_response(f"unknown album '{request.path[0]}'")
+    album_id = request.path[0]
+    if album_id.startswith(albums_module.PHYSICAL_ID_PREFIX):
+        try:
+            return json_response(albums_module.physical_album_detail(request.satellite, photo_library, album_id))
+        except AlbumNotFound as error:
+            return error_response(str(error), status=404)
 
-    photo_library = library(request.satellite)
+    album = store.get(album_id)
+    if album is None:
+        return error_response(f"unknown album '{album_id}'")
+
     # all_ids(), not all() - a photo the recycle bin is holding is still
     # physically in the library, so it must not be pruned from its albums;
     # it just doesn't show up in "photos" below until restored or erased
@@ -246,6 +261,10 @@ def _albums_post(request, store):
 
     album_id = request.path[0]
     action = tuple(request.path[1:])
+
+    if album_id.startswith(albums_module.PHYSICAL_ID_PREFIX):
+        return error_response("a physical album is derived from Photo configuration's source paths and can't "
+                               "be edited directly - add, remove or edit a source path instead", status=400)
 
     try:
         if action == ():
@@ -288,6 +307,7 @@ def _album_summary(album, photo_library) -> dict:
     return {
         "id": album["id"],
         "name": album["name"],
+        "kind": album.get("kind", "virtual"),
         "created_at": album["created_at"],
         "updated_at": album["updated_at"],
         "photo_count": len(present),

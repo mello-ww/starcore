@@ -204,6 +204,33 @@ class PhotoLibraryTest(unittest.TestCase):
         self.assertEqual(Path(photo["path"]).name, f"{photo['id']}.png")
         self.assertNotIn("holiday", photo["path"])
 
+    def test_a_desktop_import_has_no_physical_path(self):
+        self.write("holiday.png", png(4, 3))
+        self.library.import_directory(self.source)
+
+        self.assertIsNone(self.library.all()[0]["physical_path"])
+
+    def test_add_file_can_be_given_a_physical_path(self):
+        source = self.write("shot.png", png(4, 3))
+
+        photo = self.library.add_file(source, physical_path="screenshots")
+
+        self.assertEqual(photo["physical_path"], "screenshots")
+        self.assertEqual(self.library.all()[0]["physical_path"], "screenshots")
+
+    def test_a_library_saved_before_physical_albums_existed_backfills_none(self):
+        source = self.write("old.png", png(4, 3))
+        self.library.add_file(source)
+        # simulate a library.json written before "physical_path" existed at all
+        index = json.loads(self.library.index_path.read_text(encoding="utf-8"))
+        for photo in index["photos"].values():
+            del photo["physical_path"]
+        self.library.index_path.write_text(json.dumps(index), encoding="utf-8")
+
+        reloaded = photo_library(self.library.root)
+
+        self.assertIsNone(reloaded.all()[0]["physical_path"])
+
     def test_importing_the_same_directory_twice_changes_nothing(self):
         self.write("holiday.png", png(4, 3))
         self.library.import_directory(self.source)
@@ -881,11 +908,14 @@ class PhotoAlbumsTest(unittest.TestCase):
 
     # ---------- creation, listing, rename, deletion ----------
 
-    def test_a_new_library_has_no_albums(self):
+    def test_a_new_library_has_no_custom_albums(self):
+        # Favorites always shows up, even before it's ever used - see
+        # AlbumStore.ensure_favorites() - but no custom album exists yet
         status, payload = self.json_request(self.albums_url())
 
         self.assertEqual(status, 200)
-        self.assertEqual(payload["albums"], [])
+        self.assertEqual([album["name"] for album in payload["albums"]], ["Favorites"])
+        self.assertEqual(payload["albums"][0]["kind"], "favorites")
 
     def test_an_album_can_be_created(self):
         status, payload = self.json_request(self.albums_url(), "POST", {"name": "Summer trip"})
@@ -916,8 +946,9 @@ class PhotoAlbumsTest(unittest.TestCase):
         status, payload = self.json_request(self.albums_url())
 
         self.assertEqual(status, 200)
+        # Favorites is always present alongside whatever custom albums exist
         names = sorted(album["name"] for album in payload["albums"])
-        self.assertEqual(names, ["Beach", "Mountains"])
+        self.assertEqual(names, ["Beach", "Favorites", "Mountains"])
         # a freshly created album has no photos yet
         self.assertTrue(all(album["photo_count"] == 0 for album in payload["albums"]))
         self.assertTrue(all(album["cover_photo_id"] is None for album in payload["albums"]))
@@ -952,7 +983,8 @@ class PhotoAlbumsTest(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertEqual(payload["deleted"], album["id"])
-        self.assertEqual(self.json_request(self.albums_url())[1]["albums"], [])
+        remaining = self.json_request(self.albums_url())[1]["albums"]
+        self.assertEqual([a["name"] for a in remaining], ["Favorites"])
 
     def test_deleting_an_unknown_album_is_a_404(self):
         status, payload = self.json_request(self.albums_url("does-not-exist", "delete"), "POST")
@@ -981,7 +1013,7 @@ class PhotoAlbumsTest(unittest.TestCase):
         self.assertEqual(len(detail["photos"]), 1)
         self.assertEqual(detail["photos"][0]["id"], photo["id"])
 
-        listing = self.json_request(self.albums_url())[1]["albums"][0]
+        listing = next(a for a in self.json_request(self.albums_url())[1]["albums"] if a["id"] == album["id"])
         self.assertEqual(listing["photo_count"], 1)
         self.assertEqual(listing["cover_photo_id"], photo["id"])
 
@@ -1146,6 +1178,276 @@ class PhotoAlbumsTest(unittest.TestCase):
         self.assertEqual(with_camera["metadata"]["camera_model"], "Canon EOS R5")
         self.assertIsNone(without_camera["metadata"]["camera_make"])
         self.assertIsNone(without_camera["metadata"]["camera_model"])
+
+    # ---------- Favorites ----------
+
+    def test_favorites_is_always_listed_even_unused(self):
+        status, payload = self.json_request(self.albums_url())
+
+        favorites = next(a for a in payload["albums"] if a["id"] == "favorites")
+        self.assertEqual(status, 200)
+        self.assertEqual(favorites["name"], "Favorites")
+        self.assertEqual(favorites["kind"], "favorites")
+        self.assertEqual(favorites["photo_count"], 0)
+
+    def test_a_photo_can_be_favorited_and_unfavorited(self):
+        photo = self.import_photo("a.png", png(4, 3))
+
+        status, payload = self.json_request(self.albums_url("favorites", "photos"), "POST", {"photo_id": photo["id"]})
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["photo_ids"], [photo["id"]])
+
+        detail = self.json_request(self.albums_url("favorites"))[1]
+        self.assertEqual([p["id"] for p in detail["photos"]], [photo["id"]])
+
+        status, payload = self.json_request(
+            self.albums_url("favorites", "photos", "remove"), "POST", {"photo_id": photo["id"]})
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["photo_ids"], [])
+
+    def test_favorites_cannot_be_renamed_or_deleted(self):
+        status, payload = self.json_request(self.albums_url("favorites"), "POST", {"name": "Nope"})
+        self.assertEqual(status, 400)
+        self.assertIn("error", payload)
+
+        status, payload = self.json_request(self.albums_url("favorites", "delete"), "POST")
+        self.assertEqual(status, 400)
+        self.assertIn("error", payload)
+
+        # still there, untouched, after both rejected attempts
+        favorites = self.json_request(self.albums_url("favorites"))[1]
+        self.assertEqual(favorites["name"], "Favorites")
+
+    def test_a_photo_can_belong_to_a_physical_album_and_favorites_at_once(self):
+        # a physical album can't be created through this test's plain
+        # import_photo() helper (that never sets physical_path - see
+        # PhotoSyncPhysicalAlbumTest below for the sync path that does), but
+        # favoriting an imported photo alongside its (absent) physical album
+        # is exactly the "one photo, two independent album memberships"
+        # behaviour this exercises without needing a real phone-sync mapping
+        photo = self.import_photo("a.png", png(4, 3))
+        custom = self.json_request(self.albums_url(), "POST", {"name": "Trip"})[1]
+
+        self.json_request(self.albums_url("favorites", "photos"), "POST", {"photo_id": photo["id"]})
+        self.json_request(self.albums_url(custom["id"], "photos"), "POST", {"photo_id": photo["id"]})
+
+        self.assertEqual(self.json_request(self.albums_url("favorites"))[1]["photo_ids"], [photo["id"]])
+        self.assertEqual(self.json_request(self.albums_url(custom["id"]))[1]["photo_ids"], [photo["id"]])
+
+
+class PhotoConfigurationSourcePathsTest(unittest.TestCase):
+    """Photo configuration's source_paths/sync_default_path settings - the
+    phone folder -> server path mappings physical albums are built from."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = start_engine(mission_control=True)
+        if not cls.engine.api.running:
+            stop_engine(cls.engine)
+            raise unittest.SkipTest("Mission Control could not be started")
+        cls.satellite = cls.engine.registry.get("Photo")
+
+    @classmethod
+    def tearDownClass(cls):
+        stop_engine(cls.engine)
+
+    def setUp(self):
+        self.directory = Path(tempfile.mkdtemp(prefix="starcore-photo-config-"))
+        self.satellite.config.data["storage"] = str(self.directory / "library")
+        self.satellite.config.data["source_paths"] = []
+        self.satellite.config.data["sync_default_path"] = "camera"
+
+        # configuration.update() (reached through the /configuration POST
+        # route below) persists through satellite.config.set(), which would
+        # otherwise write into the real satellites/native/photo/config.toml
+        # on disk - every test here redirects that to a throwaway file first,
+        # the same pattern test_photo_sync.py's own PhotoConfigurationTest uses
+        self.config_path = self.directory / "config.toml"
+        self.config_path.write_text("enabled = true\n", encoding="utf-8")
+        self.satellite.config.path = self.config_path
+
+    def tearDown(self):
+        shutil.rmtree(self.directory, ignore_errors=True)
+
+    def request(self, path, method="GET", payload=None):
+        connection = HTTPConnection("127.0.0.1", self.engine.api.port, timeout=5)
+        body = json.dumps(payload).encode("utf-8") if payload is not None else None
+        headers = {"Content-Type": "application/json"} if body is not None else {}
+        try:
+            connection.request(method, path, body=body, headers=headers)
+            response = connection.getresponse()
+            return response.status, json.loads(response.read().decode("utf-8"))
+        finally:
+            connection.close()
+
+    def configuration_module(self):
+        from importlib import import_module
+        return import_module("satellites.native.photo.configuration")
+
+    def test_a_source_path_can_be_saved_and_read_back(self):
+        mapping = [{"phone_path": "/Pictures/Screenshots", "server_path": "screenshots", "name": "Screenshots"}]
+
+        status, payload = self.request(
+            "/api/satellites/photo/configuration", "POST", {"key": "source_paths", "value": mapping})
+
+        self.assertEqual(status, 200)
+        saved = next(s for s in payload["settings"] if s["key"] == "source_paths")
+        self.assertEqual(len(saved["value"]), 1)
+        self.assertEqual(saved["value"][0]["phone_path"], "/Pictures/Screenshots")
+        self.assertEqual(saved["value"][0]["server_path"], "screenshots")
+        self.assertTrue(saved["value"][0]["id"])
+
+    def test_source_paths_rejects_a_duplicate_server_path(self):
+        mapping = [
+            {"phone_path": "/Pictures/Screenshots", "server_path": "shared"},
+            {"phone_path": "/Pictures/Snapchat", "server_path": "shared"},
+        ]
+        status, payload = self.request(
+            "/api/satellites/photo/configuration", "POST", {"key": "source_paths", "value": mapping})
+        self.assertEqual(status, 400)
+        self.assertIn("error", payload)
+
+    def test_source_paths_rejects_an_absolute_or_escaping_server_path(self):
+        for bad in ("/etc/passwd", "../outside", ""):
+            status, payload = self.request(
+                "/api/satellites/photo/configuration", "POST",
+                {"key": "source_paths", "value": [{"phone_path": "/x", "server_path": bad}]})
+            self.assertEqual(status, 400, bad)
+            self.assertIn("error", payload)
+
+    def test_resolve_physical_path_matches_a_configured_mapping(self):
+        configuration = self.configuration_module()
+        self.satellite.config.data["source_paths"] = [
+            {"id": "abc123", "phone_path": "/Pictures/Screenshots", "server_path": "screenshots", "name": "Screenshots"},
+        ]
+
+        self.assertEqual(configuration.resolve_physical_path(self.satellite, "/Pictures/Screenshots"), "screenshots")
+
+    def test_resolve_physical_path_falls_back_to_the_default(self):
+        configuration = self.configuration_module()
+        self.satellite.config.data["source_paths"] = []
+        self.satellite.config.data["sync_default_path"] = "camera"
+
+        self.assertEqual(configuration.resolve_physical_path(self.satellite, "/Pictures/Unmapped"), "camera")
+        self.assertEqual(configuration.resolve_physical_path(self.satellite, None), "camera")
+
+
+class PhotoPhysicalAlbumTest(unittest.TestCase):
+    """Physical albums: derived from configured source_paths, membership
+    computed from each photo's own physical_path - never stored, never
+    edited directly (see albums.physical_albums()/physical_album_detail())."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = start_engine(mission_control=True)
+        if not cls.engine.api.running:
+            stop_engine(cls.engine)
+            raise unittest.SkipTest("Mission Control could not be started")
+        cls.satellite = cls.engine.registry.get("Photo")
+
+    @classmethod
+    def tearDownClass(cls):
+        stop_engine(cls.engine)
+
+    def setUp(self):
+        self.directory = Path(tempfile.mkdtemp(prefix="starcore-photo-physical-"))
+        self.satellite.config.data["storage"] = str(self.directory / "library")
+        self.satellite.config.data["source_paths"] = [
+            {"id": "screenshots1", "phone_path": "/Pictures/Screenshots", "server_path": "screenshots", "name": "Screenshots"},
+        ]
+        self.satellite.config.data["sync_default_path"] = "camera"
+        self.library = photo_library(self.directory / "library")
+
+    def tearDown(self):
+        shutil.rmtree(self.directory, ignore_errors=True)
+
+    def request(self, path, method="GET", payload=None):
+        connection = HTTPConnection("127.0.0.1", self.engine.api.port, timeout=5)
+        body = json.dumps(payload).encode("utf-8") if payload is not None else None
+        headers = {"Content-Type": "application/json"} if body is not None else {}
+        try:
+            connection.request(method, path, body=body, headers=headers)
+            response = connection.getresponse()
+            return response.status, json.loads(response.read().decode("utf-8"))
+        finally:
+            connection.close()
+
+    def _drop(self, name: str, data: bytes, physical_path=None) -> dict:
+        path = self.directory / name
+        path.write_bytes(data)
+        return self.library.add_file(path, filename=name, physical_path=physical_path)
+
+    def test_a_configured_source_path_shows_up_even_with_no_photos_yet(self):
+        status, payload = self.request("/api/satellites/photo/albums")
+
+        physical = [a for a in payload["albums"] if a["kind"] == "physical"]
+        self.assertEqual(status, 200)
+        self.assertEqual(len(physical), 1)
+        self.assertEqual(physical[0]["name"], "Screenshots")
+        self.assertEqual(physical[0]["photo_count"], 0)
+        self.assertTrue(physical[0]["id"].startswith("physical:"))
+
+    def test_a_synced_photo_joins_its_matching_physical_album(self):
+        photo = self._drop("shot.png", png(4, 3), physical_path="screenshots")
+
+        status, payload = self.request("/api/satellites/photo/albums")
+        physical = next(a for a in payload["albums"] if a["kind"] == "physical")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(physical["photo_count"], 1)
+        self.assertEqual(physical["cover_photo_id"], photo["id"])
+
+        detail = self.request(f"/api/satellites/photo/albums/{physical['id']}")[1]
+        self.assertEqual([p["id"] for p in detail["photos"]], [photo["id"]])
+
+    def test_a_photo_with_no_matching_mapping_lands_in_unsorted(self):
+        photo = self._drop("random.png", png(4, 3), physical_path="camera")
+
+        status, payload = self.request("/api/satellites/photo/albums")
+        unsorted_album = next(a for a in payload["albums"] if a["id"] == "physical:unsorted")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(unsorted_album["photo_count"], 1)
+        detail = self.request("/api/satellites/photo/albums/physical:unsorted")[1]
+        self.assertEqual(detail["photos"][0]["id"], photo["id"])
+
+    def test_unsorted_is_absent_when_there_is_nothing_unsorted(self):
+        self._drop("shot.png", png(4, 3), physical_path="screenshots")
+
+        status, payload = self.request("/api/satellites/photo/albums")
+
+        self.assertEqual(status, 200)
+        self.assertNotIn("physical:unsorted", [a["id"] for a in payload["albums"]])
+
+    def test_a_desktop_imported_photo_with_no_physical_path_has_no_physical_album(self):
+        self._drop("desktop.png", png(4, 3))  # physical_path=None, as import_directory() leaves it
+
+        status, payload = self.request("/api/satellites/photo/albums")
+
+        physical_counts = [a["photo_count"] for a in payload["albums"] if a["kind"] == "physical"]
+        self.assertEqual(status, 200)
+        self.assertEqual(physical_counts, [0])  # the configured "Screenshots" album, still empty
+        self.assertNotIn("physical:unsorted", [a["id"] for a in payload["albums"]])
+
+    def test_a_physical_album_cannot_be_renamed_deleted_or_edited_directly(self):
+        photo = self._drop("shot.png", png(4, 3), physical_path="screenshots")
+        physical_id = next(
+            a["id"] for a in self.request("/api/satellites/photo/albums")[1]["albums"] if a["kind"] == "physical")
+
+        for path, payload in [
+            (physical_id, {"name": "Nope"}),
+            (f"{physical_id}/delete", {}),
+            (f"{physical_id}/photos", {"photo_id": photo["id"]}),
+        ]:
+            status, response = self.request(f"/api/satellites/photo/albums/{path}", "POST", payload)
+            self.assertEqual(status, 400, path)
+            self.assertIn("error", response)
+
+    def test_fetching_an_unknown_physical_album_is_a_404(self):
+        status, payload = self.request("/api/satellites/photo/albums/physical:does-not-exist")
+
+        self.assertEqual(status, 404)
+        self.assertIn("error", payload)
 
 
 class PhotoCommandTest(unittest.TestCase):
