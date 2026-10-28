@@ -60,5 +60,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- react-native-maps' Android backend (react-native-maps' own
+             AIRGoogleMapModule) needs a real Google Maps SDK key here before
+             PhotoMapTab's map will render anything but a blank grid -
+             MAPS_API_KEY is read from android/gradle.properties (not
+             committed - add it there as `MAPS_API_KEY=your-key-here`,
+             matching the project's existing "no keystore of any kind
+             committed" convention for local secrets). Get a key from
+             https://developers.google.com/maps/documentation/android-sdk/get-api-key;
+             this app never needs any Maps *web* API, only this Android SDK
+             one. Without a key, every other Photo feature still works -
+             only the Map tab is affected. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
     </application>
 </manifest>

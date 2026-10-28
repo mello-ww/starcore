@@ -30,6 +30,13 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "0.1.0"
+
+        // Resolves AndroidManifest.xml's ${MAPS_API_KEY} placeholder (see
+        // the comment there) from android/gradle.properties - left blank
+        // (never committed) until you add your own key there, the same
+        // "no secret committed to this repo" convention release signing
+        // already follows above.
+        manifestPlaceholders = [MAPS_API_KEY: (project.findProperty("MAPS_API_KEY") ?: "")]
     }
 
     // Debug builds use the Android Gradle Plugin's own automatic debug
@@ -62,3 +69,11 @@ dependencies {
 // missing; it's copied verbatim from react-native's own 0.73.6 template
 // (node_modules/react-native/template/android/app/build.gradle).
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
+
+// react-native-vector-icons' own required Android step: copies its font
+// files (Feather.ttf, used for the bottom-tab icons - see MainTabs.tsx) into
+// this app's assets so <Icon name="..." /> can actually render a glyph
+// instead of a "missing character" box. Autolinking (above) registers the
+// native module itself, but never bundles font assets - that's what this
+// line is for, exactly as react-native-vector-icons' own README documents.
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
