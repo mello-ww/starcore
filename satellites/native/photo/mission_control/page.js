@@ -1,12 +1,16 @@
 const SKELETONS = 12;
-const TABS = ["photos", "albums", "trash", "map"];
+// "trash" is deliberately not a tab of its own - the Recycle bin is one of
+// the four kinds shown inside "albums" (see renderAlbums()); "config" is
+// where source_paths/sync_default_path/trash_retention_days/the standalone
+// listener's own settings all live together (see buildConfigPanel())
+const TABS = ["photos", "albums", "map", "config"];
 
 function tabLabel(name) {
     if (name === "map") {
         return "Map";
     }
-    if (name === "trash") {
-        return "Recycle bin";
+    if (name === "config") {
+        return "Configuration";
     }
     return name[0].toUpperCase() + name.slice(1);
 }
@@ -55,18 +59,21 @@ export function mount(context) {
     const { element: root, satellite, api } = context;
 
     let photos = [];
-    let albums = [];
+    let albums = [];            // physical + virtual + Favorites together, each with its own "kind" - see refresh()
+    let favoriteIds = new Set();  // kept in sync with the Favorites album's own photo_ids, for the heart toggle
     let trash = [];             // photos currently in the recycle bin (see loadTrash/renderTrash)
     let retentionDays = null;   // from the satellite's own configuration - how long the bin keeps a photo
     let tab = "photos";
-    let groupByCamera = false;
+    let groupBy = "month";      // "month" (the default), "camera", or "all" - see buildGroupToggle()
     let openAlbum = null;       // full album detail (with resolved .photos), or null
+    let trashOpen = false;      // showing the Recycle bin inside the Albums tab, instead of the albums grid
     let viewerList = [];        // whichever array the open viewer is stepping through
     let viewer = null;
     let index = -1;
     let infoOpen = false;
     let mapState = null;        // { map, markers, located } once the Map tab has been built once
     let locationMap = null;     // { map, marker } for the photo-details location panel, built once
+    let configState = null;     // { settings } from the last /configuration read - see buildConfigPanel()
 
     const summary = el("dl", "tiles");
     const tabBar = buildTabBar();
@@ -74,11 +81,12 @@ export function mount(context) {
     const albumsPanel = buildAlbumsPanel();
     const trashPanel = buildTrashPanel();
     const mapPanel = buildMapPanel();
+    const configPanel = buildConfigPanel();
     const notice = el("p", "photo-notice");
     notice.hidden = true;
 
     const body = el("div", "stack");
-    body.append(summary, tabBar, notice, photosPanel.element, albumsPanel.element, trashPanel.element, mapPanel.element);
+    body.append(summary, tabBar, notice, photosPanel.element, albumsPanel.element, mapPanel.element, configPanel.element);
     root.replaceChildren(buildHead(), body);
 
     setTab("photos");
@@ -130,15 +138,15 @@ export function mount(context) {
 
         photosPanel.element.hidden = name !== "photos";
         albumsPanel.element.hidden = name !== "albums";
-        trashPanel.element.hidden = name !== "trash";
         mapPanel.element.hidden = name !== "map";
+        configPanel.element.hidden = name !== "config";
 
         if (name === "albums") {
             renderAlbums();
-        } else if (name === "trash") {
-            loadTrash();
         } else if (name === "map") {
             renderMap();
+        } else if (name === "config") {
+            loadConfig();
         }
     }
 
@@ -147,56 +155,47 @@ export function mount(context) {
     function buildPhotosPanel() {
         const element = el("div", "photo-tab-panel");
         const importPanel = buildImportPanel();
-        const syncPanel = el("section", "panel photo-sync");
         const gallery = el("div", "photo-gallery");
-        syncPanel.hidden = true;
 
-        element.append(buildToolbar(importPanel, syncPanel), importPanel, syncPanel, gallery);
-        return { element, importPanel, syncPanel, gallery };
+        element.append(buildToolbar(importPanel), importPanel, gallery);
+        return { element, importPanel, gallery };
     }
 
-    function buildToolbar(importPanel, syncPanel) {
+    function buildToolbar(importPanel) {
         const toolbar = el("div", "photo-toolbar");
-        const phone = el("button", "button", "Phone sync");
         const button = el("button", "button button-primary", "Import photos");
-        phone.type = "button";
         button.type = "button";
-        phone.addEventListener("click", () => {
-            syncPanel.hidden = !syncPanel.hidden;
-            importPanel.hidden = true;
-        });
-        button.addEventListener("click", () => toggleImport(importPanel, syncPanel));
+        button.addEventListener("click", () => toggleImport(importPanel));
 
         const left = el("div", "photo-toolbar-left");
         left.append(el("p", "eyebrow", "Gallery"), buildGroupToggle());
 
         const actions = el("div", "photo-actions");
-        actions.append(phone, button);
+        actions.append(button);
         toolbar.append(left, actions);
         return toolbar;
     }
 
     function buildGroupToggle() {
+        // "By month" is the default grouping (most recent month first, using
+        // each photo's own captured_at) - "By camera" only ever shows once at
+        // least one photo actually carries that metadata (see renderGallery()),
+        // and "All" is a flat grid for anyone who doesn't want either grouping
         const group = el("div", "photo-group-toggle");
-        group.hidden = true;  // only shown once we know at least one photo has camera metadata
-
-        const all = el("button", "photo-tab", "All");
+        const month = el("button", "photo-tab", "By month");
         const byCamera = el("button", "photo-tab", "By camera");
-        all.type = "button";
-        byCamera.type = "button";
-        all.dataset.group = "all";
-        byCamera.dataset.group = "camera";
+        const all = el("button", "photo-tab", "All");
 
-        all.addEventListener("click", () => {
-            groupByCamera = false;
-            renderGallery();
-        });
-        byCamera.addEventListener("click", () => {
-            groupByCamera = true;
-            renderGallery();
-        });
+        for (const [button, key] of [[month, "month"], [byCamera, "camera"], [all, "all"]]) {
+            button.type = "button";
+            button.dataset.group = key;
+            button.addEventListener("click", () => {
+                groupBy = key;
+                renderGallery();
+            });
+        }
 
-        group.append(all, byCamera);
+        group.append(month, byCamera, all);
         return group;
     }
 
@@ -236,16 +235,15 @@ export function mount(context) {
         return panel;
     }
 
-    function toggleImport(importPanel, syncPanel, force) {
+    function toggleImport(importPanel, force) {
         importPanel.hidden = force === undefined ? !importPanel.hidden : !force;
-        syncPanel.hidden = true;
         if (!importPanel.hidden) {
             importPanel.querySelector("input").focus();
         }
     }
 
     function renderSync(status) {
-        const syncPanel = photosPanel.syncPanel;
+        const syncPanel = configPanel.syncSection;
         const address = status.running ? `${status.url}/?token=${encodeURIComponent(status.token)}` : null;
         const state = el("p", "photo-sync-state");
         state.append(
@@ -311,10 +309,12 @@ export function mount(context) {
 
     async function refresh() {
         try {
-            const [libraryInfo, listing, status, albumListing] = await Promise.all([
-                api.get("/library"), api.get("/photos"), api.get("/sync"), api.get("/albums")]);
+            const [libraryInfo, listing, status, albumListing, favorites] = await Promise.all([
+                api.get("/library"), api.get("/photos"), api.get("/sync"), api.get("/albums"),
+                api.get("/albums/favorites")]);
             photos = listing.photos;
             albums = albumListing.albums;
+            favoriteIds = new Set(favorites.photo_ids || []);
             renderSummary(libraryInfo, status);
             renderSync(status);
             renderGallery();
@@ -425,12 +425,13 @@ export function mount(context) {
 
         const toggle = photosPanel.element.querySelector(".photo-group-toggle");
         const hasCameraData = photos.some((photo) => cameraLabel(photo.metadata || {}));
-        toggle.hidden = !hasCameraData;
-        if (!hasCameraData) {
-            groupByCamera = false;
+        const cameraButton = toggle.querySelector('[data-group="camera"]');
+        cameraButton.hidden = !hasCameraData;
+        if (groupBy === "camera" && !hasCameraData) {
+            groupBy = "month";
         }
         for (const button of toggle.querySelectorAll(".photo-tab")) {
-            button.classList.toggle("active", (button.dataset.group === "camera") === groupByCamera);
+            button.classList.toggle("active", button.dataset.group === groupBy);
         }
 
         if (photos.length === 0) {
@@ -438,38 +439,133 @@ export function mount(context) {
             return;
         }
 
-        if (!groupByCamera || !hasCameraData) {
+        if (groupBy === "all") {
             gallery.appendChild(buildGrid(photos));
             return;
         }
 
-        // grouped by camera/device - automatic only, and only offered at all
-        // when at least one photo actually carries that metadata (see
-        // hasCameraData above); a photo with no camera metadata still shows
-        // up, in its own "Unknown camera" group, rather than being hidden
-        const groups = new Map();
-        for (const photo of photos) {
-            const label = cameraLabel(photo.metadata || {}) || "Unknown camera";
-            if (!groups.has(label)) {
-                groups.set(label, []);
+        if (groupBy === "camera") {
+            // grouped by camera/device - a photo with no camera metadata still
+            // shows up, in its own "Unknown camera" group, rather than being
+            // hidden; alphabetical, since there's no natural chronological
+            // order between cameras the way there is between months
+            const groups = new Map();
+            for (const photo of photos) {
+                const label = cameraLabel(photo.metadata || {}) || "Unknown camera";
+                if (!groups.has(label)) {
+                    groups.set(label, []);
+                }
+                groups.get(label).push(photo);
             }
-            groups.get(label).push(photo);
+            gallery.appendChild(buildGroupedGrid([...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))));
+            return;
         }
 
+        // groupBy === "month" (the default): most recent month first, each
+        // photo placed by when it was captured - falling back to when it was
+        // imported for a photo with no capture date at all, so nothing is
+        // ever left out of every group
+        const groups = new Map();
+        for (const photo of photos) {
+            const key = monthSortKey(photo);
+            if (!groups.has(key)) {
+                groups.set(key, { label: monthLabel(photo), items: [] });
+            }
+            groups.get(key).items.push(photo);
+        }
+        const ordered = [...groups.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+        gallery.appendChild(buildGroupedGrid(ordered.map(([, group]) => [group.label, group.items])));
+    }
+
+    function buildGroupedGrid(entries) {
         const wrapper = el("div", "photo-groups");
-        for (const [label, group] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+        for (const [label, group] of entries) {
             const section = el("div", "photo-group");
             section.append(el("p", "eyebrow photo-group-title", `${label} · ${group.length}`), buildGrid(group));
             wrapper.appendChild(section);
         }
-        gallery.appendChild(wrapper);
+        return wrapper;
+    }
+
+    // "Unknown date" sorts last regardless of grouping key comparisons below,
+    // since an empty sort key ("") always loses a descending string compare
+    // against any real "YYYY-MM" key
+    function monthSortKey(photo) {
+        const date = parsedDate(photo);
+        return date ? `${date.getFullYear()}-${String(date.getMonth()).padStart(2, "0")}` : "";
+    }
+
+    function monthLabel(photo) {
+        const date = parsedDate(photo);
+        return date ? date.toLocaleDateString(undefined, { month: "long", year: "numeric" }) : "Unknown date";
+    }
+
+    function parsedDate(photo) {
+        const raw = photo.captured_at || photo.imported_at;
+        if (!raw) {
+            return null;
+        }
+        const date = new Date(raw);
+        return Number.isNaN(date.getTime()) ? null : date;
     }
 
     function buildGrid(list) {
         const grid = el("div", "photo-gallery");
         list.forEach((photo, position) =>
-            grid.appendChild(buildTile(photo, () => openViewer(list, position), buildDeleteBadge(photo, refresh))));
+            grid.appendChild(buildTile(photo, () => openViewer(list, position),
+                [buildFavoriteBadge(photo), buildDeleteBadge(photo, refresh)])));
         return grid;
+    }
+
+    // The heart toggle shown on every tile and in the viewer bar - Favorites
+    // is just a normal album under the hood (see albums.py), so toggling it
+    // here is the exact same /albums/favorites/photos(/remove) call the
+    // Favorites album detail view itself uses; `onToggled(isFavorite)` lets a
+    // caller react (e.g. dropping the tile from an open Favorites album view
+    // the moment it's unfavorited).
+    function buildFavoriteBadge(photo, onToggled) {
+        const button = el("button", "photo-tile-favorite");
+        button.type = "button";
+        button.innerHTML = HEART_ICON;
+
+        const sync = () => {
+            const isFavorite = favoriteIds.has(photo.id);
+            button.classList.toggle("active", isFavorite);
+            button.title = isFavorite ? "Remove from Favorites" : "Add to Favorites";
+        };
+        sync();
+
+        button.addEventListener("click", async (event) => {
+            event.stopPropagation();
+            button.disabled = true;
+            const makeFavorite = !favoriteIds.has(photo.id);
+            try {
+                const path = makeFavorite ? "/albums/favorites/photos" : "/albums/favorites/photos/remove";
+                await api.post(path, { photo_id: photo.id });
+                if (makeFavorite) {
+                    favoriteIds.add(photo.id);
+                } else {
+                    favoriteIds.delete(photo.id);
+                }
+                sync();
+                await reloadAlbums();
+                if (tab === "albums") {
+                    renderAlbums();
+                }
+                if (viewer && viewerList[index] && viewerList[index].id === photo.id) {
+                    updateViewerFavoriteButton(photo);
+                }
+                if (onToggled) {
+                    onToggled(makeFavorite);
+                }
+            } catch (error) {
+                // the heart simply doesn't flip
+            } finally {
+                button.disabled = false;
+            }
+        });
+
+        return button;
     }
 
     // Moves a photo to the recycle bin (see docs/photo.md#recycle-bin) - the
@@ -499,7 +595,7 @@ export function mount(context) {
         const empty = el("div", "photo-empty");
         const button = el("button", "button button-primary", "Import photos");
         button.type = "button";
-        button.addEventListener("click", () => toggleImport(photosPanel.importPanel, photosPanel.syncPanel, true));
+        button.addEventListener("click", () => toggleImport(photosPanel.importPanel, true));
 
         empty.innerHTML = `
             <svg width="46" height="46" viewBox="0 0 46 46" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
@@ -515,7 +611,7 @@ export function mount(context) {
         return empty;
     }
 
-    function buildTile(photo, onOpen, badge) {
+    function buildTile(photo, onOpen, badges) {
         const isVideo = photo.media_type === "video";
         const tileEl = el("button", isVideo ? "photo-tile photo-tile-video" : "photo-tile");
         tileEl.type = "button";
@@ -545,8 +641,10 @@ export function mount(context) {
             }
         }
 
-        if (badge) {
-            tileEl.appendChild(badge);
+        for (const badge of badges || []) {
+            if (badge) {
+                tileEl.appendChild(badge);
+            }
         }
         tileEl.addEventListener("click", onOpen);
         return tileEl;
@@ -576,44 +674,124 @@ export function mount(context) {
         const { content } = albumsPanel;
         content.replaceChildren();
 
+        if (trashOpen) {
+            content.appendChild(buildTrashSection());
+            loadTrash();
+            return;
+        }
+
         if (openAlbum) {
             content.appendChild(buildAlbumDetail(openAlbum));
             return;
         }
 
-        if (albums.length === 0) {
-            content.appendChild(buildAlbumsEmpty());
-            return;
+        // four visually distinguished groups, always in this order - Physical
+        // (from Photo configuration's source_paths, see albums.py), Favorites
+        // (always present, see AlbumStore.ensure_favorites()), Custom/virtual
+        // albums the user created, then the Recycle bin - see docs/photo.md,
+        // "Albums"
+        const physical = albums.filter((album) => album.kind === "physical");
+        const favorites = albums.find((album) => album.kind === "favorites");
+        const custom = albums.filter((album) => album.kind === "virtual");
+
+        const wrapper = el("div", "photo-album-groups");
+        wrapper.appendChild(buildAlbumGroup(
+            "physical", "Physical albums", physical,
+            "Mirror your phone's own folder structure - add or edit the mapping in Photo configuration.",
+        ));
+        if (favorites) {
+            wrapper.appendChild(buildAlbumGroup("favorites", "Favorites", [favorites]));
+        }
+        wrapper.appendChild(buildAlbumGroup(
+            "virtual", "Custom albums", custom,
+            "Reference a photo from as many of these as you like - nothing is moved or copied.",
+        ));
+        wrapper.appendChild(buildRecycleBinGroup());
+        content.appendChild(wrapper);
+    }
+
+    function buildAlbumGroup(kind, title, list, hint) {
+        const section = el("div", `photo-album-group photo-album-group-${kind}`);
+        section.appendChild(el("p", "eyebrow", title));
+        if (hint) {
+            section.appendChild(el("p", "muted photo-album-group-hint", hint));
+        }
+
+        if (list.length === 0) {
+            const message = kind === "physical"
+                ? "No source paths configured yet."
+                : "No custom albums yet - create one to start grouping photos together.";
+            section.appendChild(el("p", "muted photo-album-group-empty", message));
+            return section;
         }
 
         const grid = el("div", "photo-albums");
-        for (const album of albums) {
+        for (const album of list) {
             grid.appendChild(buildAlbumCard(album));
         }
-        content.appendChild(grid);
+        section.appendChild(grid);
+        return section;
     }
 
-    function buildAlbumsEmpty() {
-        const empty = el("div", "photo-empty");
-        const button = el("button", "button button-primary", "New album");
-        button.type = "button";
-        button.addEventListener("click", () => openAlbumPrompt());
+    function buildRecycleBinGroup() {
+        const section = el("div", "photo-album-group photo-album-group-trash");
+        section.appendChild(el("p", "eyebrow", "Recycle bin"));
 
-        empty.innerHTML = `
-            <svg width="46" height="46" viewBox="0 0 46 46" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
-                <rect x="6.5" y="9.5" width="24" height="18" rx="2.5"/>
-                <rect x="15.5" y="18.5" width="24" height="18" rx="2.5" fill="none"/>
-            </svg>`;
-        empty.append(
-            el("p", null, "No albums yet."),
-            el("p", "muted", "Create one to start grouping photos together."),
-            button,
+        const card = el("div", "photo-album-card photo-album-card-trash");
+        card.tabIndex = 0;
+
+        const cover = el("div", "photo-album-cover empty");
+        cover.innerHTML = TRASH_ICON;
+        const meta = el("div", "photo-album-meta");
+        meta.append(
+            el("p", "photo-album-name", "Recycle bin"),
+            el("p", "muted", "Deleted photos, until they're restored or erased"),
         );
-        return empty;
+
+        const open = () => {
+            trashOpen = true;
+            renderAlbums();
+        };
+        card.addEventListener("click", open);
+        card.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                open();
+            }
+        });
+
+        card.append(cover, meta);
+        const grid = el("div", "photo-albums");
+        grid.appendChild(card);
+        section.appendChild(grid);
+        return section;
+    }
+
+    function buildTrashSection() {
+        const wrapper = el("div", "photo-album-detail");
+        const back = el("button", "photo-back", "← Albums");
+        back.type = "button";
+        back.addEventListener("click", () => {
+            trashOpen = false;
+            renderAlbums();
+        });
+        trashPanel.element.hidden = false;
+        wrapper.append(back, trashPanel.element);
+        return wrapper;
+    }
+
+    function albumKindLabel(kind) {
+        if (kind === "physical") {
+            return "Physical";
+        }
+        if (kind === "favorites") {
+            return "Favorites";
+        }
+        return "";
     }
 
     function buildAlbumCard(album) {
-        const card = el("div", "photo-album-card");
+        const card = el("div", `photo-album-card photo-album-card-${album.kind}`);
         card.tabIndex = 0;
 
         const cover = el("div", "photo-album-cover");
@@ -625,26 +803,19 @@ export function mount(context) {
             cover.appendChild(image);
         } else {
             cover.classList.add("empty");
+            if (album.kind === "favorites") {
+                cover.innerHTML = HEART_ICON;
+            }
         }
 
         const meta = el("div", "photo-album-meta");
-        meta.append(
-            el("p", "photo-album-name", album.name),
-            el("p", "muted", `${album.photo_count} photo${album.photo_count === 1 ? "" : "s"}`),
-        );
-
-        const actions = el("div", "photo-album-actions");
-        const rename = iconButton("Rename", RENAME_ICON);
-        const remove = iconButton("Delete", DELETE_ICON);
-        rename.addEventListener("click", (event) => {
-            event.stopPropagation();
-            openAlbumPrompt(album);
-        });
-        remove.addEventListener("click", (event) => {
-            event.stopPropagation();
-            confirmDeleteAlbum(album);
-        });
-        actions.append(rename, remove);
+        const nameRow = el("p", "photo-album-name");
+        nameRow.appendChild(document.createTextNode(album.name));
+        const kindLabel = albumKindLabel(album.kind);
+        if (kindLabel) {
+            nameRow.appendChild(el("span", `photo-album-kind-badge photo-album-kind-${album.kind}`, kindLabel));
+        }
+        meta.append(nameRow, el("p", "muted", `${album.photo_count} photo${album.photo_count === 1 ? "" : "s"}`));
 
         const open = () => openAlbumDetail(album.id);
         card.addEventListener("click", open);
@@ -655,7 +826,27 @@ export function mount(context) {
             }
         });
 
-        card.append(cover, meta, actions);
+        card.append(cover, meta);
+
+        // rename/delete only make sense for a custom album - a physical
+        // album is derived from configuration and Favorites can't be
+        // renamed or deleted at all (see AlbumStore.rename()/delete())
+        if (album.kind === "virtual") {
+            const actions = el("div", "photo-album-actions");
+            const rename = iconButton("Rename", RENAME_ICON);
+            const remove = iconButton("Delete", DELETE_ICON);
+            rename.addEventListener("click", (event) => {
+                event.stopPropagation();
+                openAlbumPrompt(album);
+            });
+            remove.addEventListener("click", (event) => {
+                event.stopPropagation();
+                confirmDeleteAlbum(album);
+            });
+            actions.append(rename, remove);
+            card.appendChild(actions);
+        }
+
         return card;
     }
 
@@ -672,7 +863,7 @@ export function mount(context) {
     }
 
     function buildAlbumDetail(album) {
-        const wrapper = el("div", "photo-album-detail");
+        const wrapper = el("div", `photo-album-detail photo-album-detail-${album.kind}`);
 
         const back = el("button", "photo-back", "← Albums");
         back.type = "button";
@@ -683,49 +874,88 @@ export function mount(context) {
 
         const header = el("div", "photo-album-detail-head");
         const title = el("h3", null, album.name);
-        const rename = iconButton("Rename", RENAME_ICON);
-        rename.addEventListener("click", () => openAlbumPrompt(album));
-        const remove = el("button", "button button-stop", "Delete album");
-        remove.type = "button";
-        remove.addEventListener("click", () => confirmDeleteAlbum(album, true));
-        const addPhotos = el("button", "button button-primary", "Add photos");
-        addPhotos.type = "button";
-        addPhotos.addEventListener("click", () => openAddPhotosPicker(album));
-
+        const kindLabel = albumKindLabel(album.kind);
         const titleRow = el("div", "photo-album-detail-title");
-        titleRow.append(title, rename);
+        titleRow.appendChild(title);
+        if (kindLabel) {
+            titleRow.appendChild(el("span", `photo-album-kind-badge photo-album-kind-${album.kind}`, kindLabel));
+        }
+
         const actionsRow = el("div", "photo-album-detail-actions");
-        actionsRow.append(addPhotos, remove);
+        // rename/delete/add-photos only apply to a custom album - a physical
+        // album's membership is automatic (its own photos join it purely by
+        // physical_path) and Favorites can't be renamed, deleted, or added to
+        // this way (use the heart toggle on a photo instead) - the backend
+        // rejects all of these for both anyway (see api.py's _albums_post)
+        if (album.kind === "virtual") {
+            const rename = iconButton("Rename", RENAME_ICON);
+            rename.addEventListener("click", () => openAlbumPrompt(album));
+            titleRow.appendChild(rename);
+
+            const addPhotos = el("button", "button button-primary", "Add photos");
+            addPhotos.type = "button";
+            addPhotos.addEventListener("click", () => openAddPhotosPicker(album));
+            const remove = el("button", "button button-stop", "Delete album");
+            remove.type = "button";
+            remove.addEventListener("click", () => confirmDeleteAlbum(album, true));
+            actionsRow.append(addPhotos, remove);
+        }
+
         header.append(titleRow, el("p", "muted", `${album.photos.length} photo${album.photos.length === 1 ? "" : "s"}`), actionsRow);
 
         wrapper.append(back, header);
 
         if (album.photos.length === 0) {
             const empty = el("div", "photo-empty");
-            empty.append(el("p", null, "This album has no photos yet."), el("p", "muted", "Use “Add photos” to choose some."));
+            const message = album.kind === "physical"
+                ? "No photos have synced into this physical album yet."
+                : album.kind === "favorites"
+                ? "You haven't favorited anything yet."
+                : "This album has no photos yet.";
+            empty.appendChild(el("p", null, message));
+            if (album.kind === "virtual") {
+                empty.appendChild(el("p", "muted", "Use “Add photos” to choose some."));
+            }
             wrapper.appendChild(empty);
             return wrapper;
         }
 
         const grid = el("div", "photo-gallery");
         album.photos.forEach((photo, position) => {
-            const remove = el("button", "photo-tile-remove", "✕");
-            remove.type = "button";
-            remove.title = "Remove from album";
-            remove.addEventListener("click", async (event) => {
-                event.stopPropagation();
-                try {
-                    await api.post(`/albums/${album.id}/photos/remove`, { photo_id: photo.id });
-                    openAlbum = await api.get(`/albums/${album.id}`);
-                    await reloadAlbums();
-                } catch (error) {
-                    albumsPanel.notice.textContent = error.message;
-                    albumsPanel.notice.hidden = false;
-                }
-                renderAlbums();
-            });
+            const badges = [];
+            // physical membership can't be edited directly, but Favorites and
+            // custom albums both get the same heart toggle every other grid
+            // uses - unfavoriting here (from the Favorites album itself) also
+            // drops the tile from this open view, same as the generic
+            // "remove from album" badge below does for a custom album
+            if (album.kind !== "physical") {
+                badges.push(buildFavoriteBadge(photo, (isFavorite) => {
+                    if (album.kind === "favorites" && !isFavorite) {
+                        openAlbum.photos = openAlbum.photos.filter((candidate) => candidate.id !== photo.id);
+                        renderAlbums();
+                    }
+                }));
+            }
+            if (album.kind === "virtual") {
+                const remove = el("button", "photo-tile-remove", "✕");
+                remove.type = "button";
+                remove.title = "Remove from album";
+                remove.addEventListener("click", async (event) => {
+                    event.stopPropagation();
+                    try {
+                        await api.post(`/albums/${album.id}/photos/remove`, { photo_id: photo.id });
+                        openAlbum = await api.get(`/albums/${album.id}`);
+                        await reloadAlbums();
+                    } catch (error) {
+                        albumsPanel.notice.textContent = error.message;
+                        albumsPanel.notice.hidden = false;
+                    }
+                    renderAlbums();
+                });
+                badges.push(remove);
+            }
 
-            grid.appendChild(buildTile(photo, () => openViewer(album.photos, position), remove));
+            grid.appendChild(buildTile(photo, () => openViewer(album.photos, position), badges));
         });
         wrapper.appendChild(grid);
         return wrapper;
@@ -1217,6 +1447,192 @@ export function mount(context) {
         return numbers.reduce((total, value) => total + value, 0) / numbers.length;
     }
 
+    /* ---------- Configuration tab ---------- */
+    //
+    // Everything Photo-specific in one place: the phone -> server path
+    // mappings physical albums are built from, the default sync
+    // destination, the recycle bin's retention period, the default import
+    // directory, and the standalone phone-sync listener's own status/token
+    // (moved in from what used to be a separate "Phone sync" toggle on the
+    // Photos toolbar - see docs/satellites/photo.md, "Mobile app"). All of
+    // it goes through the one generic /configuration route (see
+    // configuration.py) - there is no second settings mechanism here.
+
+    function buildConfigPanel() {
+        const element = el("div", "photo-tab-panel");
+        const notice = el("p", "photo-notice");
+        notice.hidden = true;
+
+        const sourcePaths = el("section", "panel photo-config-section");
+        const otherSettings = el("section", "panel photo-config-section");
+        const syncSection = el("section", "panel photo-sync");
+
+        element.append(notice, sourcePaths, otherSettings, syncSection);
+        return { element, notice, sourcePaths, otherSettings, syncSection };
+    }
+
+    async function loadConfig() {
+        configPanel.notice.hidden = true;
+        try {
+            const payload = await api.get("/configuration");
+            configState = { settings: payload.settings };
+            renderSourcePaths();
+            renderOtherSettings();
+        } catch (error) {
+            configPanel.notice.textContent = `Configuration could not be loaded: ${error.message}`;
+            configPanel.notice.hidden = false;
+        }
+    }
+
+    function settingValue(key) {
+        const setting = (configState?.settings || []).find((item) => item.key === key);
+        return setting ? setting.value : undefined;
+    }
+
+    async function saveSetting(key, value, onDone) {
+        try {
+            const payload = await api.post("/configuration", { key, value });
+            configState = { settings: payload.settings };
+            if (onDone) {
+                onDone(null, payload.note);
+            }
+        } catch (error) {
+            if (onDone) {
+                onDone(error);
+            }
+        }
+    }
+
+    function renderSourcePaths() {
+        const { sourcePaths } = configPanel;
+        sourcePaths.replaceChildren();
+
+        const mappings = (settingValue("source_paths") || []).map((entry) => ({ ...entry }));
+        const error = el("p", "banner error");
+        error.hidden = true;
+
+        const rows = el("div", "photo-source-paths");
+        const rerender = () => {
+            rows.replaceChildren(...mappings.map((entry, position) => buildSourcePathRow(entry, position)));
+        };
+
+        function buildSourcePathRow(entry, position) {
+            const row = el("div", "photo-source-path-row");
+            const phoneInput = labeledInput("Phone folder", entry.phone_path, "/Pictures/Screenshots");
+            const serverInput = labeledInput("Server path", entry.server_path, "screenshots");
+            const nameInput = labeledInput("Album name", entry.name, "Screenshots");
+            const remove = el("button", "icon-button photo-icon-button", "");
+            remove.type = "button";
+            remove.title = "Remove this mapping";
+            remove.innerHTML = DELETE_ICON;
+            remove.addEventListener("click", () => {
+                mappings.splice(position, 1);
+                rerender();
+            });
+
+            for (const [input, key] of [[phoneInput.input, "phone_path"], [serverInput.input, "server_path"], [nameInput.input, "name"]]) {
+                input.addEventListener("input", () => (entry[key] = input.value));
+            }
+
+            row.append(phoneInput.field, serverInput.field, nameInput.field, remove);
+            return row;
+        }
+
+        function labeledInput(labelText, value, placeholder) {
+            const field = el("label", "photo-source-path-field");
+            field.append(el("span", null, labelText));
+            const input = document.createElement("input");
+            input.type = "text";
+            input.value = value || "";
+            input.placeholder = placeholder;
+            input.spellcheck = false;
+            field.appendChild(input);
+            return { field, input };
+        }
+
+        rerender();
+
+        const add = el("button", "button", "Add mapping");
+        add.type = "button";
+        add.addEventListener("click", () => {
+            mappings.push({ phone_path: "", server_path: "", name: "" });
+            rerender();
+        });
+
+        const save = el("button", "button button-primary", "Save mappings");
+        save.type = "button";
+        save.addEventListener("click", async () => {
+            error.hidden = true;
+            save.disabled = true;
+            await saveSetting("source_paths", mappings, (saveError) => {
+                save.disabled = false;
+                if (saveError) {
+                    error.textContent = saveError.message;
+                    error.hidden = false;
+                } else {
+                    renderSourcePaths();
+                }
+            });
+        });
+
+        const actions = el("div", "photo-actions");
+        actions.append(add, save);
+
+        sourcePaths.append(
+            el("p", "eyebrow", "Phone folder → server path mappings"),
+            el("p", "muted", "Each mapping becomes its own physical album (see the Albums tab). The phone "
+                + "folder is whatever a phone's own camera-roll grouping calls it; the server path is never "
+                + "assumed to be the same string."),
+            rows, error, actions,
+        );
+    }
+
+    function renderOtherSettings() {
+        const { otherSettings } = configPanel;
+        otherSettings.replaceChildren();
+
+        const fields = [
+            { key: "sync_default_path", label: "Default sync destination", placeholder: "camera",
+              hint: "Physical album a synced file joins when its phone folder matches no mapping above." },
+            { key: "trash_retention_days", label: "Recycle bin retention (days)", type: "number" },
+            { key: "photo_directory", label: "Default import directory", placeholder: "/absolute/path" },
+        ];
+
+        otherSettings.appendChild(el("p", "eyebrow", "Other settings"));
+
+        for (const field of fields) {
+            const wrapper = el("div", "config-field");
+            const labelEl = el("label", null, field.label);
+            const input = document.createElement("input");
+            input.type = field.type || "text";
+            input.value = settingValue(field.key) ?? "";
+            if (field.placeholder) {
+                input.placeholder = field.placeholder;
+            }
+            const save = el("button", "button", "Save");
+            save.type = "button";
+            const status = el("span", "photo-config-status");
+
+            save.addEventListener("click", async () => {
+                save.disabled = true;
+                status.textContent = "";
+                await saveSetting(field.key, input.value, (error, note) => {
+                    save.disabled = false;
+                    status.textContent = error ? error.message : (note || "Saved.");
+                    status.classList.toggle("error", Boolean(error));
+                });
+            });
+
+            const row = el("div", "photo-config-row");
+            row.append(input, save, status);
+            wrapper.append(labelEl, row);
+            if (field.hint) {
+                wrapper.appendChild(el("p", "hint", field.hint));
+            }
+            otherSettings.appendChild(wrapper);
+        }
+    }
+
     /* ---------- viewer ---------- */
 
     function openViewer(list, position) {
@@ -1304,18 +1720,62 @@ export function mount(context) {
             ["Size", readableSize(photo.size)],
             ["Format", photo.format.toUpperCase()],
             ["Orientation", orientationLabel(metadata.orientation)],
+            // the physical album this synced photo landed in (see
+            // library.add_file()'s physical_path docstring) - absent for a
+            // desktop-imported photo, which never had one resolved at all
+            ["Path", photo.physical_path],
             ["Imported", formatDate(photo.imported_at)],
         ];
 
         const visible = rows.filter(([, value]) => value);
         viewer.meta.replaceChildren(...visible.map(([label, value, href]) => fact(label, value, href)));
         renderLocationPanel(metadata);
+        updateViewerFavoriteButton(photo);
 
         // a photo with nothing beyond its dimensions and size still has those
         // two rows, so the info button only disappears for a fully empty panel
         viewer.infoButton.hidden = visible.length === 0;
         if (visible.length === 0) {
             toggleInfo(false);
+        }
+    }
+
+    function updateViewerFavoriteButton(photo) {
+        const isFavorite = favoriteIds.has(photo.id);
+        viewer.favoriteButton.classList.toggle("active", isFavorite);
+        viewer.favoriteButton.title = isFavorite ? "Remove from Favorites" : "Add to Favorites";
+    }
+
+    // The viewer bar's own heart toggle - see buildFavoriteBadge() for the
+    // grid/album-detail equivalent this mirrors exactly.
+    async function toggleViewedFavorite() {
+        const photo = viewerList[index];
+        if (!photo) {
+            return;
+        }
+
+        viewer.favoriteButton.disabled = true;
+        const makeFavorite = !favoriteIds.has(photo.id);
+        try {
+            const path = makeFavorite ? "/albums/favorites/photos" : "/albums/favorites/photos/remove";
+            await api.post(path, { photo_id: photo.id });
+            if (makeFavorite) {
+                favoriteIds.add(photo.id);
+            } else {
+                favoriteIds.delete(photo.id);
+            }
+            updateViewerFavoriteButton(photo);
+            await reloadAlbums();
+            if (openAlbum && openAlbum.kind === "favorites" && !makeFavorite) {
+                openAlbum.photos = openAlbum.photos.filter((candidate) => candidate.id !== photo.id);
+            }
+            if (tab === "albums") {
+                renderAlbums();
+            }
+        } catch (error) {
+            // the heart simply doesn't flip
+        } finally {
+            viewer.favoriteButton.disabled = false;
         }
     }
 
@@ -1399,23 +1859,27 @@ export function mount(context) {
                 <path d="M8 7.3v4"/>
                 <circle cx="8" cy="4.9" r="0.8" fill="currentColor" stroke="none"/>
             </svg>`;
+        const favoriteButton = el("button", "photo-viewer-favorite");
+        favoriteButton.innerHTML = HEART_ICON;
         const deleteButton = el("button", "photo-viewer-delete");
         deleteButton.innerHTML = DELETE_ICON;
         const closeButton = el("button", "photo-viewer-close", "✕");
         const previous = el("button", "photo-viewer-step previous", "‹");
         const next = el("button", "photo-viewer-step next", "›");
 
-        for (const button of [infoButton, deleteButton, closeButton, previous, next]) {
+        for (const button of [infoButton, favoriteButton, deleteButton, closeButton, previous, next]) {
             button.type = "button";
         }
         infoButton.title = "Details";
         infoButton.setAttribute("aria-expanded", "false");
+        favoriteButton.title = "Add to Favorites";
         deleteButton.title = "Move to Recycle Bin";
         closeButton.title = "Close";
         previous.title = "Previous";
         next.title = "Next";
 
         infoButton.addEventListener("click", () => toggleInfo());
+        favoriteButton.addEventListener("click", () => toggleViewedFavorite());
         deleteButton.addEventListener("click", () => deleteViewedPhoto());
         closeButton.addEventListener("click", closeViewer);
         previous.addEventListener("click", () => step(-1));
@@ -1430,7 +1894,7 @@ export function mount(context) {
         const identity = el("div", "photo-viewer-identity");
         identity.append(el("p", "eyebrow", "StarCore · Photo"), title);
         const actions = el("div", "photo-viewer-bar-actions");
-        actions.append(position, infoButton, deleteButton, closeButton);
+        actions.append(position, infoButton, favoriteButton, deleteButton, closeButton);
         bar.append(identity, actions);
 
         const stage = el("div", "photo-viewer-stage");
@@ -1444,7 +1908,7 @@ export function mount(context) {
 
         element.append(bar, stage, panel);
         return {
-            element, image, video, title, position, meta, panel, infoButton, deleteButton, previous, next,
+            element, image, video, title, position, meta, panel, infoButton, favoriteButton, deleteButton, previous, next,
             locationUnavailable, locationMapEl,
         };
     }
@@ -1469,9 +1933,14 @@ export function mount(context) {
 
         viewerList = viewerList.filter((candidate) => candidate.id !== photo.id);
         photos = photos.filter((candidate) => candidate.id !== photo.id);
+        favoriteIds.delete(photo.id);
         if (openAlbum) {
             openAlbum.photos = openAlbum.photos.filter((candidate) => candidate.id !== photo.id);
-            openAlbum.photo_ids = openAlbum.photo_ids.filter((id) => id !== photo.id);
+            // a physical album has no photo_ids of its own - membership is
+            // computed from physical_path, not stored (see albums.py)
+            if (openAlbum.photo_ids) {
+                openAlbum.photo_ids = openAlbum.photo_ids.filter((id) => id !== photo.id);
+            }
         }
 
         renderGallery();
@@ -1577,6 +2046,14 @@ const RESTORE_ICON = `
 const PLAY_ICON = `
     <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
         <path d="M4.5 3.3a.8.8 0 0 1 1.22-.68l7 4.7a.8.8 0 0 1 0 1.36l-7 4.7a.8.8 0 0 1-1.22-.68V3.3z"/>
+    </svg>`;
+const HEART_ICON = `
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 13.4S2.4 10 2.4 6.1A3.1 3.1 0 0 1 8 4.2a3.1 3.1 0 0 1 5.6 1.9c0 3.9-5.6 7.3-5.6 7.3z"/>
+    </svg>`;
+const TRASH_ICON = `
+    <svg width="22" height="22" viewBox="0 0 46 46" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true">
+        <path d="M11 15.5h24M18 15.5V11a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v4.5M14.5 15.5l1.6 21a2 2 0 0 0 2 1.85h9.8a2 2 0 0 0 2-1.85l1.6-21"/>
     </svg>`;
 
 function el(tag, className, text) {
