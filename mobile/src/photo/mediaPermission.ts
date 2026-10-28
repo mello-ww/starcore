@@ -1,6 +1,7 @@
 import {PermissionsAndroid, Platform} from 'react-native';
+import type {Permission} from 'react-native';
 
-function permissionsForThisApi(): string[] {
+function permissionsForThisApi(): Permission[] {
   const version = typeof Platform.Version === 'number' ? Platform.Version : parseInt(String(Platform.Version), 10);
   // Android 13 (API 33) split the old blanket storage permission into
   // per-media-type ones; a device on the old API level still needs the

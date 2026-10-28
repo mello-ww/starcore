@@ -1,5 +1,5 @@
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import React, {useMemo, useRef, useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,

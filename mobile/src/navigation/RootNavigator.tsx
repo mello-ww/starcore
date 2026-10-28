@@ -54,7 +54,8 @@ export function RootNavigator({
     if (state.status === 'signed-in') {
       onSignedIn?.();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Deliberately keyed on state.status only: onSignedIn must fire once per
+    // sign-in, not again whenever the parent passes a new callback.
   }, [state.status]);
 
   if (state.status === 'loading') {

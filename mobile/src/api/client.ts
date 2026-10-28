@@ -70,7 +70,7 @@ export class StarCoreClient {
       const response = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',
         headers,
-        body: {uri: file.uri, type: file.type, name: file.name} as unknown as BodyInit,
+        body: {uri: file.uri, type: file.type, name: file.name},
         signal: controller.signal,
       });
 
