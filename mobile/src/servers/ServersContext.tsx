@@ -19,9 +19,13 @@ interface PendingAdd {
 interface ServersContextValue {
   loading: boolean;
   servers: ServerProfile[];
-  /** The currently selected server, or null before one has ever been
-   * added/selected - see App.tsx, which shows ConnectScreen in that case. */
+  /** The server selected in *this* app run, or null until one is picked
+   * from the server list (every cold start begins with none selected) -
+   * see App.tsx's ServersGate. */
   activeServer: ServerProfile | null;
+  /** The server that was selected last time the app ran, only used to
+   * highlight it in the server list - never selected automatically. */
+  lastServerId: string | null;
   /** Adds a server and makes it the active one in a single step - the
    * common case (the "Connect to StarCore" flow, first-run or "add
    * another server"). Resolves to the created server so a caller that
@@ -29,6 +33,9 @@ interface ServersContextValue {
    * it as `pendingAdd` - see `cancelPendingAdd`. */
   addAndActivate: (name: string, baseUrl: string) => Promise<ServerProfile>;
   switchTo: (id: string) => Promise<void>;
+  /** Back to the server list. Only forgets the in-memory selection: no
+   * session, preference or server config is touched. */
+  deselectServer: () => void;
   remove: (id: string) => Promise<void>;
   /** The server currently mid-add (not yet authenticated), if any. */
   pendingAdd: PendingAdd | null;
@@ -59,6 +66,7 @@ export function ServersProvider({children}: {children: React.ReactNode}) {
   const [loading, setLoading] = useState(true);
   const [servers, setServers] = useState<ServerProfile[]>([]);
   const [activeServerId, setActiveServerIdState] = useState<string | null>(null);
+  const [lastServerId, setLastServerId] = useState<string | null>(null);
   const [pendingAdd, setPendingAdd] = useState<PendingAdd | null>(null);
 
   useEffect(() => {
@@ -66,9 +74,10 @@ export function ServersProvider({children}: {children: React.ReactNode}) {
       await store.migrateLegacySingleServer();
       const [loadedServers, activeId] = await Promise.all([store.getServers(), store.getActiveServerId()]);
       setServers(loadedServers);
-      // a stored active id that no longer matches any server (e.g. it was
-      // removed on a previous run) is treated as "none selected", not a crash
-      setActiveServerIdState(loadedServers.some(server => server.id === activeId) ? activeId : null);
+      // the stored id is only a hint for the server list: every cold start
+      // begins with no server selected. One that no longer matches any
+      // server (e.g. it was removed on a previous run) is ignored.
+      setLastServerId(loadedServers.some(server => server.id === activeId) ? activeId : null);
       setLoading(false);
     })();
   }, []);
@@ -78,6 +87,7 @@ export function ServersProvider({children}: {children: React.ReactNode}) {
       const previousServerId = activeServerId;
       const server = await store.addServer(name, baseUrl);
       await store.setActiveServerId(server.id);
+      setLastServerId(server.id);
       setServers(await store.getServers());
       setActiveServerIdState(server.id);
       setPendingAdd({serverId: server.id, previousServerId, name: server.name, baseUrl: server.baseUrl});
@@ -88,8 +98,11 @@ export function ServersProvider({children}: {children: React.ReactNode}) {
 
   const switchTo = useCallback(async (id: string) => {
     await store.setActiveServerId(id);
+    setLastServerId(id);
     setActiveServerIdState(id);
   }, []);
+
+  const deselectServer = useCallback(() => setActiveServerIdState(null), []);
 
   const remove = useCallback(
     async (id: string) => {
@@ -111,12 +124,20 @@ export function ServersProvider({children}: {children: React.ReactNode}) {
     }
     const {serverId, previousServerId, name, baseUrl} = pendingAdd;
     setPendingAdd(null);
-    await remove(serverId);
+    // not `remove`: that would auto-select another server (briefly mounting
+    // it and prompting for its unlock) before this decides what is next
+    await store.removeServer(serverId);
+    setServers(await store.getServers());
     if (previousServerId) {
       await switchTo(previousServerId);
+    } else {
+      // added from the server list (or first run): nothing opens unless chosen
+      await store.setActiveServerId(null);
+      setLastServerId(null);
+      setActiveServerIdState(null);
     }
     return {name, address: baseUrl};
-  }, [pendingAdd, remove, switchTo]);
+  }, [pendingAdd, switchTo]);
 
   const clearPendingAdd = useCallback(() => setPendingAdd(null), []);
 
@@ -129,8 +150,10 @@ export function ServersProvider({children}: {children: React.ReactNode}) {
     loading,
     servers,
     activeServer,
+    lastServerId,
     addAndActivate,
     switchTo,
+    deselectServer,
     remove,
     pendingAdd,
     cancelPendingAdd,

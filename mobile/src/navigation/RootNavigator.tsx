@@ -1,7 +1,8 @@
 import {NavigationContainer, DarkTheme} from '@react-navigation/native';
-import React, {useEffect} from 'react';
-import {ActivityIndicator, View} from 'react-native';
+import React, {useEffect, useRef} from 'react';
+import {ActivityIndicator, StyleSheet, View} from 'react-native';
 import {useAuth} from '../auth/AuthContext';
+import {LockScreen} from '../screens/LockScreen';
 import {LoginScreen} from '../screens/LoginScreen';
 import {colors} from '../theme';
 import {MainTabs} from './MainTabs';
@@ -38,17 +39,27 @@ const navigationTheme = {
  * renders straight away, and `initialState` seeds it to open directly on
  * Settings > Servers > Add Server with what was typed still filled in,
  * instead of its usual Overview tab.
+ *
+ * Biometric app lock (AuthContext's `locked`): on a cold start the lock
+ * screen is shown alone, so no signed-in screen mounts or fetches anything
+ * before the unlock. When the app relocks after time in the background,
+ * the lock screen covers the still-mounted navigator (so navigation state
+ * survives) and the navigator is hidden from touch and accessibility.
  */
 export function RootNavigator({
   onBackToServerAddress,
+  onBackToServerList,
   onSignedIn,
   resumeAddServerParams,
 }: {
   onBackToServerAddress?: () => void;
+  /** Back from the lock screen to the server list. */
+  onBackToServerList?: () => void;
   onSignedIn?: () => void;
   resumeAddServerParams?: {name: string; address: string};
 }) {
-  const {state} = useAuth();
+  const {state, locked} = useAuth();
+  const appShown = useRef(false);
 
   useEffect(() => {
     if (state.status === 'signed-in') {
@@ -64,6 +75,13 @@ export function RootNavigator({
         <ActivityIndicator color={colors.azure} size="large" />
       </View>
     );
+  }
+
+  if (locked && !appShown.current) {
+    return <LockScreen onBack={onBackToServerList} />;
+  }
+  if (!locked) {
+    appShown.current = true;
   }
 
   const initialState = resumeAddServerParams
@@ -90,8 +108,21 @@ export function RootNavigator({
     : undefined;
 
   return (
-    <NavigationContainer theme={navigationTheme} initialState={initialState}>
-      {state.status === 'signed-in' ? <MainTabs /> : <LoginScreen onBack={onBackToServerAddress} />}
-    </NavigationContainer>
+    <View style={styles.root}>
+      <View
+        style={styles.root}
+        pointerEvents={locked ? 'none' : 'auto'}
+        importantForAccessibility={locked ? 'no-hide-descendants' : 'auto'}
+        accessibilityElementsHidden={locked}>
+        <NavigationContainer theme={navigationTheme} initialState={initialState}>
+          {state.status === 'signed-in' ? <MainTabs /> : <LoginScreen onBack={onBackToServerAddress} />}
+        </NavigationContainer>
+      </View>
+      {locked && <LockScreen onBack={onBackToServerList} />}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {flex: 1},
+});

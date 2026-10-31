@@ -148,78 +148,273 @@ describe('SessionManager', () => {
       expect(await manager.biometricUnlockEnabled()).toBe(false);
     });
 
-    it('moves the token behind the platform biometric gate once enabled', async () => {
-      const {api, secureStore, manager} = setUp();
-      const session = await manager.login(api.correctUsername, api.correctPassword);
+    it('stores the preference securely after a successful prompt', async () => {
+      const {api, biometrics, secureStore, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
 
-      const enabled = await manager.enableBiometricUnlock(session);
+      expect(await manager.enableBiometricUnlock()).toBe('enabled');
 
-      expect(enabled).toBe(true);
-      expect(secureStore.isGated(TOKEN_KEY)).toBe(true);
+      expect(biometrics.authenticateCalls).toHaveLength(1);
+      expect(await secureStore.getItem(BIOMETRIC_ENABLED_KEY)).toBe('true');
       expect(await manager.biometricUnlockEnabled()).toBe(true);
     });
 
-    it('does not enable the gate if the confirmation prompt fails', async () => {
-      const {api, biometrics, secureStore, manager} = setUp();
+    it('persists across a new SessionManager (app restart)', async () => {
+      const {api, secureStore, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
+      await manager.enableBiometricUnlock();
+
+      const restarted = new SessionManager(api, secureStore, new FakeBiometrics(), new FakeDeviceInfo());
+
+      expect(await restarted.biometricUnlockEnabled()).toBe(true);
+    });
+
+    it('leaves the session token where it was, readable without a prompt', async () => {
+      const {api, secureStore, manager} = setUp();
       const session = await manager.login(api.correctUsername, api.correctPassword);
+
+      await manager.enableBiometricUnlock();
+
+      // background sync reads this with no UI - it must not move or be gated
+      expect(await secureStore.getItem(TOKEN_KEY)).toBe(session.token);
+      expect(await manager.restore()).toEqual(session);
+    });
+
+    it('does not enable when the prompt is cancelled or fails', async () => {
+      const {api, biometrics, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
       biometrics.authenticateResult = false;
 
-      const enabled = await manager.enableBiometricUnlock(session);
-
-      expect(enabled).toBe(false);
-      expect(secureStore.isGated(TOKEN_KEY)).toBe(false);
-    });
-
-    it('a cancelled biometric prompt on restore falls back to signed-out, not a crash', async () => {
-      const {api, secureStore, manager} = setUp();
-      const session = await manager.login(api.correctUsername, api.correctPassword);
-      await manager.enableBiometricUnlock(session);
-      secureStore.biometricReadWillSucceed = false;
-
-      const restored = await manager.restore();
-
-      expect(restored).toBeNull();
-    });
-
-    it('resolves false, not a rejection, when the Keystore write fails after a successful prompt', async () => {
-      const {api, secureStore, manager} = setUp();
-      const session = await manager.login(api.correctUsername, api.correctPassword);
-      secureStore.setItemWillFail = true;
-
-      await expect(manager.enableBiometricUnlock(session)).resolves.toBe(false);
+      expect(await manager.enableBiometricUnlock()).toBe('cancelled');
       expect(await manager.biometricUnlockEnabled()).toBe(false);
     });
 
-    it('leaves password sign-in working after a Keystore write failure', async () => {
+    it('treats an authenticator that throws as cancelled, never enabled', async () => {
+      const {api, biometrics, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
+      biometrics.authenticate = async () => {
+        throw new Error('lockout');
+      };
+
+      expect(await manager.enableBiometricUnlock()).toBe('cancelled');
+      expect(await manager.biometricUnlockEnabled()).toBe(false);
+    });
+
+    it('reports missing enrollment without prompting', async () => {
+      const {api, biometrics, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
+      biometrics.available = false;
+      biometrics.reason = 'not-enrolled';
+
+      expect(await manager.enableBiometricUnlock()).toBe('not-enrolled');
+      expect(biometrics.authenticateCalls).toHaveLength(0);
+      expect(await manager.biometricUnlockEnabled()).toBe(false);
+    });
+
+    it('reports missing hardware without prompting', async () => {
+      const {api, biometrics, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
+      biometrics.available = false;
+      biometrics.reason = 'no-hardware';
+
+      expect(await manager.enableBiometricUnlock()).toBe('unavailable');
+      expect(biometrics.authenticateCalls).toHaveLength(0);
+    });
+
+    it('treats an availability check that throws as unavailable', async () => {
+      const {api, biometrics, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
+      biometrics.isAvailable = async () => {
+        throw new Error('native error');
+      };
+
+      expect(await manager.enableBiometricUnlock()).toBe('unavailable');
+      expect(await manager.biometricsAvailable()).toBe(false);
+    });
+
+    it("resolves 'failed', not a rejection, when the Keystore write fails", async () => {
       const {api, secureStore, manager} = setUp();
       const session = await manager.login(api.correctUsername, api.correctPassword);
       secureStore.setItemWillFail = true;
-      await manager.enableBiometricUnlock(session);
+
+      await expect(manager.enableBiometricUnlock()).resolves.toBe('failed');
+      expect(await manager.biometricUnlockEnabled()).toBe(false);
       secureStore.setItemWillFail = false;
-
-      expect(await manager.restore()).toEqual({token: session.token});
+      expect(await manager.restore()).toEqual(session);
     });
 
-    it('disabling never rejects even if the Keystore write fails', async () => {
-      const {api, secureStore, manager} = setUp();
-      const session = await manager.login(api.correctUsername, api.correctPassword);
-      await manager.enableBiometricUnlock(session);
-      secureStore.setItemWillFail = true;
+    it('disabling requires a successful prompt and clears the stored preference', async () => {
+      const {api, biometrics, secureStore, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
+      await manager.enableBiometricUnlock();
 
-      await expect(manager.disableBiometricUnlock(session)).resolves.toBeUndefined();
-      // biometricEnabledKey is cleared regardless, so the UI reflects "off"
+      expect(await manager.disableBiometricUnlock()).toBe('disabled');
+
+      expect(biometrics.authenticateCalls).toHaveLength(2);
+      expect(await secureStore.getItem(BIOMETRIC_ENABLED_KEY)).toBeNull();
       expect(await manager.biometricUnlockEnabled()).toBe(false);
     });
 
-    it('disable moves the token back to a plain, non-gated entry', async () => {
+    it('a cancelled prompt keeps biometric unlock on', async () => {
+      const {api, biometrics, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
+      await manager.enableBiometricUnlock();
+      biometrics.authenticateResult = false;
+
+      expect(await manager.disableBiometricUnlock()).toBe('cancelled');
+      expect(await manager.biometricUnlockEnabled()).toBe(true);
+    });
+
+    it('cannot be disabled without biometrics, and keeps the session', async () => {
+      const {api, biometrics, secureStore, manager} = setUp();
+      const session = await manager.login(api.correctUsername, api.correctPassword);
+      await manager.enableBiometricUnlock();
+      biometrics.available = false;
+      biometrics.reason = 'not-enrolled';
+
+      expect(await manager.disableBiometricUnlock()).toBe('not-enrolled');
+      expect(await manager.biometricUnlockEnabled()).toBe(true);
+      expect(await secureStore.getItem(TOKEN_KEY)).toBe(session.token);
+    });
+
+    it('disabling never touches the session token', async () => {
       const {api, secureStore, manager} = setUp();
       const session = await manager.login(api.correctUsername, api.correctPassword);
-      await manager.enableBiometricUnlock(session);
+      await manager.enableBiometricUnlock();
 
-      await manager.disableBiometricUnlock(session);
+      await manager.disableBiometricUnlock();
 
-      expect(secureStore.isGated(TOKEN_KEY)).toBe(false);
+      expect(await secureStore.getItem(TOKEN_KEY)).toBe(session.token);
+    });
+
+    it('logout keeps the preference: only an authenticated disable ever removes it', async () => {
+      const {api, secureStore, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
+      await manager.enableBiometricUnlock();
+
+      await manager.logout();
+
+      expect(await secureStore.getItem(TOKEN_KEY)).toBeNull();
+      expect(await secureStore.getItem(BIOMETRIC_ENABLED_KEY)).toBe('true');
+      expect(await manager.biometricUnlockEnabled()).toBe(true);
+    });
+
+    it('keeps the preference through repeated launches with a dismissed prompt', async () => {
+      const {api, secureStore, biometrics, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
+      await manager.enableBiometricUnlock();
+      biometrics.authenticate = async () => {
+        // react-native-biometrics rejects when the prompt is dismissed by
+        // tapping outside it (BiometricPrompt ERROR_CANCELED)
+        throw new Error('Authentication canceled');
+      };
+
+      for (let launch = 0; launch < 3; launch += 1) {
+        const relaunched = new SessionManager(api, secureStore, biometrics, new FakeDeviceInfo());
+        expect(await relaunched.biometricUnlockEnabled()).toBe(true);
+        expect(await relaunched.disableBiometricUnlock()).toBe('cancelled');
+        expect(await relaunched.restore()).not.toBeNull(); // session untouched
+      }
+      expect(await secureStore.getItem(BIOMETRIC_ENABLED_KEY)).toBe('true');
+    });
+
+    it('fails closed: an unreadable store counts as enabled, never as off', async () => {
+      const {api, secureStore, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
+      await manager.enableBiometricUnlock();
+      secureStore.readsWillFail = true;
+
+      expect(await manager.biometricPreference()).toBe('unknown');
+      expect(await manager.biometricUnlockEnabled()).toBe(true);
+
+      secureStore.readsWillFail = false;
+      expect(await manager.biometricPreference()).toBe('on'); // nothing was lost
+    });
+
+    it('retries a transient read error once before giving up', async () => {
+      const {api, secureStore, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
+      await manager.enableBiometricUnlock();
+      const real = secureStore.getItemStrict.bind(secureStore);
+      let calls = 0;
+      secureStore.getItemStrict = async key => {
+        calls += 1;
+        if (calls === 1) {
+          throw new Error('transient');
+        }
+        return real(key);
+      };
+
+      expect(await manager.biometricPreference()).toBe('on');
+    });
+
+    it('reports a fresh install (nothing stored) as off', async () => {
+      const {manager} = setUp();
+
+      expect(await manager.biometricPreference()).toBe('off');
       expect(await manager.biometricUnlockEnabled()).toBe(false);
+    });
+
+    describe('password recovery', () => {
+      it('turns it off without biometrics only after a password login, when biometrics are unavailable', async () => {
+        const {api, biometrics, manager} = setUp();
+        await manager.login(api.correctUsername, api.correctPassword);
+        await manager.enableBiometricUnlock();
+        biometrics.available = false;
+        biometrics.reason = 'not-enrolled';
+        biometrics.authenticateCalls = [];
+
+        expect(await manager.disableBiometricUnlock({passwordVerified: true})).toBe('disabled');
+
+        expect(biometrics.authenticateCalls).toHaveLength(0);
+        expect(await manager.biometricUnlockEnabled()).toBe(false);
+      });
+
+      it('still requires biometrics when they are available, even after a password login', async () => {
+        const {api, biometrics, manager} = setUp();
+        await manager.login(api.correctUsername, api.correctPassword);
+        await manager.enableBiometricUnlock();
+        biometrics.authenticateResult = false;
+
+        expect(await manager.disableBiometricUnlock({passwordVerified: true})).toBe('cancelled');
+        expect(await manager.biometricUnlockEnabled()).toBe(true);
+      });
+
+      it('never turns it off without password proof when biometrics are unavailable', async () => {
+        const {api, biometrics, manager} = setUp();
+        await manager.login(api.correctUsername, api.correctPassword);
+        await manager.enableBiometricUnlock();
+        biometrics.available = false;
+        biometrics.reason = 'no-hardware';
+
+        expect(await manager.disableBiometricUnlock()).toBe('unavailable');
+        expect(await manager.biometricUnlockEnabled()).toBe(true);
+      });
+
+      it('keeps the lock on across logout and a new password login', async () => {
+        const {api, biometrics, secureStore, manager} = setUp();
+        await manager.login(api.correctUsername, api.correctPassword);
+        await manager.enableBiometricUnlock();
+        biometrics.available = false;
+        biometrics.reason = 'not-enrolled';
+
+        await manager.logout();
+        const session = await manager.login(api.correctUsername, api.correctPassword);
+
+        expect(await secureStore.getItem(TOKEN_KEY)).toBe(session.token);
+        expect(await manager.biometricUnlockEnabled()).toBe(true);
+      });
+    });
+
+    it('keeps the preference when the server is unreachable at restore', async () => {
+      const {api, manager} = setUp();
+      await manager.login(api.correctUsername, api.correctPassword);
+      await manager.enableBiometricUnlock();
+      api.unreachable = true;
+
+      await manager.restore();
+
+      expect(await manager.biometricUnlockEnabled()).toBe(true);
     });
   });
 
@@ -253,6 +448,34 @@ describe('SessionManager', () => {
 
       expect(await managerA.restore()).toBeNull(); // server A signed out...
       expect(await managerB.restore()).toEqual(sessionB); // ...server B is untouched
+    });
+
+    it('keeps each server biometric preference separate', async () => {
+      const secureStore = new FakeSecureStore();
+      const apiA = new FakeAuthApi();
+      const apiB = new FakeAuthApi();
+      const managerA = new SessionManager(
+        apiA, secureStore, new FakeBiometrics(), new FakeDeviceInfo(), `${TOKEN_KEY}:server-a`, `${BIOMETRIC_ENABLED_KEY}:server-a`,
+      );
+      const managerB = new SessionManager(
+        apiB, secureStore, new FakeBiometrics(), new FakeDeviceInfo(), `${TOKEN_KEY}:server-b`, `${BIOMETRIC_ENABLED_KEY}:server-b`,
+      );
+      await managerA.login(apiA.correctUsername, apiA.correctPassword);
+      const sessionB = await managerB.login(apiB.correctUsername, apiB.correctPassword);
+
+      expect(await managerA.enableBiometricUnlock()).toBe('enabled');
+
+      expect(await managerA.biometricUnlockEnabled()).toBe(true);
+      expect(await managerB.biometricUnlockEnabled()).toBe(false);
+
+      await managerA.logout();
+
+      expect(await managerB.restore()).toEqual(sessionB);
+      expect(await managerB.biometricUnlockEnabled()).toBe(false);
+      expect(await managerA.biometricUnlockEnabled()).toBe(true); // A's preference survives its own logout
+      expect(secureStore.keys().sort()).toEqual(
+        [`${BIOMETRIC_ENABLED_KEY}:server-a`, `${TOKEN_KEY}:server-b`].sort(),
+      );
     });
 
     it('defaults to the plain, single-server keys when none are given', async () => {

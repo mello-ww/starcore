@@ -1,11 +1,15 @@
 import React, {useEffect, useState} from 'react';
+import {BackHandler, View} from 'react-native';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {AuthProvider} from './auth/AuthContext';
 import {OnboardingNavigator} from './navigation/OnboardingNavigator';
 import {configureBackgroundFetch, triggerForegroundSync} from './photo/backgroundSyncTask';
 import {RootNavigator} from './navigation/RootNavigator';
+import {ConnectScreen} from './screens/ConnectScreen';
+import {ServerListScreen} from './screens/ServerListScreen';
 import {ServersProvider, useServers} from './servers/ServersContext';
+import {colors} from './theme';
 
 type ResumeInfo = {name: string; address: string};
 
@@ -47,7 +51,16 @@ export default function App() {
 }
 
 function ServersGate() {
-  const {loading, activeServer, addAndActivate, pendingAdd, cancelPendingAdd, clearPendingAdd} = useServers();
+  const {
+    loading,
+    servers,
+    activeServer,
+    addAndActivate,
+    pendingAdd,
+    cancelPendingAdd,
+    clearPendingAdd,
+    deselectServer,
+  } = useServers();
 
   // What was typed for whichever server is currently mid-add (see
   // ServersContext's `pendingAdd`), kept here - the one component that
@@ -57,8 +70,48 @@ function ServersGate() {
   // server, or MainTabs' "Add Server" screen for every one after that.
   const [resumeInfo, setResumeInfo] = useState<ResumeInfo | null>(null);
 
+  // "Add server" opened from the server list (not first-run onboarding)
+  const [addingFromList, setAddingFromList] = useState(false);
+
+  useEffect(() => {
+    if (!addingFromList) {
+      return;
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      setAddingFromList(false);
+      setResumeInfo(null);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [addingFromList]);
+
   if (loading) {
     return null; // one frame of nothing while AsyncStorage resolves - not worth a spinner for
+  }
+
+  if (!activeServer && servers.length > 0) {
+    // every cold start (and every "back" out of a server's lock or login
+    // screen) lands here: nothing server-specific is mounted until the user
+    // picks one
+    if (addingFromList) {
+      return (
+        <View style={{flex: 1, backgroundColor: colors.void}}>
+          <ConnectScreen
+            initialName={resumeInfo?.name ?? ''}
+            initialAddress={resumeInfo?.address ?? ''}
+            onBack={() => {
+              setAddingFromList(false);
+              setResumeInfo(null);
+            }}
+            onConnect={async (name, url) => {
+              setAddingFromList(false);
+              await addAndActivate(name, url);
+            }}
+          />
+        </View>
+      );
+    }
+    return <ServerListScreen onAdd={() => setAddingFromList(true)} />;
   }
 
   if (!activeServer) {
@@ -86,9 +139,21 @@ function ServersGate() {
         resumeAddServerParams={resumeInfo ?? undefined}
         onBackToServerAddress={
           pendingAdd?.serverId === activeServer.id
-            ? async () => setResumeInfo(await cancelPendingAdd())
-            : undefined
+            ? async () => {
+                // added from the server list when other servers exist: the
+                // add form reopens over the list. First-ever server: no
+                // servers remain, so onboarding resumes by itself. Added
+                // from Settings: the previous server is restored and
+                // RootNavigator resumes Settings > Add Server.
+                const reopenAddForm = pendingAdd.previousServerId === null && servers.length > 1;
+                const info = await cancelPendingAdd();
+                setResumeInfo(info);
+                setAddingFromList(reopenAddForm);
+              }
+            : // an ordinary sign-in screen or lock screen: Back is the server list
+              deselectServer
         }
+        onBackToServerList={deselectServer}
         onSignedIn={() => {
           clearPendingAdd();
           setResumeInfo(null);

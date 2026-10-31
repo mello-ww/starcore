@@ -94,11 +94,10 @@ const cameraRollSource: CameraRollSource = {
 async function syncServer(serverId: string, baseUrl: string): Promise<void> {
   const token = await secureStorage.getItem(`${TOKEN_KEY}:${serverId}`);
   if (!token) {
-    // signed out, or the token is behind a biometric gate this headless
-    // run has no way to satisfy (see secureStorage.android.ts's own
-    // docstring: a gated read resolves to null rather than rejecting) -
-    // this run does nothing for this server; the next foreground open or
-    // periodic tick, once the app has a live token again, tries again
+    // signed out of this server - this run does nothing for it. The
+    // biometric app lock never applies here: it only gates the UI (see
+    // src/auth/appLock.ts), and the token is never biometric-gated in
+    // secure storage, so headless runs keep syncing while the app is locked
     return;
   }
 

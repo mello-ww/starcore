@@ -1,5 +1,5 @@
 import type {AuthApiClient} from '../api/auth';
-import type {BiometricAuthenticator, DeviceInfo, SecureStore} from '../platform/types';
+import type {BiometricAuthenticator, BiometricAvailability, DeviceInfo, SecureStore} from '../platform/types';
 
 /** Exported so App.tsx/AuthContext can wire `StarCoreClient`'s token
  * provider to read from the exact same SecureStore entry `SessionManager`
@@ -15,6 +15,12 @@ export const BIOMETRIC_ENABLED_KEY = 'starcore_biometric_unlock_enabled';
 export interface Session {
   token: string;
 }
+
+/** Outcome of turning biometric unlock on or off. Only `'enabled'` /
+ * `'disabled'` change anything; `'cancelled'` is not an error. */
+export type BiometricToggleResult = 'cancelled' | 'not-enrolled' | 'unavailable' | 'failed';
+export type BiometricEnableResult = 'enabled' | BiometricToggleResult;
+export type BiometricDisableResult = 'disabled' | BiometricToggleResult;
 
 /**
  * Owns the session token's entire lifecycle on this device: obtaining one
@@ -97,58 +103,102 @@ export class SessionManager {
       // regardless of whether StarCore could be reached just now
     }
     await this.clearStoredToken();
-    await this.secureStore.removeItem(this.biometricEnabledKey);
+    // The biometric preference is deliberately kept: it may only be turned
+    // off through disableBiometricUnlock, never as a side effect of signing
+    // out (including the lock screen's password recovery).
   }
 
-  /** Whether biometric unlock has been turned on for the *currently
-   * stored* token - not a general device capability check (see
-   * `biometricsAvailable()` for that, used to decide whether to even show
-   * the toggle). */
+  /** Reads the stored preference without ever guessing: an unreadable
+   * store is 'unknown', not 'off'. Retried once for transient Keystore
+   * errors. */
+  async biometricPreference(): Promise<'on' | 'off' | 'unknown'> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return (await this.secureStore.getItemStrict(this.biometricEnabledKey)) === 'true' ? 'on' : 'off';
+      } catch {
+        // retry once, then fall through
+      }
+    }
+    return 'unknown';
+  }
+
+  /** Whether biometric protection applies for this server. Fails closed:
+   * an unreadable preference counts as enabled, so a Keystore hiccup can
+   * never open a protected server without authentication. Stored in
+   * SecureStore, never AsyncStorage, so it can't be switched off by editing
+   * plain app storage. */
   async biometricUnlockEnabled(): Promise<boolean> {
-    return (await this.secureStore.getItem(this.biometricEnabledKey)) === 'true';
+    return (await this.biometricPreference()) !== 'off';
   }
 
   async biometricsAvailable(): Promise<boolean> {
-    const {available} = await this.biometrics.isAvailable();
-    return available;
+    return (await this.biometricAvailability()).available;
   }
 
-  /** Re-stores the current session token behind the platform's biometric
-   * gate (see `SecureStore.setItem`'s `requireAuthentication` option) -
-   * from this point on, reading it back (including on the next app
-   * launch's `restore()`) requires the OS's own biometric prompt to
-   * succeed first. Confirms the sensor actually works on this device
-   * before doing so, so a device that reports biometrics available but
-   * then fails every prompt can't lock a user out of their own stored
-   * session. */
-  async enableBiometricUnlock(session: Session): Promise<boolean> {
-    const confirmed = await this.biometrics.authenticate('Confirm biometric unlock for StarCore');
-    if (!confirmed) {
-      return false; // user cancelled, or the sensor rejected them - not an error
+  async biometricAvailability(): Promise<BiometricAvailability> {
+    try {
+      return await this.biometrics.isAvailable();
+    } catch {
+      return {available: false, biometryType: 'none', reason: 'unavailable'};
+    }
+  }
+
+  /** Turns biometric unlock on: checks the sensor and enrollment, shows the
+   * OS prompt, and only on a successful match stores the preference. The
+   * session token itself is not moved or re-encrypted - the lock is
+   * enforced in front of the UI (see appLock.ts) so background sync can
+   * keep reading it. Never throws. */
+  async enableBiometricUnlock(): Promise<BiometricEnableResult> {
+    const confirmed = await this.confirmWithBiometrics('Confirm biometric unlock for StarCore');
+    if (confirmed !== true) {
+      return confirmed;
     }
     try {
-      await this.secureStore.setItem(this.tokenKey, session.token, {requireAuthentication: true});
       await this.secureStore.setItem(this.biometricEnabledKey, 'true');
-      return true;
     } catch {
-      // The OS-level prompt above succeeded, but binding the Keystore
-      // entry to it can still fail on its own (enrollment changed
-      // mid-flow, device policy, ...). Same "never throws" contract as
-      // the rest of this class - the un-gated token from login() is left
-      // exactly as it was, so password sign-in is unaffected.
-      return false;
+      return 'failed';
     }
+    if ((await this.biometricPreference()) === 'on') {
+      return 'enabled';
+    }
+    // written but can't be read back: don't leave a preference behind that
+    // the UI reports as off
+    await this.secureStore.removeItem(this.biometricEnabledKey).catch(() => undefined);
+    return 'failed';
   }
 
-  async disableBiometricUnlock(session: Session): Promise<void> {
-    try {
-      await this.secureStore.setItem(this.tokenKey, session.token, {requireAuthentication: false});
-    } catch {
-      // best effort - biometricEnabledKey is still cleared below so the
-      // UI reflects "off" regardless of whether the ungated re-write
-      // landed
+  /** Turns biometric unlock off. This is the only code path that ever
+   * removes the preference, and it requires a successful biometric match.
+   * The one exception is `passwordVerified`: the caller has just
+   * re-authenticated against the real server with the password (the
+   * recovery path), and biometrics can't be used on this device right now.
+   * Never throws, and never touches the session token. */
+  async disableBiometricUnlock(options: {passwordVerified?: boolean} = {}): Promise<BiometricDisableResult> {
+    const availability = await this.biometricAvailability();
+    if (!(options.passwordVerified && !availability.available)) {
+      const confirmed = await this.confirmWithBiometrics('Confirm turning off biometric unlock for StarCore');
+      if (confirmed !== true) {
+        return confirmed;
+      }
     }
-    await this.secureStore.removeItem(this.biometricEnabledKey);
+    try {
+      await this.secureStore.removeItem(this.biometricEnabledKey);
+    } catch {
+      return 'failed';
+    }
+    return (await this.biometricPreference()) === 'off' ? 'disabled' : 'failed';
+  }
+
+  private async confirmWithBiometrics(promptMessage: string): Promise<true | BiometricToggleResult> {
+    const {available, reason} = await this.biometricAvailability();
+    if (!available) {
+      return reason === 'not-enrolled' ? 'not-enrolled' : 'unavailable';
+    }
+    try {
+      return (await this.biometrics.authenticate(promptMessage)) === true ? true : 'cancelled';
+    } catch {
+      return 'cancelled';
+    }
   }
 
   private async clearStoredToken(): Promise<void> {

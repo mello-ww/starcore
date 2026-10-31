@@ -15,44 +15,53 @@
 
 /** A small secure key/value store - Android Keystore-backed via
  * react-native-keychain (see secureStorage.android.ts), iOS Keychain-backed
- * in the future. Holds exactly one thing StarCore actually needs kept
- * secret: the session token (see src/auth/session.ts) - never the
- * password, which this app never stores at all past the login request
- * that sends it once over the wire. */
+ * in the future. Holds the session token per server and the biometric
+ * unlock preference (see src/auth/session.ts) - never the password, which
+ * this app never stores at all past the login request that sends it once
+ * over the wire.
+ *
+ * Entries are encrypted at rest but never biometric-gated: the headless
+ * background sync task (src/photo/backgroundSyncTask.ts) must read the
+ * token with no UI, and every API request reads it too. Biometric unlock
+ * is enforced as an app lock in front of the UI instead - see
+ * src/auth/appLock.ts. */
 export interface SecureStore {
-  /** Stores `value` under `key`. `requireAuthentication: true` asks the
-   * platform to gate this specific entry behind the device's biometric
-   * (or PIN/pattern fallback) unlock - see "Biometric unlock" in
-   * README.md. Overwrites whatever was there, including its previous
-   * `requireAuthentication` setting. */
-  setItem(key: string, value: string, options?: {requireAuthentication?: boolean}): Promise<void>;
+  /** Stores `value` under `key`, overwriting whatever was there. */
+  setItem(key: string, value: string): Promise<void>;
 
-  /** Reads `value` back, or `null` if nothing is stored under `key`. If the
-   * entry was stored with `requireAuthentication: true`, the platform
-   * itself prompts for biometrics before this resolves - StarCore never
-   * sees the value at all unless that check passes, and never implements
-   * its own "was biometrics ok?" flag to bypass. Resolves to `null`
-   * (never rejects) if the user cancels or fails that prompt, so callers
-   * can treat "declined" and "not present" the same way: fall back to a
-   * normal login. */
+  /** Reads `value` back, or `null` if nothing is stored under `key` or it
+   * can't be read. Never rejects. */
   getItem(key: string): Promise<string | null>;
+
+  /** Like `getItem`, but rejects when the platform store itself can't be
+   * read, so "absent" (`null`) is never confused with "unreadable". Used for
+   * security preferences that must fail closed, e.g. the biometric lock. */
+  getItemStrict(key: string): Promise<string | null>;
 
   removeItem(key: string): Promise<void>;
 }
 
 export type BiometryType = 'fingerprint' | 'face' | 'iris' | 'none';
 
-/** Whether *this device* can do biometric authentication at all, and a way
- * to ask for it directly (used only to show/confirm the "Enable biometric
- * unlock" toggle - the actual gate that protects the session token is
- * `SecureStore`'s `requireAuthentication`, not this). */
-export interface BiometricAuthenticator {
-  isAvailable(): Promise<{available: boolean; biometryType: BiometryType}>;
+/** Why biometrics can't be used right now: no sensor at all, a sensor but
+ * nothing enrolled, or anything else (sensor temporarily unavailable, an
+ * unsupported OS version, an error while checking). */
+export type BiometricUnavailableReason = 'no-hardware' | 'not-enrolled' | 'unavailable';
 
-  /** Shows the OS's own biometric prompt once, for its own sake (e.g. when
-   * the user first turns the "Enable biometric unlock" toggle on) - not
-   * something session restore needs to call itself, since SecureStore's
-   * `requireAuthentication` entries prompt on their own when read. */
+export interface BiometricAvailability {
+  available: boolean;
+  biometryType: BiometryType;
+  reason?: BiometricUnavailableReason;
+}
+
+/** Whether *this device* can do strong biometric authentication, and a way
+ * to ask for it. Used by the biometric unlock toggle in Settings and by the
+ * app lock (src/auth/appLock.ts). */
+export interface BiometricAuthenticator {
+  isAvailable(): Promise<BiometricAvailability>;
+
+  /** Shows the OS's own biometric prompt. Resolves `true` only on a
+   * successful match; cancellation, failure and errors all resolve `false`. */
   authenticate(promptMessage: string): Promise<boolean>;
 }
 

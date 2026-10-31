@@ -11,6 +11,14 @@ import type {SettingsStackParamList} from '../navigation/MainTabs';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'SettingsHome'>;
 
+const NOT_ENROLLED_MESSAGE = 'No fingerprint is enrolled on this device. Add one in Android Settings first.';
+
+const TOGGLE_MESSAGES: Record<string, string> = {
+  'not-enrolled': NOT_ENROLLED_MESSAGE,
+  unavailable: 'Biometric authentication is not available on this device right now.',
+  failed: 'Could not save the biometric unlock setting. Please try again.',
+};
+
 /**
  * "Settings" tab: configuration of *this mobile app* - kept strictly
  * separate from "Config" (the remote StarCore server's own settings, see
@@ -22,7 +30,9 @@ export function SettingsScreen({navigation}: Props) {
   const {
     logout,
     biometricsAvailable,
+    biometricsUnavailableReason,
     biometricUnlockEnabled,
+    passwordRecoveryAvailable,
     enableBiometricUnlock,
     disableBiometricUnlock,
   } = useAuth();
@@ -34,11 +44,10 @@ export function SettingsScreen({navigation}: Props) {
     setBusy(true);
     setBioError(null);
     try {
-      if (next) {
-        await enableBiometricUnlock();
-      } else {
-        await disableBiometricUnlock();
-      }
+      // the Switch is controlled by biometricUnlockEnabled, so it only moves
+      // once the change has been authenticated and stored
+      const result = next ? await enableBiometricUnlock() : await disableBiometricUnlock();
+      setBioError(TOGGLE_MESSAGES[result as string] ?? null);
     } catch (err: any) {
       // enableBiometricUnlock/disableBiometricUnlock are documented to
       // resolve rather than reject for every expected outcome (cancelled
@@ -50,6 +59,10 @@ export function SettingsScreen({navigation}: Props) {
       setBusy(false);
     }
   };
+
+  const notEnrolled = !biometricsAvailable && biometricsUnavailableReason === 'not-enrolled';
+  // still shown when biometrics went away after enabling, so it can be seen as on
+  const showBiometricCard = biometricsAvailable || notEnrolled || biometricUnlockEnabled;
 
   return (
     <View style={styles.screen}>
@@ -71,24 +84,31 @@ export function SettingsScreen({navigation}: Props) {
           </Card>
         </Pressable>
 
-        {biometricsAvailable && (
+        {showBiometricCard && (
           <Card style={styles.card}>
             <View style={styles.row}>
               <View style={styles.rowText}>
                 <Text style={typography.heading}>Biometric unlock</Text>
                 <Text style={[typography.caption, styles.caption]}>
-                  Use your fingerprint or face to sign back in, instead of your password, on this
-                  device only.
+                  Require your fingerprint to open StarCore for this server, on this device only.
                 </Text>
               </View>
               <Switch
                 value={biometricUnlockEnabled}
                 onValueChange={toggleBiometrics}
-                disabled={busy}
+                disabled={busy || (!biometricsAvailable && !passwordRecoveryAvailable)}
                 testID="biometric-unlock-switch"
               />
             </View>
-            {bioError && <Text style={styles.error}>{bioError}</Text>}
+            {bioError ? (
+              <Text style={styles.error}>{bioError}</Text>
+            ) : passwordRecoveryAvailable ? (
+              <Text style={[typography.caption, styles.caption]}>
+                Biometrics aren't available, but you just signed in with your password, so you can turn this off.
+              </Text>
+            ) : notEnrolled ? (
+              <Text style={[typography.caption, styles.caption]}>{NOT_ENROLLED_MESSAGE}</Text>
+            ) : null}
           </Card>
         )}
 

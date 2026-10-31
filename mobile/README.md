@@ -124,13 +124,31 @@ against the live server (`GET /api/auth/status`) before trusting it.
 
 ### Biometric unlock
 
-Turning on "Biometric unlock" in Settings re-stores the session token
-behind the device's biometric gate (Android Keystore's
-`BIOMETRY_CURRENT_SET` access control, via `react-native-keychain`) rather
-than the app implementing its own "was the fingerprint check ok?" flag -
-the OS itself refuses to release the stored token until the prompt
-succeeds. See `src/platform/types.ts` (`SecureStore`, `BiometricAuthenticator`)
-and `src/auth/session.ts`'s `enableBiometricUnlock`/`disableBiometricUnlock`.
+"Biometric unlock" in Settings is a per-server app lock. Turning it on (or
+off) checks the sensor and enrollment and requires a successful fingerprint
+match first; the preference is then stored in the Android Keystore-backed
+secure store next to that server's session token, never in AsyncStorage.
+
+Every cold start opens the server list first; nothing server-specific is
+mounted until a server is picked (Server List -> Select Server -> Biometric
+unlock or Login -> StarCore). While the lock is on, the lock screen shows
+until the fingerprint prompt succeeds, and the app locks again after 30
+seconds in the background (`RELOCK_AFTER_BACKGROUND_MS` in
+`src/auth/appLock.ts`). Back (button or hardware) on the lock screen and the
+login screen returns to the server list.
+
+The preference is only ever removed by turning it off in Settings, which
+needs a successful fingerprint. A cancelled, dismissed (tap outside the
+prompt), failed or errored prompt changes nothing, never deletes the session
+or server list, and logging out keeps the preference. An unreadable
+preference counts as "on". If biometrics stop working, "Sign in with
+password" on the lock screen signs in against the real server; after that
+login, Settings allows turning the lock off without a fingerprint.
+
+The session token itself is encrypted in the Keystore but deliberately not
+biometric-gated: every API request reads it, and the headless Photo
+background sync task must read it with no UI at all. See
+`src/auth/appLock.ts`, `src/auth/session.ts` and `src/platform/types.ts`.
 
 This is local to the device end-to-end: StarCore's server never receives a
 fingerprint, a face scan, or any biometric template - it only ever sees the

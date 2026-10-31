@@ -1,6 +1,12 @@
 import type {AuthApiClient} from '../src/api/auth';
 import type {AuthStatus} from '../src/api/types';
-import type {BiometricAuthenticator, BiometryType, DeviceInfo, SecureStore} from '../src/platform/types';
+import type {
+  BiometricAuthenticator,
+  BiometricUnavailableReason,
+  BiometryType,
+  DeviceInfo,
+  SecureStore,
+} from '../src/platform/types';
 
 /**
  * Plain in-memory fakes for every interface `SessionManager` depends on -
@@ -13,56 +19,60 @@ import type {BiometricAuthenticator, BiometryType, DeviceInfo, SecureStore} from
 
 export class FakeSecureStore implements SecureStore {
   private values = new Map<string, string>();
-  private gated = new Set<string>();
 
-  /** Test control, not part of SecureStore itself: simulates whether the
-   * next biometric-gated read succeeds or is cancelled/fails. */
-  biometricReadWillSucceed = true;
-
-  /** Test control: simulates the Keystore rejecting a write - e.g. binding
-   * a `requireAuthentication` entry fails even after the OS prompt itself
-   * already succeeded (see session.ts's enableBiometricUnlock docstring). */
+  /** Test control: simulates the Keystore rejecting a write. */
   setItemWillFail = false;
 
-  async setItem(key: string, value: string, options?: {requireAuthentication?: boolean}): Promise<void> {
+  /** Test control: simulates the Keystore being unreadable (getItem
+   * resolves null like the real adapter; getItemStrict rejects). */
+  readsWillFail = false;
+
+  async setItem(key: string, value: string): Promise<void> {
     if (this.setItemWillFail) {
       throw new Error('Keystore write failed');
     }
     this.values.set(key, value);
-    if (options?.requireAuthentication) {
-      this.gated.add(key);
-    } else {
-      this.gated.delete(key);
-    }
   }
 
   async getItem(key: string): Promise<string | null> {
-    if (this.gated.has(key) && !this.biometricReadWillSucceed) {
-      return null; // a cancelled/failed biometric prompt never throws - see the interface docstring
+    try {
+      return await this.getItemStrict(key);
+    } catch {
+      return null;
+    }
+  }
+
+  async getItemStrict(key: string): Promise<string | null> {
+    if (this.readsWillFail) {
+      throw new Error('Keystore read failed');
     }
     return this.values.has(key) ? this.values.get(key)! : null;
   }
 
   async removeItem(key: string): Promise<void> {
     this.values.delete(key);
-    this.gated.delete(key);
   }
 
-  isGated(key: string): boolean {
-    return this.gated.has(key);
+  keys(): string[] {
+    return [...this.values.keys()];
   }
 }
 
 export class FakeBiometrics implements BiometricAuthenticator {
   available = true;
   biometryType: BiometryType = 'fingerprint';
+  reason: BiometricUnavailableReason | undefined = undefined;
   authenticateResult = true;
+  authenticateCalls: string[] = [];
 
   async isAvailable() {
-    return {available: this.available, biometryType: this.biometryType};
+    return this.available
+      ? {available: true, biometryType: this.biometryType}
+      : {available: false, biometryType: 'none' as const, reason: this.reason ?? ('unavailable' as const)};
   }
 
-  async authenticate(): Promise<boolean> {
+  async authenticate(promptMessage: string): Promise<boolean> {
+    this.authenticateCalls.push(promptMessage);
     return this.authenticateResult;
   }
 }

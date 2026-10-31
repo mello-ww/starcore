@@ -25,8 +25,8 @@ const route = {} as any;
  */
 describe('SettingsScreen biometric toggle', () => {
   function setUp(overrides?: Partial<ReturnType<typeof useAuth>>) {
-    const enableBiometricUnlock = jest.fn().mockResolvedValue(true);
-    const disableBiometricUnlock = jest.fn().mockResolvedValue(undefined);
+    const enableBiometricUnlock = jest.fn().mockResolvedValue('enabled');
+    const disableBiometricUnlock = jest.fn().mockResolvedValue('disabled');
     (useAuth as jest.Mock).mockReturnValue({
       logout: jest.fn(),
       biometricsAvailable: true,
@@ -52,8 +52,8 @@ describe('SettingsScreen biometric toggle', () => {
     expect(texts.join(' ')).not.toMatch(/wrong|fail/i);
   });
 
-  it('does not crash or leave an unhandled rejection when the prompt is cancelled (resolves false)', async () => {
-    const enableBiometricUnlock = jest.fn().mockResolvedValue(false);
+  it('does not crash or leave an unhandled rejection when the prompt is cancelled', async () => {
+    const enableBiometricUnlock = jest.fn().mockResolvedValue('cancelled');
     const {tree} = setUp({enableBiometricUnlock});
 
     await act(async () => {
@@ -106,4 +106,104 @@ describe('SettingsScreen biometric toggle', () => {
 
     expect(tree.root.findAllByType(Switch)).toHaveLength(0);
   });
+
+  it('does not render the biometric card when there is no sensor', () => {
+    const {tree} = setUp({biometricsAvailable: false, biometricsUnavailableReason: 'no-hardware'});
+
+    expect(tree.root.findAllByType(Switch)).toHaveLength(0);
+  });
+
+  it('shows a disabled switch and explains when no fingerprint is enrolled', () => {
+    const {tree} = setUp({biometricsAvailable: false, biometricsUnavailableReason: 'not-enrolled'});
+
+    expect(tree.root.findByType(Switch).props.disabled).toBe(true);
+    expect(textOf(tree)).toMatch(/No fingerprint is enrolled/);
+  });
+
+  it('keeps showing an enabled lock after biometrics become unavailable', () => {
+    const {tree} = setUp({
+      biometricsAvailable: false,
+      biometricsUnavailableReason: 'unavailable',
+      biometricUnlockEnabled: true,
+    });
+
+    expect(tree.root.findByType(Switch).props.value).toBe(true);
+    expect(tree.root.findByType(Switch).props.disabled).toBe(true);
+  });
+
+  it.each([
+    ['not-enrolled', /No fingerprint is enrolled/],
+    ['unavailable', /not available/],
+    ['failed', /Could not save/],
+  ])('explains an enable that ends in %s', async (result, message) => {
+    const enableBiometricUnlock = jest.fn().mockResolvedValue(result);
+    const {tree} = setUp({enableBiometricUnlock});
+
+    await act(async () => {
+      await tree.root.findByType(Switch).props.onValueChange(true);
+    });
+
+    expect(textOf(tree)).toMatch(message);
+  });
+
+  it('keeps the switch controlled by the stored state, not the tap', async () => {
+    const enableBiometricUnlock = jest.fn().mockResolvedValue('cancelled');
+    const {tree} = setUp({enableBiometricUnlock});
+
+    await act(async () => {
+      await tree.root.findByType(Switch).props.onValueChange(true);
+    });
+
+    expect(tree.root.findByType(Switch).props.value).toBe(false);
+  });
+
+  it('lets the lock be turned off after a password login when biometrics are unavailable', async () => {
+    const {tree, disableBiometricUnlock} = setUp({
+      biometricsAvailable: false,
+      biometricsUnavailableReason: 'not-enrolled',
+      biometricUnlockEnabled: true,
+      passwordRecoveryAvailable: true,
+    });
+
+    expect(tree.root.findByType(Switch).props.disabled).toBe(false);
+    expect(textOf(tree)).toMatch(/signed in with your password/);
+
+    await act(async () => {
+      await tree.root.findByType(Switch).props.onValueChange(false);
+    });
+
+    expect(disableBiometricUnlock).toHaveBeenCalled();
+  });
+
+  it('keeps the switch disabled without password proof when biometrics are unavailable', () => {
+    const {tree} = setUp({
+      biometricsAvailable: false,
+      biometricsUnavailableReason: 'not-enrolled',
+      biometricUnlockEnabled: true,
+      passwordRecoveryAvailable: false,
+    });
+
+    expect(tree.root.findByType(Switch).props.disabled).toBe(true);
+  });
+
+  it('shows nothing when cancelling a disable', async () => {
+    const disableBiometricUnlock = jest.fn().mockResolvedValue('cancelled');
+    const {tree} = setUp({biometricUnlockEnabled: true, disableBiometricUnlock});
+
+    await act(async () => {
+      await tree.root.findByType(Switch).props.onValueChange(false);
+    });
+
+    expect(disableBiometricUnlock).toHaveBeenCalled();
+    expect(textOf(tree)).not.toMatch(/wrong|fail|Could not/i);
+  });
 });
+
+function textOf(tree: any): string {
+  return tree.root
+    .findAllByType(Text)
+    .map((node: any) => node.props.children)
+    .flat()
+    .filter(Boolean)
+    .join(' ');
+}
