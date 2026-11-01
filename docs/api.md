@@ -209,7 +209,8 @@ POST /api/auth/setup   { "username": "...", "password": "..." }  -> 200 + sessio
 POST /api/auth/login    { "username": "...", "password": "...",
                           "kind": "web"|"mobile", "device_name": "..." } -> 200 + session, or 401
 POST /api/auth/logout   (no body)                                -> 200, ends the current session
-GET  /api/auth/status   (no body)                                -> { "bootstrapped": bool, "authenticated": bool }
+GET  /api/auth/status   (no body)                                -> { "bootstrapped": bool, "authenticated": bool,
+                                                                     "username": "..." (only when authenticated) }
 ```
 
 A successful setup or login sets a `starcore_session` cookie (`HttpOnly`, `SameSite=Lax`,

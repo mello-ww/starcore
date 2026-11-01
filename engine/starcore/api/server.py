@@ -426,10 +426,12 @@ class RequestHandler(BaseHTTPRequestHandler):
     def _handle_auth_status(self):
         engine = self.server.engine
         token = AuthStore.token_from_request(self.headers.get("Cookie", ""), self.headers.get("Authorization", ""))
-        self._send_json({
-            "bootstrapped": engine.auth.is_bootstrapped,
-            "authenticated": engine.auth.validate_session(token),
-        })
+        authenticated = engine.auth.validate_session(token)
+        payload = {"bootstrapped": engine.auth.is_bootstrapped, "authenticated": authenticated}
+        if authenticated:
+            # only ever the caller's own account, so a greeting can use it
+            payload["username"] = engine.auth.session_username(token)
+        self._send_json(payload)
 
     def _handle_auth_setup(self):
         engine = self.server.engine

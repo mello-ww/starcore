@@ -5,7 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mission Control</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' fill='none' stroke='%236c9bf0' stroke-width='1.6'%3E%3Ccircle cx='11' cy='12' r='5'/%3E%3Cellipse cx='11' cy='12' rx='9.3' ry='3.3' transform='rotate(-22 11 12)' opacity='.7'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/tokens.css">
 <link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/home.css">
+<script>
+try {
+    const accent = localStorage.getItem("starcore.accent");
+    if (accent && accent !== "red") {
+        document.documentElement.dataset.accent = accent;
+    }
+} catch (error) {}
+</script>
 </head>
 <body>
 <div id="auth-overlay" class="auth-overlay" hidden>
@@ -60,12 +70,11 @@
     <nav aria-label="Core">
     <ul class="nav-list">
         <li>
-            <button class="nav-item" type="button" data-route="overview" title="Overview">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
-                    <circle cx="8" cy="8" r="2.2"/>
-                    <ellipse cx="8" cy="8" rx="7" ry="3.2" transform="rotate(-25 8 8)"/>
+            <button class="nav-item" type="button" data-route="overview" title="Home">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M2.6 7.2 8 2.8l5.4 4.4v6H9.6V9.6H6.4v3.6H2.6z"/>
                 </svg>
-                <span>Overview</span>
+                <span>Home</span>
             </button>
         </li>
         <li>
@@ -175,77 +184,73 @@
         <div class="topbar-right">
             <span id="core-state" class="badge badge-unknown">connecting</span>
             <span id="updated">&mdash;</span>
-            <button id="restart-button" class="button" type="button">Restart StarCore</button>
-            <button id="stop-button" class="button button-stop" type="button">Stop StarCore</button>
-            <button id="logout-button" class="button" type="button" title="Sign out">Sign out</button>
+            <div class="accent-picker">
+                <button id="accent-button" class="sc-icon-button" type="button" title="Accent colour" aria-label="Accent colour" aria-haspopup="true" aria-expanded="false" aria-controls="accent-menu">
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <circle cx="9" cy="9" r="6.2"/>
+                        <path d="M9 2.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor" stroke="none"/>
+                    </svg>
+                </button>
+                <div id="accent-menu" class="accent-menu" role="radiogroup" aria-label="Accent colour" hidden></div>
+            </div>
+            <button id="restart-button" class="sc-icon-button" type="button" title="Restart StarCore" aria-label="Restart StarCore">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M14.3 6.2A6 6 0 1 0 15 10"/>
+                    <path d="M14.6 2.8v3.6H11"/>
+                </svg>
+                <span class="sc-icon-button-label"></span>
+            </button>
+            <button id="stop-button" class="sc-icon-button sc-icon-button-danger" type="button" title="Stop StarCore" aria-label="Stop StarCore">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+                    <path d="M9 2.6v6"/>
+                    <path d="M5.2 4.8a6 6 0 1 0 7.6 0"/>
+                </svg>
+                <span class="sc-icon-button-label"></span>
+            </button>
+            <button id="logout-button" class="sc-icon-button" type="button" title="Sign out" aria-label="Sign out">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M7 3H4.2a1.2 1.2 0 0 0-1.2 1.2v9.6A1.2 1.2 0 0 0 4.2 15H7"/>
+                    <path d="M11.6 5.6 15 9l-3.4 3.4M15 9H7"/>
+                </svg>
+            </button>
         </div>
     </header>
 
     <p id="banner" class="banner" hidden></p>
 
-    <section id="view-overview" class="view">
-        <div class="stack">
-            <dl class="tiles">
-                <div class="tile">
-                    <dt>State</dt>
-                    <dd><i class="state-dot" id="tile-state-dot"></i><span id="tile-state">&mdash;</span></dd>
-                </div>
-                <div class="tile">
-                    <dt>Uptime</dt>
-                    <dd id="tile-uptime">&mdash;</dd>
-                </div>
-                <div class="tile">
-                    <dt>Satellites</dt>
-                    <dd><span id="tile-satellites">&mdash;</span><small id="tile-satellites-split"></small></dd>
-                </div>
-                <div class="tile">
-                    <dt>Commands</dt>
-                    <dd id="tile-commands">&mdash;</dd>
-                </div>
-            </dl>
-
-            <div class="split">
-                <div class="stack">
-                    <section class="panel">
-                        <p class="eyebrow">Runtime</p>
-                        <dl class="facts">
-                            <div><dt>Engine</dt><dd id="fact-engine">&mdash;</dd></div>
-                            <div><dt>Mission Control</dt><dd id="fact-mission-control">&mdash;</dd></div>
-                            <div><dt>Interface</dt><dd id="fact-interface">&mdash;</dd></div>
-                            <div><dt>Native</dt><dd id="fact-native">&mdash;</dd></div>
-                            <div><dt>Link</dt><dd id="fact-link">&mdash;</dd></div>
-                            <div><dt>Refresh</dt><dd>5s</dd></div>
-                        </dl>
-                    </section>
-
-                    <section class="panel">
-                        <p class="eyebrow">Registered commands</p>
-                        <div id="overview-commands"></div>
-                    </section>
-                </div>
-
-                <section class="panel orbit-panel">
-                    <div class="starfield" aria-hidden="true">
-                        <i class="twinkle" style="left: 14%; top: 26%; animation-delay: 0.5s;"></i>
-                        <i class="twinkle" style="left: 82%; top: 20%; animation-delay: 3s;"></i>
-                        <i class="twinkle" style="left: 74%; top: 78%; animation-delay: 1.4s;"></i>
-                        <i class="twinkle" style="left: 22%; top: 82%; animation-delay: 4.6s;"></i>
-                    </div>
-                    <p class="eyebrow">Orbit</p>
-                    <svg class="orbit" viewBox="0 0 220 220" fill="none" role="img" aria-label="Satellites in orbit around the Core">
-                        <circle class="orbit-ring" cx="110" cy="110" r="58" opacity="0.8"/>
-                        <circle class="orbit-ring" cx="110" cy="110" r="88" opacity="0.55"/>
-                        <g class="orbit-spin orbit-spin-native" id="orbit-bodies-native"></g>
-                        <g class="orbit-spin orbit-spin-link" id="orbit-bodies-link"></g>
-                        <circle class="orbit-nucleus" cx="110" cy="110" r="13" fill="#0f52ba" opacity="0.18"/>
-                    </svg>
-                    <div class="orbit-legend">
-                        <span><i></i>native</span>
-                        <span><i class="link"></i>link</span>
-                    </div>
-                </section>
+    <section id="view-overview" class="view home">
+        <section class="home-status" id="home-status" aria-live="polite">
+            <div class="home-status-main">
+                <p class="sc-eyebrow">System</p>
+                <p class="home-status-state"><i class="home-dot" id="home-state-dot"></i><span id="home-state">Connecting</span></p>
+                <p class="home-status-detail" id="home-state-detail">Waiting for StarCore to answer.</p>
             </div>
-        </div>
+            <dl class="home-metrics">
+                <div><dt>Uptime</dt><dd id="home-uptime">&mdash;</dd></div>
+                <div><dt>Online</dt><dd id="home-online">&mdash;</dd></div>
+                <div><dt>Commands</dt><dd id="home-commands">&mdash;</dd></div>
+            </dl>
+        </section>
+
+        <section class="home-section" aria-labelledby="home-satellites-title">
+            <div class="home-section-head">
+                <h2 class="sc-eyebrow" id="home-satellites-title">Satellites</h2>
+                <span class="home-count" id="home-satellite-count"></span>
+                <a class="home-link" href="#/satellites">View all</a>
+            </div>
+            <div class="home-grid" id="home-satellites">
+                <div class="home-card home-card-skeleton" aria-hidden="true"></div>
+                <div class="home-card home-card-skeleton" aria-hidden="true"></div>
+                <div class="home-card home-card-skeleton" aria-hidden="true"></div>
+            </div>
+        </section>
+
+        <section class="home-section" aria-labelledby="home-alerts-title">
+            <div class="home-section-head">
+                <h2 class="sc-eyebrow" id="home-alerts-title">Alerts</h2>
+            </div>
+            <div id="home-alerts"></div>
+        </section>
     </section>
 
     <section id="view-satellites" class="view" hidden>

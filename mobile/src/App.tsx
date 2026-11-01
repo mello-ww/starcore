@@ -9,7 +9,7 @@ import {RootNavigator} from './navigation/RootNavigator';
 import {ConnectScreen} from './screens/ConnectScreen';
 import {ServerListScreen} from './screens/ServerListScreen';
 import {ServersProvider, useServers} from './servers/ServersContext';
-import {colors} from './theme';
+import {AccentProvider, colors} from './theme';
 
 type ResumeInfo = {name: string; address: string};
 
@@ -42,9 +42,11 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{flex: 1}}>
       <SafeAreaProvider>
-        <ServersProvider>
-          <ServersGate />
-        </ServersProvider>
+        <AccentProvider>
+          <ServersProvider>
+            <ServersGate />
+          </ServersProvider>
+        </AccentProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

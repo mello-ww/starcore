@@ -1,0 +1,43 @@
+/* StarCore design tokens. Mirrored by hand in mobile/src/theme/tokens.ts. */
+
+:root {
+    --sc-bg: #101114;
+    --sc-sidebar: #0c0d0f;
+    --sc-card: #212228;
+    --sc-control: #24252b;
+    --sc-control-strong: #34363d;
+    --sc-line: #222329;
+
+    --sc-text: #ffffff;
+    --sc-text-icon: #e6e7eb;
+    --sc-text-2: #a6a8b1;
+    --sc-text-3: #8b8f9a;
+
+    --sc-accent: #ee444b;
+    --sc-on-accent: #141215;
+    --sc-danger: #ee444b;
+    --sc-warn: #f0b43c;
+
+    --sc-font-sans: "Inter", "Manrope", "Segoe UI Variable Text", "Segoe UI", Roboto, system-ui, sans-serif;
+    --sc-font-display: "Space Grotesk", "Manrope", "Inter", "Segoe UI Variable Display", "Segoe UI", Roboto, system-ui, sans-serif;
+    --sc-font-mono: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+
+    --sc-radius-card: 16px;
+    --sc-radius-control: 10px;
+
+    --sc-space-1: 4px;
+    --sc-space-2: 8px;
+    --sc-space-3: 12px;
+    --sc-space-4: 16px;
+    --sc-space-5: 24px;
+    --sc-space-6: 32px;
+    --sc-space-7: 48px;
+
+    --sc-dots: radial-gradient(circle, rgba(255, 255, 255, 0.09) 1px, transparent 1.5px);
+}
+
+/* accent presets, picked from the Home header and remembered per browser */
+:root[data-accent="orange"] { --sc-accent: #f08a3c; }
+:root[data-accent="green"] { --sc-accent: #45c486; }
+:root[data-accent="blue"] { --sc-accent: #5b95f7; }
+:root[data-accent="mono"] { --sc-accent: #e6e7eb; }

@@ -2,7 +2,7 @@ const REFRESH_MS = 5000;
 const STOP_CONFIRM_MS = 4000;
 
 const CORE_PAGES = {
-    overview: "Overview",
+    overview: "Home",
     satellites: "Satellites",
     console: "Console",
     configuration: "Configuration",
@@ -23,6 +23,8 @@ let directoryPickerState = null;
 // (the 5s poll doesn't wait for one to finish) still shows as busy instead of
 // silently becoming clickable again
 let pendingSatelliteActions = new Set();
+let accountName = "";
+let homeSignature = null;
 
 async function getJson(path) {
     const response = await fetch(path, { headers: { Accept: "application/json" } });
@@ -117,7 +119,11 @@ function clearBanner() {
 
 function setLink(reachable) {
     document.getElementById("pulse").className = `pulse ${reachable ? "live" : "lost"}`;
-    setText("link-state", reachable ? "link established" : "link lost");
+    setText("link-state", reachable ? "System online" : "Connection lost");
+}
+
+function greeting() {
+    return accountName ? `Ravi de vous revoir, ${accountName}` : "Ravi de vous revoir";
 }
 
 // a satellite earns its own page by shipping one, or by publishing state through
@@ -206,6 +212,7 @@ function applyRoute() {
 
 function showRoute() {
     const view = route.name === "satellite" ? "satellite" : route.name;
+    document.body.dataset.route = view;
 
     for (const section of document.querySelectorAll(".view")) {
         section.hidden = section.id !== `view-${view}`;
@@ -224,8 +231,8 @@ function showRoute() {
         renderSatellitePage();
     } else {
         unmountSatellitePage();
-        setText("page-eyebrow", "Core");
-        setText("page-title", CORE_PAGES[route.name]);
+        setText("page-eyebrow", route.name === "overview" ? "StarCore" : "Core");
+        setText("page-title", route.name === "overview" ? greeting() : CORE_PAGES[route.name]);
         if (route.name === "configuration") {
             loadConfiguration();
             loadSessions();
@@ -246,52 +253,242 @@ function renderCore(status) {
     state.textContent = status.running ? "running" : "stopped";
     state.className = `badge ${status.running ? "badge-up" : "badge-down"}`;
 
-    document.getElementById("tile-state-dot").className = `state-dot ${status.running ? "on" : "off"}`;
-    setText("tile-state", status.running ? "running" : "stopped");
-    setText("tile-uptime", formatUptime(status.uptime_seconds));
-    setText("tile-satellites", String(status.satellites.total));
-    setText("tile-satellites-split", `${status.satellites.native} native · ${status.satellites.link} link`);
-    setText("tile-commands", String(status.commands));
-
-    setText("fact-engine", status.engine);
-    setText("fact-mission-control", status.mission_control.url || (status.mission_control.enabled ? "not running" : "disabled"));
-    setText("fact-interface", status.mission_control.running ? "running" : "stopped");
-    setText("fact-native", String(status.satellites.native));
-    setText("fact-link", String(status.satellites.link));
     setText("updated", new Date().toLocaleTimeString());
+    renderHomeStatus(status);
 }
 
-// native satellites hold the inner orbit, link satellites the outer one - each
-// ring is its own <g> (see index.html) so the two can spin independently
-// (different speeds, opposite directions - see .orbit-spin-native/-link)
-function renderOrbit() {
-    for (const [type, radius, phase, groupId] of [
-        ["native", 58, -1.4, "orbit-bodies-native"],
-        ["link", 88, 0.7, "orbit-bodies-link"],
-    ]) {
-        const bodies = document.getElementById(groupId);
-        bodies.replaceChildren();
-        const members = satellites.filter((satellite) => satellite.type === type);
+/* ---------- home ---------- */
 
-        members.forEach((satellite, index) => {
-            const angle = (index / members.length) * Math.PI * 2 + phase;
-            const body = shape("circle", {
-                cx: (110 + Math.cos(angle) * radius).toFixed(1),
-                cy: (110 + Math.sin(angle) * radius).toFixed(1),
-                r: 4,
-                class: `orbit-body ${type} status-${satellite.status || "unknown"}${satellite.status === "running" ? "" : " off"}`,
-                tabindex: "0",
-                role: "img",
-            });
-            // one real, generic status string - never hardcoded per-satellite
-            // text - shown on hover and via a native tooltip on keyboard focus
-            body.setAttribute("aria-label", `${satellite.name} — ${satellite.status || "unknown"}`);
+const STATUS_LABELS = { running: "Running", stopped: "Stopped", disabled: "Disabled", error: "Error" };
 
-            const title = shape("title", {});
-            title.textContent = `${satellite.name} — ${satellite.status || "unknown"}`;
-            body.appendChild(title);
-            bodies.appendChild(body);
+function homeAlerts() {
+    return satellites
+        .filter((satellite) => satellite.status === "error" || satellite.status === "stopped")
+        .map((satellite) => ({
+            satellite,
+            level: satellite.status,
+            text: satellite.status === "error"
+                ? `${satellite.name} reported an error`
+                : `${satellite.name} is enabled but not running`,
+        }));
+}
+
+function setHomeState(dot, state, detail) {
+    document.getElementById("home-state-dot").className = `home-dot ${dot}`;
+    setText("home-state", state);
+    setText("home-state-detail", detail);
+}
+
+function renderHomeStatus(status) {
+    const online = satellites.filter((satellite) => satellite.status === "running").length;
+    const alerts = homeAlerts().length;
+
+    if (status.running) {
+        setHomeState(alerts ? "warn" : "on", "Online",
+            alerts ? `${status.engine} is running · ${alerts} alert${alerts === 1 ? "" : "s"}` : `${status.engine} is running`);
+    } else {
+        setHomeState("off", "Stopped", `${status.engine} is not running.`);
+    }
+    setText("home-uptime", formatUptime(status.uptime_seconds));
+    setText("home-online", `${online}/${satellites.length}`);
+    setText("home-commands", String(status.commands));
+}
+
+function renderHomeUnreachable(message) {
+    setHomeState("off", "Unreachable", message);
+    for (const id of ["home-uptime", "home-online", "home-commands"]) {
+        setText(id, "—");
+    }
+    if (homeSignature === null) {
+        const satellitesBox = document.getElementById("home-satellites");
+        satellitesBox.replaceChildren(homeEmpty("Satellites will appear once StarCore answers.", "Try again", refresh));
+        homeSignature = "unreachable";
+    }
+}
+
+function homeEmpty(text, actionLabel, onAction) {
+    const box = element("div", "home-empty");
+    box.appendChild(element("p", null, text));
+    if (actionLabel) {
+        const button = element("button", "sc-button", actionLabel);
+        button.type = "button";
+        button.addEventListener("click", onAction);
+        box.appendChild(button);
+    }
+    return box;
+}
+
+function openSatellite(satellite) {
+    location.hash = `#/satellite/${encodeURIComponent(satellite.name)}`;
+}
+
+function buildHomeIcon(satellite) {
+    const mark = element("span", "home-card-icon");
+    mark.setAttribute("aria-hidden", "true");
+    if (satellite.icon) {
+        // a mask lets the satellite's own stroke icon take the accent colour
+        mark.style.setProperty("--icon", `url("${satelliteUrl(satellite.name, `/assets/${satellite.icon}`)}")`);
+        mark.classList.add("masked");
+    } else {
+        mark.appendChild(buildGenericIcon());
+    }
+    return mark;
+}
+
+function buildHomeCard(satellite) {
+    const card = element("article", `home-card status-${satellite.status || "unknown"}`);
+
+    const head = element("div", "home-card-head");
+    head.appendChild(buildHomeIcon(satellite));
+    head.appendChild(element("h3", null, satellite.name));
+    const state = element("span", "home-card-state");
+    state.appendChild(element("i", "home-dot"));
+    state.appendChild(document.createTextNode(STATUS_LABELS[satellite.status] || satellite.status || "Unknown"));
+    head.appendChild(state);
+    card.appendChild(head);
+
+    card.appendChild(element("p", "home-card-desc", satellite.description || `${satellite.type} satellite`));
+
+    const actions = element("div", "home-card-actions");
+    if (hasPage(satellite)) {
+        const open = element("button", "sc-button sc-button-accent");
+        open.type = "button";
+        open.appendChild(openIcon());
+        open.appendChild(element("span", null, "Open"));
+        open.addEventListener("click", () => openSatellite(satellite));
+        actions.appendChild(open);
+    } else {
+        // no page of its own: its commands and state live on the Satellites list
+        const details = element("button", "sc-button", "Details");
+        details.type = "button";
+        details.addEventListener("click", () => {
+            location.hash = "#/satellites";
         });
+        actions.appendChild(details);
+    }
+
+    if (satellite.configurable) {
+        const configure = element("button", "sc-icon-button sc-icon-button-quiet home-card-config");
+        configure.type = "button";
+        configure.title = `${satellite.name} configuration`;
+        configure.setAttribute("aria-label", `${satellite.name} configuration`);
+        configure.appendChild(slidersIcon());
+        configure.addEventListener("click", () => openSatelliteConfig(satellite));
+        actions.appendChild(configure);
+    }
+    card.appendChild(actions);
+    return card;
+}
+
+function renderHomeSatellites() {
+    const signature = satellites
+        .map((satellite) => [satellite.name, satellite.status, satellite.icon, satellite.description,
+            satellite.configurable, hasPage(satellite)].join(":"))
+        .join("|");
+    if (signature === homeSignature) {
+        return;
+    }
+    homeSignature = signature;
+
+    const grid = document.getElementById("home-satellites");
+    const online = satellites.filter((satellite) => satellite.status === "running").length;
+    setText("home-satellite-count", satellites.length ? `${online} of ${satellites.length} online` : "");
+
+    if (satellites.length === 0) {
+        grid.replaceChildren(homeEmpty("No satellites are loaded on this StarCore."));
+    } else {
+        // satellites with a page of their own first, then by name
+        const ordered = [...satellites].sort((a, b) =>
+            Number(hasPage(b)) - Number(hasPage(a)) || a.name.localeCompare(b.name));
+        grid.replaceChildren(...ordered.map(buildHomeCard));
+    }
+
+    const alerts = homeAlerts();
+    const box = document.getElementById("home-alerts");
+    if (alerts.length === 0) {
+        box.replaceChildren(homeEmpty("No alerts. Every enabled satellite is running."));
+        return;
+    }
+    const list = element("ul", "home-alerts");
+    for (const alert of alerts) {
+        const item = element("li", `home-alert ${alert.level}`);
+        item.appendChild(element("i", "home-dot"));
+        item.appendChild(element("span", null, alert.text));
+        const view = element("button", "sc-button", "View");
+        view.type = "button";
+        view.addEventListener("click", () => {
+            location.hash = hasPage(alert.satellite) ? `#/satellite/${encodeURIComponent(alert.satellite.name)}` : "#/satellites";
+        });
+        item.appendChild(view);
+        list.appendChild(item);
+    }
+    box.replaceChildren(list);
+}
+
+function openIcon() {
+    const svg = shape("svg", { viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", "stroke-width": "1.6",
+        "stroke-linecap": "round", "stroke-linejoin": "round", width: "15", height: "15", "aria-hidden": "true" });
+    svg.appendChild(shape("path", { d: "M5.5 3.5h7v7M12.5 3.5 3.5 12.5" }));
+    return svg;
+}
+
+function slidersIcon() {
+    const svg = shape("svg", { viewBox: "0 0 18 18", fill: "none", stroke: "currentColor", "stroke-width": "1.5",
+        "stroke-linecap": "round", width: "18", height: "18", "aria-hidden": "true" });
+    svg.appendChild(shape("path", { d: "M3 5h7M13 5h2M3 9h2M8 9h7M3 13h8M14 13h1" }));
+    svg.appendChild(shape("path", { d: "M11.5 3.5v3M6.5 7.5v3M12.5 11.5v3" }));
+    return svg;
+}
+
+/* ---------- accent colour ---------- */
+
+const ACCENTS = [["red", "Red"], ["orange", "Orange"], ["green", "Green"], ["blue", "Blue"], ["mono", "Mono"]];
+const ACCENT_KEY = "starcore.accent";
+
+function currentAccent() {
+    return document.documentElement.dataset.accent || "red";
+}
+
+function setAccent(name) {
+    if (name === "red") {
+        delete document.documentElement.dataset.accent;
+    } else {
+        document.documentElement.dataset.accent = name;
+    }
+    try {
+        localStorage.setItem(ACCENT_KEY, name);
+    } catch (error) {
+        // private mode: the choice still applies until the page closes
+    }
+    renderAccentMenu();
+}
+
+function renderAccentMenu() {
+    const menu = document.getElementById("accent-menu");
+    menu.replaceChildren(...ACCENTS.map(([name, title]) => {
+        const swatch = element("button", "accent-swatch");
+        swatch.type = "button";
+        swatch.dataset.accent = name;
+        swatch.title = title;
+        swatch.setAttribute("role", "radio");
+        swatch.setAttribute("aria-label", title);
+        swatch.setAttribute("aria-checked", String(name === currentAccent()));
+        swatch.addEventListener("click", () => {
+            setAccent(name);
+            toggleAccentMenu(false);
+            document.getElementById("accent-button").focus();
+        });
+        return swatch;
+    }));
+}
+
+function toggleAccentMenu(open) {
+    const menu = document.getElementById("accent-menu");
+    menu.hidden = !open;
+    document.getElementById("accent-button").setAttribute("aria-expanded", String(open));
+    if (open) {
+        renderAccentMenu();
+        menu.querySelector('[aria-checked="true"]').focus();
     }
 }
 
@@ -548,7 +745,7 @@ async function refresh() {
         satellites = payload.satellites;
 
         renderCore(status);
-        renderOrbit();
+        renderHomeSatellites();
         renderSatelliteList();
         renderSatelliteNav();
         if (route.name === "satellite") {
@@ -563,6 +760,7 @@ async function refresh() {
     } catch (error) {
         setLink(false);
         showBanner(`Cannot reach StarCore: ${error.message}`, "error");
+        renderHomeUnreachable(error.message);
     }
 }
 
@@ -572,7 +770,6 @@ async function loadCommands() {
     try {
         const payload = await getJson("/api/commands");
         renderConsoleCommands(payload.commands);
-        document.getElementById("overview-commands").replaceChildren(renderCommands(payload.commands));
     } catch (error) {
         // the console still works without the command list, so this failure is silent
     }
@@ -1294,10 +1491,15 @@ function chooseDirectoryPickerCurrent() {
 
 /* ---------- shutdown ---------- */
 
+// the topbar's icon buttons only spell out a label while they need one
+function setButtonLabel(button, text) {
+    button.querySelector(".sc-icon-button-label").textContent = text;
+}
+
 function setStopButtonConfirming(confirming) {
     const button = document.getElementById("stop-button");
     button.classList.toggle("confirm", confirming);
-    button.textContent = confirming ? "Confirm stop?" : "Stop StarCore";
+    setButtonLabel(button, confirming ? "Confirm stop?" : "");
 }
 
 async function handleStopClick() {
@@ -1311,7 +1513,7 @@ async function handleStopClick() {
 
     clearTimeout(confirmStopTimer);
     button.disabled = true;
-    button.textContent = "Stopping…";
+    setButtonLabel(button, "Stopping…");
 
     try {
         await fetch("/api/shutdown", { method: "POST" });
@@ -1327,7 +1529,7 @@ let confirmRestartTimer = null;
 function setRestartButtonConfirming(confirming) {
     const button = document.getElementById("restart-button");
     button.classList.toggle("confirm", confirming);
-    button.textContent = confirming ? "Confirm restart?" : "Restart StarCore";
+    setButtonLabel(button, confirming ? "Confirm restart?" : "");
 }
 
 async function handleRestartClick() {
@@ -1342,7 +1544,8 @@ async function handleRestartClick() {
     clearTimeout(confirmRestartTimer);
     button.disabled = true;
     document.getElementById("stop-button").disabled = true;
-    button.textContent = "Restarting…";
+    button.classList.remove("confirm");
+    setButtonLabel(button, "Restarting…");
 
     try {
         await fetch("/api/restart", { method: "POST" });
@@ -1359,7 +1562,7 @@ async function handleRestartClick() {
         try {
             await getJson("/api/status");
             clearInterval(check);
-            button.textContent = "Restart StarCore";
+            setButtonLabel(button, "");
             button.disabled = false;
             document.getElementById("stop-button").disabled = false;
             refresh(); // clears the "restarting" banner immediately rather than
@@ -1378,10 +1581,11 @@ function onStarCoreStopped() {
     state.textContent = "stopped";
     state.className = "badge badge-down";
 
-    document.getElementById("tile-state-dot").className = "state-dot off";
-    setText("tile-state", "stopped");
+    document.getElementById("stop-button").classList.remove("confirm");
+    setButtonLabel(document.getElementById("stop-button"), "");
+    setHomeState("off", "Stopped", "StarCore was stopped from Mission Control.");
     setLink(false);
-    setText("link-state", "core stopped");
+    setText("link-state", "System stopped");
     showBanner("StarCore has been stopped from Mission Control. You can close this page.", "notice");
 
     document.getElementById("console-input").disabled = true;
@@ -1459,7 +1663,10 @@ document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") {
         return;
     }
-    if (!document.getElementById("directory-picker-overlay").hidden) {
+    if (!document.getElementById("accent-menu").hidden) {
+        toggleAccentMenu(false);
+        document.getElementById("accent-button").focus();
+    } else if (!document.getElementById("directory-picker-overlay").hidden) {
         closeDirectoryPicker();
     } else if (!document.getElementById("satellite-config-overlay").hidden) {
         closeSatelliteConfig();
@@ -1470,6 +1677,14 @@ document.addEventListener("keydown", (event) => {
 document.getElementById("stop-button").addEventListener("click", handleStopClick);
 document.getElementById("restart-button").addEventListener("click", handleRestartClick);
 document.getElementById("logout-button").addEventListener("click", handleLogoutClick);
+document.getElementById("accent-button").addEventListener("click", () => {
+    toggleAccentMenu(document.getElementById("accent-menu").hidden);
+});
+document.addEventListener("click", (event) => {
+    if (!event.target.closest(".accent-picker")) {
+        toggleAccentMenu(false);
+    }
+});
 window.addEventListener("hashchange", applyRoute);
 
 document.getElementById("sidebar-toggle").addEventListener("click", toggleSidebar);
@@ -1502,9 +1717,22 @@ function showAppShell(visible) {
     document.querySelector(".main").hidden = !visible;
 }
 
+async function loadAccount() {
+    try {
+        const status = await getJson("/api/auth/status");
+        accountName = status.username || "";
+    } catch (error) {
+        accountName = "";
+    }
+    if (route.name === "overview") {
+        setText("page-title", greeting());
+    }
+}
+
 function startApp() {
     resetConsole();
     applyRoute();
+    loadAccount();
     loadCommands();
     refresh();
     pollTimer = setInterval(refresh, REFRESH_MS);

@@ -5,13 +5,13 @@ import Icon from 'react-native-vector-icons/Feather';
 import {ConfigScreen} from '../screens/ConfigScreen';
 import {ConnectScreen} from '../screens/ConnectScreen';
 import {ConsoleScreen} from '../screens/ConsoleScreen';
-import {OverviewScreen} from '../screens/OverviewScreen';
+import {HomeScreen} from '../screens/HomeScreen';
 import {SatelliteDetailScreen} from '../screens/SatelliteDetailScreen';
 import {SatellitesListScreen} from '../screens/SatellitesListScreen';
 import {ServersScreen} from '../screens/ServersScreen';
 import {SettingsScreen} from '../screens/SettingsScreen';
 import {useServers} from '../servers/ServersContext';
-import {colors} from '../theme';
+import {colors, tokens, useAccent} from '../theme';
 import {PhotoAlbumScreen} from '../photo/PhotoAlbumScreen';
 import {PhotoConfigurationScreen} from '../photo/PhotoConfigurationScreen';
 import {PhotoHomeScreen} from '../photo/PhotoHomeScreen';
@@ -173,6 +173,7 @@ function tabIcon(name: keyof MainTabParamList) {
  * screens never stops playback.
  */
 export function MainTabs() {
+  const {color: accent} = useAccent();
   return (
     <MusicProvider>
       <Tab.Navigator
@@ -185,11 +186,11 @@ export function MainTabs() {
       )}
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {backgroundColor: colors.surface, borderTopColor: colors.line},
-        tabBarActiveTintColor: colors.azure,
-        tabBarInactiveTintColor: colors.textFaint,
+        tabBarStyle: {backgroundColor: tokens.palette.bg, borderTopColor: tokens.palette.line},
+        tabBarActiveTintColor: accent,
+        tabBarInactiveTintColor: tokens.palette.text2,
       }}>
-      <Tab.Screen name="Overview" component={OverviewScreen} options={{tabBarIcon: tabIcon('Overview')}} />
+      <Tab.Screen name="Overview" component={HomeScreen} options={{title: 'Home', tabBarIcon: tabIcon('Overview')}} />
       <Tab.Screen name="Satellites" component={SatellitesStack} options={{tabBarIcon: tabIcon('Satellites')}} />
       <Tab.Screen name="Console" component={ConsoleScreen} options={{tabBarIcon: tabIcon('Console')}} />
       <Tab.Screen name="Config" component={ConfigScreen} options={{tabBarIcon: tabIcon('Config')}} />

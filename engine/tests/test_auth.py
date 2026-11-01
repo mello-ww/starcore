@@ -270,6 +270,23 @@ class AuthApiTest(unittest.TestCase):
         finally:
             stop_engine(engine)
 
+    def test_auth_status_names_only_the_signed_in_caller(self):
+        engine = start_engine(mission_control=True)
+        try:
+            _, _, cookies = self.request(engine, "/api/auth/setup", method="POST",
+                                         payload={"username": "Ada", "password": "a very good password"})
+            token = self.token_from_set_cookie(cookies)
+
+            _, payload, _ = self.request(engine, "/api/auth/status", bearer=token)
+            self.assertTrue(payload["authenticated"])
+            self.assertEqual(payload["username"], "Ada")
+
+            _, payload, _ = self.request(engine, "/api/auth/status")
+            self.assertFalse(payload["authenticated"])
+            self.assertNotIn("username", payload)
+        finally:
+            stop_engine(engine)
+
     def test_setup_creates_an_account_and_returns_a_session_cookie(self):
         engine = start_engine(mission_control=True)
         try:
