@@ -1,6 +1,6 @@
 import React, {useMemo} from 'react';
 import {Dimensions, RefreshControl, SectionList, StyleSheet, Text, View} from 'react-native';
-import {colors, spacing, typography} from '../theme';
+import {spacing, typography, useAccentStyles} from '../theme';
 import type {Photo} from './types';
 import {PhotoThumbnail} from './PhotoThumbnail';
 
@@ -98,6 +98,7 @@ export function PhotoGrid({
   onToggleFavorite,
   emptyMessage,
 }: Props) {
+  const accentStyle = useAccentStyles();
   const sections = useMemo(() => toSections(photos, groupByDate, columns), [photos, groupByDate, columns]);
   const cellSize = (Dimensions.get('window').width - GUTTER) / columns;
 
@@ -140,7 +141,7 @@ export function PhotoGrid({
         );
       }}
       refreshControl={
-        onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.azure} /> : undefined
+        onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={accentStyle.color} /> : undefined
       }
       stickySectionHeadersEnabled={false}
     />

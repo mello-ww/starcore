@@ -2,7 +2,7 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useState} from 'react';
 import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import type {SatellitesStackParamList} from '../../navigation/MainTabs';
-import {colors, radius, spacing, typography} from '../../theme';
+import {colors, radius, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import type {Track} from '../types';
 import {longDuration} from '../ui/format';
@@ -14,6 +14,7 @@ import {CollectionHeader} from './CollectionHeader';
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'MusicPlaylist'>;
 
 export function PlaylistScreen({route, navigation}: Props) {
+  const accentStyle = useAccentStyles();
   const {api, player, downloads} = useMusic();
   const {data: playlist, error, reload, setData} = useLoad(() => api.playlist(route.params.id), [api, route.params.id]);
   const [actions, setActions] = useState<Track[] | null>(null);
@@ -22,7 +23,7 @@ export function PlaylistScreen({route, navigation}: Props) {
   const [description, setDescription] = useState('');
 
   if (!playlist) {
-    return error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.azure} style={styles.loading} />;
+    return error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={accentStyle.color} style={styles.loading} />;
   }
   const playable = playlist.tracks.filter(track => !track.missing);
   const context = `playlist:${playlist.id}`;
@@ -71,8 +72,8 @@ export function PlaylistScreen({route, navigation}: Props) {
           <TextInput value={description} onChangeText={setDescription} style={styles.input} placeholder="Description"
             placeholderTextColor={colors.textFaint} multiline />
           <View style={styles.editorButtons}>
-            <Pressable onPress={() => setEditing(false)}><Text style={styles.link}>Cancel</Text></Pressable>
-            <Pressable onPress={save}><Text style={styles.link}>Save</Text></Pressable>
+            <Pressable onPress={() => setEditing(false)}><Text style={[styles.link, accentStyle.text]}>Cancel</Text></Pressable>
+            <Pressable onPress={save}><Text style={[styles.link, accentStyle.text]}>Save</Text></Pressable>
           </View>
         </View>
       )}
@@ -104,7 +105,7 @@ const styles = StyleSheet.create({
   editor: {gap: spacing.sm, marginBottom: spacing.md},
   input: {backgroundColor: colors.raised, color: colors.text, borderRadius: radius.md, paddingHorizontal: spacing.md},
   editorButtons: {flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.lg},
-  link: {color: colors.azure, fontSize: 15},
+  link: {fontSize: 15},
   entry: {flexDirection: 'row', alignItems: 'center'},
   entryRow: {flex: 1},
   order: {paddingLeft: spacing.sm, gap: spacing.xs},

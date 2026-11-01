@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {colors, spacing, typography} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {activeLine, activeWords, lyricsTime} from '../lyrics';
 import {useMusic, usePlayerState} from '../MusicProvider';
 import type {Lyrics} from '../types';
@@ -8,6 +8,7 @@ import type {Lyrics} from '../types';
 const LINE_HEIGHT = 44;
 
 export function LyricsPanel({trackId}: {trackId: string}) {
+  const accentStyle = useAccentStyles();
   const {api, player, preferences} = useMusic();
   const state = usePlayerState();
   const [lyrics, setLyrics] = useState<Lyrics | null>(null);
@@ -59,14 +60,14 @@ export function LyricsPanel({trackId}: {trackId: string}) {
       <View style={styles.tools}>
         {lyrics.synced && (
           <>
-            <Pressable onPress={() => nudge(-250)} hitSlop={6}><Text style={styles.tool}>−0.25s</Text></Pressable>
+            <Pressable onPress={() => nudge(-250)} hitSlop={6}><Text style={accentStyle.text}>−0.25s</Text></Pressable>
             <Text style={typography.label}>{offset > 0 ? '+' : ''}{(offset / 1000).toFixed(2)}s</Text>
-            <Pressable onPress={() => nudge(250)} hitSlop={6}><Text style={styles.tool}>+0.25s</Text></Pressable>
+            <Pressable onPress={() => nudge(250)} hitSlop={6}><Text style={accentStyle.text}>+0.25s</Text></Pressable>
           </>
         )}
         {lyrics.languages.map(code => (
           <Pressable key={code} onPress={() => setLanguage(code)}>
-            <Text style={[styles.tool, (lyrics.language === code) && styles.current]}>{code}</Text>
+            <Text style={[accentStyle.text, (lyrics.language === code) && styles.current]}>{code}</Text>
           </Pressable>
         ))}
       </View>
@@ -81,7 +82,7 @@ export function LyricsPanel({trackId}: {trackId: string}) {
                 {active && line.words.length ? (
                   <Text style={[styles.text, styles.active]}>
                     {line.words.map((word, wordIndex) => (
-                      <Text key={wordIndex} style={wordIndex < reached ? styles.sung : styles.unsung}>{word.text}</Text>
+                      <Text key={wordIndex} style={wordIndex < reached ? accentStyle.text : styles.unsung}>{word.text}</Text>
                     ))}
                   </Text>
                 ) : (
@@ -103,14 +104,12 @@ const styles = StyleSheet.create({
   panel: {flex: 1},
   message: {padding: spacing.lg, textAlign: 'center'},
   tools: {flexDirection: 'row', gap: spacing.md, alignItems: 'center', paddingBottom: spacing.sm},
-  tool: {color: colors.azure},
   current: {fontWeight: '700'},
   scroll: {flex: 1},
   line: {minHeight: LINE_HEIGHT, justifyContent: 'center'},
   text: {fontSize: 20, color: colors.textFaint, fontWeight: '600'},
   active: {color: colors.text},
   past: {color: colors.textDim},
-  sung: {color: colors.azure},
   unsung: {color: colors.text},
   plain: {...typography.body, lineHeight: 26},
 });

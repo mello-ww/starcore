@@ -20,7 +20,7 @@ interface EngineStatus {
 }
 
 export function greeting(name: string): string {
-  return name ? `Ravi de vous revoir, ${name}` : 'Ravi de vous revoir';
+  return name ? `Welcome back, ${name}` : 'Welcome back';
 }
 
 export function formatUptime(seconds: number): string {

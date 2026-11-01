@@ -1,6 +1,6 @@
 import React from 'react';
 import {ActivityIndicator, Pressable, StyleSheet, Text} from 'react-native';
-import {colors, radius, spacing} from '../theme';
+import {colors, radius, spacing, useAccent} from '../theme';
 
 interface Props {
   title: string;
@@ -14,7 +14,9 @@ interface Props {
  * 48dp accessibility minimum) for every primary action in the app, so
  * "what does a button look like" is answered once. */
 export function PrimaryButton({title, onPress, disabled, loading, variant = 'primary'}: Props) {
+  const {color: accent} = useAccent();
   const isPrimary = variant === 'primary';
+  const labelColor = isPrimary ? colors.onAccent : colors.text;
   return (
     <Pressable
       accessibilityRole="button"
@@ -23,14 +25,14 @@ export function PrimaryButton({title, onPress, disabled, loading, variant = 'pri
       disabled={disabled || loading}
       style={({pressed}) => [
         styles.button,
-        isPrimary ? styles.primary : styles.secondary,
+        isPrimary ? {backgroundColor: accent} : styles.secondary,
         (disabled || loading) && styles.disabled,
         pressed && !disabled && !loading && styles.pressed,
       ]}>
       {loading ? (
-        <ActivityIndicator color={isPrimary ? colors.void : colors.text} />
+        <ActivityIndicator color={labelColor} />
       ) : (
-        <Text style={[styles.label, isPrimary ? styles.primaryLabel : styles.secondaryLabel]}>{title}</Text>
+        <Text style={[styles.label, {color: labelColor}]}>{title}</Text>
       )}
     </Pressable>
   );
@@ -44,13 +46,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
-  primary: {
-    backgroundColor: colors.royal,
-  },
   secondary: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.lineBright,
+    backgroundColor: '#34363d',
   },
   disabled: {
     opacity: 0.5,
@@ -60,12 +57,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    fontWeight: '600',
-  },
-  primaryLabel: {
-    color: colors.text,
-  },
-  secondaryLabel: {
-    color: colors.text,
+    fontWeight: '700',
   },
 });

@@ -3,7 +3,6 @@ import React, {useState} from 'react';
 import {KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View} from 'react-native';
 import {Card} from '../../components/Card';
 import {PrimaryButton} from '../../components/PrimaryButton';
-import {Starfield} from '../../components/Starfield';
 import type {OnboardingStackParamList} from '../../navigation/OnboardingNavigator';
 import {colors, spacing, typography} from '../../theme';
 
@@ -17,7 +16,6 @@ export function ServerNameStep({navigation, route}: Props) {
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Starfield />
       <View style={styles.content}>
         <Text style={typography.title}>Welcome to StarCore</Text>
         <Text style={[typography.caption, styles.subtitle]}>

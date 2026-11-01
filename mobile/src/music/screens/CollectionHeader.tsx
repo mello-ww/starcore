@@ -1,6 +1,6 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../../theme';
+import {colors, radius, spacing, typography, useAccentStyles} from '../../theme';
 import {Artwork, Mosaic} from '../ui/Artwork';
 
 interface Props {
@@ -16,6 +16,7 @@ interface Props {
 }
 
 export function CollectionHeader({title, subtitle, details, albumId, mosaic, round, onPlay, onShuffle, actions = []}: Props) {
+  const accentStyle = useAccentStyles();
   return (
     <View style={styles.header}>
       {mosaic ? <Mosaic albums={mosaic} size={200} label={title} /> : <Artwork albumId={albumId} size={200} round={round} label={title} />}
@@ -24,8 +25,8 @@ export function CollectionHeader({title, subtitle, details, albumId, mosaic, rou
       {!!details && <Text style={typography.caption}>{details}</Text>}
       <View style={styles.buttons}>
         {onPlay && (
-          <Pressable onPress={onPlay} style={[styles.button, styles.primary]} accessibilityLabel="Play">
-            <Text style={styles.label}>▶ Play</Text>
+          <Pressable onPress={onPlay} style={[styles.button, accentStyle.fill]} accessibilityLabel="Play">
+            <Text style={[styles.label, styles.primaryLabel]}>▶ Play</Text>
           </Pressable>
         )}
         {onShuffle && (
@@ -34,7 +35,7 @@ export function CollectionHeader({title, subtitle, details, albumId, mosaic, rou
           </Pressable>
         )}
         {actions.map(action => (
-          <Pressable key={action.label} onPress={action.onPress} style={[styles.button, action.active && styles.active]}>
+          <Pressable key={action.label} onPress={action.onPress} style={[styles.button, action.active && accentStyle.border]}>
             <Text style={styles.label}>{action.label}</Text>
           </Pressable>
         ))}
@@ -48,7 +49,6 @@ const styles = StyleSheet.create({
   title: {textAlign: 'center', marginTop: spacing.md},
   buttons: {flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.md},
   button: {paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.lineBright},
-  primary: {backgroundColor: colors.royal, borderColor: colors.royal},
-  active: {borderColor: colors.azure},
+  primaryLabel: {color: colors.onAccent, fontWeight: '700'},
   label: {color: colors.text, fontWeight: '600'},
 });

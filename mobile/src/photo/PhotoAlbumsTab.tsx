@@ -1,7 +1,8 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
+import Icon from 'react-native-vector-icons/Feather';
 import {Card} from '../components/Card';
-import {colors, radius, spacing, typography} from '../theme';
+import {colors, radius, spacing, typography, useAccentStyles} from '../theme';
 import {PhotoThumbnail} from './PhotoThumbnail';
 import type {AlbumSummary} from './types';
 import {usePhotoApi} from './usePhotoApi';
@@ -31,6 +32,7 @@ function kindLabel(kind: AlbumSummary['kind']): string | null {
  * album - see albums.py's FAVORITES_ID); the backend rejects both anyway.
  */
 export function PhotoAlbumsTab({onOpenAlbum, onOpenTrash}: Props) {
+  const accentStyle = useAccentStyles();
   const {api} = usePhotoApi();
   const [albums, setAlbums] = useState<AlbumSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +101,7 @@ export function PhotoAlbumsTab({onOpenAlbum, onOpenTrash}: Props) {
   if (!albums) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.azure} />
+        <ActivityIndicator color={accentStyle.color} />
       </View>
     );
   }
@@ -130,7 +132,7 @@ export function PhotoAlbumsTab({onOpenAlbum, onOpenTrash}: Props) {
         title="Custom albums"
         action={
           <Pressable onPress={() => setCreating(current => !current)} hitSlop={8}>
-            <Text style={styles.addAction}>{creating ? 'Cancel' : '+ New'}</Text>
+            <Text style={[styles.addAction, accentStyle.text]}>{creating ? 'Cancel' : '+ New'}</Text>
           </Pressable>
         }>
         {creating && (
@@ -168,7 +170,7 @@ export function PhotoAlbumsTab({onOpenAlbum, onOpenTrash}: Props) {
         <Pressable onPress={onOpenTrash}>
           <Card style={styles.card}>
             <View style={[styles.cover, styles.coverEmpty, styles.trashCover]}>
-              <Text style={styles.trashIcon}>🗑</Text>
+              <Icon name="trash-2" size={22} color={colors.textDim} />
             </View>
             <View style={styles.info}>
               <Text style={typography.heading}>Recycle bin</Text>
@@ -205,7 +207,7 @@ function AlbumRow({album, onPress, onDelete}: {album: AlbumSummary; onPress: () 
           ) : (
             <View
               style={[styles.cover, styles.coverEmpty, album.kind === 'favorites' && styles.favoritesCover]}>
-              {album.kind === 'favorites' && <Text style={styles.trashIcon}>♥</Text>}
+              {album.kind === 'favorites' && <Icon name="heart" size={22} color={colors.alert} />}
             </View>
           )}
         </View>
@@ -240,7 +242,7 @@ const styles = StyleSheet.create({
   sectionHint: {color: colors.textFaint},
   sectionBody: {gap: spacing.sm},
   sectionEmpty: {paddingVertical: spacing.xs},
-  addAction: {color: colors.azure, fontWeight: '600', fontSize: 14},
+  addAction: {fontWeight: '600', fontSize: 14},
   createRow: {flexDirection: 'row', gap: spacing.sm, alignItems: 'center'},
   createInput: {
     flex: 1,
@@ -257,13 +259,12 @@ const styles = StyleSheet.create({
   card: {flexDirection: 'row', alignItems: 'center', gap: spacing.md},
   cover: {width: 56, height: 56, borderRadius: radius.md, overflow: 'hidden'},
   coverEmpty: {backgroundColor: colors.raised, alignItems: 'center', justifyContent: 'center'},
-  favoritesCover: {backgroundColor: 'rgba(228,96,109,0.16)'},
+  favoritesCover: {backgroundColor: 'rgba(238,68,75,0.16)'},
   trashCover: {backgroundColor: colors.raised},
-  trashIcon: {fontSize: 20, color: colors.alert},
   info: {flex: 1, gap: 2},
   nameRow: {flexDirection: 'row', alignItems: 'center', gap: spacing.xs},
-  kindBadge: {paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999, backgroundColor: 'rgba(15,82,186,0.22)'},
-  kindBadgeFavorites: {backgroundColor: 'rgba(228,96,109,0.2)'},
+  kindBadge: {paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999, backgroundColor: 'rgba(230,231,235,0.1)'},
+  kindBadgeFavorites: {backgroundColor: 'rgba(238,68,75,0.2)'},
   kindBadgeLabel: {fontSize: 10, fontWeight: '700', color: colors.ice, textTransform: 'uppercase'},
   deleteAction: {padding: spacing.xs},
   deleteActionLabel: {color: colors.textFaint, fontSize: 16},

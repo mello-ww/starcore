@@ -155,9 +155,9 @@
 .photo-notice {
     margin: 0;
     padding: 0.7rem 1rem;
-    border: 1px solid rgba(228, 96, 109, 0.4);
+    border: 1px solid rgba(238, 68, 75, 0.4);
     border-radius: var(--radius);
-    background: rgba(228, 96, 109, 0.08);
+    background: rgba(238, 68, 75, 0.08);
     color: var(--alert);
     font-size: 0.85rem;
 }
@@ -190,8 +190,20 @@
 }
 
 .photo-tab.active {
-    background: rgba(0, 47, 167, 0.55);
-    color: #fff;
+    background: var(--sc-accent, #ee444b);
+    color: var(--sc-on-accent, #141215);
+    font-weight: 600;
+}
+
+.photo-tab:focus-visible {
+    outline: 2px solid var(--sc-accent, #ee444b);
+    outline-offset: 2px;
+}
+
+.photo-tab .sc-gear {
+    width: 14px;
+    height: 14px;
+    margin: -2px 6px 0 0;
 }
 
 .photo-tab-panel[hidden] {
@@ -271,7 +283,6 @@
 .photo-tile:focus-visible {
     outline: none;
     border-color: var(--sapphire);
-    box-shadow: 0 6px 20px -12px rgba(15, 82, 186, 0.9);
 }
 
 .photo-tile.unavailable::after {
@@ -306,7 +317,7 @@
     padding-left: 2px;
     transform: translate(-50%, -50%);
     border-radius: 50%;
-    background: rgba(4, 6, 13, 0.55);
+    background: rgba(10, 10, 12, 0.55);
     color: #fff;
     pointer-events: none;
 }
@@ -317,7 +328,7 @@
     bottom: 0.4rem;
     padding: 0.1rem 0.35rem;
     border-radius: 4px;
-    background: rgba(4, 6, 13, 0.72);
+    background: rgba(10, 10, 12, 0.72);
     color: var(--text);
     font-family: var(--mono);
     font-size: 0.66rem;
@@ -330,7 +341,7 @@
     bottom: 0;
     left: 0;
     padding: 1.4rem 0.5rem 0.4rem;
-    background: linear-gradient(180deg, transparent, rgba(4, 6, 13, 0.88));
+    background: linear-gradient(180deg, transparent, rgba(10, 10, 12, 0.88));
     color: var(--text);
     font-family: var(--mono);
     font-size: 0.7rem;
@@ -396,8 +407,7 @@
     z-index: 20;
     display: flex;
     flex-direction: column;
-    background-color: #03050b;
-    background-image: var(--starfield);
+    background-color: var(--void);
     animation: photo-fade 160ms ease-out;
 }
 
@@ -474,7 +484,7 @@
 
 .photo-viewer-info.active {
     border-color: var(--sapphire);
-    background: rgba(15, 82, 186, 0.18);
+    background: color-mix(in srgb, var(--sc-accent) 18%, transparent);
     color: var(--ice);
 }
 
@@ -517,7 +527,7 @@
     height: 38px;
     border: 1px solid var(--line-bright);
     border-radius: 50%;
-    background: rgba(10, 15, 30, 0.7);
+    background: rgba(22, 23, 27, 0.7);
     color: var(--text-dim);
     font-size: 1.1rem;
     line-height: 1;
@@ -615,7 +625,6 @@
 .photo-album-card:focus-visible {
     outline: none;
     border-color: var(--sapphire);
-    box-shadow: 0 6px 20px -12px rgba(15, 82, 186, 0.9);
 }
 
 .photo-album-cover {
@@ -675,12 +684,12 @@
 }
 
 .photo-icon-button {
-    background: rgba(4, 6, 13, 0.72);
+    background: rgba(10, 10, 12, 0.72);
     backdrop-filter: blur(2px);
 }
 
 .photo-icon-button:hover {
-    background: rgba(4, 6, 13, 0.9);
+    background: rgba(10, 10, 12, 0.9);
 }
 
 .photo-back {
@@ -737,7 +746,7 @@
     height: 24px;
     border: 1px solid var(--line-bright);
     border-radius: 50%;
-    background: rgba(4, 6, 13, 0.78);
+    background: rgba(10, 10, 12, 0.78);
     color: var(--text-dim);
     font-size: 0.7rem;
     line-height: 1;
@@ -812,7 +821,7 @@
 
 .photo-picker-tile.selected {
     border-color: var(--ok);
-    box-shadow: 0 0 0 2px rgba(62, 207, 142, 0.35);
+    box-shadow: 0 0 0 2px rgba(230, 231, 235, 0.3);
 }
 
 .photo-picker-tile.selected::after {
@@ -851,9 +860,7 @@
     padding: 3px;
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    background:
-        radial-gradient(circle at 12% 18%, rgba(108, 155, 240, 0.14), transparent 55%),
-        var(--void);
+    background: var(--void);
     overflow: hidden;
 }
 
@@ -889,7 +896,7 @@
    it, so marker/control contrast is unaffected */
 .photo-map .leaflet-tile-pane,
 .photo-location-map .leaflet-tile-pane {
-    filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.55);
+    filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.12);
 }
 
 .photo-map .leaflet-control-zoom a,
@@ -901,12 +908,12 @@
 
 .photo-map .leaflet-control-zoom a:hover,
 .photo-location-map .leaflet-control-zoom a:hover {
-    background: rgba(43, 91, 215, 0.25) !important;
+    background: color-mix(in srgb, var(--sc-accent) 25%, transparent) !important;
     color: var(--ice) !important;
 }
 
 .photo-map .leaflet-control-attribution {
-    background: rgba(4, 6, 13, 0.72) !important;
+    background: rgba(10, 10, 12, 0.72) !important;
     color: var(--text-faint) !important;
 }
 
@@ -926,7 +933,7 @@
     border: 2px solid var(--ice);
     border-radius: 50%;
     background: var(--azure);
-    box-shadow: 0 0 0 5px rgba(108, 155, 240, 0.25);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--sc-accent) 25%, transparent);
 }
 
 .photo-map-marker-count {
@@ -1032,7 +1039,7 @@
     height: 24px;
     border: 1px solid var(--line-bright);
     border-radius: 50%;
-    background: rgba(4, 6, 13, 0.78);
+    background: rgba(10, 10, 12, 0.78);
     color: var(--text-dim);
     line-height: 1;
     cursor: pointer;
@@ -1053,7 +1060,7 @@
 
 .photo-tile-favorite.active {
     border-color: var(--alert);
-    background: rgba(228, 96, 109, 0.25);
+    background: rgba(238, 68, 75, 0.25);
     color: var(--alert);
 }
 
@@ -1082,7 +1089,7 @@
 
 .photo-viewer-favorite.active {
     border-color: var(--alert);
-    background: rgba(228, 96, 109, 0.18);
+    background: rgba(238, 68, 75, 0.18);
     color: var(--alert);
 }
 
@@ -1125,12 +1132,12 @@
 }
 
 .photo-album-kind-physical {
-    background: rgba(15, 82, 186, 0.22);
+    background: color-mix(in srgb, var(--sc-accent) 22%, transparent);
     color: var(--ice);
 }
 
 .photo-album-kind-favorites {
-    background: rgba(228, 96, 109, 0.2);
+    background: rgba(238, 68, 75, 0.2);
     color: var(--alert);
 }
 

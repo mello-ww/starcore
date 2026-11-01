@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {BackHandler, View} from 'react-native';
+import {BackHandler, StatusBar, View} from 'react-native';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {AuthProvider} from './auth/AuthContext';
@@ -43,6 +43,7 @@ export default function App() {
     <GestureHandlerRootView style={{flex: 1}}>
       <SafeAreaProvider>
         <AccentProvider>
+          <StatusBar barStyle="light-content" backgroundColor={colors.void} />
           <ServersProvider>
             <ServersGate />
           </ServersProvider>

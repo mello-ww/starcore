@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../theme';
+import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
+import {StarSwitch} from '../components/StarSwitch';
+import {colors, radius, spacing, typography, useAccentStyles} from '../theme';
 import {configureBackgroundFetch, runBackgroundSync} from './backgroundSyncTask';
 import {requestMediaLibraryPermission} from './mediaPermission';
 import {getSyncState, setSyncEnabled, setWifiOnly} from './syncState';
@@ -24,6 +25,7 @@ function settingValue<T>(settings: ConfigurationSetting[], key: string, fallback
  * tab uses (see configuration.py) - there is no second settings mechanism.
  */
 export function PhotoConfigurationScreen() {
+  const accentStyle = useAccentStyles();
   const {api, serverId} = usePhotoApi();
   const [settings, setSettings] = useState<ConfigurationSetting[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -151,7 +153,7 @@ export function PhotoConfigurationScreen() {
   if (!settings || !syncLoaded) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.azure} />
+        <ActivityIndicator color={accentStyle.color} />
       </View>
     );
   }
@@ -192,7 +194,7 @@ export function PhotoConfigurationScreen() {
           <Pressable onPress={addMapping} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonLabel}>Add mapping</Text>
           </Pressable>
-          <Pressable onPress={saveMappings} disabled={savingMappings} style={styles.primaryButton}>
+          <Pressable onPress={saveMappings} disabled={savingMappings} style={[styles.primaryButton, accentStyle.border]}>
             <Text style={styles.primaryButtonLabel}>{savingMappings ? 'Saving…' : 'Save mappings'}</Text>
           </Pressable>
         </View>
@@ -224,7 +226,7 @@ export function PhotoConfigurationScreen() {
               every 15 minutes, and whenever you open this app. Nothing is ever deleted from your phone.
             </Text>
           </View>
-          <Switch value={syncEnabled} onValueChange={onToggleSyncEnabled} />
+          <StarSwitch value={syncEnabled} onValueChange={onToggleSyncEnabled} />
         </View>
         <View style={styles.row}>
           <View style={styles.rowText}>
@@ -233,7 +235,7 @@ export function PhotoConfigurationScreen() {
               Applies to the periodic background check. Opening the app can still sync over cellular.
             </Text>
           </View>
-          <Switch value={wifiOnly} onValueChange={onToggleWifiOnly} disabled={!syncEnabled} />
+          <StarSwitch value={wifiOnly} onValueChange={onToggleWifiOnly} disabled={!syncEnabled} />
         </View>
         <Pressable
           style={[styles.syncButton, (syncing || !syncEnabled) && styles.syncButtonDisabled]}
@@ -360,7 +362,7 @@ const styles = StyleSheet.create({
   mappingActions: {flexDirection: 'row', gap: spacing.sm},
   secondaryButton: {paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.lineBright, alignItems: 'center', justifyContent: 'center'},
   secondaryButtonLabel: {color: colors.text, fontWeight: '600'},
-  primaryButton: {flex: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: colors.raised, borderWidth: 1, borderColor: colors.azure, alignItems: 'center'},
+  primaryButton: {flex: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.md, backgroundColor: colors.raised, borderWidth: 1, alignItems: 'center'},
   primaryButtonLabel: {color: colors.text, fontWeight: '700'},
   configRow: {gap: spacing.xs},
   configInputRow: {flexDirection: 'row', gap: spacing.sm, alignItems: 'center'},

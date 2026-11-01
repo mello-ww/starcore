@@ -1,9 +1,9 @@
-import {DarkTheme, NavigationContainer} from '@react-navigation/native';
+import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import React from 'react';
 import {ServerAddressStep} from '../screens/onboarding/ServerAddressStep';
 import {ServerNameStep} from '../screens/onboarding/ServerNameStep';
-import {colors} from '../theme';
+import {useNavigationTheme} from './navigationTheme';
 
 export type OnboardingStackParamList = {
   ServerName: {name?: string} | undefined;
@@ -11,18 +11,6 @@ export type OnboardingStackParamList = {
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
-
-const navigationTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: colors.void,
-    card: colors.surface,
-    border: colors.line,
-    text: colors.text,
-    primary: colors.azure,
-  },
-};
 
 /**
  * First-launch-only: name the server, then give its address - see "Fix the
@@ -59,6 +47,7 @@ export function OnboardingNavigator({
   initialAddress?: string;
   startOnAddressStep?: boolean;
 }) {
+  const navigationTheme = useNavigationTheme();
   const initialState = startOnAddressStep
     ? {
         index: 1,

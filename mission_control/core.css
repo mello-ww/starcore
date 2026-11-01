@@ -1,5 +1,5 @@
-/* StarCore design language for the Core pages (Satellites, Console, Configuration),
-   their dialogs and sign-in. Satellite pages drop .sc-themed and keep style.css. */
+/* StarCore design language applied over style.css: every page, dialog and sign-in,
+   satellite pages included, through the shared variables below. */
 
 .sc-themed {
     --void: var(--sc-bg);
@@ -17,6 +17,7 @@
     --text-dim: var(--sc-text-2);
     --text-faint: var(--sc-text-3);
     --alert: var(--sc-danger);
+    --ok: var(--sc-text-icon);
     --radius: var(--sc-radius-card);
 }
 
@@ -73,6 +74,11 @@
 
 .sc-themed .view form + .panel {
     margin-top: 24px;
+}
+
+/* a satellite can leave a panel empty until it has something to show */
+.sc-themed .panel:empty {
+    display: none;
 }
 
 .sc-themed .panel > .eyebrow {
@@ -363,15 +369,119 @@
 }
 
 .sc-themed .config-checkbox {
+    gap: 12px;
     min-height: 40px;
     color: var(--sc-text);
     font-size: 14px;
 }
 
-.sc-themed input[type="checkbox"] {
+.sc-themed input[type="checkbox"]:not(.sc-switch) {
     width: 18px;
     height: 18px;
     accent-color: var(--sc-accent);
+}
+
+/* ---------- switch ----------
+   The one on/off control for every page, Mission Control's and the satellites'.
+   A checkbox with role="switch": the track is the input, the thumb its ::before. */
+
+.sc-switch {
+    position: relative;
+    flex: none;
+    box-sizing: border-box;
+    width: 40px;
+    height: 24px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--sc-control-strong);
+    vertical-align: middle;
+    cursor: pointer;
+    transition: background 140ms ease;
+}
+
+.sc-switch::before {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--sc-text-2);
+    transition: transform 140ms ease, background 140ms ease;
+}
+
+.sc-switch:hover {
+    background: #42444c;
+}
+
+.sc-switch:hover::before {
+    background: var(--sc-text);
+}
+
+.sc-switch:checked,
+.sc-switch:checked:hover {
+    background: var(--sc-accent);
+}
+
+.sc-switch:checked::before {
+    background: var(--sc-on-accent);
+    transform: translateX(16px);
+}
+
+.sc-switch:checked:hover {
+    filter: brightness(1.08);
+}
+
+.sc-switch:focus-visible {
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 2px;
+}
+
+.sc-switch:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: none;
+}
+
+.sc-switch:disabled:not(:checked) {
+    background: var(--sc-control-strong);
+}
+
+.sc-switch:disabled::before {
+    background: var(--sc-text-2);
+}
+
+.sc-switch:disabled:checked::before {
+    background: var(--sc-on-accent);
+}
+
+/* Music's light theme sits on white, so its unchecked track needs a darker grey */
+[data-mu-theme="light"] .sc-switch:not(:checked) {
+    background: #c9cbd2;
+}
+
+[data-mu-theme="light"] .sc-switch:not(:checked)::before {
+    background: #ffffff;
+}
+
+/* ---------- gear ----------
+   The one Settings icon (Feather's "settings" glyph, the same one the Android app uses),
+   drawn as a mask so it takes the colour of the text around it. */
+
+.sc-gear {
+    display: inline-block;
+    flex: none;
+    width: 16px;
+    height: 16px;
+    background: currentColor;
+    -webkit-mask: var(--sc-icon-gear) center / contain no-repeat;
+    mask: var(--sc-icon-gear) center / contain no-repeat;
+    vertical-align: middle;
 }
 
 /* ---------- console ---------- */

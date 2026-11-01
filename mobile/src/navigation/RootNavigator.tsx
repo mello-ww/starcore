@@ -1,23 +1,12 @@
-import {NavigationContainer, DarkTheme} from '@react-navigation/native';
+import {NavigationContainer} from '@react-navigation/native';
 import React, {useEffect, useRef} from 'react';
 import {ActivityIndicator, StyleSheet, View} from 'react-native';
 import {useAuth} from '../auth/AuthContext';
 import {LockScreen} from '../screens/LockScreen';
 import {LoginScreen} from '../screens/LoginScreen';
-import {colors} from '../theme';
+import {colors, useAccent} from '../theme';
+import {useNavigationTheme} from './navigationTheme';
 import {MainTabs} from './MainTabs';
-
-const navigationTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: colors.void,
-    card: colors.surface,
-    border: colors.line,
-    text: colors.text,
-    primary: colors.azure,
-  },
-};
 
 /**
  * Everything *after* a server address is known (see App.tsx) - login vs.
@@ -59,6 +48,8 @@ export function RootNavigator({
   resumeAddServerParams?: {name: string; address: string};
 }) {
   const {state, locked} = useAuth();
+  const navigationTheme = useNavigationTheme();
+  const {color: accent} = useAccent();
   const appShown = useRef(false);
 
   useEffect(() => {
@@ -72,7 +63,7 @@ export function RootNavigator({
   if (state.status === 'loading') {
     return (
       <View style={{flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.void}}>
-        <ActivityIndicator color={colors.azure} size="large" />
+        <ActivityIndicator color={accent} size="large" />
       </View>
     );
   }

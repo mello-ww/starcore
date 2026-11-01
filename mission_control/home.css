@@ -147,6 +147,7 @@ body {
 }
 
 .nav-item svg,
+.nav-item .sc-gear,
 .nav-item .dot {
     color: var(--sc-text-3);
 }
@@ -156,7 +157,8 @@ body {
     color: var(--sc-text);
 }
 
-.nav-item:hover svg {
+.nav-item:hover svg,
+.nav-item:hover .sc-gear {
     color: var(--sc-text);
 }
 
@@ -165,7 +167,8 @@ body {
     color: var(--sc-text);
 }
 
-.nav-item.active svg {
+.nav-item.active svg,
+.nav-item.active .sc-gear {
     color: var(--sc-accent);
 }
 
@@ -195,7 +198,8 @@ body {
     height: 11px;
 }
 
-.nav-item .satellite-icon {
+/* neutral until hovered or active; .sidebar outranks core.css's accent card icon */
+.sidebar .nav-item .satellite-icon {
     background: transparent;
     border-color: transparent;
     color: var(--sc-text-3);
@@ -207,11 +211,11 @@ body {
     height: 15px;
 }
 
-.nav-item:hover .satellite-icon {
+.sidebar .nav-item:hover .satellite-icon {
     color: var(--sc-text);
 }
 
-.nav-item.active .satellite-icon {
+.sidebar .nav-item.active .satellite-icon {
     color: var(--sc-accent);
 }
 
@@ -639,5 +643,17 @@ body[data-route="overview"] #updated {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 16px;
+    }
+}
+
+/* the icon-only rail hides every label span in a nav item (style.css), which would take the
+   satellite icons with them; at phone widths the sidebar is a labelled overlay again */
+@media (max-width: 1040px) and (min-width: 601px) {
+    .sidebar .nav-item .satellite-icon {
+        display: flex;
+    }
+
+    .sidebar .nav-item .satellite-icon .icon-mask {
+        display: block;
     }
 }

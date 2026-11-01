@@ -46,3 +46,18 @@ export function AccentProvider({children}: {children: ReactNode}) {
 export function useAccent(): AccentValue {
   return useContext(AccentContext);
 }
+
+/** The live accent as ready-made style fragments, for screens whose StyleSheet is built once at
+ * startup: apply `text`, `fill` or `border` next to the static style so a new accent shows at once. */
+export function useAccentStyles() {
+  const {color} = useAccent();
+  return useMemo(
+    () => ({
+      color,
+      text: {color},
+      fill: {backgroundColor: color, borderColor: color},
+      border: {borderColor: color},
+    }),
+    [color],
+  );
+}

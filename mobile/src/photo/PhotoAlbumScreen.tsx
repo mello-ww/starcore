@@ -1,7 +1,7 @@
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useCallback, useEffect, useState} from 'react';
 import {ActivityIndicator, Alert, Pressable, StyleSheet, Text, View} from 'react-native';
-import {colors, spacing} from '../theme';
+import {colors, spacing, useAccentStyles} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
 import {PhotoGrid} from './PhotoGrid';
 import type {AlbumDetail} from './types';
@@ -23,6 +23,7 @@ type Props = NativeStackScreenProps<SatellitesStackParamList, 'PhotoAlbum'>;
  * it from this view immediately, the same way the web panel's own Favorites
  * detail behaves. */
 export function PhotoAlbumScreen({route, navigation}: Props) {
+  const accentStyle = useAccentStyles();
   const {albumId, name} = route.params;
   const {api} = usePhotoApi();
   const [album, setAlbum] = useState<AlbumDetail | null>(null);
@@ -89,7 +90,7 @@ export function PhotoAlbumScreen({route, navigation}: Props) {
   if (!album) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.azure} />
+        <ActivityIndicator color={accentStyle.color} />
       </View>
     );
   }

@@ -123,6 +123,12 @@ export function mount(context) {
         for (const name of TABS) {
             const button = el("button", "photo-tab", tabLabel(name));
             button.type = "button";
+            if (name === "config") {
+                // StarCore's shared Settings gear (.sc-gear in Mission Control's core.css)
+                const gear = el("i", "sc-gear");
+                gear.setAttribute("aria-hidden", "true");
+                button.prepend(gear);
+            }
             button.dataset.tab = name;
             button.addEventListener("click", () => setTab(name));
             group.appendChild(button);

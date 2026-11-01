@@ -1,8 +1,8 @@
 import * as api from "./api.js";
 import * as store from "./store.js";
 
-const DEFAULT_ACCENT = [108, 155, 240];
 const palettes = new Map();
+let currentAlbum = null; // the album whose cover colours Music when the accent follows artwork
 const themed = new Set();
 const media = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
 
@@ -30,6 +30,8 @@ export function apply() {
     const accent = store.preference("accent", "artwork");
     if (accent && accent !== "artwork") {
         setAccent(hexToRgb(accent));
+    } else {
+        followArtwork(currentAlbum);
     }
 }
 
@@ -43,12 +45,15 @@ function hexToRgb(hex) {
     return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 }
 
-function setAccent(rgb, secondary) {
+// Music's own accent (a picked colour or the cover's) lives in --mu-accent and only colours Music.
+// With none set, page.css falls back to StarCore's --sc-accent, so the global choice applies live.
+function setAccent(rgb) {
     const root = document.documentElement.style;
-    root.setProperty("--mu-accent", `rgb(${rgb.join(",")})`);
-    root.setProperty("--mu-accent-rgb", rgb.join(","));
-    const second = secondary || rgb.map((channel) => Math.round(channel * 0.35));
-    root.setProperty("--mu-accent-deep-rgb", second.join(","));
+    if (rgb) {
+        root.setProperty("--mu-accent", `rgb(${rgb.join(",")})`);
+    } else {
+        root.removeProperty("--mu-accent");
+    }
 }
 
 // the most saturated colours of the cover, sampled small; artwork is same-origin so the canvas stays readable
@@ -87,9 +92,7 @@ export function palette(albumId) {
                 }
                 const ranked = [...buckets.values()].sort((a, b) => b.weight - a.weight);
                 const colour = (entry) => [entry.r, entry.g, entry.b].map((sum) => Math.round(sum / entry.count));
-                const primary = ranked[0] ? lift(colour(ranked[0])) : DEFAULT_ACCENT;
-                const secondary = ranked[1] ? colour(ranked[1]).map((channel) => Math.round(channel * 0.5)) : null;
-                resolve({ primary, secondary });
+                resolve(ranked[0] ? { primary: lift(colour(ranked[0])) } : null);
             } catch (error) {
                 resolve(null);
             }
@@ -103,19 +106,21 @@ export function palette(albumId) {
 
 function lift(rgb) {
     const max = Math.max(...rgb);
-    if (max < 110) {
-        const scale = 110 / Math.max(max, 1);
+    // bright enough for dark on-accent text to stay readable on it
+    if (max < 170) {
+        const scale = 170 / Math.max(max, 1);
         return rgb.map((channel) => Math.min(255, Math.round(channel * scale)));
     }
     return rgb;
 }
 
 export async function followArtwork(albumId) {
+    currentAlbum = albumId || null;
     if (store.preference("accent", "artwork") !== "artwork") {
         return;
     }
     const colours = await palette(albumId);
-    setAccent(colours ? colours.primary : DEFAULT_ACCENT, colours ? colours.secondary : null);
+    if (currentAlbum === (albumId || null) && store.preference("accent", "artwork") === "artwork") {
+        setAccent(colours ? colours.primary : null);
+    }
 }
-
-setAccent(DEFAULT_ACCENT);

@@ -1,11 +1,12 @@
 import React, {useMemo} from 'react';
 import {ActivityIndicator, PanResponder, Pressable, StyleSheet, Text, View} from 'react-native';
-import {colors, radius, spacing, touchTarget, typography} from '../../theme';
+import {colors, radius, spacing, touchTarget, typography, useAccentStyles} from '../../theme';
 import {useMusic, usePlayerState} from '../MusicProvider';
 import {Artwork} from '../ui/Artwork';
 
 /** Sits above the tab bar on every tab; tap or swipe up opens the full player. */
 export function MiniPlayer() {
+  const accentStyle = useAccentStyles();
   const {player, setFullPlayer, liked, setLiked} = useMusic();
   const state = usePlayerState();
   const responder = useMemo(
@@ -33,7 +34,7 @@ export function MiniPlayer() {
           </Text>
         </View>
         <Pressable onPress={() => setLiked([track.id], !liked.has(track.id))} style={styles.touch} accessibilityRole="button" accessibilityLabel="Like">
-          <Text style={[styles.icon, liked.has(track.id) && styles.liked]}>{liked.has(track.id) ? '♥' : '♡'}</Text>
+          <Text style={[styles.icon, liked.has(track.id) && accentStyle.text]}>{liked.has(track.id) ? '♥' : '♡'}</Text>
         </Pressable>
         {state.buffering && state.playing ? (
           <ActivityIndicator color={colors.text} style={styles.control} />
@@ -44,7 +45,7 @@ export function MiniPlayer() {
         )}
       </Pressable>
       <View style={styles.progress}>
-        <View style={[styles.fill, {width: `${progress * 100}%`}]} />
+        <View style={[[styles.fill, accentStyle.fill], {width: `${progress * 100}%`}]} />
       </View>
     </View>
   );
@@ -56,9 +57,8 @@ const styles = StyleSheet.create({
   text: {flex: 1},
   title: {...typography.body, fontWeight: '600'},
   icon: {color: colors.text, fontSize: 20, paddingHorizontal: spacing.xs},
-  liked: {color: colors.azure},
   control: {width: 48, alignItems: 'center'},
   touch: touchTarget,
   progress: {height: 2, backgroundColor: colors.line},
-  fill: {height: 2, backgroundColor: colors.azure},
+  fill: {height: 2},
 });

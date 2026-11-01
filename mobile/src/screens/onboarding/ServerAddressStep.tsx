@@ -3,10 +3,9 @@ import React, {useState} from 'react';
 import {KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import {Card} from '../../components/Card';
 import {PrimaryButton} from '../../components/PrimaryButton';
-import {Starfield} from '../../components/Starfield';
 import type {OnboardingStackParamList} from '../../navigation/OnboardingNavigator';
 import {normalizeServerUrl, testConnection} from '../../servers/testConnection';
-import {colors, spacing, typography} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'ServerAddress'> & {
   onConnect: (name: string, url: string) => void;
@@ -26,6 +25,7 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'ServerAddress'> &
  * treating a wrong or unreachable address as connected.
  */
 export function ServerAddressStep({navigation, route, onConnect}: Props) {
+  const accentStyle = useAccentStyles();
   const [url, setUrl] = useState(route.params?.address ?? '');
   const [touched, setTouched] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -49,10 +49,9 @@ export function ServerAddressStep({navigation, route, onConnect}: Props) {
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Starfield />
       <View style={styles.content}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} testID="onboarding-back-button">
-          <Text style={styles.back}>‹ Back</Text>
+          <Text style={[styles.back, accentStyle.text]}>‹ Back</Text>
         </Pressable>
 
         <Text style={typography.title}>Connect to StarCore</Text>
@@ -98,5 +97,5 @@ const styles = StyleSheet.create({
   card: {gap: spacing.xs, marginBottom: spacing.lg},
   input: {color: colors.text, fontSize: 16, paddingVertical: spacing.sm},
   error: {color: colors.alert, fontSize: 13},
-  back: {color: colors.azure, fontSize: 16, marginBottom: spacing.sm},
+  back: {fontSize: 16, marginBottom: spacing.sm},
 });

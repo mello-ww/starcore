@@ -1,6 +1,6 @@
 import React from 'react';
 import {FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
-import {colors, spacing, typography} from '../../theme';
+import {spacing, typography, useAccentStyles} from '../../theme';
 import {Artwork, Mosaic} from './Artwork';
 
 export interface ShelfItem {
@@ -52,12 +52,13 @@ export function Shelf({title, subtitle, items}: {title: string; subtitle?: strin
 }
 
 export function SectionHeader({title, action, onAction}: {title: string; action?: string; onAction?: () => void}) {
+  const accentStyle = useAccentStyles();
   return (
     <View style={styles.header}>
       <Text style={typography.heading}>{title}</Text>
       {action && (
         <Pressable onPress={onAction} hitSlop={8}>
-          <Text style={styles.action}>{action}</Text>
+          <Text style={accentStyle.text}>{action}</Text>
         </Pressable>
       )}
     </View>
@@ -71,5 +72,4 @@ const styles = StyleSheet.create({
   title: {marginTop: spacing.xs, fontSize: 14},
   center: {textAlign: 'center'},
   header: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.lg},
-  action: {color: colors.azure},
 });

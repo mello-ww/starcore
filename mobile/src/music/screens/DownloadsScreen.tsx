@@ -1,11 +1,12 @@
 import React, {useEffect, useReducer} from 'react';
 import {Alert, FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
-import {colors, spacing, typography} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import {bytes} from '../ui/format';
 import {TrackRow} from '../ui/TrackRow';
 
 export function DownloadsScreen() {
+  const accentStyle = useAccentStyles();
   const {downloads, player, preferences} = useMusic();
   const [, refresh] = useReducer((count: number) => count + 1, 0);
   useEffect(() => downloads.subscribe(refresh), [downloads]);
@@ -36,15 +37,15 @@ export function DownloadsScreen() {
               <Text style={typography.caption}>
                 {job.status === 'failed' ? job.error : job.total ? `${Math.round((job.received / job.total) * 100)}%` : job.status}
               </Text>
-              <Pressable onPress={() => downloads.cancel(job.id)} hitSlop={8}><Text style={styles.link}>Cancel</Text></Pressable>
+              <Pressable onPress={() => downloads.cancel(job.id)} hitSlop={8}><Text style={accentStyle.text}>Cancel</Text></Pressable>
             </View>
           ))}
           {downloads.jobs.some(job => job.status === 'failed') && (
-            <Pressable onPress={() => downloads.retryFailed()}><Text style={styles.link}>Retry failed downloads</Text></Pressable>
+            <Pressable onPress={() => downloads.retryFailed()}><Text style={accentStyle.text}>Retry failed downloads</Text></Pressable>
           )}
           {entries.length > 0 && (
             <View style={styles.actions}>
-              <Pressable onPress={() => player.playTracks(tracks, 0, 'library:downloads')}><Text style={styles.link}>Play all</Text></Pressable>
+              <Pressable onPress={() => player.playTracks(tracks, 0, 'library:downloads')}><Text style={accentStyle.text}>Play all</Text></Pressable>
               <Pressable onPress={() => Alert.alert('Remove downloads', 'Remove every downloaded song from this phone?', [
                 {text: 'Cancel', style: 'cancel'},
                 {text: 'Remove', style: 'destructive', onPress: () => downloads.removeAll()},
@@ -70,6 +71,5 @@ const styles = StyleSheet.create({
   job: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
   jobTitle: {flex: 1},
   actions: {flexDirection: 'row', gap: spacing.lg},
-  link: {color: colors.azure},
   danger: {color: colors.alert},
 });

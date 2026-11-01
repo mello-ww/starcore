@@ -5,7 +5,7 @@ import {useAuth} from '../auth/AuthContext';
 import {SatellitesApi} from '../satellites/api';
 import {DeclarativeScreen} from '../satellites/DeclarativeScreen';
 import type {UiScreen} from '../satellites/types';
-import {colors, spacing} from '../theme';
+import {colors, spacing, useAccentStyles} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
 
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'SatelliteDetail'>;
@@ -17,6 +17,7 @@ type Props = NativeStackScreenProps<SatellitesStackParamList, 'SatelliteDetail'>
  * showing beyond its name, and needs no changes for a new one to work.
  */
 export function SatelliteDetailScreen({route, navigation}: Props) {
+  const accentStyle = useAccentStyles();
   const {name} = route.params;
   const {client} = useAuth();
   const api = useMemo(() => new SatellitesApi(client), [client]);
@@ -66,7 +67,7 @@ export function SatelliteDetailScreen({route, navigation}: Props) {
   if (!screen) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.azure} />
+        <ActivityIndicator color={accentStyle.color} />
       </View>
     );
   }
@@ -75,7 +76,7 @@ export function SatelliteDetailScreen({route, navigation}: Props) {
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.azure} />}>
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentStyle.color} />}>
       {error && <Text style={styles.error}>{error}</Text>}
       <DeclarativeScreen screen={screen} onAction={runAction} />
     </ScrollView>

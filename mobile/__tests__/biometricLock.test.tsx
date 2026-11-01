@@ -37,7 +37,6 @@ jest.mock('@react-navigation/native', () => ({
   NavigationContainer: ({children}: {children: React.ReactNode}) => children,
   DarkTheme: {colors: {}},
 }));
-jest.mock('../src/components/Starfield', () => ({Starfield: () => null}));
 jest.mock('../src/navigation/MainTabs', () => {
   const {Text: RNText} = require('react-native');
   const {useAuth} = require('../src/auth/AuthContext');

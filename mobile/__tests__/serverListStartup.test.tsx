@@ -24,7 +24,6 @@ jest.mock('../src/photo/backgroundSyncTask', () => ({
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaProvider: ({children}: {children: React.ReactNode}) => children,
 }));
-jest.mock('../src/components/Starfield', () => ({Starfield: () => null}));
 
 const mockAuthMounts: string[] = [];
 const mockAuthUnmounts: string[] = [];

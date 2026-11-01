@@ -123,7 +123,7 @@ function setLink(reachable) {
 }
 
 function greeting() {
-    return accountName ? `Ravi de vous revoir, ${accountName}` : "Ravi de vous revoir";
+    return accountName ? `Welcome back, ${accountName}` : "Welcome back";
 }
 
 // a satellite earns its own page by shipping one, or by publishing state through
@@ -215,8 +215,6 @@ function applyRoute() {
 function showRoute() {
     const view = route.name === "satellite" ? "satellite" : route.name;
     document.body.dataset.route = view;
-    // satellite pages keep their own styling until they are redesigned
-    document.body.classList.toggle("sc-themed", view !== "satellite");
 
     for (const section of document.querySelectorAll(".view")) {
         section.hidden = section.id !== `view-${view}`;
@@ -1142,27 +1140,18 @@ function updateSatelliteToggleButton() {
  * /api/satellites/<name>/configuration, which every satellite answers for
  * itself. Nothing here knows what any particular satellite's settings mean. */
 
+// the shared Settings gear (.sc-gear in core.css), sized for card and topbar buttons
 function gearIcon() {
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("width", "14");
-    svg.setAttribute("height", "14");
-    svg.setAttribute("viewBox", "0 0 16 16");
-    svg.setAttribute("fill", "none");
-    svg.setAttribute("stroke", "currentColor");
-    svg.setAttribute("stroke-width", "1.4");
-    svg.setAttribute("stroke-linecap", "round");
-    svg.setAttribute("stroke-linejoin", "round");
-    svg.appendChild(shape("circle", { cx: 8, cy: 8, r: 1.7 }));
-    svg.appendChild(shape("path", {
-        d: "M8 2.4v1.7M8 11.9v1.7M13.6 8h-1.7M4.1 8H2.4M11.7 4.3l-1.2 1.2M5.5 10.5l-1.2 1.2M11.7 11.7l-1.2-1.2M5.5 5.5 4.3 4.3",
-    }));
-    return svg;
+    const gear = element("i", "sc-gear");
+    gear.setAttribute("aria-hidden", "true");
+    return gear;
 }
 
 function buildConfigButton(satellite, extraClass) {
     const button = element("button", extraClass ? `icon-button ${extraClass}` : "icon-button");
     button.type = "button";
     button.title = `${satellite.name} configuration`;
+    button.setAttribute("aria-label", button.title);
     button.appendChild(gearIcon());
     button.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -1258,6 +1247,8 @@ function buildConfigField(setting) {
         const wrapper = element("label", "config-checkbox");
         const input = document.createElement("input");
         input.type = "checkbox";
+        input.className = "sc-switch";
+        input.setAttribute("role", "switch");
         input.id = id;
         input.dataset.key = setting.key;
         input.checked = setting.value;

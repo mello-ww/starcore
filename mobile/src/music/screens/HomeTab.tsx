@@ -1,6 +1,6 @@
 import React, {useState} from 'react';
 import {ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {colors, spacing, typography} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import type {HomeSection, Track} from '../types';
 import {useMusicNavigation} from '../ui/navigation';
@@ -11,6 +11,7 @@ import {trackCount} from '../ui/format';
 import {useLoad} from '../ui/useLoad';
 
 export function HomeTab() {
+  const accentStyle = useAccentStyles();
   const {api, player} = useMusic();
   const go = useMusicNavigation();
   const {data, error, loading, reload} = useLoad(() => api.home(new Date().getHours()), [api]);
@@ -52,12 +53,12 @@ export function HomeTab() {
   };
 
   if (loading && !data) {
-    return <ActivityIndicator color={colors.azure} style={styles.loading} />;
+    return <ActivityIndicator color={accentStyle.color} style={styles.loading} />;
   }
 
   return (
     <ScrollView contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={colors.azure} />}>
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor={accentStyle.color} />}>
       {error && <Text style={styles.error}>{error}</Text>}
       {data && <Text style={typography.title}>{data.greeting}</Text>}
       {data?.sections.length === 0 && (

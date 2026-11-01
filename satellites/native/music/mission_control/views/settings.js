@@ -53,7 +53,8 @@ function choice(key, options) {
 function toggle(key, disabled = false) {
     const input = el("input");
     input.type = "checkbox";
-    input.className = "mu-switch";
+    input.className = "sc-switch";
+    input.setAttribute("role", "switch");
     input.checked = Boolean(store.preference(key));
     input.disabled = disabled;
     input.addEventListener("change", () => set(key, input.checked));
@@ -107,7 +108,9 @@ function equalizer() {
     const update = () => set("equalizer", { ...eq, bands: eq.bands.slice() });
     const enabled = el("input");
     enabled.type = "checkbox";
-    enabled.className = "mu-switch";
+    enabled.className = "sc-switch";
+    enabled.setAttribute("role", "switch");
+    enabled.setAttribute("aria-label", "Equalizer");
     enabled.checked = eq.enabled;
     enabled.addEventListener("change", () => { eq.enabled = enabled.checked; update(); });
     const preset = el("select", "mu-select");
@@ -165,6 +168,12 @@ function equalizer() {
     return node;
 }
 
+// the picker starts on StarCore's own accent (a #rrggbb token) when Music has none of its own
+function starcoreAccent() {
+    const value = getComputedStyle(document.documentElement).getPropertyValue("--sc-accent").trim();
+    return /^#[0-9a-f]{6}$/i.test(value) ? value : "#ee444b";
+}
+
 function appearance() {
     const node = section("Appearance");
     const accent = el("span", "mu-accent-pick");
@@ -174,7 +183,7 @@ function appearance() {
     colour.type = "color";
     const current = store.preference("accent", "artwork");
     mode.value = current === "artwork" ? "artwork" : "fixed";
-    colour.value = current === "artwork" ? "#6c9bf0" : current;
+    colour.value = current === "artwork" ? starcoreAccent() : current;
     colour.hidden = mode.value === "artwork";
     mode.addEventListener("change", () => {
         colour.hidden = mode.value === "artwork";

@@ -44,7 +44,6 @@ const ICONS = {
     search: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5 20 20",
     home: "M4 11 12 4l8 7v9h-5v-6H9v6H4z",
     library: "M5 4v16M10 4v16M15 4l4.5 15.5",
-    settings: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8",
     stats: "M5 19V11M10 19V5M15 19v-6M20 19V8",
     plus: "M12 5v14M5 12h14",
     close: "M6 6l12 12M18 6 6 18",
@@ -56,6 +55,14 @@ const ICONS = {
 };
 
 export function icon(name, size = 18) {
+    if (name === "settings") {
+        // StarCore's one Settings gear (.sc-gear in Mission Control's core.css)
+        const gear = el("i", "sc-gear mu-icon");
+        gear.setAttribute("aria-hidden", "true");
+        gear.style.width = `${size}px`;
+        gear.style.height = `${size}px`;
+        return gear;
+    }
     const ns = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(ns, "svg");
     svg.setAttribute("viewBox", "0 0 24 24");

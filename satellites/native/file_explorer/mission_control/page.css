@@ -41,7 +41,7 @@
 }
 
 .fe-crumb:hover {
-    background: rgba(43, 91, 215, 0.12);
+    background: color-mix(in srgb, var(--sc-accent) 12%, transparent);
     color: var(--ice);
 }
 
@@ -158,7 +158,7 @@ button.fe-name:hover {
 
 .icon-button.confirm {
     color: var(--alert);
-    background: rgba(228, 96, 109, 0.14);
+    background: rgba(238, 68, 75, 0.14);
     border-radius: 6px;
 }
 
@@ -206,8 +206,8 @@ button.fe-name:hover {
     padding: 1rem 1.1rem;
     border: 1px solid var(--line-bright);
     border-radius: var(--radius);
-    background: linear-gradient(180deg, var(--raised), var(--surface));
-    box-shadow: 0 0 24px rgba(108, 155, 240, 0.08);
+    background: var(--raised);
+    box-shadow: 0 0 24px color-mix(in srgb, var(--sc-accent) 8%, transparent);
 }
 
 .fe-hero-label {
@@ -234,7 +234,7 @@ button.fe-name:hover {
 .fe-hero-fill {
     height: 100%;
     border-radius: 999px;
-    background: linear-gradient(90deg, var(--sapphire), var(--azure));
+    background: var(--sc-accent, var(--azure));
     transition: width 0.4s ease;
 }
 
@@ -303,7 +303,7 @@ button.fe-name:hover {
 .fe-donut-leftover-chip:focus-visible,
 .fe-orbital-leftover-chip:focus-visible {
     border-color: var(--azure);
-    box-shadow: 0 0 0 1px rgba(108, 155, 240, 0.15), 0 0 10px rgba(108, 155, 240, 0.18);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--sc-accent) 15%, transparent), 0 0 10px color-mix(in srgb, var(--sc-accent) 18%, transparent);
     outline: none;
 }
 
@@ -341,7 +341,7 @@ button.fe-name:hover {
 .fe-classic-fill {
     height: 100%;
     border-radius: 999px;
-    background: linear-gradient(90deg, var(--royal), var(--azure));
+    background: var(--sc-accent, var(--azure));
 }
 
 .fe-drive-figures {
@@ -393,7 +393,7 @@ button.fe-name:hover {
 .fe-bar-fill {
     height: 100%;
     border-radius: 999px;
-    background: linear-gradient(90deg, var(--sapphire), var(--azure));
+    background: var(--sc-accent, var(--azure));
 }
 
 .fe-bar-percent {
@@ -589,8 +589,8 @@ button.fe-name:hover {
     padding: 0.4rem;
     border: 1px solid var(--line-bright);
     border-radius: 50%;
-    background: radial-gradient(circle, var(--raised), var(--surface));
-    box-shadow: 0 0 18px rgba(108, 155, 240, 0.1);
+    background: var(--raised);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--sc-accent) 10%, transparent);
     text-align: center;
 }
 
@@ -628,7 +628,7 @@ button.fe-name:hover {
 
 .fe-orbital-node:hover,
 .fe-orbital-node:focus-visible {
-    box-shadow: 0 0 0 1px rgba(108, 155, 240, 0.2), 0 0 12px rgba(108, 155, 240, 0.25);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--sc-accent) 20%, transparent), 0 0 12px color-mix(in srgb, var(--sc-accent) 25%, transparent);
     outline: none;
     transform: translate(-50%, -50%) scale(1.05);
 }

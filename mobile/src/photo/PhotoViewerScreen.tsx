@@ -15,7 +15,7 @@ import {
 import {Gesture, GestureDetector} from 'react-native-gesture-handler';
 import Animated, {useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
 import Video from 'react-native-video';
-import {colors, spacing, typography} from '../theme';
+import {colors, spacing, typography, useAccentStyles} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
 import {durationLabel} from './duration';
 import type {Photo} from './types';
@@ -55,6 +55,7 @@ function formatBytes(size: number): string {
  * rather than leaving audio running behind the next page.
  */
 export function PhotoViewerScreen({route, navigation}: Props) {
+  const accentStyle = useAccentStyles();
   const {media: initialMedia, startIndex} = route.params;
   const {api, imageSource} = usePhotoApi();
   const [media, setMedia] = useState<MediaItem[]>(initialMedia);
@@ -200,7 +201,7 @@ export function PhotoViewerScreen({route, navigation}: Props) {
               {photoDetail.physical_path && <DetailRow label="Path" value={photoDetail.physical_path} />}
             </>
           ) : (
-            <ActivityIndicator color={colors.azure} />
+            <ActivityIndicator color={accentStyle.color} />
           )}
         </View>
       )}
@@ -209,6 +210,7 @@ export function PhotoViewerScreen({route, navigation}: Props) {
 }
 
 function ViewerPage({item, active}: {item: MediaItem; active: boolean}) {
+  const accentStyle = useAccentStyles();
   const {imageSource} = usePhotoApi();
   const [loading, setLoading] = useState(true);
   const [paused, setPaused] = useState(false);
@@ -233,7 +235,7 @@ function ViewerPage({item, active}: {item: MediaItem; active: boolean}) {
         ) : (
           <Image source={imageSource(item.id, 'thumbnail')} style={styles.image} resizeMode="contain" />
         )}
-        {loading && active && <ActivityIndicator color={colors.azure} style={StyleSheet.absoluteFill} />}
+        {loading && active && <ActivityIndicator color={accentStyle.color} style={StyleSheet.absoluteFill} />}
       </Pressable>
     );
   }
@@ -262,6 +264,7 @@ function ZoomableImage({
   onLoadEnd: () => void;
   loading: boolean;
 }) {
+  const accentStyle = useAccentStyles();
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -327,7 +330,7 @@ function ZoomableImage({
           onLoadEnd={onLoadEnd}
         />
       </GestureDetector>
-      {loading && <ActivityIndicator color={colors.azure} style={StyleSheet.absoluteFill} />}
+      {loading && <ActivityIndicator color={accentStyle.color} style={StyleSheet.absoluteFill} />}
     </View>
   );
 }
@@ -381,7 +384,7 @@ const styles = StyleSheet.create({
     left: spacing.md,
     right: spacing.md,
     bottom: 96,
-    backgroundColor: 'rgba(10,15,30,0.92)',
+    backgroundColor: 'rgba(28,29,34,0.94)',
     borderRadius: 12,
     padding: spacing.md,
     gap: spacing.xs,

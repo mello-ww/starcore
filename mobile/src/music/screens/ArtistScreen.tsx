@@ -2,7 +2,7 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useState} from 'react';
 import {ActivityIndicator, ScrollView, StyleSheet, Text, View} from 'react-native';
 import type {SatellitesStackParamList} from '../../navigation/MainTabs';
-import {colors, spacing, typography} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import type {Album, Track} from '../types';
 import {useMusicNavigation} from '../ui/navigation';
@@ -15,13 +15,14 @@ import {CollectionHeader} from './CollectionHeader';
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'MusicArtist'>;
 
 export function ArtistScreen({route}: Props) {
+  const accentStyle = useAccentStyles();
   const {api, player} = useMusic();
   const go = useMusicNavigation();
   const {data: artist, error, setData} = useLoad(() => api.artist(route.params.id), [api, route.params.id]);
   const [actions, setActions] = useState<Track[] | null>(null);
 
   if (!artist) {
-    return error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.azure} style={styles.loading} />;
+    return error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={accentStyle.color} style={styles.loading} />;
   }
   const albums = (list: Album[]): ShelfItem[] =>
     list.map(album => ({key: album.id, title: album.album, subtitle: album.year ? String(album.year) : album.type,

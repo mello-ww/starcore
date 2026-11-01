@@ -1,11 +1,12 @@
 import React from 'react';
 import {FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
-import {colors, spacing, typography} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic, usePlayerState} from '../MusicProvider';
 import {upcoming} from '../queue';
 import {TrackRow} from '../ui/TrackRow';
 
 export function QueuePanel() {
+  const accentStyle = useAccentStyles();
   const {player} = useMusic();
   const state = usePlayerState();
   const next = upcoming(state.queue);
@@ -14,7 +15,7 @@ export function QueuePanel() {
       <View style={styles.header}>
         <Text style={typography.heading}>Next up · {next.length}</Text>
         {next.length > 0 && (
-          <Pressable onPress={() => player.clearUpcoming()} hitSlop={8}><Text style={styles.link}>Clear</Text></Pressable>
+          <Pressable onPress={() => player.clearUpcoming()} hitSlop={8}><Text style={accentStyle.text}>Clear</Text></Pressable>
         )}
       </View>
       <FlatList
@@ -47,7 +48,6 @@ export function QueuePanel() {
 const styles = StyleSheet.create({
   panel: {flex: 1},
   header: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm},
-  link: {color: colors.azure},
   row: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
   track: {flex: 1},
   icon: {color: colors.textDim, fontSize: 14, padding: 4},

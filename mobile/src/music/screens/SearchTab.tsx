@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../../theme';
+import {colors, radius, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import type {SearchResult, Track} from '../types';
 import {useMusicNavigation} from '../ui/navigation';
@@ -15,6 +15,7 @@ const QUALITIES = [
 ];
 
 export function SearchTab() {
+  const accentStyle = useAccentStyles();
   const {api, player, downloads} = useMusic();
   const go = useMusicNavigation();
   const [query, setQuery] = useState('');
@@ -72,8 +73,8 @@ export function SearchTab() {
       <View style={styles.filters}>
         {QUALITIES.map(option => (
           <Pressable key={option.key} onPress={() => setQuality(option.key)}
-            style={[styles.chip, quality === option.key && styles.chipActive]}>
-            <Text style={styles.chipLabel}>{option.label}</Text>
+            style={[styles.chip, quality === option.key && accentStyle.fill]}>
+            <Text style={[styles.chipLabel, quality === option.key && styles.chipLabelActive]}>{option.label}</Text>
           </Pressable>
         ))}
       </View>
@@ -83,7 +84,7 @@ export function SearchTab() {
           <View style={styles.row}>
             <Text style={typography.heading}>Recent searches</Text>
             <Pressable onPress={() => api.clearSearches().then(() => setRecent([]))}>
-              <Text style={styles.link}>Clear</Text>
+              <Text style={accentStyle.text}>Clear</Text>
             </Pressable>
           </View>
           {recent.map(item => (
@@ -147,10 +148,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm, fontSize: 16},
   filters: {flexDirection: 'row', gap: spacing.sm, marginVertical: spacing.md},
   chip: {paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.lineBright},
-  chipActive: {backgroundColor: colors.royal, borderColor: colors.royal},
+  chipLabelActive: {color: colors.onSelected, fontWeight: '700'},
   chipLabel: {color: colors.text, fontSize: 13},
   row: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
-  link: {color: colors.azure},
   suggestion: {paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line},
   empty: {marginTop: spacing.lg},
   section: {marginTop: spacing.md},

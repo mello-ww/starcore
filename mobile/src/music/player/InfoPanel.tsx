@@ -1,6 +1,6 @@
 import React from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../../theme';
+import {colors, radius, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic, usePlayerState} from '../MusicProvider';
 import {bytes} from '../ui/format';
 
@@ -21,6 +21,7 @@ function Line({label, value}: {label: string; value: string | number | null | un
 
 /** Quality, delivery, credits and file details, plus speed and the sleep timer. */
 export function InfoPanel() {
+  const accentStyle = useAccentStyles();
   const {player} = useMusic();
   const state = usePlayerState();
   const track = state.track;
@@ -42,8 +43,8 @@ export function InfoPanel() {
       <Text style={typography.heading}>Playback</Text>
       <View style={styles.options}>
         {SPEEDS.map(speed => (
-          <Pressable key={speed} onPress={() => player.setSpeed(speed)} style={[styles.option, state.speed === speed && styles.active]}>
-            <Text style={styles.optionLabel}>{speed}×</Text>
+          <Pressable key={speed} onPress={() => player.setSpeed(speed)} style={[styles.option, state.speed === speed && accentStyle.fill]}>
+            <Text style={[styles.optionLabel, state.speed === speed && styles.optionLabelActive]}>{speed}×</Text>
           </Pressable>
         ))}
       </View>
@@ -56,8 +57,8 @@ export function InfoPanel() {
             <Text style={styles.optionLabel}>{minutes} min</Text>
           </Pressable>
         ))}
-        <Pressable onPress={() => player.setSleep('end')} style={[styles.option, state.sleepAtEnd && styles.active]}>
-          <Text style={styles.optionLabel}>End of song</Text>
+        <Pressable onPress={() => player.setSleep('end')} style={[styles.option, state.sleepAtEnd && accentStyle.fill]}>
+          <Text style={[styles.optionLabel, state.sleepAtEnd && styles.optionLabelActive]}>End of song</Text>
         </Pressable>
         {(state.sleepAt || state.sleepAtEnd) && (
           <Pressable onPress={() => player.setSleep(null)} style={styles.option}>
@@ -97,7 +98,7 @@ const styles = StyleSheet.create({
   heading: {marginTop: spacing.lg},
   options: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginVertical: spacing.sm},
   option: {paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.lineBright},
-  active: {backgroundColor: colors.royal, borderColor: colors.royal},
+  optionLabelActive: {color: colors.onSelected, fontWeight: '700'},
   optionLabel: {color: colors.text, fontSize: 13},
   line: {paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line},
 });

@@ -1,6 +1,6 @@
 import React, {useMemo, useState} from 'react';
 import {Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../../theme';
+import {colors, radius, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import type {Album, Artist, Playlist} from '../types';
 import {Artwork, Mosaic} from '../ui/Artwork';
@@ -26,6 +26,7 @@ interface Row {
 }
 
 export function LibraryTab() {
+  const accentStyle = useAccentStyles();
   const {api, downloads} = useMusic();
   const go = useMusicNavigation();
   const [filter, setFilter] = useState<Filter>('playlists');
@@ -76,8 +77,8 @@ export function LibraryTab() {
     <View style={styles.screen}>
       <View style={styles.filters}>
         {FILTERS.map(option => (
-          <Pressable key={option.key} onPress={() => setFilter(option.key)} style={[styles.chip, filter === option.key && styles.chipActive]}>
-            <Text style={styles.chipLabel}>{option.label}</Text>
+          <Pressable key={option.key} onPress={() => setFilter(option.key)} style={[styles.chip, filter === option.key && accentStyle.fill]}>
+            <Text style={[styles.chipLabel, filter === option.key && styles.chipLabelActive]}>{option.label}</Text>
           </Pressable>
         ))}
         <Pressable onPress={() => setSort(sort === 'recent' ? 'name' : 'recent')} style={styles.chip}>
@@ -118,7 +119,7 @@ const styles = StyleSheet.create({
   screen: {flex: 1},
   filters: {flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.md},
   chip: {paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.lineBright},
-  chipActive: {backgroundColor: colors.royal, borderColor: colors.royal},
+  chipLabelActive: {color: colors.onSelected, fontWeight: '700'},
   chipLabel: {color: colors.text, fontSize: 13},
   tools: {flexDirection: 'row', gap: spacing.sm, padding: spacing.md},
   input: {flex: 1, backgroundColor: colors.raised, color: colors.text, borderRadius: radius.md, paddingHorizontal: spacing.md},

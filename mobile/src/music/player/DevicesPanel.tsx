@@ -1,11 +1,12 @@
 import React, {useEffect, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {colors, spacing, typography} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic, usePlayerState} from '../MusicProvider';
 import type {ConnectDevice} from '../types';
 
 /** StarCore Connect: move playback between this phone and the listener's other devices. */
 export function DevicesPanel() {
+  const accentStyle = useAccentStyles();
   const {api, player, deviceId} = useMusic();
   const state = usePlayerState();
   const [devices, setDevices] = useState<ConnectDevice[] | null>(null);
@@ -58,7 +59,7 @@ export function DevicesPanel() {
             style={[styles.device, !device.online && styles.offline]}>
             <Text style={styles.icon}>{device.kind === 'web' ? '🖥' : device.kind === 'mobile' ? '📱' : '🔊'}</Text>
             <View style={styles.text}>
-              <Text style={[typography.body, current && styles.current]}>
+              <Text style={[typography.body, current && [styles.current, accentStyle.text]]}>
                 {device.name}{device.id === deviceId ? ' (this phone)' : ''}
               </Text>
               <Text style={typography.caption}>
@@ -82,6 +83,6 @@ const styles = StyleSheet.create({
   offline: {opacity: 0.5},
   icon: {fontSize: 22},
   text: {flex: 1},
-  current: {color: colors.azure, fontWeight: '600'},
+  current: {fontWeight: '600'},
   note: {marginTop: spacing.md},
 });

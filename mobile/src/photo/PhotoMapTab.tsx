@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {ActivityIndicator, Image, StyleSheet, Text, View} from 'react-native';
 import MapView, {Marker} from 'react-native-maps';
-import {colors, radius, spacing, typography} from '../theme';
+import {colors, radius, spacing, typography, useAccentStyles} from '../theme';
 import type {Photo} from './types';
 import {usePhotoApi} from './usePhotoApi';
 
@@ -23,6 +23,7 @@ function hasLocation(photo: Photo): boolean {
  * panel's own map never asks for the browser's location either.
  */
 export function PhotoMapTab({onOpenPhoto}: Props) {
+  const accentStyle = useAccentStyles();
   const {api, imageSource} = usePhotoApi();
   const [photos, setPhotos] = useState<Photo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +52,7 @@ export function PhotoMapTab({onOpenPhoto}: Props) {
   if (!photos) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.azure} />
+        <ActivityIndicator color={accentStyle.color} />
       </View>
     );
   }
@@ -83,7 +84,7 @@ export function PhotoMapTab({onOpenPhoto}: Props) {
             longitude: photo.metadata.gps_longitude as number,
           }}
           onPress={() => onOpenPhoto(located, located.indexOf(photo))}>
-          <View style={styles.markerFrame}>
+          <View style={[styles.markerFrame, accentStyle.border]}>
             <Image source={imageSource(photo.id, 'thumbnail')} style={styles.markerImage} />
           </View>
         </Marker>
@@ -102,7 +103,6 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: radius.sm,
     borderWidth: 2,
-    borderColor: colors.azure,
     overflow: 'hidden',
     backgroundColor: colors.raised,
   },

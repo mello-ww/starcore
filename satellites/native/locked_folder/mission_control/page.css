@@ -62,7 +62,7 @@
 }
 
 .lf-crumb:hover {
-    background: rgba(43, 91, 215, 0.12);
+    background: color-mix(in srgb, var(--sc-accent) 12%, transparent);
     color: var(--ice);
 }
 

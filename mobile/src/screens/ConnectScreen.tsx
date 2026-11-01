@@ -2,9 +2,8 @@ import React, {useState} from 'react';
 import {KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import {Card} from '../components/Card';
 import {PrimaryButton} from '../components/PrimaryButton';
-import {Starfield} from '../components/Starfield';
 import {normalizeServerUrl, testConnection} from '../servers/testConnection';
-import {colors, spacing, typography} from '../theme';
+import {colors, spacing, typography, useAccentStyles} from '../theme';
 
 /**
  * Where is *your* StarCore? There is no default and no hardcoded address
@@ -31,6 +30,7 @@ export function ConnectScreen({
   initialName?: string;
   initialAddress?: string;
 }) {
+  const accentStyle = useAccentStyles();
   const [name, setName] = useState(initialName);
   const [url, setUrl] = useState(initialAddress);
   const [touched, setTouched] = useState(false);
@@ -57,11 +57,10 @@ export function ConnectScreen({
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Starfield />
       <View style={styles.content}>
         {onBack && (
           <Pressable onPress={onBack} hitSlop={12} testID="connect-back-button">
-            <Text style={styles.back}>‹ Back</Text>
+            <Text style={[styles.back, accentStyle.text]}>‹ Back</Text>
           </Pressable>
         )}
         <Text style={typography.title}>Connect to StarCore</Text>
@@ -123,5 +122,5 @@ const styles = StyleSheet.create({
   },
   divider: {height: 1, backgroundColor: colors.line, marginVertical: spacing.xs},
   error: {color: colors.alert, fontSize: 13},
-  back: {color: colors.azure, fontSize: 16, marginBottom: spacing.sm},
+  back: {fontSize: 16, marginBottom: spacing.sm},
 });

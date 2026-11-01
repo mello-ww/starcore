@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Pressable, ScrollView, StyleSheet, Switch, Text, View} from 'react-native';
-import {colors, radius, spacing, typography} from '../../theme';
+import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {StarSwitch} from '../../components/StarSwitch';
+import {colors, radius, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import {audioEffects} from '../native';
 import type {Equalizer} from '../types';
@@ -22,6 +23,7 @@ const STEP = 1;
 const LIMIT = 12;
 
 export function EqualizerScreen() {
+  const accentStyle = useAccentStyles();
   const {preferences, updatePreferences} = useMusic();
   const [eq, setEq] = useState<Equalizer>(preferences?.equalizer ?? {enabled: false, preset: 'flat', bands: PRESETS.flat, preamp: 0});
   const [bass, setBass] = useState(preferences?.bass_boost ?? 0);
@@ -53,14 +55,14 @@ export function EqualizerScreen() {
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.row}>
         <Text style={typography.heading}>Equalizer</Text>
-        <Switch value={eq.enabled} onValueChange={enabled => setEq({...eq, enabled})} />
+        <StarSwitch value={eq.enabled} onValueChange={enabled => setEq({...eq, enabled})} />
       </View>
       {status && <Text style={typography.caption}>{status}</Text>}
       <View style={styles.presets}>
         {Object.keys(PRESETS).map(name => (
           <Pressable key={name} onPress={() => setEq({...eq, preset: name, bands: PRESETS[name], enabled: true})}
-            style={[styles.preset, eq.preset === name && styles.presetActive]}>
-            <Text style={styles.presetLabel}>{name}</Text>
+            style={[styles.preset, eq.preset === name && accentStyle.fill]}>
+            <Text style={[styles.presetLabel, eq.preset === name && styles.presetLabelActive]}>{name}</Text>
           </Pressable>
         ))}
       </View>
@@ -71,7 +73,7 @@ export function EqualizerScreen() {
               <Text style={styles.step}>＋</Text>
             </Pressable>
             <View style={styles.track}>
-              <View style={[styles.fill, {height: `${((eq.bands[index] + LIMIT) / (2 * LIMIT)) * 100}%`}]} />
+              <View style={[[styles.fill, accentStyle.fill], {height: `${((eq.bands[index] + LIMIT) / (2 * LIMIT)) * 100}%`}]} />
             </View>
             <Pressable onPress={() => band(index, -STEP)} hitSlop={6} accessibilityLabel={`Lower ${label} hertz`}>
               <Text style={styles.step}>－</Text>
@@ -108,12 +110,12 @@ const styles = StyleSheet.create({
   row: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
   presets: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs},
   preset: {paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.lineBright},
-  presetActive: {backgroundColor: colors.royal, borderColor: colors.royal},
+  presetLabelActive: {color: colors.onSelected, fontWeight: '700'},
   presetLabel: {color: colors.text, fontSize: 13, textTransform: 'capitalize'},
   bands: {flexDirection: 'row', justifyContent: 'space-between'},
   band: {alignItems: 'center', gap: 4},
   track: {width: 8, height: 140, borderRadius: 4, backgroundColor: colors.raised, justifyContent: 'flex-end', overflow: 'hidden'},
-  fill: {width: 8, backgroundColor: colors.azure},
+  fill: {width: 8},
   step: {color: colors.text, fontSize: 18, paddingHorizontal: 4},
   value: {color: colors.textDim, fontSize: 11},
   label: {color: colors.textFaint, fontSize: 10},

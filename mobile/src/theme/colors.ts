@@ -1,36 +1,45 @@
+import {palette} from './tokens';
+
 /**
- * StarCore's dark/space palette, carried over from Mission Control's own
- * `:root` custom properties (mission_control/style.css) so the mobile app
- * reads as the same product rather than a re-skin. Keep these two files in
- * sync by hand when the web palette changes - there's no shared build step
- * between a CSS file and React Native, and introducing one just for color
- * tokens would be more machinery than five constants are worth.
+ * The palette every older screen styles itself with, mapped onto the
+ * StarCore design tokens (tokens.ts) so the whole app shares one look.
+ * The accent entries are the default red: these values are read once at
+ * startup, so only screens using useAccent() follow the chosen accent.
  */
+const ACCENT = '#ee444b';
+
 export const colors = {
-  void: '#04060d',
-  deep: '#070b16',
-  surface: '#0a0f1e',
-  raised: '#0e1428',
-  line: '#161d33',
-  lineBright: '#202a47',
+  void: palette.bg,
+  deep: palette.bg,
+  surface: palette.card,
+  raised: palette.control,
+  // separators mostly sit on cards, so they need to be lighter than the card itself
+  line: '#2e2f36',
+  lineBright: '#3a3c44',
 
-  klein: '#002fa7',
-  sapphire: '#0f52ba',
-  royal: '#2b5bd7',
-  azure: '#6c9bf0',
-  ice: '#a8c4f5',
+  klein: ACCENT,
+  sapphire: ACCENT,
+  royal: ACCENT,
+  azure: ACCENT,
+  ice: palette.text,
 
-  text: '#e7ecf8',
-  textDim: '#98a3be',
-  textFaint: '#6e7b99',
+  text: palette.text,
+  textDim: palette.text2,
+  textFaint: palette.text3,
 
-  ok: '#3ecf8e',
-  alert: '#e4606d',
+  ok: palette.textIcon,
+  alert: palette.danger,
+
+  /** Text drawn on an accent fill. */
+  onAccent: palette.onAccent,
+  /** A selected chip or segment: a light pill with dark text. */
+  selected: palette.textIcon,
+  onSelected: palette.onAccent,
 } as const;
 
 export const radius = {
-  sm: 6,
-  md: 8,
+  sm: 8,
+  md: 12,
   lg: 16,
 } as const;
 

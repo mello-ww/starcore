@@ -80,13 +80,13 @@ describe('HomeScreen', () => {
   it('greets the signed-in account by name', async () => {
     (useAuth as jest.Mock).mockReturnValue({client: clientWith('Ada')});
     const tree = await render();
-    expect(texts(tree)).toContain('Ravi de vous revoir, Ada');
+    expect(texts(tree)).toContain('Welcome back, Ada');
   });
 
   it('falls back to a nameless greeting when the server reports no name', async () => {
     (useAuth as jest.Mock).mockReturnValue({client: clientWith(null)});
     const tree = await render();
-    expect(texts(tree)).toContain('Ravi de vous revoir');
+    expect(texts(tree)).toContain('Welcome back');
   });
 
   it('shows the live status, the satellites and real alerts', async () => {
@@ -152,7 +152,7 @@ describe('AccentProvider', () => {
 
 describe('Home helpers', () => {
   it('formats greetings, uptime and alerts', () => {
-    expect(greeting('')).toBe('Ravi de vous revoir');
+    expect(greeting('')).toBe('Welcome back');
     expect(formatUptime(42)).toBe('42s');
     expect(formatUptime(600)).toBe('10m');
     expect(alertsFor([music, {...docker, status: 'disabled' as const}])).toEqual([]);

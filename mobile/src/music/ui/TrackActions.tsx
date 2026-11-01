@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ModalSafeArea} from '../../components/ModalSafeArea';
-import {colors, radius, spacing, TOUCH_TARGET, typography} from '../../theme';
+import {colors, radius, spacing, TOUCH_TARGET, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import type {Playlist, Track} from '../types';
 import {useMusicNavigation} from './navigation';
@@ -99,6 +99,7 @@ function Sheet({children, onClose}: {children: React.ReactNode; onClose: () => v
 }
 
 function PlaylistPicker({tracks, onDone}: {tracks: Track[]; onDone: () => void}) {
+  const accentStyle = useAccentStyles();
   const {api} = useMusic();
   const [playlists, setPlaylists] = useState<Playlist[] | null>(null);
   const [name, setName] = useState('');
@@ -136,7 +137,7 @@ function PlaylistPicker({tracks, onDone}: {tracks: Track[]; onDone: () => void})
       <View style={styles.createRow}>
         <TextInput value={name} onChangeText={setName} placeholder="New playlist" placeholderTextColor={colors.textFaint}
           style={styles.input} onSubmitEditing={create} />
-        <Pressable onPress={create} style={styles.createButton}>
+        <Pressable onPress={create} style={[styles.createButton, accentStyle.fill]}>
           <Text style={styles.createLabel}>Create</Text>
         </Pressable>
       </View>
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
   item: {minHeight: TOUCH_TARGET, justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line},
   createRow: {flexDirection: 'row', gap: spacing.sm, marginVertical: spacing.md},
   input: {flex: 1, minHeight: TOUCH_TARGET, color: colors.text, backgroundColor: colors.raised, borderRadius: radius.md, paddingHorizontal: spacing.md},
-  createButton: {backgroundColor: colors.royal, borderRadius: radius.md, paddingHorizontal: spacing.md, minHeight: TOUCH_TARGET, justifyContent: 'center'},
-  createLabel: {color: colors.text, fontWeight: '600'},
+  createButton: {borderRadius: radius.md, paddingHorizontal: spacing.md, minHeight: TOUCH_TARGET, justifyContent: 'center'},
+  createLabel: {color: colors.onAccent, fontWeight: '700'},
   list: {maxHeight: 320},
 });

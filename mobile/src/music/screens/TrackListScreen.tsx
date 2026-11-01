@@ -2,7 +2,7 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useEffect, useState} from 'react';
 import {ActivityIndicator, FlatList, StyleSheet, Text} from 'react-native';
 import type {SatellitesStackParamList} from '../../navigation/MainTabs';
-import {colors, spacing, typography} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import type {MusicApi} from '../api';
 import {useMusic} from '../MusicProvider';
 import type {Track} from '../types';
@@ -33,6 +33,7 @@ async function load(api: MusicApi, kind: TrackListKind, id: string): Promise<{tr
 
 /** Any generated or derived list of songs: a mix, a radio, a mood, liked songs, history, a genre. */
 export function TrackListScreen({route, navigation}: Props) {
+  const accentStyle = useAccentStyles();
   const {api, player} = useMusic();
   const {kind, id, title} = route.params;
   const {data, error} = useLoad(() => load(api, kind, id), [api, kind, id]);
@@ -43,7 +44,7 @@ export function TrackListScreen({route, navigation}: Props) {
   }, [navigation, title]);
 
   if (!data) {
-    return error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.azure} style={styles.loading} />;
+    return error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={accentStyle.color} style={styles.loading} />;
   }
   const context = kind === 'mix' ? `mix:${id}` : kind === 'liked' ? 'liked:' : kind === 'genre' ? `genre:${id.slice(0, 60).replace(/[^\w.-]/g, '-')}` : `queue:${kind}`;
   return (

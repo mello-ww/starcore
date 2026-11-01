@@ -66,6 +66,9 @@ export function mount(context) {
     main.tabIndex = -1;
     root.append(sidebar, main);
     element.replaceChildren(root);
+    // Music is a full-height app: its host view stops scrolling and Music's own content area scrolls
+    const host = element.closest(".view");
+    host?.classList.add("mu-host");
 
     const navButtons = new Map();
     const navList = el("div", "mu-nav");
@@ -175,6 +178,7 @@ export function mount(context) {
         if (disposeView) {
             disposeView();
         }
+        host?.classList.remove("mu-host");
         unregister();
     };
 }

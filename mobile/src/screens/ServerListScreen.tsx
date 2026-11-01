@@ -2,7 +2,6 @@ import React from 'react';
 import {FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
 import {Card} from '../components/Card';
 import {PrimaryButton} from '../components/PrimaryButton';
-import {Starfield} from '../components/Starfield';
 import {useServers} from '../servers/ServersContext';
 import {colors, spacing, typography} from '../theme';
 
@@ -21,7 +20,6 @@ export function ServerListScreen({onAdd}: {onAdd: () => void}) {
 
   return (
     <View style={styles.screen} testID="server-list-screen">
-      <Starfield />
       <FlatList
         contentContainerStyle={styles.content}
         data={servers}

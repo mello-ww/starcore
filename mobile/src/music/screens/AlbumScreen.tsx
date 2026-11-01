@@ -2,7 +2,7 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useState} from 'react';
 import {ActivityIndicator, Alert, ScrollView, StyleSheet, Text} from 'react-native';
 import type {SatellitesStackParamList} from '../../navigation/MainTabs';
-import {colors, spacing, typography} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import type {Track} from '../types';
 import {longDuration} from '../ui/format';
@@ -16,13 +16,14 @@ import {CollectionHeader} from './CollectionHeader';
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'MusicAlbum'>;
 
 export function AlbumScreen({route}: Props) {
+  const accentStyle = useAccentStyles();
   const {api, player, downloads} = useMusic();
   const go = useMusicNavigation();
   const {data: album, error, setData} = useLoad(() => api.album(route.params.id), [api, route.params.id]);
   const [actions, setActions] = useState<Track[] | null>(null);
 
   if (!album) {
-    return error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={colors.azure} style={styles.loading} />;
+    return error ? <Text style={styles.error}>{error}</Text> : <ActivityIndicator color={accentStyle.color} style={styles.loading} />;
   }
   const context = `album:${album.id}`;
   const discs = new Set(album.tracks.map(track => track.disc ?? 1)).size > 1;

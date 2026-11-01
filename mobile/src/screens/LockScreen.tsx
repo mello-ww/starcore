@@ -3,8 +3,7 @@ import {Alert, BackHandler, Pressable, StyleSheet, Text, View} from 'react-nativ
 import {useAuth} from '../auth/AuthContext';
 import type {UnlockResult} from '../auth/appLock';
 import {PrimaryButton} from '../components/PrimaryButton';
-import {Starfield} from '../components/Starfield';
-import {colors, spacing, typography} from '../theme';
+import {colors, spacing, typography, useAccentStyles} from '../theme';
 
 const MESSAGES: Partial<Record<UnlockResult, string>> = {
   cancelled: 'Unlock was cancelled. Tap Unlock to try again.',
@@ -29,6 +28,7 @@ const MESSAGES: Partial<Record<UnlockResult, string>> = {
  * around the lock - and the stored biometric preference is kept.
  */
 export function LockScreen({onBack}: {onBack?: () => void}) {
+  const accentStyle = useAccentStyles();
   const {unlock, logout} = useAuth();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -83,11 +83,10 @@ export function LockScreen({onBack}: {onBack?: () => void}) {
 
   return (
     <View style={styles.screen} testID="lock-screen">
-      <Starfield />
       <View style={styles.content}>
         {onBack && (
           <Pressable onPress={onBack} hitSlop={12} testID="lock-back-button">
-            <Text style={styles.back}>‹ Back</Text>
+            <Text style={[styles.back, accentStyle.text]}>‹ Back</Text>
           </Pressable>
         )}
         <Text style={typography.title}>StarCore is locked</Text>
@@ -104,6 +103,6 @@ const styles = StyleSheet.create({
   screen: {...StyleSheet.absoluteFillObject, backgroundColor: colors.void},
   content: {flex: 1, justifyContent: 'center', padding: spacing.lg, gap: spacing.md},
   subtitle: {marginBottom: spacing.md},
-  back: {color: colors.azure, fontSize: 16, marginBottom: spacing.sm},
+  back: {fontSize: 16, marginBottom: spacing.sm},
   error: {color: colors.alert, fontSize: 13, marginBottom: spacing.sm},
 });

@@ -14,9 +14,10 @@ export const fonts = Platform.select({
   default: {sans: 'System', mono: 'monospace'},
 })!;
 
+// Android only renders the default family in regular or bold, so headings use bold
 export const typography = {
-  title: {fontFamily: fonts.sans, fontSize: 24, fontWeight: '600' as const, color: colors.text},
-  heading: {fontFamily: fonts.sans, fontSize: 18, fontWeight: '600' as const, color: colors.text},
+  title: {fontFamily: fonts.sans, fontSize: 26, fontWeight: '700' as const, letterSpacing: -0.4, color: colors.text},
+  heading: {fontFamily: fonts.sans, fontSize: 17, fontWeight: '700' as const, color: colors.text},
   body: {fontFamily: fonts.sans, fontSize: 15, color: colors.text},
   caption: {fontFamily: fonts.sans, fontSize: 13, color: colors.textDim},
   label: {fontFamily: fonts.sans, fontSize: 13, color: colors.textFaint},

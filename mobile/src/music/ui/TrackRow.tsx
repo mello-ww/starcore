@@ -1,6 +1,6 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {colors, spacing, TOUCH_TARGET, touchTarget, typography} from '../../theme';
+import {colors, spacing, TOUCH_TARGET, touchTarget, typography, useAccentStyles} from '../../theme';
 import {useCurrentTrackId, useMusic} from '../MusicProvider';
 import type {Track} from '../types';
 import {Artwork} from './Artwork';
@@ -16,6 +16,7 @@ interface Props {
 }
 
 export function TrackRow({track, onPress, onMore, showArtwork = true, number, subtitle}: Props) {
+  const accentStyle = useAccentStyles();
   const {liked, downloads} = useMusic();
   const playingId = useCurrentTrackId();
   const active = playingId === track.id;
@@ -33,7 +34,7 @@ export function TrackRow({track, onPress, onMore, showArtwork = true, number, su
         <Text style={styles.number}>{number ?? track.track ?? ''}</Text>
       )}
       <View style={styles.text}>
-        <Text numberOfLines={1} style={[styles.title, active && styles.active]}>
+        <Text numberOfLines={1} style={[styles.title, active && accentStyle.text]}>
           {track.title || 'Unavailable track'}
         </Text>
         <Text numberOfLines={1} style={typography.caption}>
@@ -60,7 +61,6 @@ const styles = StyleSheet.create({
   number: {width: 28, textAlign: 'center', color: colors.textFaint},
   text: {flex: 1},
   title: {...typography.body},
-  active: {color: colors.azure},
   time: {...typography.label},
   more: touchTarget,
   moreGlyph: {color: colors.textDim, fontSize: 20},

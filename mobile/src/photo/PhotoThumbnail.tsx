@@ -1,6 +1,6 @@
 import React, {useState} from 'react';
 import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
-import {colors, radius} from '../theme';
+import {colors, radius, useAccentStyles} from '../theme';
 import {durationLabel} from './duration';
 import {usePhotoApi} from './usePhotoApi';
 
@@ -40,6 +40,7 @@ export function PhotoThumbnail({
   favorite,
   onToggleFavorite,
 }: Props) {
+  const accentStyle = useAccentStyles();
   const {imageSource} = usePhotoApi();
   const [failed, setFailed] = useState(false);
   const label = isVideo ? durationLabel(duration) : '';
@@ -66,7 +67,7 @@ export function PhotoThumbnail({
         </View>
       )}
       {selected !== undefined && (
-        <View style={[styles.selectionDot, selected && styles.selectionDotActive]} />
+        <View style={[styles.selectionDot, selected && accentStyle.fill]} />
       )}
       {favorite !== undefined && onToggleFavorite && (
         <Pressable
@@ -95,10 +96,6 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
     backgroundColor: 'rgba(4,6,13,0.35)',
   },
-  selectionDotActive: {
-    backgroundColor: colors.azure,
-    borderColor: colors.azure,
-  },
   favoriteBadge: {
     position: 'absolute',
     top: 8,
@@ -111,7 +108,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(4,6,13,0.45)',
   },
   favoriteBadgeActive: {
-    backgroundColor: 'rgba(228,96,109,0.28)',
+    backgroundColor: 'rgba(238,68,75,0.28)',
   },
   favoriteIcon: {
     color: '#fff',

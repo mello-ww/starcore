@@ -1,7 +1,8 @@
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useState} from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {colors, spacing, typography} from '../theme';
+import {colors, spacing, typography, useAccentStyles} from '../theme';
+import {SettingsButton} from '../components/SettingsButton';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
 import {PhotoAlbumsTab} from './PhotoAlbumsTab';
 import {PhotoLibraryTab} from './PhotoLibraryTab';
@@ -35,6 +36,7 @@ const SECTIONS: {key: Section; label: string}[] = [
  * *other* client.
  */
 export function PhotoHomeScreen({navigation}: Props) {
+  const accentStyle = useAccentStyles();
   const [section, setSection] = useState<Section>('library');
 
   const openPhoto = (photos: Photo[], index: number) => {
@@ -53,16 +55,14 @@ export function PhotoHomeScreen({navigation}: Props) {
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <Text style={typography.title}>Photos</Text>
-          <Pressable onPress={() => navigation.navigate('PhotoConfiguration')} hitSlop={12} style={styles.gearButton}>
-            <Text style={styles.gearIcon}>⚙</Text>
-          </Pressable>
+          <SettingsButton onPress={() => navigation.navigate('PhotoConfiguration')} label="Photo settings" />
         </View>
         <View style={styles.segments}>
           {SECTIONS.map(item => (
             <Pressable
               key={item.key}
               onPress={() => setSection(item.key)}
-              style={[styles.segment, section === item.key && styles.segmentActive]}>
+              style={[styles.segment, section === item.key && accentStyle.fill]}>
               <Text style={[typography.body, styles.segmentLabel, section === item.key && styles.segmentLabelActive]}>
                 {item.label}
               </Text>
@@ -84,11 +84,8 @@ const styles = StyleSheet.create({
   screen: {flex: 1, backgroundColor: colors.void},
   header: {padding: spacing.lg, paddingBottom: spacing.sm, gap: spacing.md},
   titleRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
-  gearButton: {padding: spacing.xs},
-  gearIcon: {color: colors.textDim, fontSize: 20},
   segments: {flexDirection: 'row', backgroundColor: colors.surface, borderRadius: 10, padding: 3, gap: 3},
   segment: {flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center'},
-  segmentActive: {backgroundColor: colors.raised},
   segmentLabel: {color: colors.textDim, fontSize: 14},
-  segmentLabelActive: {color: colors.text, fontWeight: '600'},
+  segmentLabelActive: {color: colors.onSelected, fontWeight: '700'},
 });

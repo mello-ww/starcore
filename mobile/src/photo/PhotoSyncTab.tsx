@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {ActivityIndicator, Alert, Pressable, StyleSheet, Switch, Text, View} from 'react-native';
-import {colors, spacing, typography} from '../theme';
+import {ActivityIndicator, Alert, Pressable, StyleSheet, Text, View} from 'react-native';
+import {StarSwitch} from '../components/StarSwitch';
+import {colors, spacing, typography, useAccentStyles} from '../theme';
 import {configureBackgroundFetch, runBackgroundSync} from './backgroundSyncTask';
 import {requestMediaLibraryPermission} from './mediaPermission';
 import {getSyncState, setSyncEnabled, setWifiOnly} from './syncState';
@@ -21,6 +22,7 @@ import {usePhotoApi} from './usePhotoApi';
  * for a browser.
  */
 export function PhotoSyncTab() {
+  const accentStyle = useAccentStyles();
   const {serverId} = usePhotoApi();
   const [loaded, setLoaded] = useState(false);
   const [enabled, setEnabled] = useState(false);
@@ -79,7 +81,7 @@ export function PhotoSyncTab() {
   if (!loaded) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.azure} />
+        <ActivityIndicator color={accentStyle.color} />
       </View>
     );
   }
@@ -95,7 +97,7 @@ export function PhotoSyncTab() {
             deleted from your phone.
           </Text>
         </View>
-        <Switch value={enabled} onValueChange={onToggleEnabled} />
+        <StarSwitch value={enabled} onValueChange={onToggleEnabled} />
       </View>
 
       <View style={styles.row}>
@@ -105,7 +107,7 @@ export function PhotoSyncTab() {
             Applies to the periodic background check. Opening the app can still sync over cellular.
           </Text>
         </View>
-        <Switch value={wifiOnly} onValueChange={onToggleWifiOnly} disabled={!enabled} />
+        <StarSwitch value={wifiOnly} onValueChange={onToggleWifiOnly} disabled={!enabled} />
       </View>
 
       <Pressable

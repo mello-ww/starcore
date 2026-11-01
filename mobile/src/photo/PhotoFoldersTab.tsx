@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
 import {Card} from '../components/Card';
-import {colors, radius, spacing, typography} from '../theme';
+import {colors, radius, spacing, typography, useAccentStyles} from '../theme';
 import {PhotoThumbnail} from './PhotoThumbnail';
 import type {AlbumSummary} from './types';
 import {usePhotoApi} from './usePhotoApi';
@@ -17,6 +17,7 @@ interface Props {
  * docs/satellites/photo.md) - so this deliberately never invents nesting.
  */
 export function PhotoFoldersTab({onOpenAlbum}: Props) {
+  const accentStyle = useAccentStyles();
   const {api} = usePhotoApi();
   const [albums, setAlbums] = useState<AlbumSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export function PhotoFoldersTab({onOpenAlbum}: Props) {
   if (!albums) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.azure} />
+        <ActivityIndicator color={accentStyle.color} />
       </View>
     );
   }

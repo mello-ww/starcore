@@ -1,6 +1,7 @@
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useState} from 'react';
-import {Pressable, ScrollView, StyleSheet, Switch, Text, View} from 'react-native';
+import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {StarSwitch} from '../components/StarSwitch';
 import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
 import {useServers} from '../servers/ServersContext';
@@ -101,12 +102,10 @@ export function SettingsScreen({navigation}: Props) {
                 Require your fingerprint to open StarCore for this server, on this device only.
               </Text>
             </View>
-            <Switch
+            <StarSwitch
               value={biometricUnlockEnabled}
               onValueChange={toggleBiometrics}
               disabled={busy || (!biometricsAvailable && !passwordRecoveryAvailable)}
-              trackColor={{false: palette.controlStrong, true: accent}}
-              thumbColor={palette.text}
               testID="biometric-unlock-switch"
             />
           </View>

@@ -2,7 +2,7 @@ import React, {useMemo, useState} from 'react';
 import {ActivityIndicator, Modal, PanResponder, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ModalSafeArea} from '../../components/ModalSafeArea';
-import {colors, spacing, touchTarget, typography} from '../../theme';
+import {colors, spacing, touchTarget, typography, useAccentStyles} from '../../theme';
 import {useMusic, usePlayerState} from '../MusicProvider';
 import {Artwork} from '../ui/Artwork';
 import {useMusicNavigation} from '../ui/navigation';
@@ -33,6 +33,7 @@ export function FullPlayer() {
 }
 
 function PlayerBody() {
+  const accentStyle = useAccentStyles();
   const {player, setFullPlayer, liked, setLiked} = useMusic();
   const state = usePlayerState();
   const go = useMusicNavigation();
@@ -96,7 +97,7 @@ function PlayerBody() {
             </Text>
           </View>
           <Pressable onPress={() => setLiked([track.id], !liked.has(track.id))} style={styles.touch} accessibilityRole="button" accessibilityLabel="Like">
-            <Text style={[styles.heart, liked.has(track.id) && styles.liked]}>{liked.has(track.id) ? '♥' : '♡'}</Text>
+            <Text style={[styles.heart, liked.has(track.id) && accentStyle.text]}>{liked.has(track.id) ? '♥' : '♡'}</Text>
           </Pressable>
         </View>
 
@@ -110,7 +111,7 @@ function PlayerBody() {
 
         <View style={styles.controls}>
           <Pressable onPress={() => player.setShuffle(!state.queue.shuffle)} style={styles.touch} accessibilityRole="button" accessibilityLabel="Shuffle">
-            <Text style={[styles.small, state.queue.shuffle && styles.on]}>⇄</Text>
+            <Text style={[styles.small, state.queue.shuffle && accentStyle.text]}>⇄</Text>
           </Pressable>
           <Pressable onPress={() => player.previous()} style={styles.touch} accessibilityRole="button" accessibilityLabel="Previous"><Text style={styles.big}>⏮</Text></Pressable>
           <Pressable onPress={() => player.toggle()} style={styles.play} accessibilityLabel={playing ? 'Pause' : 'Play'}>
@@ -119,14 +120,14 @@ function PlayerBody() {
           </Pressable>
           <Pressable onPress={() => player.next()} style={styles.touch} accessibilityRole="button" accessibilityLabel="Next"><Text style={styles.big}>⏭</Text></Pressable>
           <Pressable onPress={() => player.cycleRepeat()} style={styles.touch} accessibilityRole="button" accessibilityLabel={`Repeat ${state.queue.repeat}`}>
-            <Text style={[styles.small, state.queue.repeat !== 'off' && styles.on]}>{state.queue.repeat === 'one' ? '↻1' : '↻'}</Text>
+            <Text style={[styles.small, state.queue.repeat !== 'off' && accentStyle.text]}>{state.queue.repeat === 'one' ? '↻1' : '↻'}</Text>
           </Pressable>
         </View>
 
         <View style={styles.tabs}>
           {(['lyrics', 'queue', 'devices', 'info'] as Panel[]).map(name => (
             <Pressable key={name} onPress={() => setPanel(panel === name ? 'artwork' : name)} style={styles.tabTouch} accessibilityRole="tab">
-              <Text style={[styles.tab, panel === name && styles.on]}>{name === 'devices' ? 'Devices' : name[0].toUpperCase() + name.slice(1)}</Text>
+              <Text style={[styles.tab, panel === name && accentStyle.text]}>{name === 'devices' ? 'Devices' : name[0].toUpperCase() + name.slice(1)}</Text>
             </Pressable>
           ))}
         </View>
@@ -147,13 +148,11 @@ const styles = StyleSheet.create({
   titleRow: {flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm},
   titles: {flex: 1, gap: 2},
   heart: {color: colors.text, fontSize: 26},
-  liked: {color: colors.azure},
   errorRow: {paddingVertical: spacing.xs},
   error: {color: colors.alert},
   controls: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: spacing.md},
   small: {color: colors.textDim, fontSize: 22},
   big: {color: colors.text, fontSize: 30},
-  on: {color: colors.azure},
   play: {width: 68, height: 68, borderRadius: 34, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center'},
   playGlyph: {color: colors.void, fontSize: 24},
   tabs: {flexDirection: 'row', justifyContent: 'space-around'},

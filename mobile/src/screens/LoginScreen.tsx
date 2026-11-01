@@ -3,8 +3,7 @@ import {BackHandler, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text
 import {useAuth} from '../auth/AuthContext';
 import {Card} from '../components/Card';
 import {PrimaryButton} from '../components/PrimaryButton';
-import {Starfield} from '../components/Starfield';
-import {colors, spacing, typography} from '../theme';
+import {colors, spacing, typography, useAccentStyles} from '../theme';
 
 /**
  * `onBack` is only ever passed when the server about to be signed into was
@@ -18,6 +17,7 @@ import {colors, spacing, typography} from '../theme';
  * neither, unchanged from before.
  */
 export function LoginScreen({onBack}: {onBack?: () => void}) {
+  const accentStyle = useAccentStyles();
   const {login, loginError} = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -50,11 +50,10 @@ export function LoginScreen({onBack}: {onBack?: () => void}) {
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Starfield />
       <View style={styles.content}>
         {onBack && (
           <Pressable onPress={onBack} hitSlop={12} testID="login-back-button">
-            <Text style={styles.back}>‹ Back</Text>
+            <Text style={[styles.back, accentStyle.text]}>‹ Back</Text>
           </Pressable>
         )}
 
@@ -98,5 +97,5 @@ const styles = StyleSheet.create({
   input: {color: colors.text, fontSize: 16, paddingVertical: spacing.sm},
   divider: {height: 1, backgroundColor: colors.line, marginVertical: spacing.xs},
   error: {color: colors.alert, fontSize: 13, marginBottom: spacing.sm},
-  back: {color: colors.azure, fontSize: 16, marginBottom: spacing.sm},
+  back: {fontSize: 16, marginBottom: spacing.sm},
 });

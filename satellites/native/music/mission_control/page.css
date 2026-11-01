@@ -33,9 +33,7 @@
 }
 
 :root {
-    --mu-accent: rgb(108, 155, 240);
-    --mu-accent-rgb: 108, 155, 240;
-    --mu-accent-deep-rgb: 30, 50, 90;
+    --mu-accent: var(--sc-accent, rgb(238, 68, 75));
     --mu-radius: var(--radius, 8px);
     --mu-bar-height: 84px;
 }
@@ -52,11 +50,35 @@
     --mu-row: 40px;
 }
 
+/* Music is a full-height app inside Mission Control: the host view stops scrolling, the sidebar
+   stays put, and only the content column scrolls. The mini-player is fixed to the bottom of the
+   window and body.mu-has-bar reserves its height, so the app always ends just above it. */
+.view.mu-host {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 1rem;
+}
+
+.view.mu-host > #satellite-page {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    max-width: none;
+}
+
+body.mu-has-bar .main {
+    padding-bottom: var(--mu-bar-height);
+}
+
 .mu-root {
     display: grid;
+    flex: 1;
     grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     gap: 0;
-    min-height: calc(100vh - 140px);
+    min-height: 0;
     border: 1px solid var(--mu-line);
     border-radius: var(--mu-radius);
     background: var(--mu-bg);
@@ -67,13 +89,12 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    min-height: 0;
     padding: 1rem 0.6rem;
     border-right: 1px solid var(--mu-line);
     background: var(--mu-surface);
-    position: sticky;
-    top: 0;
-    max-height: calc(100vh - 140px);
     overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .mu-nav {
@@ -108,9 +129,14 @@
 
 .mu-nav-item.active,
 .mu-nav-playlist.active {
-    background: rgba(var(--mu-accent-rgb), 0.16);
+    background: var(--mu-raised);
     color: var(--mu-text);
     font-weight: 600;
+}
+
+.mu-nav-item.active .mu-icon,
+.mu-nav-item.active .sc-gear {
+    color: var(--mu-accent);
 }
 
 .mu-nav-shelf {
@@ -152,12 +178,13 @@
 .mu-main {
     position: relative;
     min-width: 0;
+    min-height: 0;
     padding: 1.5rem clamp(1rem, 3vw, 2.25rem) 2.5rem;
     outline: none;
-    background:
-        radial-gradient(1200px 380px at 20% -120px, rgba(var(--mu-accent-rgb), 0.18), transparent 70%),
-        var(--mu-bg);
-    transition: background 600ms ease;
+    background: var(--mu-bg);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
 }
 
 .mu-view {
@@ -173,10 +200,6 @@
     font-size: clamp(1.5rem, 3vw, 2.1rem);
     font-weight: 700;
     letter-spacing: -0.02em;
-}
-
-body.mu-has-bar .main {
-    padding-bottom: calc(var(--mu-bar-height) + 1.5rem);
 }
 
 @keyframes mu-rise {
@@ -238,6 +261,34 @@ body.mu-has-bar .main {
 
     .mu-main {
         padding: 1rem 0.9rem 2rem;
+    }
+}
+
+/* Phones and very short windows: no room for a fixed frame, so the page scrolls as a whole
+   again and the nav row sticks to the top of the view. */
+@media (max-width: 680px), (max-height: 520px) {
+    .view.mu-host {
+        display: block;
+        overflow-y: auto;
+    }
+
+    .mu-root {
+        grid-template-rows: auto;
+        min-height: auto;
+        overflow: visible;
+    }
+
+    .mu-sidebar {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        align-self: start;
+        max-height: 100vh;
+    }
+
+    .mu-main {
+        overflow: visible;
+        scrollbar-gutter: auto;
     }
 }
 

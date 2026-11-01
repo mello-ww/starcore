@@ -58,10 +58,10 @@
     font-size: 0.78rem;
 }
 
-.mu-mood-calm { background: linear-gradient(135deg, #1d6b8f, #6ac3c4); }
-.mu-mood-energy { background: linear-gradient(135deg, #a3222f, #f2783c); }
-.mu-mood-groove { background: linear-gradient(135deg, #6a2aa8, #e55aa8); }
-.mu-mood-focus { background: linear-gradient(135deg, #1c3a8a, #5f86e8); }
+.mu-mood-calm { background: #1d6b8f; }
+.mu-mood-energy { background: #a3222f; }
+.mu-mood-groove { background: #6a2aa8; }
+.mu-mood-focus { background: #1c3a8a; }
 
 .mu-shelf-moods .mu-row {
     grid-auto-columns: minmax(180px, 220px);
@@ -73,14 +73,14 @@
     gap: 0.8rem;
 }
 
-.mu-hue-0 { background: linear-gradient(135deg, #8b2fc9, #4a1f8a); }
-.mu-hue-1 { background: linear-gradient(135deg, #e0475f, #8c1e3b); }
-.mu-hue-2 { background: linear-gradient(135deg, #1f8f6b, #135a4a); }
-.mu-hue-3 { background: linear-gradient(135deg, #d4782a, #8a4214); }
-.mu-hue-4 { background: linear-gradient(135deg, #2f6fd6, #18397a); }
-.mu-hue-5 { background: linear-gradient(135deg, #b8497e, #6a2048); }
-.mu-hue-6 { background: linear-gradient(135deg, #4e8f2a, #2c5214); }
-.mu-hue-7 { background: linear-gradient(135deg, #5a5f73, #2b2e3b); }
+.mu-hue-0 { background: #4a1f8a; }
+.mu-hue-1 { background: #8c1e3b; }
+.mu-hue-2 { background: #135a4a; }
+.mu-hue-3 { background: #8a4214; }
+.mu-hue-4 { background: #18397a; }
+.mu-hue-5 { background: #6a2048; }
+.mu-hue-6 { background: #2c5214; }
+.mu-hue-7 { background: #2b2e3b; }
 
 /* ---------- search ---------- */
 
@@ -217,19 +217,16 @@
     opacity: 0.85;
 }
 
-.mu-tab.active {
-    background: var(--mu-text);
-    color: var(--mu-bg);
+.mu-tab.active,
+.mu-full .mu-tab.active {
+    background: var(--mu-accent);
+    color: var(--sc-on-accent, #141215);
+    font-weight: 600;
     opacity: 1;
 }
 
-.mu-full .mu-tab.active {
-    background: #fff;
-    color: #05070f;
-}
-
 .mu-tab-accent {
-    background: rgba(var(--mu-accent-rgb), 0.25);
+    background: color-mix(in srgb, var(--mu-accent) 25%, transparent);
 }
 
 .mu-library-tools {
@@ -458,8 +455,8 @@
 .mu-wrapped-hero {
     padding: 2rem;
     border-radius: 16px;
-    background: linear-gradient(135deg, rgba(var(--mu-accent-rgb), 0.85), rgba(var(--mu-accent-deep-rgb), 1));
-    color: #fff;
+    background: var(--mu-accent);
+    color: var(--sc-on-accent, #141215);
 }
 
 .mu-wrapped-hero h1 {

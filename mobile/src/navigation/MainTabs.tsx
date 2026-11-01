@@ -1,8 +1,8 @@
 import {BottomTabBar, createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import React from 'react';
-import {StatusBar} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import {SETTINGS_ICON} from '../components/SettingsButton';
 import {ConfigScreen} from '../screens/ConfigScreen';
 import {ConnectScreen} from '../screens/ConnectScreen';
 import {ConsoleScreen} from '../screens/ConsoleScreen';
@@ -92,7 +92,7 @@ function SatellitesStack() {
     <SatellitesStackNav.Navigator screenOptions={stackScreenOptions}>
       <SatellitesStackNav.Screen name="SatellitesList" component={SatellitesListScreen} options={{title: 'Satellites', headerShown: false}} />
       <SatellitesStackNav.Screen name="SatelliteDetail" component={SatelliteDetailScreen} />
-      <SatellitesStackNav.Screen name="PhotoHome" component={PhotoHomeScreen} options={{title: 'Photos'}} />
+      <SatellitesStackNav.Screen name="PhotoHome" component={PhotoHomeScreen} options={{title: ''}} />
       <SatellitesStackNav.Screen name="PhotoAlbum" component={PhotoAlbumScreen} />
       <SatellitesStackNav.Screen
         name="PhotoConfiguration"
@@ -105,12 +105,12 @@ function SatellitesStack() {
         component={PhotoViewerScreen}
         options={{headerShown: false, presentation: 'fullScreenModal'}}
       />
-      <SatellitesStackNav.Screen name="MusicHome" component={MusicHomeScreen} options={{title: 'Music'}} />
+      <SatellitesStackNav.Screen name="MusicHome" component={MusicHomeScreen} options={{title: ''}} />
       <SatellitesStackNav.Screen name="MusicAlbum" component={AlbumScreen} options={{title: 'Album'}} />
       <SatellitesStackNav.Screen name="MusicArtist" component={ArtistScreen} options={{title: 'Artist'}} />
       <SatellitesStackNav.Screen name="MusicPlaylist" component={PlaylistScreen} options={{title: 'Playlist'}} />
       <SatellitesStackNav.Screen name="MusicTracks" component={TrackListScreen} />
-      <SatellitesStackNav.Screen name="MusicSettings" component={MusicSettingsScreen} options={{title: 'Music settings'}} />
+      <SatellitesStackNav.Screen name="MusicSettings" component={MusicSettingsScreen} options={{title: ''}} />
       <SatellitesStackNav.Screen name="MusicEqualizer" component={EqualizerScreen} options={{title: 'Equalizer'}} />
       <SatellitesStackNav.Screen name="MusicDownloads" component={DownloadsScreen} options={{title: 'Downloads'}} />
     </SatellitesStackNav.Navigator>
@@ -160,7 +160,7 @@ const TAB_ICONS: Record<keyof MainTabParamList, string> = {
   Satellites: 'radio',
   Console: 'terminal',
   Config: 'sliders',
-  Settings: 'settings',
+  Settings: SETTINGS_ICON,
 };
 
 function tabIcon(name: keyof MainTabParamList) {
@@ -179,7 +179,6 @@ export function MainTabs() {
   const {color: accent} = useAccent();
   return (
     <MusicProvider>
-      <StatusBar barStyle="light-content" backgroundColor={tokens.palette.bg} />
       <Tab.Navigator
       tabBar={props => (
         <>

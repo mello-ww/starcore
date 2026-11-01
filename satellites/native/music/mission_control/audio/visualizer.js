@@ -20,7 +20,7 @@ export function visualizer(canvas, effects, getMode) {
         if (!analyser || mode === "off" || !width) {
             return;
         }
-        const color = getComputedStyle(canvas).color || "#6c9bf0";
+        const color = getComputedStyle(canvas).color || "#ee444b";
         context.fillStyle = color;
         context.strokeStyle = color;
         if (mode === "wave") {
