@@ -6,6 +6,7 @@ import json
 import shutil
 import struct
 import tempfile
+import tomllib
 import unittest
 import wave
 import zlib
@@ -375,7 +376,8 @@ class MusicConfigurationTest(unittest.TestCase):
         result = configuration_module().update(self.satellite, "library", directory)
 
         self.assertEqual(self.satellite.config.get("library"), directory)
-        self.assertIn(f'library = "{directory}"', self.config_path.read_text(encoding="utf-8"))
+        # parsed rather than searched: on Windows the path's backslashes are escaped in the file
+        self.assertEqual(tomllib.loads(self.config_path.read_text(encoding="utf-8"))["library"], directory)
         by_key = {setting["key"]: setting for setting in result["settings"]}
         self.assertEqual(by_key["library"]["value"], directory)
         self.assertIn(directory, result["note"])

@@ -6,6 +6,7 @@ import json
 import shutil
 import socket
 import tempfile
+import tomllib
 import unittest
 
 from starcore.api.response import RawBody
@@ -583,7 +584,8 @@ class PhotoConfigurationTest(unittest.TestCase):
             result = configuration_module().update(self.engine, self.satellite, "photo_directory", directory)
 
         self.assertEqual(self.satellite.config.get("photo_directory"), directory)
-        self.assertIn(f'photo_directory = "{directory}"', self.config_path.read_text(encoding="utf-8"))
+        # parsed rather than searched: on Windows the path's backslashes are escaped in the file
+        self.assertEqual(tomllib.loads(self.config_path.read_text(encoding="utf-8"))["photo_directory"], directory)
         by_key = {setting["key"]: setting for setting in result["settings"]}
         self.assertEqual(by_key["photo_directory"]["value"], directory)
         self.assertFalse(by_key["photo_directory"]["pending_restart"])
