@@ -147,7 +147,7 @@ export async function backgroundFetchHeadlessTask(event: {taskId: string}): Prom
 
 /** (Re)applies the current sync settings to BackgroundFetch's own periodic
  * scheduler - called once at app start (App.tsx) and again whenever
- * PhotoSyncTab changes a setting, so a toggle takes effect on the very next
+ * PhotoConfigurationScreen changes a setting, so a toggle takes effect on the very next
  * scheduling decision rather than waiting for the next app restart.
  *
  * BackgroundFetch has one process-wide schedule, not one per server: if

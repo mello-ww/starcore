@@ -28,7 +28,7 @@ export async function hasMediaLibraryPermission(): Promise<boolean> {
 }
 
 /** Shows the OS permission prompt if needed - only ever called from the
- * foreground (turning PhotoSyncTab's "Automatic sync" toggle on), never
+ * foreground (turning PhotoConfigurationScreen's "Automatic sync" toggle on), never
  * from the background/periodic path above. */
 export async function requestMediaLibraryPermission(): Promise<boolean> {
   try {

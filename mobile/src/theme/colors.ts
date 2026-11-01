@@ -3,10 +3,9 @@ import {palette} from './tokens';
 /**
  * The palette every older screen styles itself with, mapped onto the
  * StarCore design tokens (tokens.ts) so the whole app shares one look.
- * The accent entries are the default red: these values are read once at
- * startup, so only screens using useAccent() follow the chosen accent.
+ * There is deliberately no accent here: StyleSheets are built once at
+ * startup, so the accent always comes from useAccent()/useAccentStyles().
  */
-const ACCENT = '#ee444b';
 
 export const colors = {
   void: palette.bg,
@@ -17,10 +16,6 @@ export const colors = {
   line: '#2e2f36',
   lineBright: '#3a3c44',
 
-  klein: ACCENT,
-  sapphire: ACCENT,
-  royal: ACCENT,
-  azure: ACCENT,
   ice: palette.text,
 
   text: palette.text,
@@ -32,8 +27,7 @@ export const colors = {
 
   /** Text drawn on an accent fill. */
   onAccent: palette.onAccent,
-  /** A selected chip or segment: a light pill with dark text. */
-  selected: palette.textIcon,
+  /** Text on a selected chip or segment, which is filled with the accent. */
   onSelected: palette.onAccent,
 } as const;
 
