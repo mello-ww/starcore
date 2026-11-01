@@ -103,6 +103,7 @@ class MusicLibraryTest(unittest.TestCase):
         self.library = music_library(self.directory / "library", str(self.source))
 
     def tearDown(self):
+        self.library.close()
         shutil.rmtree(self.directory, ignore_errors=True)
 
     def write(self, name: str, data: bytes) -> Path:
@@ -303,12 +304,18 @@ class MusicLibraryTest(unittest.TestCase):
     def test_a_damaged_index_does_not_break_the_library(self):
         self.write("one.flac", flac())
         self.library.scan()
-        self.library.index_path.write_text("{ not json", encoding="utf-8")
+        self.library.close()
+        for suffix in ("-wal", "-shm"):
+            Path(f"{self.library.index_path}{suffix}").unlink(missing_ok=True)
+        self.library.index_path.write_text("{ not a database", encoding="utf-8")
 
         with contextlib.redirect_stdout(io.StringIO()):
             reopened = music_library(self.library.root, str(self.source))
 
         self.assertEqual(reopened.count, 0)
+        # set aside for inspection, never deleted
+        self.assertTrue(list(self.library.root.glob("music.db.damaged-*")))
+        reopened.close()
 
     def test_a_missing_source_is_reported_clearly(self):
         from satellites.native.music.library import MusicScanError
@@ -602,12 +609,23 @@ class MusicSatelliteTest(unittest.TestCase):
         self.assertEqual(len(body), 10)
         self.assertEqual(headers.get("Content-Range"), f"bytes 0-9/{track['size']}")
 
-    def test_an_impossible_range_falls_back_to_the_whole_file(self):
+    def test_an_impossible_range_is_refused_with_the_real_size(self):
+        self.fill()
+        track = self.json_request("/api/satellites/music/tracks")[1]["tracks"][0]
+
+        status, headers, body = self.request(
+            f"/api/satellites/music/stream/{track['id']}", headers={"Range": "bytes=999999999-"})
+
+        self.assertEqual(status, 416)
+        self.assertEqual(headers.get("Content-Range"), f"bytes */{track['size']}")
+        self.assertEqual(body, b"")
+
+    def test_a_malformed_range_falls_back_to_the_whole_file(self):
         self.fill()
         track = self.json_request("/api/satellites/music/tracks")[1]["tracks"][0]
 
         status, _, body = self.request(
-            f"/api/satellites/music/stream/{track['id']}", headers={"Range": "bytes=999999999-"})
+            f"/api/satellites/music/stream/{track['id']}", headers={"Range": "bytes=abc-"})
 
         self.assertEqual(status, 200)
         self.assertEqual(len(body), track["size"])

@@ -38,6 +38,19 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Music (see src/music/): background playback runs in react-native-video's
+         media session service, a mediaPlayback foreground service with its
+         notification and lock-screen controls. POST_NOTIFICATIONS is only
+         asked for at runtime the first time something plays (Android 13+).
+         MODIFY_AUDIO_SETTINGS lets the equalizer attach to the player's own
+         audio session; ACCESS_NETWORK_STATE tells Wi-Fi from cellular for
+         streaming quality and Wi-Fi-only downloads. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- allowBackup=false: no app data (including anything AsyncStorage
          writes, like the server address) goes into Android's auto backup -->
     <application
@@ -75,5 +88,14 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
+
+        <service
+            android:name="com.brentvatne.exoplayer.VideoPlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

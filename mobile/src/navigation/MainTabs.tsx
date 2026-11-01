@@ -1,4 +1,4 @@
-import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import {BottomTabBar, createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import React from 'react';
 import Icon from 'react-native-vector-icons/Feather';
@@ -17,6 +17,18 @@ import {PhotoConfigurationScreen} from '../photo/PhotoConfigurationScreen';
 import {PhotoHomeScreen} from '../photo/PhotoHomeScreen';
 import {PhotoTrashTab} from '../photo/PhotoTrashTab';
 import {PhotoViewerScreen} from '../photo/PhotoViewerScreen';
+import {MusicProvider} from '../music/MusicProvider';
+import {FullPlayer} from '../music/player/FullPlayer';
+import {MiniPlayer} from '../music/player/MiniPlayer';
+import {AlbumScreen} from '../music/screens/AlbumScreen';
+import {ArtistScreen} from '../music/screens/ArtistScreen';
+import {DownloadsScreen} from '../music/screens/DownloadsScreen';
+import {EqualizerScreen} from '../music/screens/EqualizerScreen';
+import {MusicHomeScreen} from '../music/screens/MusicHomeScreen';
+import {MusicSettingsScreen} from '../music/screens/MusicSettingsScreen';
+import {PlaylistScreen} from '../music/screens/PlaylistScreen';
+import {TrackListScreen} from '../music/screens/TrackListScreen';
+import type {TrackListKind} from '../music/ui/navigation';
 
 export type MainTabParamList = {
   Overview: undefined;
@@ -42,6 +54,15 @@ export type SatellitesStackParamList = {
    * PhotoAlbumsTab's own "Recycle bin" card. */
   PhotoTrash: undefined;
   PhotoViewer: {media: {id: string; mediaType: 'photo' | 'video'; duration: number | null}[]; startIndex: number};
+  /** "Music" is special-cased the same way - see src/music/MusicProvider.tsx. */
+  MusicHome: undefined;
+  MusicAlbum: {id: string};
+  MusicArtist: {id: string};
+  MusicPlaylist: {id: string};
+  MusicTracks: {kind: TrackListKind; id: string; title: string};
+  MusicSettings: undefined;
+  MusicEqualizer: undefined;
+  MusicDownloads: undefined;
 };
 
 export type SettingsStackParamList = {
@@ -81,6 +102,14 @@ function SatellitesStack() {
         component={PhotoViewerScreen}
         options={{headerShown: false, presentation: 'fullScreenModal'}}
       />
+      <SatellitesStackNav.Screen name="MusicHome" component={MusicHomeScreen} options={{title: 'Music'}} />
+      <SatellitesStackNav.Screen name="MusicAlbum" component={AlbumScreen} options={{title: 'Album'}} />
+      <SatellitesStackNav.Screen name="MusicArtist" component={ArtistScreen} options={{title: 'Artist'}} />
+      <SatellitesStackNav.Screen name="MusicPlaylist" component={PlaylistScreen} options={{title: 'Playlist'}} />
+      <SatellitesStackNav.Screen name="MusicTracks" component={TrackListScreen} />
+      <SatellitesStackNav.Screen name="MusicSettings" component={MusicSettingsScreen} options={{title: 'Music settings'}} />
+      <SatellitesStackNav.Screen name="MusicEqualizer" component={EqualizerScreen} options={{title: 'Equalizer'}} />
+      <SatellitesStackNav.Screen name="MusicDownloads" component={DownloadsScreen} options={{title: 'Downloads'}} />
     </SatellitesStackNav.Navigator>
   );
 }
@@ -138,11 +167,22 @@ function tabIcon(name: keyof MainTabParamList) {
 /**
  * Bottom tabs - exactly the five destinations in "New mobile bottom
  * navigation" in the task brief. Individual Satellites are never their own
- * tab; they live inside the Satellites tab's own stack.
+ * tab; they live inside the Satellites tab's own stack. Music's mini-player
+ * rides on top of the tab bar so it stays visible on every tab, and its one
+ * audio player (MusicProvider) lives above all of them, so changing tabs or
+ * screens never stops playback.
  */
 export function MainTabs() {
   return (
-    <Tab.Navigator
+    <MusicProvider>
+      <Tab.Navigator
+      tabBar={props => (
+        <>
+          <MiniPlayer />
+          <BottomTabBar {...props} />
+          <FullPlayer />
+        </>
+      )}
       screenOptions={{
         headerShown: false,
         tabBarStyle: {backgroundColor: colors.surface, borderTopColor: colors.line},
@@ -154,6 +194,7 @@ export function MainTabs() {
       <Tab.Screen name="Console" component={ConsoleScreen} options={{tabBarIcon: tabIcon('Console')}} />
       <Tab.Screen name="Config" component={ConfigScreen} options={{tabBarIcon: tabIcon('Config')}} />
       <Tab.Screen name="Settings" component={SettingsStack} options={{tabBarIcon: tabIcon('Settings')}} />
-    </Tab.Navigator>
+      </Tab.Navigator>
+    </MusicProvider>
   );
 }

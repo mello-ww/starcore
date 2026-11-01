@@ -180,6 +180,19 @@ class AuthStore:
             return ""
         return self._data["sessions"][token].get("kind", "web")
 
+    def session_username(self, token: str) -> str:
+        """The account a valid token belongs to, or "" - so a Satellite can keep each
+        account's own data apart without ever touching the session store itself."""
+        if not self.validate_session(token):
+            return ""
+        return self._data["sessions"][token].get("username", "")
+
+    def session_id(self, token: str) -> str:
+        """The opaque id list_sessions() reports for this token, or "" when it doesn't validate."""
+        if not self.validate_session(token):
+            return ""
+        return self._data["sessions"][token].get("session_id", "")
+
     def logout(self, token: str):
         if token and self._data["sessions"].pop(token, None) is not None:
             self._save()

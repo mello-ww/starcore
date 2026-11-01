@@ -1,10 +1,14 @@
 """Audio tags, duration and cover art read straight out of the container bytes.
 
-FLAC, MP3, WAV and MP4 all keep that information in documented headers, so the music
-satellite can index a library with nothing but the standard library behind it.
+FLAC, MP3, WAV, MP4 and Ogg all keep that information in documented headers, so the music
+satellite can index a library with nothing but the standard library behind it. Everything
+read here comes from an untrusted file: every parser is bounded and isolated by _guard.
 """
 
+import os
 import struct
+
+from . import ogg
 
 FORMATS = {
     ".mp3": "mp3",
@@ -13,6 +17,11 @@ FORMATS = {
     ".m4a": "m4a",
     ".mp4": "m4a",
     ".aac": "m4a",
+    ".m4b": "m4a",
+    ".alac": "m4a",
+    ".ogg": "ogg",
+    ".oga": "ogg",
+    ".opus": "opus",
 }
 
 CONTENT_TYPES = {
@@ -20,19 +29,63 @@ CONTENT_TYPES = {
     "flac": "audio/flac",
     "wav": "audio/wav",
     "m4a": "audio/mp4",
+    "ogg": "audio/ogg",
+    "opus": "audio/ogg; codecs=opus",
 }
 
 TAG_KEYS = ("title", "artist", "album", "album_artist", "track", "disc", "year", "genre")
 
+# read when present, never required
+EXTRA_KEYS = (
+    "date", "track_total", "disc_total", "composer", "producer", "label", "copyright", "isrc",
+    "compilation", "lyrics", "comment", "mb_track_id", "mb_album_id", "mb_artist_id",
+    "mb_release_group_id", "rg_track_gain", "rg_track_peak", "rg_album_gain", "rg_album_peak",
+)
+
+# technical description of the stream, filled in by each format's reader
+TECHNICAL_KEYS = ("codec", "sample_rate", "bit_depth", "channels", "bitrate")
+
+LOSSLESS_CODECS = {"flac", "alac", "pcm"}
+
+MULTI_KEYS = ("artist", "album_artist", "genre", "composer")
+
 VORBIS_TAGS = {
     "TITLE": "title",
     "ARTIST": "artist",
+    "ARTISTS": "artist",
     "ALBUM": "album",
     "ALBUMARTIST": "album_artist",
+    "ALBUM ARTIST": "album_artist",
     "TRACKNUMBER": "track",
     "DISCNUMBER": "disc",
-    "DATE": "year",
+    "TRACKTOTAL": "track_total",
+    "TOTALTRACKS": "track_total",
+    "DISCTOTAL": "disc_total",
+    "TOTALDISCS": "disc_total",
+    "DATE": "date",
+    "YEAR": "year",
+    "ORIGINALDATE": "date",
     "GENRE": "genre",
+    "COMPOSER": "composer",
+    "PRODUCER": "producer",
+    "LABEL": "label",
+    "ORGANIZATION": "label",
+    "PUBLISHER": "label",
+    "COPYRIGHT": "copyright",
+    "ISRC": "isrc",
+    "COMPILATION": "compilation",
+    "LYRICS": "lyrics",
+    "UNSYNCEDLYRICS": "lyrics",
+    "COMMENT": "comment",
+    "DESCRIPTION": "comment",
+    "MUSICBRAINZ_TRACKID": "mb_track_id",
+    "MUSICBRAINZ_ALBUMID": "mb_album_id",
+    "MUSICBRAINZ_ARTISTID": "mb_artist_id",
+    "MUSICBRAINZ_RELEASEGROUPID": "mb_release_group_id",
+    "REPLAYGAIN_TRACK_GAIN": "rg_track_gain",
+    "REPLAYGAIN_TRACK_PEAK": "rg_track_peak",
+    "REPLAYGAIN_ALBUM_GAIN": "rg_album_gain",
+    "REPLAYGAIN_ALBUM_PEAK": "rg_album_peak",
 }
 
 ID3_FRAMES = {
@@ -42,9 +95,31 @@ ID3_FRAMES = {
     b"TPE2": "album_artist",
     b"TRCK": "track",
     b"TPOS": "disc",
-    b"TDRC": "year",
+    b"TDRC": "date",
     b"TYER": "year",
+    b"TDOR": "date",
     b"TCON": "genre",
+    b"TCOM": "composer",
+    b"TPUB": "label",
+    b"TCOP": "copyright",
+    b"TSRC": "isrc",
+    b"TCMP": "compilation",
+}
+
+# TXXX frames are matched on their description, case-insensitively
+ID3_USER_FRAMES = {
+    "musicbrainz release track id": "mb_track_id",
+    "musicbrainz track id": "mb_track_id",
+    "musicbrainz album id": "mb_album_id",
+    "musicbrainz artist id": "mb_artist_id",
+    "musicbrainz release group id": "mb_release_group_id",
+    "replaygain_track_gain": "rg_track_gain",
+    "replaygain_track_peak": "rg_track_peak",
+    "replaygain_album_gain": "rg_album_gain",
+    "replaygain_album_peak": "rg_album_peak",
+    "producer": "producer",
+    "label": "label",
+    "artists": "artist",
 }
 
 MP4_TAGS = {
@@ -54,9 +129,14 @@ MP4_TAGS = {
     b"aART": "album_artist",
     b"trkn": "track",
     b"disk": "disc",
-    b"\xa9day": "year",
+    b"\xa9day": "date",
     b"\xa9gen": "genre",
     b"gnre": "genre",
+    b"\xa9wrt": "composer",
+    b"cprt": "copyright",
+    b"\xa9lyr": "lyrics",
+    b"\xa9cmt": "comment",
+    b"cpil": "compilation",
 }
 
 WAV_TAGS = {
@@ -75,6 +155,15 @@ MPEG_SAMPLE_RATES = {3: (44100, 48000, 32000), 2: (22050, 24000, 16000), 0: (110
 # a Xing header sits behind the frame's side information, the one part of a frame whose
 # length depends on the MPEG version and on whether the frame is mono
 XING_OFFSETS = {(3, True): 21, (3, False): 36, (2, True): 13, (2, False): 21, (0, True): 13, (0, False): 21}
+
+# freeform "----" atoms carry the same names Vorbis comments use
+MP4_FREEFORM = {name.lower(): key for name, key in VORBIS_TAGS.items()}
+MP4_FREEFORM.update({
+    "musicbrainz track id": "mb_track_id",
+    "musicbrainz album id": "mb_album_id",
+    "musicbrainz artist id": "mb_artist_id",
+    "musicbrainz release group id": "mb_release_group_id",
+})
 
 MP4_IMAGE_TYPES = {13: "image/jpeg", 14: "image/png"}
 
@@ -110,11 +199,22 @@ def probe(path) -> dict:
     kind, tags, art, duration = _read(path)
 
     information = {"format": kind}
-    for key in TAG_KEYS:
+    for key in TAG_KEYS + EXTRA_KEYS + TECHNICAL_KEYS:
         information[key] = tags.get(key)
+
+    if information["year"] is None and information["date"]:
+        information["year"] = _year(information["date"])
+    if information["date"] is None and information["year"]:
+        information["date"] = str(information["year"])
+    for key in MULTI_KEYS:
+        information[f"{key}s"] = tags.get(f"{key}s") or ([information[key]] if information[key] else [])
 
     information["duration"] = round(duration, 1) if duration and duration > 0 else None
     information["has_artwork"] = art is not None
+
+    if information["bitrate"] is None and information["duration"]:
+        information["bitrate"] = int(_size_of(path) * 8 / information["duration"])
+    information["lossless"] = information["codec"] in LOSSLESS_CODECS
 
     return information
 
@@ -140,6 +240,9 @@ def _read(path) -> tuple:
             return ("mp3", *_mp3(file, size))
         if kind == "wav":
             return ("wav", *_wav(file, size))
+        if kind in ("ogg", "opus"):
+            tags, art, duration = ogg.read(file, size, vorbis_comment)
+            return ("opus" if tags.get("codec") == "opus" else "ogg", tags, art, duration)
 
         return ("m4a", *_mp4(file, size))
 
@@ -153,6 +256,8 @@ def _sniff(file, header: bytes, hint):
         return "wav"
     if header[4:8] == b"ftyp":
         return "m4a"
+    if header[:4] == b"OggS":
+        return "ogg"
     if _mpeg_header(header, 0):
         return "mp3"
 
@@ -177,7 +282,12 @@ def _flac(file) -> tuple:
     if stream is None or len(stream) < 34:
         raise UnsupportedAudio("the FLAC stream information is missing")
 
-    return _guard(_flac_tags, blocks) or {}, _guard(_flac_picture, blocks), _guard(_flac_duration, blocks)
+    tags = _guard(_flac_tags, blocks) or {}
+    packed = int.from_bytes(stream[10:18], "big")
+    tags.update({"codec": "flac", "sample_rate": packed >> 44, "channels": ((packed >> 41) & 0x07) + 1,
+                 "bit_depth": ((packed >> 36) & 0x1F) + 1})
+
+    return tags, _guard(_flac_picture, blocks), _guard(_flac_duration, blocks)
 
 
 def _flac_blocks(file) -> list:
@@ -236,11 +346,22 @@ def _flac_tags(blocks: list) -> dict:
         offset += 4 + length
 
         name, separator, value = entry.partition("=")
-        key = VORBIS_TAGS.get(name.strip().upper())
-        if separator and key:
-            _put(tags, key, _typed(key, _text(value)))
+        if separator:
+            vorbis_comment(tags, name, value)
 
     return tags
+
+
+def vorbis_comment(tags: dict, name: str, value: str):
+    """Shared by FLAC and Ogg, which use the same comment block."""
+    key = VORBIS_TAGS.get(name.strip().upper())
+    if key is None:
+        return
+    if key in ("track", "disc") and "/" in value:
+        _put(tags, f"{key}_total", _number(value.partition("/")[2]))
+    _put(tags, key, _typed(key, _text(value)))
+    if key in MULTI_KEYS:
+        _append(tags, f"{key}s", _text(value))
 
 
 def _flac_picture(blocks: list):
@@ -278,7 +399,23 @@ def _mp3(file, size) -> tuple:
     if not tags:
         tags = _guard(_id3v1, file, size) or {}
 
+    tags.update(_guard(_mp3_technical, file, start) or {})
+
     return tags, art, _guard(_mp3_duration, file, size, start)
+
+
+def _mp3_technical(file, start) -> dict:
+    file.seek(start)
+    window = file.read(MP3_SCAN)
+    offset = _first_frame(window)
+    if offset is None:
+        return {}
+
+    frame = _mpeg_header(window, offset)
+    technical = {"codec": "mp3", "sample_rate": frame["sample_rate"], "channels": 1 if frame["mono"] else 2}
+    if not _xing_frames(window, offset, frame):
+        technical["bitrate"] = frame["bitrate"]
+    return technical
 
 
 def _id3v2(file, size, header: bytes) -> tuple:
@@ -308,11 +445,56 @@ def _id3v2(file, size, header: bytes) -> tuple:
 
         if name == b"APIC" and art is None:
             art = _guard(_id3_picture, payload)
+        elif name == b"USLT":
+            _put(tags, "lyrics", _guard(_id3_lyrics, payload))
+        elif name == b"TXXX":
+            described = _guard(_id3_user_text, payload)
+            if described:
+                key = ID3_USER_FRAMES.get(described[0].lower())
+                if key:
+                    _put(tags, key, _typed(key, described[1]))
         elif name in ID3_FRAMES:
             key = ID3_FRAMES[name]
-            _put(tags, key, _typed(key, _id3_text(payload)))
+            values = _guard(_id3_values, payload) or []
+            first = values[0] if values else None
+            if key in ("track", "disc") and first and "/" in first:
+                _put(tags, f"{key}_total", _number(first.partition("/")[2]))
+            _put(tags, key, _typed(key, first))
+            if key in MULTI_KEYS:
+                for value in values:
+                    _append(tags, f"{key}s", value)
 
     return tags, art
+
+
+def _id3_values(payload: bytes) -> list:
+    if len(payload) < 2:
+        return []
+    return [part.strip() for part in _id3_decode(payload[0], payload[1:]).split("\x00") if part.strip()]
+
+
+def _id3_decode(encoding: int, raw: bytes) -> str:
+    if encoding == 0:
+        return raw.decode("latin-1", "replace")
+    if encoding == 1:
+        return raw.decode("utf-16", "replace")
+    if encoding == 2:
+        return raw.decode("utf-16-be", "replace")
+    return raw.decode("utf-8", "replace")
+
+
+def _id3_user_text(payload: bytes):
+    encoding = payload[0]
+    description, offset = _id3_string(payload, 1, encoding)
+    value = _id3_decode(encoding, payload[offset:]).split("\x00")[0].strip()
+    return _id3_decode(encoding, description).strip(), value or None
+
+
+def _id3_lyrics(payload: bytes):
+    # encoding, a three letter language and a terminated description come before the text
+    encoding = payload[0]
+    _, offset = _id3_string(payload, 4, encoding)
+    return _typed("lyrics", _text(_id3_decode(encoding, payload[offset:])))
 
 
 def _id3_text(payload: bytes):
@@ -452,7 +634,14 @@ def _xing_frames(window: bytes, offset: int, frame: dict):
 
 def _wav(file, size) -> tuple:
     chunks = _guard(_wav_chunks, file, size) or {}
-    return _guard(_wav_tags, file, chunks) or {}, None, _guard(_wav_duration, file, chunks)
+    tags = _guard(_wav_tags, file, chunks) or {}
+    fmt = _wav_payload(file, chunks.get(b"fmt "))
+    if fmt and len(fmt) >= 16:
+        channels, sample_rate = struct.unpack("<HI", fmt[2:8])
+        bits = struct.unpack("<H", fmt[14:16])[0]
+        tags.update({"codec": "pcm", "channels": channels, "sample_rate": sample_rate, "bit_depth": bits,
+                     "bitrate": channels * sample_rate * bits})
+    return tags, None, _guard(_wav_duration, file, chunks)
 
 
 def _wav_chunks(file, size) -> dict:
@@ -528,7 +717,36 @@ def _mp4(file, size) -> tuple:
     moov = _guard(_mp4_atom, file, size, b"moov") or b""
     ilst = _guard(_mp4_ilst, moov) or b""
 
-    return _guard(_mp4_tags, ilst) or {}, _guard(_mp4_artwork, ilst), _guard(_mp4_duration, moov)
+    tags = _guard(_mp4_tags, ilst) or {}
+    tags.update(_guard(_mp4_technical, moov) or {})
+    return tags, _guard(_mp4_artwork, ilst), _guard(_mp4_duration, moov)
+
+
+def _mp4_technical(moov: bytes) -> dict:
+    """The first audio sample entry: mp4a (AAC) or alac, with channels, sample size and rate."""
+    for name, trak in _mp4_children(moov):
+        if name != b"trak":
+            continue
+        stbl = _mp4_path(trak, (b"mdia", b"minf", b"stbl"))
+        stsd = _mp4_child(stbl, b"stsd") if stbl else None
+        if not stsd or len(stsd) < 8:
+            continue
+        for entry, body in _mp4_children(stsd[8:]):
+            if entry not in (b"mp4a", b"alac") or len(body) < 28:
+                continue
+            channels, bits = struct.unpack(">HH", body[16:20])
+            rate = int.from_bytes(body[24:26], "big")
+            technical = {"codec": "alac" if entry == b"alac" else "aac", "channels": channels, "sample_rate": rate}
+            if entry == b"alac":
+                technical["bit_depth"] = bits
+            return technical
+    return {}
+
+
+def _mp4_path(body: bytes, names: tuple):
+    for name in names:
+        body = _mp4_child(body, name) if body else None
+    return body
 
 
 def _mp4_atom(file, size, name: bytes):
@@ -614,6 +832,14 @@ def _mp4_tags(ilst: bytes) -> dict:
     tags = {}
 
     for name, body in _mp4_children(ilst):
+        if name == b"----":
+            freeform = _guard(_mp4_freeform, body)
+            if freeform:
+                key = MP4_FREEFORM.get(freeform[0].lower())
+                if key:
+                    _put(tags, key, _typed(key, freeform[1]))
+            continue
+
         key = MP4_TAGS.get(name)
         if key is None:
             continue
@@ -624,6 +850,10 @@ def _mp4_tags(ilst: bytes) -> dict:
 
         if key in ("track", "disc"):
             _put(tags, key, int.from_bytes(payload[2:4], "big") if len(payload) >= 4 else None)
+            if len(payload) >= 6:
+                _put(tags, f"{key}_total", int.from_bytes(payload[4:6], "big") or None)
+        elif key == "compilation":
+            _put(tags, key, payload[:1] == b"\x01")
         elif name == b"gnre":
             index = int.from_bytes(payload, "big") - 1  # gnre indexes the genre list from one
             _put(tags, key, GENRES[index] if 0 <= index < len(GENRES) else None)
@@ -631,6 +861,14 @@ def _mp4_tags(ilst: bytes) -> dict:
             _put(tags, key, _typed(key, _text(payload.decode("utf-8", "replace"))))
 
     return tags
+
+
+def _mp4_freeform(body: bytes):
+    name = _mp4_child(body, b"name")
+    _, payload = _mp4_data(body)
+    if name is None or payload is None:
+        return None
+    return name[4:].decode("utf-8", "replace"), _text(payload.decode("utf-8", "replace"))
 
 
 def _mp4_data(body: bytes) -> tuple:
@@ -669,15 +907,44 @@ def _put(tags: dict, key: str, value):
         tags[key] = value
 
 
+def _append(tags: dict, key: str, value):
+    if value and value not in tags.setdefault(key, []) and len(tags[key]) < 32:
+        tags[key].append(value[:300])
+
+
 def _typed(key: str, text):
     if text is None:
         return None
-    if key in ("track", "disc"):
+    if isinstance(text, bool):
+        return text
+    if key in ("track", "disc", "track_total", "disc_total"):
         return _number(text)
     if key == "year":
         return _year(text)
+    if key in ("rg_track_gain", "rg_album_gain", "rg_track_peak", "rg_album_peak"):
+        return _decibels(text)
+    if key == "compilation":
+        return str(text).strip().lower() in ("1", "true", "yes")
+    if key == "date":
+        return str(text).strip()[:10] or None
+    if key == "lyrics":
+        return str(text).strip()[:200_000] or None
 
-    return text
+    return str(text).strip()[:1000] or None
+
+
+def _decibels(text):
+    try:
+        return round(float(str(text).lower().replace("db", "").strip()), 2)
+    except ValueError:
+        return None
+
+
+def _size_of(path) -> int:
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return 0
 
 
 def _text(value):

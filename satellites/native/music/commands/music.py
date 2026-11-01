@@ -56,13 +56,17 @@ def _scan(tracks, args):
         print(f"[ERROR]: {error}")
         return
 
-    print(f"Scanned {result['source']}\n")
+    sources = result["source"] if isinstance(result["source"], list) else [result["source"]]
+    print(f"Scanned {', '.join(sources)}\n")
     print(f"Found        {result['found']}")
     print(f"Added        {result['added']}")
     print(f"Updated      {result['updated']}")
+    print(f"Moved        {result['moved']}")
     print(f"Unchanged    {result['unchanged']}")
+    print(f"Restored     {result['restored']}")
     print(f"Duplicates   {result['duplicates']}")
-    print(f"Removed      {result['removed']}")
+    print(f"Skipped      {result['skipped']}")
+    print(f"Missing      {result['removed']}")
     print(f"Failed       {len(result['failed'])}")
 
     for failure in result["failed"]:

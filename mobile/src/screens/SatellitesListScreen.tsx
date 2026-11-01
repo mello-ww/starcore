@@ -81,7 +81,9 @@ export function SatellitesListScreen({navigation}: Props) {
                 // (see satellites/native/photo/api.py).
                 item.name === 'Photo'
                   ? navigation.navigate('PhotoHome')
-                  : navigation.navigate('SatelliteDetail', {name: item.name})
+                  : item.name === 'Music'
+                    ? navigation.navigate('MusicHome')
+                    : navigation.navigate('SatelliteDetail', {name: item.name})
               }>
               <Card style={styles.card}>
                 <View style={styles.row}>

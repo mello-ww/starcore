@@ -578,7 +578,18 @@ class RequestHandler(BaseHTTPRequestHandler):
     # file a satellite serves without downloading all of it
     def _send_file(self, path: Path, content_type: str, cache: str = None, download_name: str = None):
         size = path.stat().st_size
-        start, end = self._requested_range(size)
+        requested = self._requested_range(size)
+        if requested is None:
+            # RFC 9110: a range that starts beyond the end can't be satisfied, and the
+            # client is told the real size so it can ask again
+            self._responded = True
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{size}")
+            self.send_header("Content-Length", "0")
+            self.send_header("Accept-Ranges", "bytes")
+            self.end_headers()
+            return
+        start, end = requested
         length = end - start + 1
 
         self._responded = True
@@ -611,6 +622,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         first, _, last = header[len("bytes="):].partition("-")
         try:
             if not first:
+                if int(last) == 0:
+                    return None if size else (0, 0)
                 start = max(size - int(last), 0)
                 end = size - 1
             else:
@@ -619,7 +632,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         except ValueError:
             return 0, max(size - 1, 0)
 
-        if start >= size or start > end:
+        if start >= size:
+            return None if size else (0, 0)
+        if start > end:
             return 0, max(size - 1, 0)
 
         return start, min(end, size - 1)

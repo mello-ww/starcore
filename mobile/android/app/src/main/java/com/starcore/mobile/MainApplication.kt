@@ -8,19 +8,23 @@ import com.facebook.react.ReactPackage
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.load
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.soloader.SoLoader
+import com.brentvatne.react.ReactNativeVideoManager
+import com.starcore.mobile.music.MusicPackage
+import com.starcore.mobile.music.PlayerRegistry
 
 /**
  * Standard React Native application bootstrap - autolinking (via
  * `PackageList`) is what wires in the native halves of react-native-keychain
  * and react-native-biometrics (see src/platform/), so neither is
- * hand-registered here; adding another native module later needs no edit
- * to this file at all.
+ * hand-registered here. The one exception is the app's own Music package
+ * (src/music/native.ts), which has no npm package to autolink from, and
+ * its react-native-video plugin hook that gives it the player's session.
  */
 class MainApplication : Application(), ReactApplication {
 
     override val reactNativeHost: ReactNativeHost =
         object : DefaultReactNativeHost(this) {
-            override fun getPackages(): List<ReactPackage> = PackageList(this).packages
+            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MusicPackage()
 
             override fun getJSMainModuleName(): String = "index"
 
@@ -33,6 +37,7 @@ class MainApplication : Application(), ReactApplication {
     override fun onCreate() {
         super.onCreate()
         SoLoader.init(this, false)
+        ReactNativeVideoManager.getInstance().registerPlugin(PlayerRegistry)
         if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
             load()
         }

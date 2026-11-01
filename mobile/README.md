@@ -79,6 +79,24 @@ possibly `minSdkVersion`) across the whole Android project has to be a
 deliberate, separate decision, not a side effect of `npm update` quietly
 picking up a newer 6.x release.
 
+### Music playback
+
+StarCore Music (`src/music/`) plays through that same `react-native-video`
+rather than adding `react-native-track-player`: one hidden `<Video>` lives in
+`MusicProvider` (mounted around the tab navigator, inside the per-server
+`AuthProvider`), with `playInBackground` and `showNotificationControls`, so
+playback runs in react-native-video's media3 `VideoPlaybackService` - a
+`mediaPlayback` foreground service with notification, lock-screen and
+headset play/pause, audio focus and becoming-noisy handling. The app's own
+Kotlin package (`android/.../music/`) adds what JS can't reach: a
+react-native-video plugin hook that gives the equalizer, bass boost,
+loudness (ReplayGain boost) and pitch/tempo the player's own audio session,
+Wi-Fi/cellular detection, and private-storage downloads under
+`files/music/<server>/`. Limits of this approach: the notification shows
+play/pause and seek, not next/previous; there is no crossfade or true gapless
+playback (one player, tracks are loaded back to back); and remote control
+through StarCore Connect only runs while the app is in the foreground.
+
 ## Connecting to a server
 
 The first screen asks for your StarCore server's address (e.g.

@@ -1,3 +1,11 @@
 enabled = true
 storage = "data" # relative paths are resolved inside the satellite
 library = "~/Music" # the directory 'music scan' indexes by default
+sources = [] # additional music folders scanned alongside library
+exclude = [] # glob patterns never indexed, relative to a source
+min_duration = 0 # skip audio shorter than this many seconds
+missing_metadata = "filename" # "filename" or "folders" (Artist/Album/NN Title)
+scan_interval = 0 # minutes between scheduled rescans, 0 for none
+ffmpeg = "ffmpeg" # optional, for transcoding; "ffmpeg" on PATH or an absolute path
+transcode_workers = 2
+transcode_cache_mb = 2048
