@@ -6,6 +6,7 @@ export const palette = {
   card: '#212228',
   control: '#24252b',
   controlStrong: '#34363d',
+  field: '#17181c',
   line: '#222329',
 
   text: '#ffffff',

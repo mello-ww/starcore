@@ -5,3 +5,4 @@ import * as tokens from './tokens';
 
 export {tokens};
 export {AccentProvider, useAccent} from './AccentContext';
+export {useTopInset} from './insets';

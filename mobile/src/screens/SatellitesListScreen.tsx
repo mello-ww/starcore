@@ -1,15 +1,19 @@
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
+import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
 import {useServers} from '../servers/ServersContext';
 import {SatellitesApi} from '../satellites/api';
 import {getCachedSatellites, setCachedSatellites} from '../satellites/cache';
+import {STATUS_LABELS, satelliteIcon, statusDotColor} from '../satellites/icons';
 import type {SatelliteSummary} from '../satellites/types';
-import {Card} from '../components/Card';
-import {Starfield} from '../components/Starfield';
-import {colors, spacing, typography} from '../theme';
+import {ScreenTitle} from '../components/ScreenTitle';
+import {Surface} from '../components/Surface';
+import {tokens, useAccent, useTopInset} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
+
+const {palette, space, type} = tokens;
 
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'SatellitesList'>;
 
@@ -23,6 +27,8 @@ type Props = NativeStackScreenProps<SatellitesStackParamList, 'SatellitesList'>;
 export function SatellitesListScreen({navigation}: Props) {
   const {client} = useAuth();
   const {activeServer} = useServers();
+  const {color: accent} = useAccent();
+  const top = useTopInset();
   const api = useMemo(() => new SatellitesApi(client), [client]);
 
   const [satellites, setSatellites] = useState<SatelliteSummary[] | null>(null);
@@ -59,68 +65,72 @@ export function SatellitesListScreen({navigation}: Props) {
 
   return (
     <View style={styles.screen}>
-      <Starfield count={20} />
-      <View style={styles.content}>
-        <Text style={typography.title}>Satellites</Text>
-        {isCache && <Text style={[typography.caption, styles.offline]}>Showing cached data - offline</Text>}
-        {error && <Text style={styles.error}>{error}</Text>}
-        <FlatList
-          data={satellites ?? []}
-          keyExtractor={item => item.name}
-          contentContainerStyle={styles.list}
-          renderItem={({item}) => (
-            <Pressable
-              disabled={!item.mobile_ui}
-              onPress={() =>
-                // "Photo" gets its own dedicated screens (grid, folders,
-                // search, a full-screen viewer) instead of the generic
-                // DeclarativeScreen every other Satellite renders through -
-                // see PhotoHomeScreen's docstring. Still gated on
-                // item.mobile_ui like everything else: Photo only reaches
-                // here at all because it now answers a "mobile" route too
-                // (see satellites/native/photo/api.py).
-                item.name === 'Photo'
-                  ? navigation.navigate('PhotoHome')
-                  : item.name === 'Music'
-                    ? navigation.navigate('MusicHome')
-                    : navigation.navigate('SatelliteDetail', {name: item.name})
-              }>
-              <Card style={styles.card}>
-                <View style={styles.row}>
-                  <Text style={typography.heading}>{item.name}</Text>
-                  <Text style={[typography.caption, statusColor(item.status)]}>{item.status}</Text>
-                </View>
-                <Text style={typography.caption}>{item.description}</Text>
-                {!item.mobile_ui && <Text style={styles.noUi}>No mobile interface yet</Text>}
-              </Card>
-            </Pressable>
-          )}
-          ListEmptyComponent={
-            satellites !== null ? <Text style={typography.caption}>No Satellites are loaded on this server.</Text> : null
-          }
-        />
-      </View>
+      <FlatList
+        data={satellites ?? []}
+        keyExtractor={item => item.name}
+        contentContainerStyle={[styles.list, {paddingTop: top + space.xl}]}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <ScreenTitle eyebrow={activeServer?.name ? `StarCore · ${activeServer.name}` : 'StarCore'} title="Satellites" />
+            {isCache && <Text style={[type.caption, styles.offline]}>Showing cached data - offline</Text>}
+            {error && <Text style={styles.error}>{error}</Text>}
+          </View>
+        }
+        renderItem={({item}) => (
+          <Pressable
+            disabled={!item.mobile_ui}
+            accessibilityRole="button"
+            accessibilityLabel={item.mobile_ui ? `Open ${item.name}` : `${item.name}, no mobile interface yet`}
+            style={({pressed}) => pressed && styles.pressed}
+            onPress={() =>
+              // "Photo" gets its own dedicated screens (grid, folders,
+              // search, a full-screen viewer) instead of the generic
+              // DeclarativeScreen every other Satellite renders through -
+              // see PhotoHomeScreen's docstring. Still gated on
+              // item.mobile_ui like everything else: Photo only reaches
+              // here at all because it now answers a "mobile" route too
+              // (see satellites/native/photo/api.py).
+              item.name === 'Photo'
+                ? navigation.navigate('PhotoHome')
+                : item.name === 'Music'
+                  ? navigation.navigate('MusicHome')
+                  : navigation.navigate('SatelliteDetail', {name: item.name})
+            }>
+            <Surface style={styles.card}>
+              <View style={styles.row}>
+                <Icon name={satelliteIcon(item.name)} size={20} color={accent} />
+                <Text style={[type.title, styles.name]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <View style={[styles.dot, {backgroundColor: statusDotColor(item.status)}]} />
+                <Text style={type.caption}>{STATUS_LABELS[item.status] ?? item.status}</Text>
+                {item.mobile_ui && <Icon name="chevron-right" size={20} color={palette.text3} />}
+              </View>
+              <Text style={type.body} numberOfLines={2}>
+                {item.description}
+              </Text>
+              {!item.mobile_ui && <Text style={styles.noUi}>No mobile interface yet</Text>}
+            </Surface>
+          </Pressable>
+        )}
+        ListEmptyComponent={
+          satellites !== null ? <Text style={type.body}>No Satellites are loaded on this server.</Text> : null
+        }
+      />
     </View>
   );
 }
 
-function statusColor(status: SatelliteSummary['status']) {
-  if (status === 'running') {
-    return {color: colors.ok};
-  }
-  if (status === 'error') {
-    return {color: colors.alert};
-  }
-  return {color: colors.textFaint};
-}
-
 const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: colors.void},
-  content: {flex: 1, padding: spacing.lg, paddingTop: spacing.xl, gap: spacing.sm},
-  list: {gap: spacing.sm, paddingBottom: spacing.lg},
-  card: {gap: spacing.xs},
-  row: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
-  offline: {color: colors.textFaint},
-  error: {color: colors.alert, fontSize: 13},
-  noUi: {color: colors.textFaint, fontSize: 12, fontStyle: 'italic'},
+  screen: {flex: 1, backgroundColor: palette.bg},
+  list: {paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.md},
+  header: {gap: space.sm, marginBottom: space.sm},
+  card: {gap: space.md},
+  row: {flexDirection: 'row', alignItems: 'center', gap: space.sm},
+  name: {flex: 1, marginLeft: space.xs},
+  dot: {width: 6, height: 6, borderRadius: 3},
+  offline: {color: palette.text3},
+  error: {color: palette.danger, fontSize: 13},
+  noUi: {...type.caption, color: palette.text3},
+  pressed: {opacity: 0.85},
 });

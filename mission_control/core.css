@@ -1,0 +1,533 @@
+/* StarCore design language for the Core pages (Satellites, Console, Configuration),
+   their dialogs and sign-in. Satellite pages drop .sc-themed and keep style.css. */
+
+.sc-themed {
+    --void: var(--sc-bg);
+    --deep: var(--sc-bg);
+    --surface: var(--sc-card);
+    --raised: var(--sc-control);
+    --line: var(--sc-line);
+    --line-bright: #2e2f36;
+    --klein: var(--sc-accent);
+    --sapphire: var(--sc-accent);
+    --royal: var(--sc-accent);
+    --azure: var(--sc-accent);
+    --ice: var(--sc-text);
+    --text: var(--sc-text);
+    --text-dim: var(--sc-text-2);
+    --text-faint: var(--sc-text-3);
+    --alert: var(--sc-danger);
+    --radius: var(--sc-radius-card);
+}
+
+.sc-themed .view,
+.sc-themed .banner,
+.sc-themed .modal,
+.sc-themed .auth-card {
+    font-family: var(--sc-font-sans);
+}
+
+.sc-themed .view .eyebrow,
+.sc-themed .modal .eyebrow {
+    color: var(--sc-text-3);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+}
+
+.sc-themed :is(.view, .modal) :is(h2, h3) {
+    font-family: var(--sc-font-display);
+    font-weight: 700;
+}
+
+/* ---------- page structure ---------- */
+
+.sc-themed .view:not(.home) {
+    padding: 24px 32px 48px;
+}
+
+.sc-themed .page-head {
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.sc-themed .page-head h2 {
+    font-size: 22px;
+    letter-spacing: -0.01em;
+}
+
+.sc-themed .page-head p {
+    color: var(--sc-text-2);
+    font-size: 14px;
+}
+
+.sc-themed .stack {
+    gap: 16px;
+}
+
+.sc-themed .panel {
+    padding: 20px 22px;
+    border: 0;
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+}
+
+.sc-themed .view form + .panel {
+    margin-top: 24px;
+}
+
+.sc-themed .panel > .eyebrow {
+    margin-bottom: 16px;
+}
+
+.sc-themed .banner.error {
+    background: rgba(238, 68, 75, 0.1);
+    color: var(--sc-danger);
+}
+
+.sc-themed .banner.notice {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--sc-text-2);
+}
+
+.sc-themed .view .banner {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border: 0;
+    border-radius: var(--sc-radius-control);
+}
+
+.sc-themed .modal .banner {
+    border: 0;
+    border-radius: var(--sc-radius-control);
+}
+
+.sc-themed code {
+    font-family: var(--sc-font-mono);
+    color: var(--sc-text);
+}
+
+/* ---------- satellites list ---------- */
+
+.sc-themed .satellite-group + .satellite-group {
+    margin-top: 32px;
+}
+
+.sc-themed .satellite-group-head {
+    margin-bottom: 14px;
+}
+
+.sc-themed .cards {
+    gap: 16px;
+}
+
+.sc-themed .card {
+    gap: 12px;
+    padding: 18px;
+    border: 0;
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+    transition: background 140ms ease;
+}
+
+.sc-themed .card:hover {
+    background: #25262c;
+}
+
+.sc-themed .card-head {
+    gap: 10px;
+}
+
+/* name and actions share the first line, badges sit underneath */
+.sc-themed .card-head h3 {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sc-themed .card-badges {
+    order: 3;
+    flex-basis: 100%;
+    gap: 6px;
+}
+
+.sc-themed .card-head h3 {
+    font-size: 16px;
+}
+
+.sc-themed .satellite-icon {
+    border: 0;
+    background: transparent;
+    color: var(--sc-accent);
+}
+
+.sc-themed .card-head .satellite-icon .icon-mask,
+.sc-themed .card-head .satellite-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.sc-themed .card-meta {
+    margin-top: -6px;
+    color: var(--sc-text-3);
+    font-family: var(--sc-font-mono);
+    font-size: 12px;
+}
+
+.sc-themed .card .description {
+    color: var(--sc-text-2);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.sc-themed .card-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: var(--sc-radius-control);
+    background: var(--sc-control-strong);
+    color: var(--sc-text);
+    font: 600 13px/1 var(--sc-font-sans);
+}
+
+.sc-themed .card-link:hover {
+    background: #3e4048;
+    color: var(--sc-text);
+}
+
+.sc-themed .card-actions {
+    gap: 4px;
+}
+
+.sc-themed .icon-button {
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 9px;
+    color: var(--sc-text-2);
+}
+
+.sc-themed .icon-button:hover {
+    background: var(--sc-control);
+    color: var(--sc-text);
+}
+
+.sc-themed .icon-button-alert:hover {
+    background: rgba(238, 68, 75, 0.12);
+    color: var(--sc-danger);
+}
+
+.sc-themed .icon-button:focus-visible,
+.sc-themed .button:focus-visible,
+.sc-themed .chip:focus-visible,
+.sc-themed .card-link:focus-visible,
+.sc-themed .dir-picker-row:focus-visible,
+.sc-themed .dir-picker-crumb:focus-visible {
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 2px;
+}
+
+/* ---------- chips & badges ---------- */
+
+.sc-themed .chip {
+    padding: 4px 9px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--sc-control);
+    color: var(--sc-text-2);
+    font-family: var(--sc-font-mono);
+    font-size: 12px;
+}
+
+.sc-themed button.chip:hover {
+    background: var(--sc-control-strong);
+    color: var(--sc-text);
+}
+
+.sc-themed .badge {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+}
+
+.sc-themed .badge-up {
+    background: rgba(230, 231, 235, 0.08);
+    color: var(--sc-text-icon);
+}
+
+.sc-themed .badge-down,
+.sc-themed .badge-error {
+    background: rgba(238, 68, 75, 0.14);
+    color: var(--sc-danger);
+}
+
+.sc-themed .badge-stopped {
+    background: rgba(240, 180, 60, 0.12);
+    color: var(--sc-warn);
+}
+
+.sc-themed .badge-unknown {
+    background: var(--sc-control);
+    color: var(--sc-text-2);
+}
+
+.sc-themed .badge-type {
+    border: 1px solid #2e2f36;
+    background: transparent;
+    color: var(--sc-text-3);
+}
+
+/* ---------- buttons ---------- */
+
+.sc-themed .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: var(--sc-radius-control);
+    background: var(--sc-control-strong);
+    color: var(--sc-text);
+    font: 600 14px/1 var(--sc-font-sans);
+    transition: background 120ms ease, filter 120ms ease;
+}
+
+.sc-themed .button:hover {
+    background: #3e4048;
+}
+
+.sc-themed .button-primary,
+.sc-themed .button-primary:hover {
+    background: var(--sc-accent);
+    color: var(--sc-on-accent);
+}
+
+.sc-themed .button-primary:hover {
+    filter: brightness(1.08);
+}
+
+.sc-themed .button-stop {
+    box-shadow: inset 0 0 0 1px rgba(238, 68, 75, 0.5);
+    background: transparent;
+    color: var(--sc-danger);
+}
+
+.sc-themed .button-stop:hover {
+    background: rgba(238, 68, 75, 0.1);
+}
+
+.sc-themed .button.confirm {
+    background: #4a4c55;
+    color: var(--sc-text);
+}
+
+.sc-themed .button-stop.confirm {
+    background: var(--sc-danger);
+    color: var(--sc-on-accent);
+}
+
+/* ---------- form fields ---------- */
+
+.sc-themed :is(.console-form input, .field input, .config-field input) {
+    min-height: 42px;
+    border: 1px solid #2e2f36;
+    border-radius: var(--sc-radius-control);
+    background: var(--sc-field);
+    color: var(--sc-text);
+    font-size: 14px;
+    transition: border-color 120ms ease;
+}
+
+.sc-themed :is(.console-form input, .field input, .config-field input):focus {
+    outline: none;
+    border-color: var(--sc-accent);
+}
+
+.sc-themed .config-field {
+    margin-bottom: 18px;
+}
+
+.sc-themed .config-field label,
+.sc-themed .field {
+    color: var(--sc-text-2);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.sc-themed .config-field .hint {
+    color: var(--sc-text-3);
+    font-size: 13px;
+}
+
+.sc-themed .config-checkbox {
+    min-height: 40px;
+    color: var(--sc-text);
+    font-size: 14px;
+}
+
+.sc-themed input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--sc-accent);
+}
+
+/* ---------- console ---------- */
+
+.sc-themed .console-form {
+    gap: 8px;
+    margin: 16px 0;
+}
+
+.sc-themed .console-field::before {
+    left: 14px;
+    color: var(--sc-accent);
+}
+
+.sc-themed .console-form input {
+    padding-left: 30px;
+    font-family: var(--sc-font-mono);
+}
+
+.sc-themed .console-output {
+    padding: 20px 22px;
+    border: 0;
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+    color: var(--sc-text-2);
+    font-family: var(--sc-font-mono);
+    font-size: 13px;
+}
+
+.sc-themed .console-echo {
+    color: var(--sc-text);
+}
+
+.sc-themed .console-echo::before {
+    color: var(--sc-accent);
+}
+
+/* ---------- sessions ---------- */
+
+.sc-themed .session-row {
+    gap: 12px;
+    padding: 10px 10px 10px 16px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--sc-control);
+}
+
+.sc-themed .session-title {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.sc-themed .session-meta {
+    color: var(--sc-text-3);
+    font-size: 13px;
+}
+
+/* ---------- dialogs ---------- */
+
+.sc-themed .modal-overlay {
+    background: rgba(6, 6, 8, 0.72);
+    backdrop-filter: none;
+}
+
+.sc-themed .modal {
+    padding: 22px 24px;
+    border: 1px solid var(--sc-line);
+    border-radius: 20px;
+    background: #18191d;
+}
+
+.sc-themed .modal-head h2 {
+    font-size: 18px;
+}
+
+.sc-themed .modal-close {
+    min-width: 36px;
+    min-height: 36px;
+    border-radius: 9px;
+    color: var(--sc-text-2);
+    font-size: 20px;
+}
+
+.sc-themed .modal-close:hover {
+    background: var(--sc-control);
+    color: var(--sc-text);
+}
+
+.sc-themed .dir-picker-breadcrumb {
+    border: 0;
+    border-radius: var(--sc-radius-control);
+    background: var(--sc-control);
+}
+
+.sc-themed .dir-picker-crumb {
+    color: var(--sc-text);
+}
+
+.sc-themed .dir-picker-crumb:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--sc-text);
+}
+
+.sc-themed .dir-picker-list {
+    border-color: var(--sc-line);
+    border-radius: 12px;
+}
+
+.sc-themed .dir-picker-row {
+    min-height: 42px;
+    border-bottom-color: var(--sc-line);
+}
+
+.sc-themed .dir-picker-row:hover {
+    background: var(--sc-control);
+}
+
+/* ---------- sign-in ---------- */
+
+.sc-themed .auth-overlay {
+    background: var(--sc-bg);
+}
+
+.sc-themed .auth-overlay .starfield {
+    display: none;
+}
+
+.sc-themed .auth-card {
+    gap: 14px;
+    max-width: 360px;
+    padding: 28px;
+    border: 0;
+    border-radius: 20px;
+    background: var(--sc-card);
+}
+
+.sc-themed .auth-card h2 {
+    font-family: var(--sc-font-display);
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.sc-themed .auth-card .muted {
+    color: var(--sc-text-2);
+    font-size: 14px;
+}
+
+.sc-themed .auth-card .button {
+    margin-top: 6px;
+    min-height: 44px;
+}
+
+/* ---------- smaller screens ---------- */
+
+@media (max-width: 600px) {
+    .sc-themed .view:not(.home) {
+        padding: 16px 16px 40px;
+    }
+}

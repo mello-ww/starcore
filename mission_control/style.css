@@ -849,6 +849,12 @@ h3 {
     font-size: 0.98rem;
 }
 
+.card-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 /* the satellite's own icon (or the generic fallback) - a small fixed square so
    cards, the topbar and the sidebar nav can all show it at a consistent size
    without it ever dominating the layout */

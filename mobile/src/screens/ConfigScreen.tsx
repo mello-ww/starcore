@@ -1,9 +1,12 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {ScrollView, StyleSheet, Text, TextInput} from 'react-native';
 import {useAuth} from '../auth/AuthContext';
-import {Card} from '../components/Card';
-import {PrimaryButton} from '../components/PrimaryButton';
-import {colors, spacing, typography} from '../theme';
+import {Button} from '../components/Button';
+import {ScreenTitle} from '../components/ScreenTitle';
+import {Surface} from '../components/Surface';
+import {fonts, tokens, useTopInset} from '../theme';
+
+const {palette, radii, space, type} = tokens;
 
 /** Mirrors GET/POST /api/configuration - see docs/api.md. */
 interface Setting {
@@ -25,6 +28,7 @@ interface Setting {
  */
 export function ConfigScreen() {
   const {client} = useAuth();
+  const top = useTopInset();
   const [settings, setSettings] = useState<Setting[] | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -72,43 +76,52 @@ export function ConfigScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={typography.title}>Config</Text>
-      <Text style={typography.caption}>Configuration of this StarCore server.</Text>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, {paddingTop: top + space.xl}]}>
+      <ScreenTitle eyebrow="StarCore" title="Config" subtitle="Configuration of this StarCore server." />
       {error && <Text style={styles.error}>{error}</Text>}
       {(settings ?? []).map(setting => (
-        <Card key={setting.path} style={styles.card}>
-          <Text style={typography.label}>{setting.path.toUpperCase()}</Text>
-          <Text style={typography.caption}>{setting.description}</Text>
+        <Surface key={setting.path} style={styles.card}>
+          <Text style={type.eyebrow}>{setting.path.toUpperCase()}</Text>
+          <Text style={type.body}>{setting.description}</Text>
           <TextInput
             style={styles.input}
             value={drafts[setting.path] ?? String(setting.value)}
             onChangeText={value => setDrafts(previous => ({...previous, [setting.path]: value}))}
-            placeholderTextColor={colors.textFaint}
+            placeholderTextColor={palette.text3}
             autoCapitalize="none"
             autoCorrect={false}
           />
           {setting.pending_restart && (
             <Text style={styles.pending}>Saved value differs from what's running - restart to apply.</Text>
           )}
-          <PrimaryButton
+          <Button
             title="Save"
             variant="secondary"
+            style={styles.save}
             onPress={() => save(setting)}
             disabled={savingKey === setting.path || drafts[setting.path] === undefined}
             loading={savingKey === setting.path}
           />
-        </Card>
+        </Surface>
       ))}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: colors.void},
-  content: {padding: spacing.lg, paddingTop: spacing.xl, gap: spacing.md},
-  card: {gap: spacing.xs},
-  input: {color: colors.text, fontSize: 15, backgroundColor: colors.raised, borderRadius: 8, padding: spacing.sm},
-  pending: {color: colors.ice, fontSize: 12},
-  error: {color: colors.alert, fontSize: 13},
+  screen: {flex: 1, backgroundColor: palette.bg},
+  content: {paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.md},
+  card: {gap: space.md},
+  input: {
+    minHeight: 48,
+    paddingHorizontal: space.md,
+    borderRadius: radii.control,
+    backgroundColor: palette.field,
+    color: palette.text,
+    fontFamily: fonts.mono,
+    fontSize: 14,
+  },
+  pending: {color: palette.warn, fontSize: 13},
+  save: {alignSelf: 'flex-start'},
+  error: {color: palette.danger, fontSize: 13},
 });

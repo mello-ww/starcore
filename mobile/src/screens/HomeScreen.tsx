@@ -1,10 +1,11 @@
-import {useFocusEffect, useIsFocused, useNavigation} from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import React, {useCallback, useMemo, useState} from 'react';
-import {Pressable, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, View} from 'react-native';
+import {Pressable, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
 import {SatellitesApi} from '../satellites/api';
+import {STATUS_LABELS, satelliteIcon, statusDotColor as dotColor} from '../satellites/icons';
 import type {SatelliteSummary} from '../satellites/types';
 import {useServers} from '../servers/ServersContext';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
@@ -17,23 +18,6 @@ interface EngineStatus {
   uptime_seconds: number;
   commands: number;
 }
-
-const STATUS_LABELS: Record<SatelliteSummary['status'], string> = {
-  running: 'Running',
-  stopped: 'Stopped',
-  disabled: 'Disabled',
-  error: 'Error',
-};
-
-// Satellites only ship SVG icons, which this app can't draw yet
-const SATELLITE_ICONS: Record<string, string> = {
-  FileExplorer: 'folder',
-  LockedFolder: 'lock',
-  Music: 'music',
-  Photo: 'camera',
-  Status: 'activity',
-  docker: 'box',
-};
 
 export function greeting(name: string): string {
   return name ? `Ravi de vous revoir, ${name}` : 'Ravi de vous revoir';
@@ -61,19 +45,6 @@ export function alertsFor(satellites: SatelliteSummary[]) {
     }));
 }
 
-function dotColor(status: SatelliteSummary['status'] | 'offline') {
-  if (status === 'running') {
-    return palette.textIcon;
-  }
-  if (status === 'stopped') {
-    return palette.warn;
-  }
-  if (status === 'error' || status === 'offline') {
-    return palette.danger;
-  }
-  return palette.text3;
-}
-
 /** The first tab: a greeting, the selected server's state and its Satellites. */
 export function HomeScreen() {
   const {client} = useAuth();
@@ -81,7 +52,6 @@ export function HomeScreen() {
   const {accent, color: accentColor, setAccent} = useAccent();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const focused = useIsFocused();
   const api = useMemo(() => new SatellitesApi(client), [client]);
 
   const [status, setStatus] = useState<EngineStatus | null>(null);
@@ -134,7 +104,6 @@ export function HomeScreen() {
 
   return (
     <View style={styles.screen}>
-      {focused && <StatusBar barStyle="light-content" backgroundColor={palette.bg} />}
       <ScrollView
         contentContainerStyle={[styles.content, {paddingTop: insets.top + space.xl}]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentColor} colors={[accentColor]} progressBackgroundColor={palette.card} />}>
@@ -231,7 +200,7 @@ export function HomeScreen() {
         {satellites?.map(satellite => (
           <View key={satellite.name} style={styles.card}>
             <View style={styles.cardHead}>
-              <Icon name={SATELLITE_ICONS[satellite.name] ?? 'circle'} size={20} color={accentColor} />
+              <Icon name={satelliteIcon(satellite.name)} size={20} color={accentColor} />
               <Text style={[type.title, styles.cardTitle]} numberOfLines={1}>
                 {satellite.name}
               </Text>

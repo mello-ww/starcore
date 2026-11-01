@@ -1,6 +1,7 @@
 import {BottomTabBar, createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import React from 'react';
+import {StatusBar} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {ConfigScreen} from '../screens/ConfigScreen';
 import {ConnectScreen} from '../screens/ConnectScreen';
@@ -11,7 +12,7 @@ import {SatellitesListScreen} from '../screens/SatellitesListScreen';
 import {ServersScreen} from '../screens/ServersScreen';
 import {SettingsScreen} from '../screens/SettingsScreen';
 import {useServers} from '../servers/ServersContext';
-import {colors, tokens, useAccent} from '../theme';
+import {tokens, useAccent} from '../theme';
 import {PhotoAlbumScreen} from '../photo/PhotoAlbumScreen';
 import {PhotoConfigurationScreen} from '../photo/PhotoConfigurationScreen';
 import {PhotoHomeScreen} from '../photo/PhotoHomeScreen';
@@ -76,9 +77,11 @@ const SatellitesStackNav = createNativeStackNavigator<SatellitesStackParamList>(
 const SettingsStackNav = createNativeStackNavigator<SettingsStackParamList>();
 
 const stackScreenOptions = {
-  headerStyle: {backgroundColor: colors.surface},
-  headerTintColor: colors.text,
+  headerStyle: {backgroundColor: tokens.palette.bg},
+  headerTintColor: tokens.palette.text,
+  headerTitleStyle: {fontFamily: tokens.type.title.fontFamily, fontWeight: '700' as const},
   headerShadowVisible: false,
+  contentStyle: {backgroundColor: tokens.palette.bg},
 };
 
 /** "Satellites" tab's own stack: the list, then whichever Satellite the
@@ -87,7 +90,7 @@ const stackScreenOptions = {
 function SatellitesStack() {
   return (
     <SatellitesStackNav.Navigator screenOptions={stackScreenOptions}>
-      <SatellitesStackNav.Screen name="SatellitesList" component={SatellitesListScreen} options={{title: 'Satellites'}} />
+      <SatellitesStackNav.Screen name="SatellitesList" component={SatellitesListScreen} options={{title: 'Satellites', headerShown: false}} />
       <SatellitesStackNav.Screen name="SatelliteDetail" component={SatelliteDetailScreen} />
       <SatellitesStackNav.Screen name="PhotoHome" component={PhotoHomeScreen} options={{title: 'Photos'}} />
       <SatellitesStackNav.Screen name="PhotoAlbum" component={PhotoAlbumScreen} />
@@ -121,7 +124,7 @@ function SettingsStack() {
   const {addAndActivate} = useServers();
   return (
     <SettingsStackNav.Navigator screenOptions={stackScreenOptions}>
-      <SettingsStackNav.Screen name="SettingsHome" component={SettingsScreen} options={{title: 'Settings'}} />
+      <SettingsStackNav.Screen name="SettingsHome" component={SettingsScreen} options={{title: 'Settings', headerShown: false}} />
       <SettingsStackNav.Screen name="Servers" component={ServersScreen} options={{title: 'Servers'}} />
       <SettingsStackNav.Screen name="AddServer" options={{headerShown: false}}>
         {({navigation, route}) => (
@@ -176,6 +179,7 @@ export function MainTabs() {
   const {color: accent} = useAccent();
   return (
     <MusicProvider>
+      <StatusBar barStyle="light-content" backgroundColor={tokens.palette.bg} />
       <Tab.Navigator
       tabBar={props => (
         <>

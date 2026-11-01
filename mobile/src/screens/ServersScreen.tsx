@@ -2,10 +2,12 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React from 'react';
 import {Alert, FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useServers} from '../servers/ServersContext';
-import {Card} from '../components/Card';
-import {PrimaryButton} from '../components/PrimaryButton';
-import {colors, spacing, typography} from '../theme';
+import {Button} from '../components/Button';
+import {Surface} from '../components/Surface';
+import {tokens, useAccent} from '../theme';
 import type {SettingsStackParamList} from '../navigation/MainTabs';
+
+const {palette, space, type} = tokens;
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'Servers'>;
 
@@ -17,6 +19,7 @@ type Props = NativeStackScreenProps<SettingsStackParamList, 'Servers'>;
  */
 export function ServersScreen({navigation}: Props) {
   const {servers, activeServer, switchTo, remove} = useServers();
+  const {color: accent} = useAccent();
 
   const confirmRemove = (id: string, name: string) => {
     Alert.alert(`Remove "${name}"?`, 'This only forgets it on this device - the server itself is unaffected.', [
@@ -34,22 +37,28 @@ export function ServersScreen({navigation}: Props) {
         renderItem={({item}) => {
           const isActive = item.id === activeServer?.id;
           return (
-            <Card style={styles.card}>
-              <Pressable onPress={() => !isActive && switchTo(item.id)} style={styles.row}>
+            <Surface style={styles.card}>
+              <Pressable
+                onPress={() => !isActive && switchTo(item.id)}
+                accessibilityRole="button"
+                accessibilityLabel={isActive ? `${item.name}, active` : `Switch to ${item.name}`}
+                style={styles.row}>
                 <View style={styles.rowText}>
-                  <Text style={typography.heading}>{item.name}</Text>
-                  <Text style={typography.caption}>{item.baseUrl}</Text>
+                  <Text style={type.title}>{item.name}</Text>
+                  <Text style={type.caption}>{item.baseUrl}</Text>
                 </View>
-                {isActive && <Text style={styles.active}>ACTIVE</Text>}
+                {isActive && <Text style={[type.meta, {color: accent}]}>ACTIVE</Text>}
               </Pressable>
-              <PrimaryButton title="Remove" variant="secondary" onPress={() => confirmRemove(item.id, item.name)} />
-            </Card>
+              <Button
+                title="Remove"
+                variant="danger"
+                style={styles.remove}
+                onPress={() => confirmRemove(item.id, item.name)}
+              />
+            </Surface>
           );
         }}
-        ListHeaderComponent={<Text style={typography.title}>Servers</Text>}
-        ListFooterComponent={
-          <PrimaryButton title="Add server" onPress={() => navigation.navigate('AddServer')} />
-        }
+        ListFooterComponent={<Button title="Add server" onPress={() => navigation.navigate('AddServer')} />}
         ListFooterComponentStyle={styles.footer}
       />
     </View>
@@ -57,11 +66,11 @@ export function ServersScreen({navigation}: Props) {
 }
 
 const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: colors.void},
-  content: {padding: spacing.lg, gap: spacing.md},
-  card: {gap: spacing.sm},
-  row: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
-  rowText: {gap: spacing.xs},
-  active: {color: colors.ok, fontSize: 12, fontWeight: '600'},
-  footer: {marginTop: spacing.sm},
+  screen: {flex: 1, backgroundColor: palette.bg},
+  content: {padding: space.lg, gap: space.md},
+  card: {gap: space.md},
+  row: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48},
+  rowText: {flex: 1, gap: space.xs},
+  remove: {alignSelf: 'flex-start'},
+  footer: {marginTop: space.sm},
 });

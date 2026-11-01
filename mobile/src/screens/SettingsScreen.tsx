@@ -1,13 +1,16 @@
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useState} from 'react';
-import {Pressable, StyleSheet, Switch, Text, View} from 'react-native';
+import {Pressable, ScrollView, StyleSheet, Switch, Text, View} from 'react-native';
+import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
 import {useServers} from '../servers/ServersContext';
-import {Card} from '../components/Card';
-import {PrimaryButton} from '../components/PrimaryButton';
-import {Starfield} from '../components/Starfield';
-import {colors, spacing, typography} from '../theme';
+import {Button} from '../components/Button';
+import {ScreenTitle} from '../components/ScreenTitle';
+import {Surface} from '../components/Surface';
+import {tokens, useAccent, useTopInset} from '../theme';
 import type {SettingsStackParamList} from '../navigation/MainTabs';
+
+const {palette, space, type} = tokens;
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'SettingsHome'>;
 
@@ -37,6 +40,8 @@ export function SettingsScreen({navigation}: Props) {
     disableBiometricUnlock,
   } = useAuth();
   const {activeServer} = useServers();
+  const {color: accent} = useAccent();
+  const top = useTopInset();
   const [busy, setBusy] = useState(false);
   const [bioError, setBioError] = useState<string | null>(null);
 
@@ -65,66 +70,69 @@ export function SettingsScreen({navigation}: Props) {
   const showBiometricCard = biometricsAvailable || notEnrolled || biometricUnlockEnabled;
 
   return (
-    <View style={styles.screen}>
-      <Starfield count={20} />
-      <View style={styles.content}>
-        <Text style={typography.title}>Settings</Text>
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, {paddingTop: top + space.xl}]}>
+      <ScreenTitle eyebrow="StarCore" title="Settings" subtitle="Preferences for this app on this device." />
 
-        <Pressable onPress={() => navigation.navigate('Servers')}>
-          <Card style={styles.card}>
-            <View style={styles.row}>
-              <View style={styles.rowText}>
-                <Text style={typography.heading}>Servers</Text>
-                <Text style={[typography.caption, styles.caption]}>
-                  {activeServer ? `Connected to ${activeServer.name}` : 'No server selected'} - manage or add servers
-                </Text>
-              </View>
-              <Text style={styles.chevron}>›</Text>
-            </View>
-          </Card>
-        </Pressable>
-
-        {showBiometricCard && (
-          <Card style={styles.card}>
-            <View style={styles.row}>
-              <View style={styles.rowText}>
-                <Text style={typography.heading}>Biometric unlock</Text>
-                <Text style={[typography.caption, styles.caption]}>
-                  Require your fingerprint to open StarCore for this server, on this device only.
-                </Text>
-              </View>
-              <Switch
-                value={biometricUnlockEnabled}
-                onValueChange={toggleBiometrics}
-                disabled={busy || (!biometricsAvailable && !passwordRecoveryAvailable)}
-                testID="biometric-unlock-switch"
-              />
-            </View>
-            {bioError ? (
-              <Text style={styles.error}>{bioError}</Text>
-            ) : passwordRecoveryAvailable ? (
-              <Text style={[typography.caption, styles.caption]}>
-                Biometrics aren't available, but you just signed in with your password, so you can turn this off.
+      <Pressable
+        onPress={() => navigation.navigate('Servers')}
+        accessibilityRole="button"
+        style={({pressed}) => pressed && styles.pressed}>
+        <Surface>
+          <View style={styles.row}>
+            <Icon name="server" size={20} color={accent} />
+            <View style={styles.rowText}>
+              <Text style={type.title}>Servers</Text>
+              <Text style={type.caption}>
+                {activeServer ? `Connected to ${activeServer.name}` : 'No server selected'} - manage or add servers
               </Text>
-            ) : notEnrolled ? (
-              <Text style={[typography.caption, styles.caption]}>{NOT_ENROLLED_MESSAGE}</Text>
-            ) : null}
-          </Card>
-        )}
+            </View>
+            <Icon name="chevron-right" size={20} color={palette.text3} />
+          </View>
+        </Surface>
+      </Pressable>
 
-        <PrimaryButton title="Log out" variant="secondary" onPress={() => logout()} />
-      </View>
-    </View>
+      {showBiometricCard && (
+        <Surface style={styles.card}>
+          <View style={styles.row}>
+            <Icon name="lock" size={20} color={accent} />
+            <View style={styles.rowText}>
+              <Text style={type.title}>Biometric unlock</Text>
+              <Text style={type.caption}>
+                Require your fingerprint to open StarCore for this server, on this device only.
+              </Text>
+            </View>
+            <Switch
+              value={biometricUnlockEnabled}
+              onValueChange={toggleBiometrics}
+              disabled={busy || (!biometricsAvailable && !passwordRecoveryAvailable)}
+              trackColor={{false: palette.controlStrong, true: accent}}
+              thumbColor={palette.text}
+              testID="biometric-unlock-switch"
+            />
+          </View>
+          {bioError ? (
+            <Text style={styles.error}>{bioError}</Text>
+          ) : passwordRecoveryAvailable ? (
+            <Text style={type.caption}>
+              Biometrics aren't available, but you just signed in with your password, so you can turn this off.
+            </Text>
+          ) : notEnrolled ? (
+            <Text style={type.caption}>{NOT_ENROLLED_MESSAGE}</Text>
+          ) : null}
+        </Surface>
+      )}
+
+      <Button title="Log out" variant="secondary" onPress={() => logout()} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: colors.void},
-  content: {flex: 1, padding: spacing.lg, paddingTop: spacing.xl, gap: spacing.md},
-  card: {},
-  row: {flexDirection: 'row', alignItems: 'center', gap: spacing.md},
-  rowText: {flex: 1, gap: spacing.xs},
-  caption: {},
-  chevron: {color: colors.textFaint, fontSize: 20},
-  error: {color: colors.alert, fontSize: 13},
+  screen: {flex: 1, backgroundColor: palette.bg},
+  content: {paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.md},
+  card: {gap: space.md},
+  row: {flexDirection: 'row', alignItems: 'center', gap: space.md},
+  rowText: {flex: 1, gap: space.xs},
+  error: {color: palette.danger, fontSize: 13},
+  pressed: {opacity: 0.85},
 });

@@ -171,13 +171,15 @@ function buildSatelliteIcon(satellite, extraClass = "") {
     const wrapper = element("span", `satellite-icon${extraClass ? ` ${extraClass}` : ""}`);
     wrapper.setAttribute("aria-hidden", "true");
     if (satellite.icon) {
-        const img = document.createElement("img");
-        img.src = satelliteUrl(satellite.name, `/assets/${satellite.icon}`);
-        img.alt = "";
-        img.addEventListener("error", () => {
-            img.replaceWith(buildGenericIcon());
-        });
-        wrapper.appendChild(img);
+        // painted through a mask so the icon takes the text colour; as an <img>,
+        // an SVG drawn in currentColor always comes out black
+        const url = satelliteUrl(satellite.name, `/assets/${satellite.icon}`);
+        const mark = element("span", "icon-mask");
+        mark.style.setProperty("--icon", `url("${url}")`);
+        wrapper.appendChild(mark);
+        const probe = new Image();
+        probe.addEventListener("error", () => mark.replaceWith(buildGenericIcon()));
+        probe.src = url;
     } else {
         wrapper.appendChild(buildGenericIcon());
     }
@@ -213,6 +215,8 @@ function applyRoute() {
 function showRoute() {
     const view = route.name === "satellite" ? "satellite" : route.name;
     document.body.dataset.route = view;
+    // satellite pages keep their own styling until they are redesigned
+    document.body.classList.toggle("sc-themed", view !== "satellite");
 
     for (const section of document.querySelectorAll(".view")) {
         section.hidden = section.id !== `view-${view}`;
@@ -564,8 +568,10 @@ function renderSatelliteCard(satellite) {
     const head = element("div", "card-head");
     head.appendChild(buildSatelliteIcon(satellite));
     head.appendChild(element("h3", null, satellite.name));
-    head.appendChild(element("span", "badge badge-type", satellite.type));
-    head.appendChild(buildStatusBadge(satellite));
+    const badges = element("div", "card-badges");
+    badges.appendChild(element("span", "badge badge-type", satellite.type));
+    badges.appendChild(buildStatusBadge(satellite));
+    head.appendChild(badges);
 
     const actions = element("div", "card-actions");
     if (satellite.configurable) {

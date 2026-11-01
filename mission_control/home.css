@@ -181,18 +181,38 @@ body {
     color: var(--sc-danger);
 }
 
+.icon-mask {
+    display: block;
+    width: 14px;
+    height: 14px;
+    background: currentColor;
+    -webkit-mask: var(--icon) center / contain no-repeat;
+    mask: var(--icon) center / contain no-repeat;
+}
+
+.satellite-icon.small .icon-mask {
+    width: 11px;
+    height: 11px;
+}
+
 .nav-item .satellite-icon {
     background: transparent;
     border-color: transparent;
+    color: var(--sc-text-3);
 }
 
-/* satellite icons arrive as <img>s, so their currentColor strokes draw black; invert to light grey */
-.nav-item .satellite-icon img {
-    filter: invert(0.72);
+.nav-item .satellite-icon .icon-mask,
+.nav-item .satellite-icon svg {
+    width: 15px;
+    height: 15px;
 }
 
-.nav-item.active .satellite-icon img {
-    filter: invert(1);
+.nav-item:hover .satellite-icon {
+    color: var(--sc-text);
+}
+
+.nav-item.active .satellite-icon {
+    color: var(--sc-accent);
 }
 
 .sidebar-foot {
