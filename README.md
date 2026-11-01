@@ -32,7 +32,8 @@ provide - see "HTTPS" in the same two documents.
 - **Native Satellites** — Native feature modules, including Status, FileExplorer, Photo and Music.
 - **Link Satellites** — Integrations with external services.
 - **Mission Control** — Official web interface.
-- **Signals** — Internal event system.
+- **StarCore for Android** — The mobile app, in `mobile/`.
+- **Signals** — Internal event system (planned, not implemented yet).
 
 ## Running StarCore
 
@@ -60,6 +61,6 @@ See the Deployment documentation for installing, running as a Linux service and 
 - Deployment
 - Mission Control
 - Philosophy
-- Roadmap
+- Roadmap (also the current state, known limitations and latest security review)
 - Satellites
 - Terminology
