@@ -10,3 +10,6 @@ dependencies = []
 # the Photo satellite serves originals instead.
 [project.optional-dependencies]
 thumbnails = ["pillow>=10"]
+encryption = [
+    "cryptography>=44",
+]

@@ -2,27 +2,46 @@
 
 The Locked Folder owns everything specific to *being locked*: where the
 root is, whether a PIN is set, whether *this* session currently has it
-open, biometric unlock for enrolled phones, and the vault's own media view
-and moves to and from Photos. File Explorer's routes stay usable on the
-vault too, and refuse every path inside it unless this session has
-unlocked it (see satellites/native/file_explorer/locked_folder_guard.py).
+open, biometric unlock for enrolled phones, the vault's own media view,
+uploads, deletes and moves to and from Photos, and its encryption (see
+encryption.py). File Explorer refuses every path inside the vault unless
+this session has unlocked it - and, once the vault is encrypted, refuses it
+altogether (see satellites/native/file_explorer/locked_folder_guard.py).
 
 Everything that reads or changes the vault, or loosens its protection,
 checks this session's unlock on the server - hiding the Locked Folder from
-navigation is never what keeps it private. See docs/satellites/locked_folder.md.
+navigation is never what keeps it private. Damaged or edited security state
+(an unreadable PIN file, a PIN record that doesn't match the vault, attempt
+counters that can't be saved) always keeps the vault locked.
+See docs/satellites/locked_folder.md.
 """
 
 import base64
 import binascii
+import threading
 
-from starcore.api.response import error_response, file_response, json_response
+from starcore.api.response import error_response, file_response, json_response, stream_response
 
-from . import configuration, vault
-from .runtime import runtime, validate_pin
+from . import configuration, crypto, encryption, vault
+from .runtime import SecurityStateError, runtime, validate_pin
 
 # settings that would loosen protection or point it somewhere else once a
 # PIN guards the vault - changing them needs this session to be unlocked
 GUARDED_SETTINGS = {"locked_folder_path", "session_timeout_seconds", "max_pin_attempts", "lockout_seconds"}
+
+PROBLEMS = {
+    "pin_unreadable": ("the stored PIN could not be read, so the Locked Folder stays locked - "
+                       "use the recovery key, or repair pin.json on the server", 409),
+    "pin_tampered": ("the Locked Folder's PIN record was changed outside StarCore, so it stays locked - "
+                     "use the recovery key", 409),
+    "key_unavailable": ("this server can't open the Locked Folder's encryption key - "
+                        "use the recovery key to open it here", 409),
+    "keyring_damaged": ("the Locked Folder's keyring is missing or damaged, so its files can't be decrypted", 409),
+    "encryption_unavailable": ("the Locked Folder is encrypted, but StarCore's encryption support isn't "
+                               "installed on this server", 503),
+}
+
+_migration_lock = threading.Lock()
 
 
 def routes() -> dict:
@@ -34,9 +53,13 @@ def routes() -> dict:
         "lock": lock,
         "delink": delink,
         "media": media,
+        "upload": upload,
+        "delete": delete,
         "move_in": move_in,
         "move_out": move_out,
         "biometric": biometric,
+        "encryption": encryption_route,
+        "recover": recover,
     }
 
 
@@ -49,6 +72,25 @@ def _too_many(retry_after: int):
     response = error_response(f"too many incorrect attempts - try again in {retry_after}s", status=429)
     response.payload["retry_after"] = retry_after
     return response
+
+
+def _problem(code: str):
+    message, status_code = PROBLEMS.get(code, ("the Locked Folder can't be opened right now", 409))
+    response = error_response(message, status=status_code)
+    response.payload["problem"] = code
+    return response
+
+
+def _begin(request, live, kind: str = "pin"):
+    """None when this attempt may go ahead (it is already counted), otherwise
+    the response to return - including when the count can't be saved."""
+    max_attempts, lockout_seconds = _limits(request)
+    try:
+        retry_after = live.begin_attempt(request.token, max_attempts, lockout_seconds, kind=kind)
+    except SecurityStateError:
+        return error_response("the Locked Folder could not record this attempt, so it was refused - "
+                              "check the server's disk", status=503)
+    return _too_many(retry_after) if retry_after else None
 
 
 def _protected(live) -> bool:
@@ -64,6 +106,12 @@ def _require_unlocked(request, live):
         return error_response("no Locked Folder location is configured yet", status=400)
     if not live.is_unlocked(request.token):
         return error_response("the Locked Folder is locked - unlock it first", status=403)
+    return None
+
+
+def _require_idle(live):
+    if live.migration is not None and live.migration.running:
+        return error_response("the Locked Folder is being encrypted - try again when it has finished", status=409)
     return None
 
 
@@ -84,6 +132,8 @@ def configuration_route(request):
         # otherwise anyone signed in could point the Locked Folder elsewhere
         # (or loosen its limits) and reach the old vault without the PIN
         return error_response("unlock the Locked Folder before changing its settings", status=403)
+    if key == "locked_folder_path" and _require_idle(live) is not None:
+        return _require_idle(live)
 
     try:
         return json_response(configuration.update(request.engine, request.satellite, key, value))
@@ -118,6 +168,10 @@ def status(request):
         "session_timeout_seconds": int(request.satellite.config.get("session_timeout_seconds", 900)),
         "photos_available": vault.photo_library(request.engine) is not None,
         "biometric_devices": live.device_count(),
+        # diagnostics for whoever administers the server: never a PIN, key or token
+        "security": {"problem": live.security_problem() if root is not None else None,
+                     "lockout": live.lockout_status()},
+        "encryption": encryption.status(live, root, unlocked),
     })
 
 
@@ -128,9 +182,9 @@ def pin(request):
         return error_response("authentication required", status=401)
 
     live = runtime(request.satellite)
-    if live.pin_unreadable:
-        return error_response("the stored PIN could not be read - repair or remove pin.json on the server",
-                              status=409)
+    problem = live.security_problem()
+    if problem is not None:
+        return _problem(problem)
 
     body = request.body or {}
     try:
@@ -142,15 +196,17 @@ def pin(request):
         current_pin = body.get("current_pin")
         if not isinstance(current_pin, str) or not current_pin:
             return error_response("the current PIN is required to change it", status=401)
-        max_attempts, lockout_seconds = _limits(request)
-        retry_after = live.begin_attempt(request.token, max_attempts, lockout_seconds)
-        if retry_after:
-            return _too_many(retry_after)
+        refused = _begin(request, live)
+        if refused is not None:
+            return refused
         if not live.verify_pin(current_pin):
             return error_response("the current PIN is incorrect", status=401)
         live.record_success(request.token)
 
-    live.set_pin(new_pin)
+    try:
+        live.set_pin(new_pin)
+    except encryption.KeyProblem as problem:
+        return _problem(problem.code)
     return json_response({"pin_set": True})
 
 
@@ -163,9 +219,9 @@ def unlock(request):
     live = runtime(request.satellite)
     if live.configured_root is None:
         return error_response("no Locked Folder location is configured yet", status=400)
-    if live.pin_unreadable:
-        return error_response("the stored PIN could not be read - repair or remove pin.json on the server",
-                              status=409)
+    problem = live.security_problem()
+    if problem is not None:
+        return _problem(problem)
     if not live.pin_set:
         return error_response("no PIN has been set yet - configure one from this page first", status=400)
 
@@ -174,10 +230,9 @@ def unlock(request):
     if not isinstance(pin_value, str) or not pin_value:
         return error_response("'pin' must be a non-empty string", status=400)
 
-    max_attempts, lockout_seconds = _limits(request)
-    retry_after = live.begin_attempt(request.token, max_attempts, lockout_seconds)
-    if retry_after:
-        return _too_many(retry_after)
+    refused = _begin(request, live)
+    if refused is not None:
+        return refused
 
     if not live.verify_pin(pin_value):
         return error_response("incorrect PIN", status=401)
@@ -211,7 +266,8 @@ def delink(request):
     Needs this session unlocked once a PIN is set: delinking takes the
     protection off that directory, so it must never be a way around the PIN
     (or around a brute-force lockout). The PIN itself is left alone, so a
-    PIN already set keeps working once a new location is configured.
+    PIN already set keeps working once a new location is configured. An
+    encrypted vault keeps its keyring, so linking the folder again opens it.
     """
     if request.method != "POST":
         return error_response("only POST is supported here", status=405)
@@ -223,6 +279,9 @@ def delink(request):
         return error_response("no Locked Folder location is configured", status=400)
     if live.pin_set and not live.is_unlocked(request.token):
         return error_response("unlock the Locked Folder before delinking it", status=403)
+    busy = _require_idle(live)
+    if busy is not None:
+        return busy
 
     configuration.update(request.engine, request.satellite, "locked_folder_path", "")
     return json_response({"delinked": True})
@@ -231,7 +290,8 @@ def delink(request):
 # ---------- the vault as media ----------
 
 def media(request):
-    """GET media -> every file in the vault; GET media/file?path=... -> one file."""
+    """GET media -> every file in the vault; GET media/file?path=... -> one file,
+    decrypted as it is sent when it is encrypted (Range requests included)."""
     if request.method != "GET":
         return error_response("only GET is supported here", status=405)
 
@@ -243,51 +303,231 @@ def media(request):
     if not root.is_dir():
         return error_response("the Locked Folder directory is missing", status=404)
 
-    if not request.path:
-        return json_response(vault.list_items(root))
-    if request.path != ("file",):
-        return error_response("unknown endpoint", status=404)
-
     try:
-        target = vault.resolve_item(root, request.query.get("path"))
-    except vault.VaultError as error:
+        if not request.path:
+            return json_response(vault.list_vault(live, root))
+        if request.path != ("file",):
+            return error_response("unknown endpoint", status=404)
+
+        relative = request.query.get("path")
+        download = request.query.get("download") == "1"
+        if encryption.Store.is_object_path(relative):
+            store = encryption.Store.open(live, root)
+            if store is None:
+                return error_response("no such file in the Locked Folder", status=404)
+            opened = store.open_file(relative)
+            name = vault._safe_name(opened.metadata.get("name"))
+            content_type = vault.MEDIA_TYPES.get(_suffix(name), (None, "application/octet-stream"))[1]
+            # never cached by the browser, so nothing private outlives the unlock on disk
+            return stream_response(opened, content_type, cache="private, no-store",
+                                   download_name=name if download else None)
+
+        target = vault.resolve_item(root, relative)
+    except encryption.KeyProblem as problem:
+        return _problem(problem.code)
+    except (vault.VaultError, encryption.EncryptionError) as error:
         return error_response(str(error), status=error.status)
     content_type = vault.MEDIA_TYPES.get(target.suffix.lower(), (None, "application/octet-stream"))[1]
-    # never cached by the browser, so nothing private outlives the unlock on disk
     return file_response(target, content_type, cache="private, no-store",
-                         download_name=target.name if request.query.get("download") == "1" else None)
+                         download_name=target.name if download else None)
+
+
+def _suffix(name: str) -> str:
+    dot = name.rfind(".")
+    return name[dot:].lower() if dot > 0 else ""
+
+
+def _vault_action(request, action):
+    """Runs a vault-changing action for an unlocked session, translating every
+    failure into a response."""
+    live = runtime(request.satellite)
+    refused = _require_unlocked(request, live) or _require_idle(live)
+    if refused is not None:
+        return refused
+    if not live.configured_root.is_dir():
+        return error_response("the Locked Folder directory is missing", status=404)
+    try:
+        return action(live, live.configured_root)
+    except encryption.KeyProblem as problem:
+        return _problem(problem.code)
+    except (vault.VaultError, encryption.EncryptionError) as error:
+        return error_response(str(error), status=error.status)
+    except OSError as error:
+        return error_response(f"the Locked Folder could not be changed ({error.strerror or type(error).__name__})",
+                              status=507 if getattr(error, "errno", None) == 28 else 500)
+
+
+def upload(request):
+    """POST upload?name=...&folder=... with the file as the raw body."""
+    if request.method != "POST":
+        return error_response("only POST is supported here", status=405)
+    return _vault_action(request, lambda live, root: json_response(
+        vault.upload(live, root, request.raw, request.query.get("name"), request.query.get("folder"))))
+
+
+def delete(request):
+    """POST delete {paths: [...]} - permanently, files only."""
+    if request.method != "POST":
+        return error_response("only POST is supported here", status=405)
+
+    def action(live, root):
+        result = vault.delete(live, root, (request.body or {}).get("paths"))
+        return json_response(result, status=200 if result["deleted"] or not result["failed"] else 409)
+    return _vault_action(request, action)
 
 
 def move_in(request):
     if request.method != "POST":
         return error_response("only POST is supported here", status=405)
-    live = runtime(request.satellite)
-    refused = _require_unlocked(request, live)
-    if refused is not None:
-        return refused
-    if not live.configured_root.is_dir():
-        return error_response("the Locked Folder directory is missing", status=404)
 
-    try:
-        result = vault.move_in(request.engine, live, live.configured_root, (request.body or {}).get("photo_ids"))
-    except vault.VaultError as error:
-        return error_response(str(error), status=error.status)
-    return json_response(result, status=200 if result["moved"] or not result["failed"] else 409)
+    def action(live, root):
+        result = vault.move_in(request.engine, live, root, (request.body or {}).get("photo_ids"))
+        return json_response(result, status=200 if result["moved"] or not result["failed"] else 409)
+    return _vault_action(request, action)
 
 
 def move_out(request):
     if request.method != "POST":
         return error_response("only POST is supported here", status=405)
+
+    def action(live, root):
+        result = vault.move_out(request.engine, live, root, (request.body or {}).get("paths"))
+        return json_response(result, status=200 if result["moved"] or not result["failed"] else 409)
+    return _vault_action(request, action)
+
+
+# ---------- encryption ----------
+
+def encryption_route(request):
+    """GET  encryption                       -> encryption details (unlocked)
+    POST encryption/start   {recovery_key: bool} -> starts encrypting; the
+                                               recovery key, if one was made now
+    POST encryption/undo    {run}             -> puts a run's originals back
+    POST encryption/discard {run, pin}        -> deletes a run's backup
+    POST encryption/recovery_key {pin, remove?} -> a new recovery key, or none
+
+    Everything here needs this session unlocked; deleting a backup and
+    replacing the recovery key need the PIN again on top."""
     live = runtime(request.satellite)
     refused = _require_unlocked(request, live)
     if refused is not None:
         return refused
+    root = live.configured_root
+
+    if request.method == "GET" and not request.path:
+        return json_response(encryption.status(live, root, True))
+    if request.method != "POST" or len(request.path) != 1:
+        return error_response("unknown endpoint", status=404)
+    action = request.path[0]
+    body = request.body or {}
+
+    problem = live.security_problem()
+    if problem is not None:
+        return _problem(problem)
+    if not root.is_dir():
+        return error_response("the Locked Folder directory is missing", status=404)
 
     try:
-        result = vault.move_out(request.engine, live, live.configured_root, (request.body or {}).get("paths"))
-    except vault.VaultError as error:
+        if action == "start":
+            return _start_encryption(live, root, body)
+        busy = _require_idle(live)
+        if busy is not None:
+            return busy
+        if action == "undo":
+            return json_response(encryption.undo_run(live, root, str(body.get("run") or "")))
+        if action in ("discard", "recovery_key"):
+            refused = _confirm_pin(request, live, body.get("pin"))
+            if refused is not None:
+                return refused
+            if action == "discard":
+                return json_response(encryption.discard_backup(live, root, str(body.get("run") or "")))
+            text = encryption.replace_recovery_key(live, root, remove=body.get("remove") is True)
+            return json_response({"recovery_key": text})
+    except encryption.KeyProblem as error:
+        return _problem(error.code)
+    except encryption.EncryptionError as error:
         return error_response(str(error), status=error.status)
-    return json_response(result, status=200 if result["moved"] or not result["failed"] else 409)
+    return error_response("unknown endpoint", status=404)
+
+
+def _confirm_pin(request, live, pin_value):
+    if not isinstance(pin_value, str) or not pin_value:
+        return error_response("enter the PIN to confirm", status=401)
+    refused = _begin(request, live)
+    if refused is not None:
+        return refused
+    if not live.verify_pin(pin_value):
+        return error_response("incorrect PIN", status=401)
+    live.record_success(request.token)
+    return None
+
+
+def _start_encryption(live, root, body):
+    with _migration_lock:
+        if live.migration is not None and live.migration.running:
+            return error_response("the Locked Folder is already being encrypted", status=409)
+        recovery = None
+        if not encryption.is_encrypted(root):
+            if not live.pin_set:
+                return error_response("set a PIN before encrypting the Locked Folder", status=400)
+            if not isinstance(body.get("recovery_key"), bool):
+                return error_response("'recovery_key' must say whether to create a recovery key", status=400)
+            recovery = encryption.set_up(live, root, body["recovery_key"])
+        else:
+            encryption.vault_key(live, root)  # raises KeyProblem before anything starts
+        progress = encryption.Progress()
+        progress.running = True
+        live.migration = progress
+
+    def work():
+        try:
+            result = encryption.encrypt_vault(live, root, progress)
+            progress.failed = result["failed"]
+        except encryption.EncryptionError as error:
+            progress.error = str(error)
+        except encryption.KeyProblem as error:
+            progress.error = PROBLEMS.get(error.code, (str(error),))[0]
+        except Exception as error:
+            progress.error = "encryption stopped unexpectedly - every original is still in place; resume to retry"
+            print(f"[WARNING]: encrypting the Locked Folder failed ({type(error).__name__}).")
+        finally:
+            progress.running = False
+
+    threading.Thread(target=work, name="locked-folder-encryption", daemon=True).start()
+    # the recovery key is in this response and nowhere else, ever
+    return json_response({"started": True, "recovery_key": recovery})
+
+
+def recover(request):
+    """POST recover {recovery_key, pin} - sets a new PIN with the recovery
+    key. Removes every biometric enrollment and unlock, like a PIN change."""
+    if request.method != "POST":
+        return error_response("only POST is supported here", status=405)
+    if not request.token:
+        return error_response("authentication required", status=401)
+    live = runtime(request.satellite)
+    root = live.configured_root
+    if root is None:
+        return error_response("no Locked Folder location is configured yet", status=400)
+
+    body = request.body or {}
+    try:
+        new_pin = validate_pin(body.get("pin"))
+    except ValueError as error:
+        return error_response(str(error), status=400)
+    try:
+        wait = encryption.recover(live, root, body.get("recovery_key"), new_pin, request.token, _limits(request))
+    except SecurityStateError:
+        return error_response("the Locked Folder could not record this attempt, so it was refused", status=503)
+    except crypto.WrongKey:
+        return error_response("that recovery key doesn't open this Locked Folder", status=401)
+    except encryption.KeyProblem as problem:
+        return _problem(problem.code)
+    except encryption.EncryptionError as error:
+        return error_response(str(error), status=error.status)
+    if wait:
+        return _too_many(wait)
+    return json_response({"pin_set": True})
 
 
 # ---------- biometric unlock ----------
@@ -320,10 +560,11 @@ def biometric(request):
         return error_response("unknown endpoint", status=404)
     if live.configured_root is None:
         return error_response("no Locked Folder location is configured yet", status=400)
-    if live.pin_unreadable or not live.pin_set:
+    problem = live.security_problem()
+    if problem is not None:
+        return _problem(problem)
+    if not live.pin_set:
         return error_response("set a PIN before turning on biometric unlock", status=400)
-
-    max_attempts, lockout_seconds = _limits(request)
 
     if action == "enroll":
         pin_value = body.get("pin")
@@ -333,9 +574,9 @@ def biometric(request):
             public_key = _decode(body.get("public_key"))
         except ValueError:
             return error_response("'public_key' must be a base64 RSA public key", status=400)
-        retry_after = live.begin_attempt(request.token, max_attempts, lockout_seconds)
-        if retry_after:
-            return _too_many(retry_after)
+        refused = _begin(request, live)
+        if refused is not None:
+            return refused
         if not live.verify_pin(pin_value):
             return error_response("incorrect PIN", status=401)
         live.record_success(request.token)
@@ -356,9 +597,9 @@ def biometric(request):
         signature = _decode(body.get("signature"))
     except ValueError:
         return error_response("'signature' must be base64", status=400)
-    retry_after = live.begin_attempt(request.token, max_attempts, lockout_seconds)
-    if retry_after:
-        return _too_many(retry_after)
+    refused = _begin(request, live)
+    if refused is not None:
+        return refused
     if not live.verify_signature(request.token, key_id, body.get("challenge", ""), signature):
         return error_response("biometric unlock failed - use the PIN", status=401)
     return _grant_unlock(request, live)

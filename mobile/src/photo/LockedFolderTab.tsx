@@ -18,7 +18,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import Video from 'react-native-video';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {StarSwitch} from '../components/StarSwitch';
-import type {LockedFolderStatus, VaultItem} from '../lockedFolder/api';
+import type {LockedFolderStatus, SecurityProblem, VaultItem} from '../lockedFolder/api';
 import {disable, enroll, isEnrolled} from '../lockedFolder/biometricUnlock';
 import {LockedFolderUnlock, formatWait} from '../lockedFolder/LockedFolderUnlock';
 import {PrivateImage} from '../lockedFolder/PrivateImage';
@@ -144,15 +144,9 @@ export function LockedFolderTab({onPhotosChanged}: {onPhotosChanged?: () => void
         text="Choose where it lives on the server from Mission Control: Photos → Locked Folder. Then come back here."
       />
     );
-  } else if (status.pin_unreadable) {
-    body = (
-      <StateCard
-        icon="alert-triangle"
-        title="The PIN can’t be read"
-        text="The stored PIN on the server is damaged, so the Locked Folder stays locked until an administrator repairs it."
-        danger
-      />
-    );
+  } else if (status.security?.problem || status.pin_unreadable) {
+    const [title, text] = problemText(status.security?.problem ?? 'pin_unreadable', Boolean(status.encryption?.recovery_key));
+    body = <StateCard icon="alert-triangle" title={title} text={text} danger />;
   } else if (!status.pin_set) {
     body = <CreatePin api={api} onCreated={refresh} />;
   } else if (!status.unlocked) {
@@ -165,6 +159,7 @@ export function LockedFolderTab({onPhotosChanged}: {onPhotosChanged?: () => void
             <Icon name="unlock" size={16} color={colors.textDim} />
             <Text style={typography.body}>Unlocked</Text>
             {status.expires_at && <Text style={typography.caption}>· locks at {formatTime(status.expires_at)}</Text>}
+            {status.encryption?.state === 'on' && <Text style={typography.caption}>· encrypted</Text>}
           </View>
           <View style={styles.barActions}>
             <Pressable
@@ -241,6 +236,30 @@ export function LockedFolderTab({onPhotosChanged}: {onPhotosChanged?: () => void
       )}
     </View>
   );
+}
+
+/** What to say when the server can't check the PIN. Recovery is done from Mission Control. */
+export function problemText(problem: SecurityProblem, hasRecoveryKey: boolean): [string, string] {
+  const recover = hasRecoveryKey
+    ? ' Reset the PIN with your recovery key in Mission Control: Photos → Locked Folder.'
+    : '';
+  switch (problem) {
+    case 'pin_tampered':
+      return ['The PIN was changed outside StarCore', `The PIN record on the server doesn’t match this Locked Folder, so it stays locked.${recover}`];
+    case 'key_unavailable':
+      return [
+        'This server can’t open the Locked Folder',
+        hasRecoveryKey
+          ? `The encryption key for these files isn’t on this server.${recover}`
+          : 'The encryption key for these files isn’t on this server, and no recovery key was set up.',
+      ];
+    case 'keyring_damaged':
+      return ['The Locked Folder’s keyring is missing', 'Its encryption keyring is missing or damaged on the server, so the files can’t be decrypted.'];
+    case 'encryption_unavailable':
+      return ['Encryption support is missing', 'The Locked Folder is encrypted, but the server doesn’t have StarCore’s encryption support installed.'];
+    default:
+      return ['The PIN can’t be read', `The stored PIN on the server is damaged, so the Locked Folder stays locked.${recover}`];
+  }
 }
 
 function StateCard({icon, title, text, danger}: {icon: string; title: string; text: string; danger?: boolean}) {

@@ -273,6 +273,139 @@
     font-size: 0.82rem;
 }
 
+/* ---------- encryption and recovery ---------- */
+
+.lf-encryption {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sc-space-2, 8px);
+    min-width: 0;
+}
+
+.lf-encryption p {
+    margin: 0;
+}
+
+.lf-wrap {
+    flex-wrap: wrap;
+}
+
+.lf-backup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-2, 8px);
+    padding-top: var(--sc-space-2, 8px);
+    border-top: 1px solid var(--sc-line, #2a2b30);
+}
+
+.lf-check {
+    display: flex;
+    gap: var(--sc-space-2, 8px);
+    align-items: flex-start;
+    color: var(--sc-text-2, #9b9ca3);
+    font-size: 0.88rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.lf-check input {
+    flex: none;
+    margin-top: 3px;
+    accent-color: var(--sc-accent, #d71921);
+}
+
+.lf-warning {
+    color: var(--sc-danger, #ff4d4f);
+}
+
+.lf-warning[hidden] {
+    display: none;
+}
+
+.lf-badge {
+    margin-left: var(--sc-space-2, 8px);
+    padding: 2px 8px;
+    border: 1px solid var(--sc-line, #2a2b30);
+    border-radius: 999px;
+    color: var(--sc-text-2, #9b9ca3);
+    font-family: var(--sc-font-mono, monospace);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.lf-notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sc-space-2, 8px) var(--sc-space-4, 16px);
+    padding: var(--sc-space-3, 12px) var(--sc-space-4, 16px);
+    border-radius: var(--sc-radius-card, 16px);
+    background: var(--sc-card, #1b1c20);
+}
+
+.lf-notice p {
+    margin: 0;
+}
+
+.lf-notice-error {
+    box-shadow: inset 3px 0 0 var(--sc-danger, #ff4d4f);
+}
+
+.lf-meter {
+    flex: 1 1 100%;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: var(--sc-control, #26272c);
+}
+
+.lf-meter span {
+    display: block;
+    height: 100%;
+    background: var(--sc-accent, #d71921);
+    transition: width 0.3s ease;
+}
+
+.lf-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--sc-text, #f2f2f2);
+    font: inherit;
+    font-size: 0.88rem;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.lf-recovery-form {
+    margin-top: var(--sc-space-2, 8px);
+}
+
+.lf-recovery-input {
+    font-family: var(--sc-font-mono, monospace);
+    letter-spacing: 0.04em;
+}
+
+.lf-recovery-key {
+    display: block;
+    padding: var(--sc-space-3, 12px);
+    border-radius: var(--sc-radius-control, 10px);
+    background: var(--sc-field, #111214);
+    font-family: var(--sc-font-mono, monospace);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    letter-spacing: 0.06em;
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.photo-tile.unavailable:disabled {
+    cursor: not-allowed;
+}
+
 /* ---------- viewer (shares Photo's .photo-viewer) ---------- */
 
 .lf-viewer .photo-viewer-bar-actions .button {

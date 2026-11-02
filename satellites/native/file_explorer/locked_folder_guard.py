@@ -58,6 +58,15 @@ def guard(request, target: Path):
     if live is None or not live.protects(target):
         return None
 
+    if _managed(live):
+        # an encrypted vault is only ever read and written through the
+        # Locked Folder itself: here there would be nothing but ciphertext to
+        # show, and anything uploaded here would land unencrypted
+        return error_response(
+            "this location is the encrypted Locked Folder - open it from Photos instead",
+            status=403,
+        )
+
     if live.is_unlocked(request.token):
         return None
 
@@ -65,6 +74,12 @@ def guard(request, target: Path):
         "this location is inside the Locked Folder - unlock it from the Locked Folder page first",
         status=403,
     )
+
+
+def _managed(live) -> bool:
+    migration = getattr(live, "migration", None)
+    encrypted = getattr(live, "vault_encrypted", None)
+    return bool((migration is not None and migration.running) or (encrypted is not None and encrypted()))
 
 
 def guard_tree(request, target: Path):

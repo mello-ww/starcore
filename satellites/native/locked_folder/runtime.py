@@ -1,20 +1,30 @@
 """Locked Folder runtime state: PIN verification, per-session unlock state,
 and brute-force rate limiting.
 
-The PIN hash is the only thing persisted (data/pin.json, written the same
-atomic way every other satellite's index is - see PhotoLibrary._save() for
-the same idiom). Everything else here - which sessions are currently
-unlocked, and failed-PIN attempt counters - lives in memory only and is
-lost on restart. That is deliberate, not an oversight: it means a StarCore
-restart always starts every session locked out again, which is the safer
-default, and it means a session token (a bearer secret) is never written to
-disk a second time anywhere - see docs/satellites/locked_folder.md, "Why unlock state
-is memory-only".
+Persisted next to each other in the satellite's storage root (StarCore's
+application-data directory, never the vault itself):
+- pin.json      - the PIN hash (format unchanged since the first release);
+- attempts.json - failed-PIN counters and lockout deadlines, so a restart
+                  never resets a lockout. Sessions appear only as a hash of
+                  their token, never the token itself;
+- devices.json  - biometric public keys;
+- sealed.json   - digests of photos moved in from Photos.
+
+Which sessions are unlocked stays in memory only: a restart locks every
+session again, and a session token (a bearer secret) is never written to
+disk a second time - see docs/satellites/locked_folder.md, "Why unlock
+state is memory-only".
+
+Once the vault is encrypted (see encryption.py), pin.json and devices.json
+also carry a "binding": a MAC under a key only the vault key can produce. A
+PIN file or device list edited, swapped or deleted outside StarCore then
+keeps the vault locked instead of opening it.
 """
 
 from datetime import datetime, timezone
 from pathlib import Path
 import base64
+import hashlib
 import json
 import math
 import os
@@ -41,7 +51,26 @@ GLOBAL_MAX_LOCKOUT = 24 * 60 * 60
 CHALLENGE_SECONDS = 120     # how long a biometric unlock challenge stays valid
 MAX_DEVICE_KEYS = 20        # biometric devices enrolled at once
 
+# a day without a single wrong PIN forgets earlier escalation, so ordinary
+# typos spread over weeks never add up to long lockouts
+FAILURE_MEMORY = 24 * 60 * 60
+ATTEMPTS_VERSION = 1
+
 _runtimes = {}
+
+
+class SecurityStateError(Exception):
+    """The attempt counters could not be saved. No PIN is checked then, since
+    an attempt that isn't recorded could be repeated without limit."""
+
+
+def _empty_counter() -> dict:
+    return {"count": 0, "lockouts": 0, "locked_until": 0.0, "last_failure": 0.0}
+
+
+def _session_key(token: str) -> str:
+    # counters are kept per session without ever writing the bearer token itself
+    return hashlib.sha256(str(token).encode("utf-8")).hexdigest()[:32]
 
 
 def runtime(satellite):
@@ -113,17 +142,21 @@ class LockedFolderRuntime:
         self.pin_path = storage_root / "pin.json"
         self.sealed_path = storage_root / "sealed.json"
         self.devices_path = storage_root / "devices.json"
+        self.attempts_path = storage_root / "attempts.json"
         # "unreadable" when pin.json exists but can't be parsed: that must
         # never read as "no PIN yet", or anyone could set a new one
         self.pin_unreadable = False
+        # attempts.json existed but couldn't be read: everyone was locked out
+        # for one lockout period instead of starting from zero
+        self.attempts_damaged = False
+        self._lock = threading.RLock()
         self._pin = self._load_pin()
         self._unlocked = {}   # session token -> expires (epoch seconds)
-        self._attempts = {}   # session token -> {"count": int, "locked_until": float|None}
-        self._global = {"count": 0, "lockouts": 0, "locked_until": 0.0}
+        self._attempts, self._global, self._recovery = self._load_attempts()
         self._challenges = {}  # session token -> {"key_id", "challenge", "expires"}
-        self._lock = threading.RLock()
         self._sealed = self._load_set(self.sealed_path, "digests")
-        self._devices = self._load_devices()
+        self._devices, self._devices_binding = self._load_devices()
+        self.migration = None  # set by encryption.py while an encryption run is going
 
     # ---------- the protected root ----------
 
@@ -160,31 +193,90 @@ class LockedFolderRuntime:
         self._unlocked.clear()
 
     def reset_attempts(self):
-        """Clears every session's brute-force attempt/lockout counters -
-        called alongside forget_all_unlocks() whenever the protected root
-        is cleared or changed (see configuration.py's update() and the
-        "delink" route in api.py), since a lockout earned against the old
-        configuration has nothing left to protect once it no longer
-        applies either."""
-        self._attempts.clear()
+        """Clears every session's own attempt counters - called alongside
+        forget_all_unlocks() when the protected root changes (configuration.py's
+        update()), which already needed an unlocked session once a PIN is
+        set. The account-wide counter is left alone: only a correct PIN (or
+        the recovery key) clears that."""
+        with self._lock:
+            self._attempts.clear()
+            self._try_save_attempts()
+
+    # ---------- the vault's encryption, as far as the PIN is concerned ----------
+
+    def vault_encrypted(self) -> bool:
+        """Whether the configured vault holds an encryption keyring - cheap,
+        and true even when the key itself can't be reached right now."""
+        from . import encryption
+        return encryption.is_encrypted(self.configured_root)
+
+    def binder(self):
+        """The configured vault's binding function, None for a vault that
+        isn't encrypted. Raises encryption.KeyProblem when the vault is
+        encrypted but its key can't be used."""
+        from . import encryption
+        return encryption.binder(self)
+
+    def security_problem(self):
+        """None when the PIN can be checked normally, otherwise why not:
+        pin_unreadable, pin_tampered, or one of encryption.KeyProblem's codes.
+        Every route that checks a PIN or a biometric signature asks first, so
+        damaged or edited security state never reads as permission."""
+        if self.pin_unreadable:
+            return "pin_unreadable"
+        from . import encryption
+        try:
+            bind = self.binder()
+        except encryption.KeyProblem as problem:
+            return problem.code
+        if bind is None:
+            return None
+        with self._lock:
+            record = self._pin
+        if record is None:
+            return "pin_tampered"   # the vault is encrypted, so a PIN was set
+        expected = bind("pin", {"salt": record.get("salt"), "hash": record.get("hash")})
+        if not secrets.compare_digest(str(record.get("binding", "")), expected):
+            return "pin_tampered"
+        return None
 
     # ---------- PIN ----------
 
     @property
     def pin_set(self) -> bool:
         # an unreadable PIN file still counts as "set": the vault stays
-        # locked until an administrator repairs or removes it on the server
-        return self._pin is not None or self.pin_unreadable
+        # locked until an administrator repairs or removes it on the server.
+        # So does an encrypted vault whose pin.json went missing.
+        return self._pin is not None or self.pin_unreadable or self.vault_encrypted()
 
-    def set_pin(self, pin: str):
-        if self.pin_unreadable:
+    def set_pin(self, pin: str, bind=None):
+        """Sets a new PIN. `bind` is given by a recovery-key reset, which proved
+        it holds the vault key; otherwise the vault's own binder is used."""
+        if self.pin_unreadable and bind is None:
             raise ValueError("the stored PIN could not be read - repair or remove pin.json on the server first")
+        if bind is None:
+            bind = self.binder()  # raises KeyProblem: never re-PIN a vault whose key is unreachable
         salt = secrets.token_bytes(16)
-        self._pin = {"salt": salt.hex(), "hash": hash_secret(pin, salt)}
-        self._save_pin()
+        record = {"salt": salt.hex(), "hash": hash_secret(pin, salt)}
+        if bind is not None:
+            record["binding"] = bind("pin", {"salt": record["salt"], "hash": record["hash"]})
+        with self._lock:
+            self._pin = record
+            self._save_pin()
+            self.pin_unreadable = False
         self.forget_all_unlocks()  # a changed PIN revokes every existing unlock
         # and every biometric enrollment, which was authorized by the old PIN
-        self.clear_devices()
+        self.clear_devices(bind)
+
+    def bind_existing(self, bind):
+        """Adds bindings to the current pin.json and devices.json, without
+        changing the PIN or any device - done once when a vault is encrypted."""
+        with self._lock:
+            if self._pin is not None:
+                self._pin = dict(self._pin, binding=bind("pin", {"salt": self._pin["salt"],
+                                                                 "hash": self._pin["hash"]}))
+                self._save_pin()
+            self._save_devices(bind)
 
     def verify_pin(self, pin: str) -> bool:
         if self._pin is None:
@@ -214,10 +306,7 @@ class LockedFolderRuntime:
         return data
 
     def _save_pin(self):
-        self.storage_root.mkdir(parents=True, exist_ok=True)
-        partial = self.pin_path.with_suffix(".part")
-        partial.write_text(json.dumps(self._pin), encoding="utf-8")
-        os.replace(partial, self.pin_path)
+        self._save_json(self.pin_path, self._pin)
 
     # ---------- unlock state (session-aware, memory only) ----------
 
@@ -259,43 +348,170 @@ class LockedFolderRuntime:
     #
     # Since signing in again gives a fresh session (and a fresh per-session
     # counter), an account-wide counter backs it up - see GLOBAL_ATTEMPT_FACTOR.
+    #
+    # Every counter is written to attempts.json before the PIN is checked, so
+    # neither a restart nor a crash mid-check forgets an attempt. The recovery
+    # key has a counter of its own (kind="recovery"): a PIN lockout must not
+    # stop the owner from recovering, and a recovery key can't be guessed.
 
-    def begin_attempt(self, token: str, max_attempts: int, lockout_seconds: int) -> int:
-        """0 when this session may try a PIN now, otherwise the seconds to wait.
+    def begin_attempt(self, token: str, max_attempts: int, lockout_seconds: int, kind: str = "pin") -> int:
+        """0 when this session may try now, otherwise the seconds to wait.
 
         The attempt is counted as a failure straight away and only cleared by
         record_success(), so firing many guesses at once while the slow PIN
-        hash runs can't get past the limit."""
+        hash runs can't get past the limit. Raises SecurityStateError, and
+        allows nothing, when the counters can't be saved."""
+        max_attempts = max(1, int(max_attempts))
+        lockout_seconds = max(1, int(lockout_seconds))
         with self._lock:
             now = time.time()
-            if self._global["locked_until"] > now:
-                return max(1, math.ceil(self._global["locked_until"] - now))
+            shared = self._recovery if kind == "recovery" else self._global
+            self._decay(shared, now)
+            if shared["locked_until"] > now:
+                return max(1, math.ceil(shared["locked_until"] - now))
 
-            record = self._attempts.get(token)
-            if record is not None and record.get("locked_until"):
-                if record["locked_until"] > now:
-                    return max(1, math.ceil(record["locked_until"] - now))
-                record = None
-            if record is None:
-                record = self._attempts[token] = {"count": 0, "locked_until": None}
+            if kind == "pin":
+                key = _session_key(token)
+                record = self._attempts.get(key)
+                if record is not None and record.get("locked_until"):
+                    if record["locked_until"] > now:
+                        return max(1, math.ceil(record["locked_until"] - now))
+                    record = None
+                if record is None:
+                    record = self._attempts[key] = {"count": 0, "locked_until": 0.0, "last": now}
+                record["count"] += 1
+                record["last"] = now
+                if record["count"] >= max_attempts:
+                    record["count"] = 0
+                    record["locked_until"] = now + lockout_seconds
 
-            record["count"] += 1
-            if record["count"] >= max_attempts:
-                record["count"] = 0
-                record["locked_until"] = now + lockout_seconds
-
-            self._global["count"] += 1
-            if self._global["count"] >= max_attempts * GLOBAL_ATTEMPT_FACTOR:
-                self._global["count"] = 0
-                self._global["lockouts"] += 1
-                wait = lockout_seconds * 2 ** min(self._global["lockouts"] - 1, 20)
-                self._global["locked_until"] = now + min(wait, GLOBAL_MAX_LOCKOUT)
+            factor = 1 if kind == "recovery" else GLOBAL_ATTEMPT_FACTOR
+            shared["count"] += 1
+            shared["last_failure"] = now
+            if shared["count"] >= max_attempts * factor:
+                shared["count"] = 0
+                shared["lockouts"] += 1
+                wait = min(lockout_seconds * 2 ** min(shared["lockouts"] - 1, 20), GLOBAL_MAX_LOCKOUT)
+                shared["locked_until"] = now + wait
+                what = "recovery-key" if kind == "recovery" else "PIN"
+                print(f"[WARNING]: Locked Folder: too many incorrect {what} attempts - "
+                      f"locked for {int(wait)}s (lockout {shared['lockouts']}).")
+            self._save_attempts()
             return 0
 
-    def record_success(self, token: str):
+    def record_success(self, token: str, kind: str = "pin"):
         with self._lock:
-            self._attempts.pop(token, None)
-            self._global = {"count": 0, "lockouts": 0, "locked_until": 0.0}
+            if kind == "recovery":
+                # the recovery key proves ownership, so every counter starts over
+                self._recovery = _empty_counter()
+                self._global = _empty_counter()
+                self._attempts.clear()
+            else:
+                self._attempts.pop(_session_key(token), None)
+                self._global = _empty_counter()
+            self._try_save_attempts()
+
+    def lockout_status(self) -> dict:
+        """What an administrator may see about the counters - no tokens, no PINs."""
+        with self._lock:
+            now = time.time()
+            self._decay(self._global, now)
+            locked_until = self._global["locked_until"]
+            return {
+                "retry_after": max(0, math.ceil(locked_until - now)) if locked_until > now else 0,
+                "failed_attempts": self._global["count"],
+                "lockouts": self._global["lockouts"],
+                "state_damaged": self.attempts_damaged,
+            }
+
+    @staticmethod
+    def _decay(counter: dict, now: float):
+        if counter["locked_until"] <= now and counter["last_failure"] and now - counter["last_failure"] > FAILURE_MEMORY:
+            counter.update(_empty_counter())
+
+    def _load_attempts(self):
+        """(per-session, account-wide, recovery) counters from attempts.json.
+
+        A missing file is a fresh start. A file that exists but can't be read
+        is never a fresh start: everyone is locked out for one lockout
+        period, then the counters start over - so a damaged file can neither
+        reset a lockout nor lock the owner out for good."""
+        try:
+            data = json.loads(self.attempts_path.read_text(encoding="utf-8"))
+            sessions, shared, recovery = self._parse_attempts(data)
+        except FileNotFoundError:
+            return {}, _empty_counter(), _empty_counter()
+        except (OSError, ValueError, TypeError, KeyError, AttributeError):
+            now = time.time()
+            wait = max(1, int(self.satellite.config.get("lockout_seconds", 300)))
+            print(f"[WARNING]: Locked Folder attempt counters ({self.attempts_path.name}) could not be read. "
+                  f"Every session is locked out for {wait}s before PINs are accepted again.")
+            self.attempts_damaged = True
+            shared = dict(_empty_counter(), lockouts=1, locked_until=now + wait, last_failure=now)
+            self._attempts, self._global, self._recovery = {}, shared, dict(shared)
+            self._try_save_attempts()
+            return {}, shared, dict(shared)
+
+        # a clock that jumped ahead (and back) must not stretch a lockout
+        # beyond the longest one this ever hands out
+        ceiling = time.time() + GLOBAL_MAX_LOCKOUT
+        for counter in [shared, recovery, *sessions.values()]:
+            counter["locked_until"] = min(counter["locked_until"], ceiling)
+        return sessions, shared, recovery
+
+    @staticmethod
+    def _parse_attempts(data):
+        if not isinstance(data, dict) or data.get("version") != ATTEMPTS_VERSION:
+            raise ValueError("unknown attempts format")
+
+        def counter(raw):
+            if not isinstance(raw, dict):
+                raise ValueError("bad counter")
+            parsed = _empty_counter()
+            for field in parsed:
+                value = raw.get(field, 0)
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0 or value != value:
+                    raise ValueError("bad counter")
+                parsed[field] = type(parsed[field])(value)
+            return parsed
+
+        sessions = {}
+        raw_sessions = data["sessions"]
+        if not isinstance(raw_sessions, dict):
+            raise ValueError("bad sessions")
+        for key, raw in raw_sessions.items():
+            if not isinstance(key, str) or not isinstance(raw, dict):
+                raise ValueError("bad session")
+            values = [raw.get("count", 0), raw.get("locked_until", 0), raw.get("last", 0)]
+            if any(isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 for v in values):
+                raise ValueError("bad session")
+            sessions[key] = {"count": int(values[0]), "locked_until": float(values[1]), "last": float(values[2])}
+        return sessions, counter(data["global"]), counter(data["recovery"])
+
+    def _save_attempts(self):
+        """Writes the counters durably, or raises SecurityStateError."""
+        now = time.time()
+        # sessions with nothing pending are forgotten after a day
+        for key in [key for key, record in self._attempts.items()
+                    if record["locked_until"] <= now and now - record.get("last", 0) > FAILURE_MEMORY]:
+            del self._attempts[key]
+        try:
+            self._save_json(self.attempts_path, {
+                "version": ATTEMPTS_VERSION,
+                "global": self._global,
+                "recovery": self._recovery,
+                "sessions": self._attempts,
+            }, durable=True)
+        except OSError as error:
+            print(f"[WARNING]: Locked Folder attempt counters could not be saved ({type(error).__name__}). "
+                  f"PINs are refused until they can be.")
+            raise SecurityStateError("the attempt counters could not be saved") from error
+
+    def _try_save_attempts(self):
+        try:
+            self._save_attempts()
+        except SecurityStateError:
+            pass  # counters stay as strict as they are in memory
 
     # ---------- media moved in from Photos ----------
     #
@@ -329,7 +545,9 @@ class LockedFolderRuntime:
 
     def add_device(self, public_key_der: bytes, label: str) -> str:
         signatures.parse_public_key(public_key_der)  # raises ValueError on anything unusable
+        trusted = self._trusted_devices()  # never re-sign entries nobody can vouch for
         with self._lock:
+            self._devices = trusted
             if len(self._devices) >= MAX_DEVICE_KEYS:
                 raise ValueError(f"at most {MAX_DEVICE_KEYS} devices can use biometric unlock")
             key_id = secrets.token_hex(12)
@@ -341,27 +559,46 @@ class LockedFolderRuntime:
             self._save_devices()
             return key_id
 
-    def has_device(self, key_id: str) -> bool:
+    def _trusted_devices(self) -> dict:
+        """The enrolled devices, or none at all when the vault is encrypted
+        and devices.json doesn't carry a valid binding - so a key added to the
+        file by hand can never unlock anything."""
+        from . import encryption
         with self._lock:
-            return isinstance(key_id, str) and key_id in self._devices
+            devices = dict(self._devices)
+            binding = self._devices_binding
+        if not devices:
+            return devices
+        try:
+            bind = self.binder()
+        except encryption.KeyProblem:
+            return {}
+        if bind is None:
+            return devices
+        if not secrets.compare_digest(str(binding or ""), bind("devices", devices)):
+            return {}
+        return devices
+
+    def has_device(self, key_id: str) -> bool:
+        return isinstance(key_id, str) and key_id in self._trusted_devices()
 
     def device_count(self) -> int:
-        with self._lock:
-            return len(self._devices)
+        return len(self._trusted_devices())
 
     def remove_device(self, key_id: str) -> bool:
+        trusted = self._trusted_devices()
         with self._lock:
+            self._devices = trusted
             if self._devices.pop(key_id, None) is None:
                 return False
             self._save_devices()
             return True
 
-    def clear_devices(self):
+    def clear_devices(self, bind=None):
         with self._lock:
             self._challenges.clear()
-            if self._devices:
-                self._devices.clear()
-                self._save_devices()
+            self._devices.clear()
+            self._save_devices(bind)
 
     def new_challenge(self, token: str, key_id: str) -> str:
         with self._lock:
@@ -376,7 +613,7 @@ class LockedFolderRuntime:
         by the first attempt, right or wrong."""
         with self._lock:
             issued = self._challenges.pop(token, None)
-            device = self._devices.get(key_id)
+        device = self._trusted_devices().get(key_id)
         if issued is None or device is None or issued["expires"] < time.time():
             return False
         if not isinstance(challenge, str) or issued["key_id"] != key_id:
@@ -401,24 +638,50 @@ class LockedFolderRuntime:
             print(f"[WARNING]: {path} could not be read ({error}). Treating it as empty.")
             return set()
 
-    def _load_devices(self) -> dict:
+    def _load_devices(self):
+        """(devices, binding) from devices.json."""
         try:
             data = json.loads(self.devices_path.read_text(encoding="utf-8"))
             devices = data.get("devices", {})
-            return {key: value for key, value in devices.items()
-                    if isinstance(value, dict) and isinstance(value.get("public_key"), str)}
+            binding = data.get("binding")
+            return ({key: value for key, value in devices.items()
+                     if isinstance(value, dict) and isinstance(value.get("public_key"), str)},
+                    binding if isinstance(binding, str) else None)
         except FileNotFoundError:
-            return {}
+            return {}, None
         except (OSError, ValueError, AttributeError) as error:
             # fails closed: no device can use biometric unlock until it re-enrolls
-            print(f"[WARNING]: {self.devices_path} could not be read ({error}). Biometric unlock is off.")
-            return {}
+            print(f"[WARNING]: {self.devices_path} could not be read ({type(error).__name__}). Biometric unlock is off.")
+            return {}, None
 
-    def _save_devices(self):
-        self._save_json(self.devices_path, {"version": 1, "devices": self._devices})
+    def _save_devices(self, bind=None):
+        """Saves the device list, bound to the vault key when the vault is
+        encrypted. Without a usable key no binding is written, so the list
+        stays untrusted rather than trusted by accident."""
+        from . import encryption
+        if bind is None:
+            try:
+                bind = self.binder()
+            except encryption.KeyProblem:
+                bind = None
+        data = {"version": 1, "devices": self._devices}
+        self._devices_binding = bind("devices", self._devices) if bind is not None else None
+        if self._devices_binding is not None:
+            data["binding"] = self._devices_binding
+        self._save_json(self.devices_path, data)
 
-    def _save_json(self, path: Path, data: dict):
+    def _save_json(self, path: Path, data: dict, durable: bool = False):
+        """Atomic replace; `durable` also flushes to disk first, for security
+        state a power cut must not roll back."""
         self.storage_root.mkdir(parents=True, exist_ok=True)
-        partial = path.with_suffix(".part")
-        partial.write_text(json.dumps(data), encoding="utf-8")
-        os.replace(partial, path)
+        partial = path.with_name(f".{path.name}.{secrets.token_hex(4)}.part")
+        try:
+            with open(partial, "w", encoding="utf-8") as file:
+                file.write(json.dumps(data))
+                if durable:
+                    file.flush()
+                    os.fsync(file.fileno())
+            os.replace(partial, path)
+        except BaseException:
+            partial.unlink(missing_ok=True)
+            raise

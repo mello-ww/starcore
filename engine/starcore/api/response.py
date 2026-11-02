@@ -29,10 +29,13 @@ class Response:
     """What a satellite route handler returns: either a payload or a file to serve."""
 
     def __init__(self, status: int = 200, payload=None, path: Path = None, content_type: str = None,
-                 cache: str = None, download_name: str = None):
+                 cache: str = None, download_name: str = None, stream=None):
         self.status = status
         self.payload = payload
         self.path = path
+        # instead of a path: content a satellite produces on the fly (see
+        # stream_response) - served exactly like a file, Range requests included
+        self.stream = stream
         self.content_type = content_type
         self.cache = cache
         # when set, the file is sent with Content-Disposition: attachment - a
@@ -47,6 +50,15 @@ def json_response(payload, status: int = 200) -> Response:
 
 def file_response(path, content_type: str, cache: str = None, download_name: str = None) -> Response:
     return Response(path=Path(path), content_type=content_type, cache=cache, download_name=download_name)
+
+
+def stream_response(source, content_type: str, cache: str = None, download_name: str = None) -> Response:
+    """Serves content that isn't a plain file on disk - decrypted on the fly,
+    say. `source` has a `size` (bytes), a `read_range(start, end)` generator
+    yielding bytes start..end inclusive, and `close()`. If the first chunk
+    can't be produced, the client gets an error status; if a later one can't,
+    the connection is closed early instead of carrying on with bad data."""
+    return Response(stream=source, content_type=content_type, cache=cache, download_name=download_name)
 
 
 def error_response(message: str, status: int = 404) -> Response:

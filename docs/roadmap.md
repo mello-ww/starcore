@@ -56,6 +56,24 @@ redirected to temporary folders (generated test photos, a temporary vault, a tes
 Not verified: biometric unlock on a physical phone, and Android's handling of a changed
 fingerprint enrollment (covered by unit tests only).
 
+### Locked Folder encryption, persistent lockouts and recovery (after the checkpoint)
+
+Same machine, same isolated demo server (temporary photos, vault, keys and test PIN; the
+encryption extra installed in `engine/.venv`):
+
+| Check | Result |
+| --- | --- |
+| Python tests | 776 tests: 771 passed, 5 skipped (the same 5), 0 failed - 49 of them new in `test_locked_folder_encryption.py` |
+| Mission Control scripts | 35 tracked files, all parse; API smoke test 35 / 35 |
+| Web Locked Folder in a browser: encrypt with a recovery key (key shown once, confirmation required), photos decrypting in the grid, an upload stored encrypted, a move in from Photos, deleting the backup with the PIN, relock on reload, a wrong and a right recovery key, the old PIN refused and the new one accepted, the "needs attention" state at 390 px | All as expected; no plaintext left in the vault folder |
+| Android Jest / TypeScript / ESLint | 32 suites, 315 tests passed; clean; clean |
+| Android `assembleDebug` (JDK 17) | Builds |
+
+Not verified: the emulator was not re-run (only TypeScript changed on Android - the "needs
+attention" state and an "encrypted" note); a physical phone;
+Linux and macOS hosts; a real power cut or full disk (both simulated); a real Windows password
+reset.
+
 ### Implemented
 
 - **Design language**: shared tokens (`mission_control/tokens.css`, mirrored in
@@ -71,6 +89,11 @@ fingerprint enrollment (covered by unit tests only).
   its own; verified moves to and from Photos; private media kept out of Photos' imports,
   sync, albums and caches; optional, server-verified biometric unlock on Android. See
   `docs/satellites/locked_folder.md`.
+- **Locked Folder encryption at rest** (opt-in, with the `encryption` extra): AES-256-GCM in
+  authenticated 1 MiB segments with per-file keys, a random vault key wrapped by a
+  DPAPI-protected (Windows) server key and an optional recovery key, an explicit, resumable
+  migration that keeps the originals as a backup until the owner deletes it, PIN records and
+  biometric devices bound to the vault, and PIN lockouts that survive restarts.
 
 ### Known limitations
 
@@ -80,12 +103,20 @@ fingerprint enrollment (covered by unit tests only).
 - The Android Config tab keeps a sliders icon, so it does not look identical to Settings.
 - Mission Control still carries hidden legacy markup and styles from the previous design
   (the starfield and asteroid belt in `index.html`, their rules in `style.css`).
-- Locked Folder files are protected by access control and a hashed PIN, but not encrypted
-  at rest. Its counters and unlocks are in memory, so a restart clears a lockout.
+- Locked Folder encryption is server-side: it protects copies of the vault, backups and (on
+  Windows) a stolen disk, not a compromised server. On Linux/macOS the server key is a plain
+  0600 file, so a disk holding both the vault and StarCore's data directory needs full-disk
+  encryption. File sizes and counts stay visible. See "Encryption at rest" in
+  `docs/satellites/locked_folder.md` for the full threat model.
+- An unencrypted Locked Folder (the default until the owner turns encryption on) has no PIN
+  recovery and no protection against someone who can edit StarCore's files.
+- An encrypted Locked Folder without a recovery key is lost for good if the server key is
+  lost (reinstall, new machine, Windows password reset by an administrator).
+- Unlocks are in memory, so a restart locks every session (deliberately).
 - Without Pillow on the server, Locked Folder (like Photos) shows originals as thumbnails.
-- The Locked Folder location is chosen from Mission Control only; the Android app can create
-  the PIN but not pick the folder, and changes the PIN only from Mission Control.
-- A forgotten Locked Folder PIN can only be reset by editing the server's files.
+- The Locked Folder location, encryption, the recovery key and PIN changes are managed from
+  Mission Control only; the Android app can create the PIN and shows problems, but doesn't
+  pick the folder or recover.
 - The Signal Bus is not implemented yet (`engine/starcore/signals.py` is empty).
 - Developer Mode and Space Mode do not exist yet.
 
@@ -134,12 +165,23 @@ Found and fixed while moving the Locked Folder into Photos (each covered by
 - Photos could import the vault (or a folder containing it) into the public library, and a
   photo moved into the vault could come back through phone sync.
 
+Found and fixed while adding encryption (covered by
+`engine/tests/test_locked_folder_encryption.py`):
+
+- The account-wide PIN limit was in memory, so a restart reset it. It is now persisted and
+  written before each PIN check; damaged or unsaveable counters lock rather than open.
+- Deleting or replacing `pin.json` let anyone signed in set a new PIN. For an encrypted vault,
+  the PIN record and device list are now bound to the vault key and fail closed. (An
+  unencrypted vault still can't defend against someone who can edit StarCore's files.)
+- On Windows, a source file left open by an interrupted encryption blocked moving the
+  original afterwards; the source is now always closed.
+
 Checked and fine: PBKDF2-SHA256 (260,000 iterations, per-secret salt) and constant-time
 comparison for the password and Locked Folder PIN; `HttpOnly; SameSite=Lax` session cookies
 (`Secure` over HTTPS); path traversal refused for Mission Control and satellite assets;
-Locked Folder unlock rate-limited per session and kept in memory only; Android tokens in the
-Keychain with app backup disabled; no shell commands built from user input; the engine has
-no required third-party Python dependencies.
+Locked Folder unlocks kept in memory only; Android tokens in the Keychain with app backup
+disabled; no shell commands built from user input; the engine has no required third-party
+Python dependencies (`cryptography` is an optional extra, for Locked Folder encryption).
 
 ## Engine
 
@@ -176,7 +218,8 @@ no required third-party Python dependencies.
 - [x] Locked Folder (PIN, lockout, isolation from File Explorer)
     - [x] Move Locked Folder into Photos (a Photos tab on web and Android)
     - [x] Biometric unlock on Android, verified by the server
-    - [ ] Encryption at rest
+    - [x] Encryption at rest (opt-in), with a recovery key and backups kept until deleted
+    - [x] PIN lockouts that survive restarts
 - [x] Photos
     - [x] Library indexing, thumbnails, albums, favorites, map, recycle bin
     - [x] Phone sync with source-path mapping
@@ -210,4 +253,5 @@ no required third-party Python dependencies.
 - [x] Request body size limit and sign-in throttling (see the review above)
 - [ ] Hashed session tokens at rest
 - [ ] Periodic security audits, including dependency audits
-- [ ] Encryption improvements (Locked Folder at rest)
+- [x] Locked Folder encryption at rest (server-side; see its threat model)
+- [ ] End-to-end encryption for the Locked Folder (keys never on the server)

@@ -16,7 +16,7 @@ None of this is done for you: the server is prepared separately, and StarCore on
 
 ## Installing
 
-StarCore itself has no required dependencies; Pillow is an optional extra that enables photo thumbnails (without it, the Photo Satellite serves original images instead). The project is managed with [`uv`](https://docs.astral.sh/uv/), which handles the virtual environment and this optional dependency identically on both platforms.
+StarCore itself has no required dependencies. Two optional extras add features: `thumbnails` (Pillow) enables photo thumbnails - without it, the Photo Satellite serves original images instead - and `encryption` ([cryptography](https://cryptography.io/)) lets the Locked Folder encrypt its files at rest - without it, the Locked Folder stays unencrypted, and an already-encrypted one stays locked until the extra is installed again (see "Encryption at rest" in `docs/satellites/locked_folder.md`). The project is managed with [`uv`](https://docs.astral.sh/uv/), which handles the virtual environment and these optional dependencies identically on both platforms.
 
 ### With `uv` (preferred)
 
@@ -24,7 +24,10 @@ StarCore itself has no required dependencies; Pillow is an optional extra that e
 cd engine
 uv sync                     # core install
 uv sync --extra thumbnails  # also installs Pillow, for thumbnails
+uv sync --extra encryption  # also installs cryptography, for Locked Folder encryption
 ```
+
+Several extras at once: `uv sync --extra thumbnails --extra encryption` (each `uv sync` installs exactly the extras it is given).
 
 This creates `engine/.venv`. `uv` provisions Python 3.13 itself if it isn't already available.
 
@@ -46,7 +49,8 @@ Windows (PowerShell):
 
 Then, optionally:
 ```
-pip install pillow
+pip install pillow          # thumbnails
+pip install "cryptography>=44"  # Locked Folder encryption
 ```
 
 ## Starting StarCore

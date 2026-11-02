@@ -174,4 +174,43 @@ describe('LockedFolderTab', () => {
     expect(texts(tree)).toContain('The PIN can’t be read');
     expect(tree.root.findAllByType(TextInput)).toHaveLength(0);
   });
+
+  it('stays locked, with no PIN entry, when the server reports a security problem', async () => {
+    const api = fakeApi({
+      ...baseStatus,
+      security: {problem: 'pin_tampered'},
+      encryption: {available: true, state: 'on', problem: null, recovery_key: true},
+    });
+    useApi(api);
+    const tree = await render();
+    expect(texts(tree)).toContain('The PIN was changed outside StarCore');
+    expect(texts(tree).join(' ')).toContain('recovery key in Mission Control');
+    expect(tree.root.findAllByType(TextInput)).toHaveLength(0);
+    expect(api.media).not.toHaveBeenCalled();
+  });
+
+  it('says so when this server cannot open the vault and there is no recovery key', async () => {
+    useApi(fakeApi({
+      ...baseStatus,
+      security: {problem: 'key_unavailable'},
+      encryption: {available: true, state: 'on', problem: 'key_unavailable', recovery_key: false},
+    }));
+    const tree = await render();
+    expect(texts(tree)).toContain('This server can’t open the Locked Folder');
+    expect(texts(tree).join(' ')).toContain('no recovery key was set up');
+  });
+
+  it('lists a damaged encrypted file without opening it', async () => {
+    const api = fakeApi({...baseStatus, unlocked: true, expires_at: '2099-01-01T00:00:00+00:00',
+      encryption: {available: true, state: 'on', problem: null, recovery_key: false}});
+    api.media.mockResolvedValue([
+      {path: '.starcore-vault/objects/ab.sclf', name: 'Damaged file', size: 99, modified: null,
+        media_type: 'file', content_type: 'application/octet-stream', encrypted: true, damaged: true},
+    ] as any);
+    useApi(api);
+    const tree = await render();
+    expect(texts(tree)).toContain('Damaged file');
+    expect(texts(tree)).toContain('· encrypted');
+    expect(tree.root.findAllByProps({testID: 'private-image'})).toHaveLength(0);
+  });
 });

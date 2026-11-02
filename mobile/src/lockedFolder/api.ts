@@ -14,15 +14,37 @@ export interface LockedFolderStatus {
   session_timeout_seconds: number;
   photos_available?: boolean;
   biometric_devices?: number;
+  /** Why the PIN can't be checked right now, if it can't - the vault then stays locked. */
+  security?: {
+    problem: SecurityProblem | null;
+    lockout?: {retry_after: number; failed_attempts: number; lockouts: number; state_damaged: boolean};
+  };
+  encryption?: {
+    available: boolean;
+    state: 'off' | 'encrypting' | 'interrupted' | 'on';
+    problem: SecurityProblem | null;
+    recovery_key: boolean;
+  };
 }
+
+export type SecurityProblem =
+  | 'pin_unreadable'
+  | 'pin_tampered'
+  | 'key_unavailable'
+  | 'keyring_damaged'
+  | 'encryption_unavailable';
 
 export interface VaultItem {
   path: string;
   name: string;
+  folder?: string;
   size: number;
-  modified: string;
+  modified: string | null;
   media_type: 'photo' | 'video' | 'file';
   content_type: string;
+  encrypted?: boolean;
+  /** An encrypted file that failed its integrity check - it can't be opened. */
+  damaged?: boolean;
 }
 
 export interface MoveResult {

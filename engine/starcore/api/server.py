@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread, Timer
 from urllib.parse import parse_qs, quote, unquote, urlparse
+import itertools
 import json
 import ssl
 
@@ -608,6 +609,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         self._send_json({"error": "the StarCore API is read-only"}, status=405)
 
     def _send_response(self, response: Response):
+        if response.stream is not None:
+            self._send_stream(response)
+            return
+
         if response.path is None:
             self._send_json(response.payload, status=response.status)
             return
@@ -619,11 +624,42 @@ class RequestHandler(BaseHTTPRequestHandler):
             if not self._responded:
                 self._send_json({"error": "the requested file is not available"}, status=404)
 
+    def _send_stream(self, response: Response):
+        source = response.stream
+        try:
+            self._send_ranged(source.size, source.read_range, response.content_type, response.cache,
+                              response.download_name)
+        except Exception as error:
+            # the source names no file and carries no content in its message
+            print(f"[WARNING]: a streamed response failed ({type(error).__name__}).")
+            if not self._responded:
+                self._send_json({"error": "the requested file could not be read"}, status=500)
+            else:
+                self.close_connection = True  # never pretend the rest arrived
+        finally:
+            try:
+                source.close()
+            except Exception:
+                pass
+
     # files are streamed rather than read into memory, and a Range request is
     # answered with the part that was asked for, so a browser can seek in a large
     # file a satellite serves without downloading all of it
     def _send_file(self, path: Path, content_type: str, cache: str = None, download_name: str = None):
-        size = path.stat().st_size
+        def read_range(start, end):
+            with open(path, "rb") as file:
+                file.seek(start)
+                remaining = end - start + 1
+                while remaining > 0:
+                    chunk = file.read(min(FILE_CHUNK, remaining))
+                    if not chunk:
+                        break
+                    yield chunk
+                    remaining -= len(chunk)
+
+        self._send_ranged(path.stat().st_size, read_range, content_type, cache, download_name)
+
+    def _send_ranged(self, size: int, read_range, content_type: str, cache: str = None, download_name: str = None):
         requested = self._requested_range(size)
         if requested is None:
             # RFC 9110: a range that starts beyond the end can't be satisfied, and the
@@ -636,7 +672,11 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         start, end = requested
-        length = end - start + 1
+        length = end - start + 1 if size else 0
+        chunks = iter(read_range(start, end)) if size else iter(())
+        # the first chunk is produced before any header goes out, so a source
+        # that fails straight away still gets a proper error status
+        first = next(chunks, b"")
 
         self._responded = True
         self.send_response(206 if length != size else 200)
@@ -650,15 +690,16 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Disposition", _content_disposition(download_name))
         self.end_headers()
 
-        with open(path, "rb") as file:
-            file.seek(start)
-            remaining = length
-            while remaining > 0:
-                chunk = file.read(min(FILE_CHUNK, remaining))
-                if not chunk:
-                    break
+        sent = 0
+        for chunk in itertools.chain((first,), chunks):
+            chunk = chunk[:length - sent]
+            if chunk:
                 self.wfile.write(chunk)
-                remaining -= len(chunk)
+                sent += len(chunk)
+            if sent >= length:
+                break
+        if sent < length:
+            self.close_connection = True  # the source ended early
 
     def _requested_range(self, size: int) -> tuple:
         header = self.headers.get("Range", "")
