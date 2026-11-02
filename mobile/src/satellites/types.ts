@@ -16,6 +16,10 @@ export interface SatelliteSummary {
    * decides whether tapping it on the Satellites screen opens a real
    * screen or just shows its name/status. See docs/satellites.md. */
   mobile_ui: boolean;
+  /** Set when this Satellite's interface is a section of another's (the
+   * Locked Folder lives in Photos), so it gets no list entry of its own.
+   * Presentation only - its routes are as protected as any other. */
+  section_of?: string | null;
 }
 
 /** The declarative UI schema a Satellite's "mobile" route answers with -

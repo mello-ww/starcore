@@ -34,3 +34,13 @@ export async function getCachedPhotos(serverId: string): Promise<Photo[] | null>
 export async function setCachedPhotos(serverId: string, photos: Photo[]): Promise<void> {
   await AsyncStorage.setItem(`${KEY_PREFIX}:${serverId}`, JSON.stringify(photos));
 }
+
+/** Drops one photo from the cached list straight away - used when it moves
+ * into the Locked Folder, so its name and details don't linger on the phone
+ * until the next refresh. */
+export async function forgetCachedPhoto(serverId: string, photoId: string): Promise<void> {
+  const cached = await getCachedPhotos(serverId);
+  if (cached && cached.some(photo => photo.id === photoId)) {
+    await setCachedPhotos(serverId, cached.filter(photo => photo.id !== photoId));
+  }
+}

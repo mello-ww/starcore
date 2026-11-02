@@ -11,6 +11,9 @@ def describe_satellite(engine, satellite) -> dict:
         "author": satellite.manifest.author,
         "description": satellite.manifest.description,
         "icon": satellite.manifest.icon,
+        # set when this satellite's interface is a section of another
+        # satellite's page - see SatelliteManifest.section_of
+        "section_of": satellite.manifest.section_of,
         "type": satellite.type,
         "enabled": bool(satellite.config.get("enabled", True)),
         "status": _satellite_status(engine, satellite),

@@ -8,6 +8,7 @@ from . import state as state_module
 from .albums import AlbumError, AlbumNotFound, albums
 from .images import UnsupportedImage
 from .library import PhotoImportError, PhotoNotFound, library
+from .private_media import policy
 
 # photos are addressed by the digest of their content, so a stored file can be
 # cached by the browser for as long as it likes
@@ -184,7 +185,7 @@ def scan(request):
                                "default photo_directory", status=400)
 
     try:
-        return json_response(library(request.satellite).scan(source))
+        return json_response(library(request.satellite).scan(source, private=policy(request.engine)))
     except PhotoImportError as error:
         return error_response(str(error), status=400)
 
@@ -199,7 +200,7 @@ def import_directory(request):
                                "default photo_directory", status=400)
 
     try:
-        return json_response(library(request.satellite).import_directory(source))
+        return json_response(library(request.satellite).import_directory(source, private=policy(request.engine)))
     except PhotoImportError as error:
         return error_response(str(error), status=400)
 

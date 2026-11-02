@@ -6,10 +6,9 @@ alone only returns the Satellite object, not a populated
 run at least once (see runtime.py). state() is called automatically
 whenever the API is asked for Satellites, which happens on every Mission
 Control dashboard load, so in practice this satellite is warmed up well
-before anyone reaches a route that needs it. A cold guard (nothing has
-called runtime() yet at all) still fails safe - see
-file_explorer/locked_folder_guard.py - so this is a convenience, not a
-correctness requirement.
+before anyone reaches a route that needs it. File Explorer's guard and
+Photo's private_media check also call this themselves when nothing has
+created the runtime yet, so a cold start is guarded too.
 """
 
 from .runtime import runtime as runtime_module

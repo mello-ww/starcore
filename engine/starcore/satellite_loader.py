@@ -67,6 +67,7 @@ class SatelliteLoader:
                 author=manifest_data["author"],
                 description=manifest_data["description"],
                 icon=manifest_data.get("icon"),
+                section_of=manifest_data.get("section_of") or None,
             )
         except (tomllib.TOMLDecodeError, KeyError) as error:
             raise SatelliteLoadError(f"satellite.toml for satellite in {satellite_dir} is invalid ({error})")

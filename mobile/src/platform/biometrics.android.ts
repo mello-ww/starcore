@@ -1,5 +1,12 @@
 import ReactNativeBiometrics, {BiometryTypes} from 'react-native-biometrics';
-import type {BiometricAuthenticator, BiometricAvailability, BiometricUnavailableReason, BiometryType} from './types';
+import type {
+  BiometricAuthenticator,
+  BiometricAvailability,
+  BiometricSigner,
+  BiometricUnavailableReason,
+  BiometryType,
+  SignResult,
+} from './types';
 
 const rnBiometrics = new ReactNativeBiometrics({allowDeviceCredentials: false});
 
@@ -56,3 +63,54 @@ class AndroidBiometricAuthenticator implements BiometricAuthenticator {
 }
 
 export const biometrics: BiometricAuthenticator = new AndroidBiometricAuthenticator();
+
+/**
+ * Android implementation of `BiometricSigner`, via react-native-biometrics'
+ * Keystore key (RSA 2048, SHA256withRSA, user authentication required, so
+ * every signature needs a BIOMETRIC_STRONG match and new enrollments
+ * invalidate the key). The global app lock above never uses this key.
+ */
+class AndroidBiometricSigner implements BiometricSigner {
+  isAvailable(): Promise<BiometricAvailability> {
+    return biometrics.isAvailable();
+  }
+
+  async keyExists(): Promise<boolean> {
+    try {
+      const {keysExist} = await rnBiometrics.biometricKeysExist();
+      return keysExist === true;
+    } catch {
+      return false;
+    }
+  }
+
+  async createKey(): Promise<string | null> {
+    try {
+      const {publicKey} = await rnBiometrics.createKeys();
+      return publicKey || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async sign(promptMessage: string, payload: string): Promise<SignResult> {
+    try {
+      const {success, signature} = await rnBiometrics.createSignature({promptMessage, payload});
+      return success && signature ? {status: 'signed', signature} : {status: 'cancelled'};
+    } catch {
+      // the key couldn't be initialised for signing: deleted, or invalidated
+      // by a change to the enrolled biometrics
+      return {status: 'key-invalid'};
+    }
+  }
+
+  async deleteKey(): Promise<void> {
+    try {
+      await rnBiometrics.deleteKeys();
+    } catch {
+      // nothing to delete
+    }
+  }
+}
+
+export const biometricSigner: BiometricSigner = new AndroidBiometricSigner();

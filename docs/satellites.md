@@ -106,6 +106,20 @@ Satellite didn't declare one; Mission Control falls back to a generic icon in th
 Core holds no name-to-icon mapping of its own - a Satellite that wants a recognizable mark in
 the sidebar and on its card provides its own image, the same way it provides its own page.
 
+A Satellite whose interface lives inside another Satellite's page can say so:
+
+```toml
+section_of = "Photo"
+```
+
+`describe_satellite()` reports it as `section_of` (`null` otherwise). Mission Control then
+gives it no sidebar entry or Home card, and opens `#/satellite/<it>` as
+`#/satellite/<host>/<it>`, handing the host page that section name in its mount context
+(`context.section`) and through `cleanup.showSection(section)` while it's showing. The
+Android app leaves it out of the Satellites list. It is presentation only: the Satellite
+keeps its own routes, data and configuration, and they are exactly as protected as any
+other's. The Locked Folder uses this to appear as a tab of Photos.
+
 ## Enabling, disabling and reloading
 
 Every Satellite - native or link, with or without a background service - can be enabled,

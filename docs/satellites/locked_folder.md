@@ -5,10 +5,12 @@ storage location, PIN-guarded on the server, that the existing File Explorer Sat
 already knows how to browse - not a second file-browsing feature, and not a second
 authentication system.
 
-It also lays the groundwork a future StarCore mobile application will need: a uniform way
-for any client, desktop or phone, to prove it may reach the Locked Folder's contents,
-without inventing a second server-side security mechanism for mobile. See "Mobile
-authentication" below for the full design.
+People reach it as the **Locked Folder tab of Photos**, on the web and in the Android app -
+it has no navigation entry of its own (`section_of = "Photo"` in its `satellite.toml`; see
+"Satellite manifest" in `docs/satellites.md`). That is presentation only: the Locked Folder
+keeps its own data, PIN and routes, separate from Photo's, and every route checks the
+caller's session and unlock on the server. Hiding a navigation entry is never what keeps it
+private. Old links to `#/satellite/LockedFolder` open the Photos tab.
 
 ## What it protects, and how
 
@@ -48,7 +50,7 @@ A single PIN (4-12 digits, `validate_pin()` in `runtime.py`) unlocks the Locked 
 the caller's current session.
 
 ```
-GET  /api/satellites/LockedFolder/status                      -> { "configured": bool, "pin_set": bool, "unlocked": bool, "expires_at": str|null }
+GET  /api/satellites/LockedFolder/status                      -> { "configured", "pin_set", "pin_unreadable", "unlocked", "expires_at", "biometric_devices", ... }
 POST /api/satellites/LockedFolder/pin      { "pin": "...", "current_pin": "..." }  -> set or change the PIN
 POST /api/satellites/LockedFolder/unlock   { "pin": "..." }                       -> unlock this session
 POST /api/satellites/LockedFolder/lock     {}                                     -> lock this session immediately
@@ -61,6 +63,13 @@ rather than a second hashing implementation living inside this Satellite. The ha
 are the only things ever written to disk (`pin.json`, atomic `.part` + rename, the same
 convention every other Satellite's index files use); the plaintext PIN is never stored,
 logged, or included in any API response.
+
+The format of `pin.json` (`{"salt": <hex>, "hash": <hex>}`) is unchanged from the first
+release, so an existing PIN keeps working as is. A `pin.json` that exists but can't be read
+is treated as **set but unusable** (`"pin_unreadable": true`): unlocking and setting a new PIN
+are refused with `409` until an administrator repairs or removes the file on the server.
+Before, an unreadable file read as "no PIN yet", which would have let anyone signed in set a
+new one and open the vault.
 
 By default, `pin.json` lives under StarCore's application-data directory, not inside the Git
 checkout - see "Runtime data location" in `docs/deployment.md` for exactly where, and how an
@@ -88,15 +97,29 @@ failure - so Mission Control's unlock dialog can show the caller exactly what's 
 ### Brute-force protection
 
 Repeated incorrect PIN attempts against the same session are rate-limited: after
-`max_pin_attempts` (default 5) consecutive failures, that session's PIN attempts - unlock
-*and* the "current PIN" check when changing the PIN, since guessing one is exactly as useful
-an attack as guessing the other - are locked out for `lockout_seconds` (default 300), even a
-correct PIN refused until the lockout expires. This is scoped per session, not per account or
-per IP: reaching a Locked Folder route at all already requires a valid, authenticated
-StarCore session (see "Authentication" in `docs/api.md`), so the realistic threat here is a
-stolen or shared session guessing at the PIN, not an anonymous caller - rate-limiting by
-session token addresses exactly that, and correctly does not penalize a different, unrelated
-session for the same account.
+`max_pin_attempts` (default 5) consecutive failures, that session's attempts - unlock, the
+"current PIN" check when changing the PIN, biometric enrollment, and a failed biometric
+signature - are locked out for `lockout_seconds` (default 300), even a correct PIN refused
+until the lockout expires.
+
+Signing in again gives a fresh session, so an **account-wide backstop** sits on top: after
+`max_pin_attempts × 4` failures from any mix of sessions with no correct PIN in between,
+every session is refused for `lockout_seconds`, doubling with each further lockout up to 24
+hours. A correct PIN resets both counters.
+
+Each attempt is counted as a failure the moment it starts and only cleared by a correct PIN,
+so firing many guesses at once while the slow PIN hash runs can't get past the limit. The
+counters are in memory, like the unlock state, so a restart clears them.
+
+### Settings that need the PIN
+
+Once a PIN guards a configured vault, the settings that could point the protection elsewhere
+or loosen it - `locked_folder_path`, `max_pin_attempts`, `lockout_seconds`,
+`session_timeout_seconds` - and `POST /delink` all need **this session unlocked** (`403`
+otherwise). Without this, anyone signed in could repoint or delink the Locked Folder and read
+the old vault through File Explorer without the PIN, or reset a brute-force lockout by
+delinking and relinking. Before a PIN is set, they can be changed freely, since there is
+nothing to protect yet. Someone who forgets the PIN has to edit `config.toml` on the server.
 
 ### The configured directory can disappear
 
@@ -120,38 +143,111 @@ reporting it as configured and protected forever, with no way to move on from it
 - clears `locked_folder_path` back to empty (the same effect as configuring it to `""`
   through the generic Satellite configuration route - `delink` is a thin, named wrapper
   around that exact call, not a second mechanism);
+- needs this session unlocked once a PIN is set (see "Settings that need the PIN");
 - invalidates every existing unlock, for every session, the same as any other change to the
-  configured path already does (see "Unlock design" above);
-- clears every session's brute-force attempt/lockout counters too, since a lockout earned
-  against a configuration that no longer exists has nothing left to protect;
+  configured path already does;
 - leaves the PIN itself untouched - delinking removes the *location*, not the *credential*,
   so a PIN already set keeps working once a new location is configured. Change or clear the
   PIN separately (`POST /pin`) if that's what's actually wanted.
 
 `400` if nothing is configured to delink in the first place; otherwise `200` with
-`{"delinked": true}`. Mission Control's Locked Folder page offers this as a "Delink
-Locked Folder" button, shown whenever a location is configured (not only when its directory
-is missing), with a confirmation prompt before it runs since - unlike locking - it can't be
+`{"delinked": true}`. The Locked Folder tab offers this as "Delink this folder" in its
+settings, with a confirmation prompt before it runs since - unlike locking - it can't be
 undone by simply unlocking again: a new location has to be configured afterward.
 
-## Mission Control
+## The vault as media, and moves to and from Photos
 
-The Locked Folder's own Mission Control page shows its status (configured or not, PIN set or
-not, locked or unlocked, and when an unlock expires), a form to set or change the PIN, an
-unlock dialog, and a lock button once unlocked - matching the rest of Mission Control's
-visual language, not a redesign of it. A configured directory that no longer exists on disk
-(see "The configured directory can disappear" above) shows a distinct "missing" badge and a
-plain-language explanation, right alongside the "Delink Locked Folder" button that's always
-present once a location is configured. Once unlocked, the same page also renders an embedded
-file browser confined to the vault, built entirely on File Explorer's existing `entries`,
-`content`, `upload`, `mkdir`, `rename` and `delete` routes (called directly, the same way any
-other client would) rather than a second, satellite-specific browsing implementation - it
-simply never lets navigation go above the configured root.
+```
+GET  /api/satellites/LockedFolder/media                         -> { "items": [ {path, name, size, modified, media_type, content_type} ], "truncated" }
+GET  /api/satellites/LockedFolder/media/file?path=<relative>    -> the file itself (Cache-Control: private, no-store)
+POST /api/satellites/LockedFolder/move_in   { "photo_ids": [...] } -> { "moved": [...], "failed": [...] }
+POST /api/satellites/LockedFolder/move_out  { "paths": [...] }     -> { "moved": [...], "failed": [...] }
+```
 
-Separately, File Explorer's own page now draws a small lock badge next to any entry the
-Locked Folder reports as `"locked": true`, and refuses to enter it - with the same clear
-"unlock it from the Locked Folder page first" message the API itself returns - until it has
-been unlocked from there.
+All four need this session unlocked (`403` otherwise). `media` lists every file in the vault,
+tagged `photo`, `video` or `file`, skipping hidden files and in-progress copies; paths are
+relative to the vault and anything that resolves outside it (`..`, an absolute path, a
+symlink out) is refused. Files are served `no-store`, so a browser or the app never keeps a
+copy on disk.
+
+**Moving a photo in** copies its original from the Photo library into the vault's `Photos`
+folder under a free name (never overwriting), flushes it to disk and checks its SHA-256
+against the original before giving it its final name. Only then is the photo removed from the
+library (index first, then its stored file and thumbnail) and from every album, Favorites
+included. If anything fails before that point the vault copy is removed and the photo stays
+exactly where it was; if removing it from the library fails, the vault copy is removed again.
+
+**Moving a file out** imports it into the Photo library through Photo's normal ingestion,
+checks the library's copy against the original's SHA-256, and only then deletes the vault
+file. A file Photo can't read (a document, say) stays in the vault and is reported in
+`failed`. A photo that was sitting in Photo's recycle bin comes back out of it.
+
+### Keeping private media out of Photos
+
+Photo asks the Locked Folder two questions (`satellites/native/photo/private_media.py`),
+whether or not the Locked Folder is currently enabled:
+
+- **Is this path inside the vault?** Importing or scanning the vault itself is refused, and
+  importing a folder that contains the vault (or links into it) skips the vault's files.
+- **Was this file moved in from Photos?** Every move in records the file's SHA-256 (only the
+  digest, never a name or path) in `sealed.json` next to `pin.json`. Photo answers such a file
+  like a duplicate in a directory import, a phone sync upload and the standalone sync
+  listener - so a phone that still has the photo stops re-sending it, and it never reappears
+  in the gallery, search, albums, the map or thumbnails. Moving it back out clears the record.
+
+## Biometric unlock
+
+Android phones can unlock with a fingerprint or face, as an option on top of the PIN, never
+instead of it. It is separate from the app's own biometric app lock.
+
+```
+POST /api/satellites/LockedFolder/biometric/enroll     { "pin", "public_key", "device_name" } -> { "key_id" }
+POST /api/satellites/LockedFolder/biometric/challenge  { "key_id" }                           -> { "challenge" }
+POST /api/satellites/LockedFolder/biometric/unlock     { "key_id", "challenge", "signature" } -> like /unlock
+POST /api/satellites/LockedFolder/biometric/revoke     { "key_id" }                           -> { "revoked": true }
+```
+
+- **Turning it on** creates an RSA-2048 key in the phone's Android Keystore that can only sign
+  after a strong biometric match (react-native-biometrics). The app sends the public half with
+  the **PIN**, which the server checks (and rate-limits) before storing the key in
+  `devices.json`, next to `pin.json`.
+- **Unlocking** asks the server for a random challenge that belongs to this session, is used
+  up by the first attempt and expires after two minutes. The phone signs it behind the
+  biometric prompt (SHA256withRSA) and the server verifies the signature against the enrolled
+  key before unlocking the session - so a client that merely claims a biometric match gets
+  nothing. A wrong signature counts toward the brute-force limits.
+- **The PIN is never stored on the phone.** The earlier plan was to keep the PIN in the
+  Keystore and release it after a biometric check; a signing key does the same job without a
+  copy of the PIN existing anywhere but in the person's head.
+- **It turns itself off** when it can no longer be trusted: changing the PIN removes every
+  enrolled device on the server, and Android invalidates the key when fingerprints or faces
+  are added. Either way the app falls back to the PIN and asks to turn it on again.
+- Verification is standard-library only (`signatures.py`, RSASSA-PKCS1-v1_5 per RFC 8017,
+  comparing the full expected encoding rather than parsing it). Keys under 2048 bits are
+  refused.
+
+## Mission Control and the Android app
+
+**Mission Control:** the Photos page has a "Locked Folder" tab (`#/satellite/Photo/LockedFolder`)
+with four states - set up a location, create a PIN, locked (PIN entry with a countdown during
+a lockout), and unlocked (a grid of photos and videos, other files listed below, a viewer with
+"Move to Photos" and "Delete", upload, and settings for changing the PIN and delinking). A
+photo's viewer in Photos has a lock button that moves it in, asking for the PIN first when
+needed and locking again straight after. The tab locks again when you switch tabs, leave
+Photos, or close or reload the page (a `sendBeacon` to `/lock`), and when the server's time
+limit runs out.
+
+**Android:** Photos has a "Locked" section with the same states (a location is chosen from
+Mission Control), biometric unlock as above, and a private viewer with "Move to Photos"; a
+photo's viewer has "Lock". While the section is open the window is `FLAG_SECURE` (no
+screenshots or screen recording, a blank card in recent apps). Vault images are fetched with
+the session token and shown from memory, never through the image loader's disk cache. Moving a
+photo in also drops it from the app's cached photo list and evicts its gallery thumbnail from
+the image cache. The section locks again when it closes, when the app goes to the background,
+when the server is switched, and when the server's time limit runs out.
+
+File Explorer's own page still draws a lock badge next to the vault and refuses to enter it
+until unlocked.
 
 ## Configuration
 
@@ -182,58 +278,14 @@ not be a filesystem root; changing it to a new value revokes every existing unlo
 clearing it back to empty disables protection entirely (File Explorer then treats that
 location as any other).
 
-## Mobile authentication
+## Sessions on phones
 
-A future StarCore mobile app authenticates with the device's native biometrics - Face ID,
-Touch ID, or Android's Biometric API - but StarCore itself never implements, receives, or
-stores anything biometric. The design keeps exactly one server-side mechanism doing the
-actual work on both platforms:
-
-- **On PC**, a person types the PIN into Mission Control's unlock dialog, which calls
-  `POST /unlock` with it.
-- **On a future phone app**, the PIN is stored in the OS's own secure storage (Keychain on
-  iOS, Keystore on Android) and released locally, on the device, only after a successful
-  local Face ID/Touch ID/biometric check - then submitted to the *exact same*
-  `POST /unlock` endpoint.
-
-Biometrics gate local release of a secret that already exists (the PIN); they are never sent
-anywhere, and the server-side unlock code path is identical regardless of which kind of
-client called it. This is why no second unlock mechanism, no biometric-specific endpoint, and
-no biometric data format appear anywhere in this Satellite or in `starcore/auth.py`.
-
-Separately, from "Authentication" in `docs/api.md`: `POST /api/auth/login` already accepts an
-optional `kind` (`"web"` or `"mobile"`) and `device_name`, so a future mobile app establishes
-its StarCore session through the exact same login endpoint every other client uses - not a
-second session mechanism - just labeled so it can be told apart later. `GET
-/api/auth/sessions` and `POST /api/auth/sessions/revoke` (also documented in `docs/api.md`)
-are how a mobile device's session is listed and can be securely revoked - from Mission
-Control's "Active sessions" panel today, and from a future in-app "manage devices" screen
-later, both reaching the same server-side session store.
-
-### The two flows in full
-
-**Phone:** local biometric authentication (Face ID/Touch ID/Android Biometrics, entirely on
-the device) unlocks local access to a securely stored device credential (the PIN, released
-only after that local biometric check) → the app uses StarCore's ordinary authentication/
-session API (`POST /api/auth/login`, labeled `"kind": "mobile"`) to establish a normal
-StarCore session → that session calls `POST /api/satellites/LockedFolder/unlock` with the
-released PIN → the server, exactly as it does for any other client, checks the PIN and marks
-that session unlocked.
-
-**PC:** a person authenticates to StarCore itself (`POST /api/auth/login`, a normal `"web"`
-session) → Mission Control's unlock dialog collects the PIN and calls
-`POST /api/satellites/LockedFolder/unlock` → the server checks it and marks that session
-unlocked.
-
-Both flows converge on the same two server-side checks - a valid StarCore session, then a
-correct PIN for that session - and nothing about the Locked Folder's authorization logic
-needs to know or care which kind of client it's talking to. Biometrics never leave the
-device, StarCore never receives or stores anything biometric, and the backend remains the
-single source of truth for whether the Locked Folder is actually unlocked, regardless of
-which client is asking.
-
-This block deliberately stops at these foundations - the API, session labeling, and PIN-based
-unlock a mobile app would call into. It does not build the mobile application itself.
+`POST /api/auth/login` accepts an optional `kind` (`"web"` or `"mobile"`) and `device_name`,
+so the app's session is created through the same login endpoint every other client uses,
+just labeled so it can be told apart. `GET /api/auth/sessions` and
+`POST /api/auth/sessions/revoke` (see `docs/api.md`) list and revoke it. The Locked Folder's
+unlock always belongs to one session: a phone's unlock never opens the vault for the browser,
+or the other way round.
 
 ## Cross-satellite reference: how File Explorer finds the Locked Folder
 
@@ -245,10 +297,14 @@ by manifest name, `engine.registry.get("LockedFolder")`, combined with a live ru
 the Locked Folder Satellite stashes on itself as a plain attribute
 (`satellite.locked_folder_runtime`, set inside `runtime.py`'s `runtime(satellite)` factory,
 and kept warm by its `state.py`, which the Core already calls whenever a Satellite's state is
-queried). File Explorer's guard reads that attribute defensively
-(`getattr(satellite, "locked_folder_runtime", None)`) and simply protects nothing if the
-Locked Folder Satellite is absent, disabled, or hasn't initialized yet - never an error, just
-"nothing to guard here."
+queried). File Explorer's guard reads that attribute, and when nothing has created the
+runtime yet - the first request after a restart - it runs the Locked Folder's state provider
+to create it, rather than letting the request through unguarded. Photo's `private_media.py`
+does the same. Only an absent or disabled Locked Folder Satellite means "nothing to guard".
+
+Renaming or deleting a folder that **contains** the vault is refused while it is locked too
+(`guard_tree()`), since either would move the vault out from under its configured path or
+erase it without the PIN.
 
 ## Tests
 
@@ -269,6 +325,21 @@ the same PIN still working). A separate fixture (`LockedFolderStorageMigrationTe
 the PIN storage default resolving to StarCore's application-data directory, and a PIN from
 the historical in-checkout location being migrated there automatically - both with
 `STARCORE_DATA_DIR` redirected so neither test can ever touch a real machine's actual data.
+
+`engine/tests/test_locked_folder_security.py` covers the later hardening and the Photos
+integration, all on temporary directories: settings and delink needing the vault unlocked;
+fresh sessions not resetting the PIN limit; parallel guesses not exceeding it; a wrong
+current PIN counting; an existing `pin.json` working unchanged and an unreadable one keeping
+the vault locked; the PIN never appearing in responses or stored files; the media and move
+routes refusing a locked or missing session and anything outside the vault; `no-store` on
+vault files; folders containing the vault protected from rename and delete; the guard working
+before anything created the runtime; Photo refusing to import the vault and skipping it
+inside a parent folder; moves in removing a photo from the library, albums, thumbnails and
+originals; a moved photo not coming back through import or sync; a failed copy, or a failure
+after copying, leaving everything where it was; moves out, unreadable files and failed moves
+out; and biometric enrollment, signature checks, replayed or foreign challenges, failures
+counting toward the limit, PIN changes removing enrollments, revocation and weak keys - with
+an RSA test key generated in the test itself.
 
 `engine/tests/test_auth.py` was extended alongside it to cover session `kind`/`device_name`
 labeling, `list_sessions()` and `revoke_session()`, and the two new `/api/auth/sessions*`

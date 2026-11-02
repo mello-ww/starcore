@@ -27,6 +27,7 @@ import secrets
 import socket
 
 from .images import UnsupportedImage
+from . import private_media
 from .library import library, storage_root
 
 TOKEN_HEADER = "X-StarCore-Token"
@@ -58,6 +59,8 @@ def start(engine, satellite):
     # (api.py's sync_upload, via accept_authenticated_upload() below) goes
     # through - so the mobile app's background sync keeps working even on a
     # machine where the standalone listener's own port can't be bound.
+    # sync never takes back a photo that was moved into the Locked Folder
+    service.private = lambda: private_media.policy(engine)
     _services[storage_root(satellite)] = service
 
     if service.start():
@@ -217,6 +220,7 @@ class SyncService:
         self.max_bytes = max_bytes
         self.activity = SyncActivity()
         self.incoming = photo_library.root / INCOMING
+        self.private = lambda: None  # replaced by start() with the Locked Folder check
         self._server = None
         self._thread = None
 
@@ -273,7 +277,8 @@ class SyncService:
 
         try:
             partial.write_bytes(data)
-            photo = self.library.add_file(partial, filename=filename, physical_path=physical_path)
+            photo = self.library.add_file(partial, filename=filename, physical_path=physical_path,
+                                          private=self.private())
         finally:
             partial.unlink(missing_ok=True)
 

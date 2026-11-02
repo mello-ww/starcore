@@ -351,7 +351,7 @@ def rename(request):
     if paths.is_filesystem_root(source):
         return error_response("a filesystem root cannot be renamed", status=400)
 
-    blocked = locked_folder_guard.guard(request, source)
+    blocked = locked_folder_guard.guard_tree(request, source)
     if blocked is not None:
         return blocked
 
@@ -390,7 +390,7 @@ def delete(request):
     if paths.is_filesystem_root(target):
         return error_response("a filesystem root cannot be deleted", status=400)
 
-    blocked = locked_folder_guard.guard(request, target)
+    blocked = locked_folder_guard.guard_tree(request, target)
     if blocked is not None:
         return blocked
 

@@ -1,6 +1,7 @@
 from .. import configuration
 from ..images import thumbnails_available
 from ..library import PhotoImportError, library_for, readable_size
+from ..private_media import policy
 
 COMMAND = {
     "description": "Inspect and fill the local StarCore photo library.",
@@ -31,7 +32,7 @@ def photo(engine, args):
     elif args[0] == "list":
         _list(photos, args[1:])
     elif args[0] == "import":
-        _import(photos, args[1:])
+        _import(photos, args[1:], policy(engine))
     elif args[0] == "config":
         _config(engine, args[1:])
     else:
@@ -65,14 +66,14 @@ def _list(photos, args):
         print(f"{entry['id']}  {dimensions:<12} {readable_size(entry['size']):>9}  {taken}  {entry['filename']}")
 
 
-def _import(photos, args):
+def _import(photos, args, private=None):
     if not args:
         print(f"[ERROR]: Usage: {COMMAND['usage']}")
         return
 
     try:
         # the CLI splits on whitespace, so a path containing spaces arrives in pieces
-        result = photos.import_directory(" ".join(args))
+        result = photos.import_directory(" ".join(args), private=private)
     except PhotoImportError as error:
         print(f"[ERROR]: {error}")
         return

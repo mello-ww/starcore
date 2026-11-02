@@ -200,6 +200,23 @@
     outline-offset: 2px;
 }
 
+.photo-tab[hidden],
+.photo-viewer-lock[hidden] {
+    display: none;
+}
+
+.photo-tab-lock {
+    display: inline-flex;
+    vertical-align: -2px;
+    margin-right: 6px;
+}
+
+.photo-notice-ok {
+    border-color: var(--sc-line, var(--line));
+    background: var(--sc-card, var(--surface));
+    color: var(--sc-text, var(--text));
+}
+
 .photo-tab .sc-gear {
     width: 14px;
     height: 14px;
@@ -252,10 +269,17 @@
 
 /* ---------- gallery ---------- */
 
+/* holds the grid(s); never a grid itself - see buildPhotosPanel() */
+.photo-gallery-host {
+    display: block;
+    min-width: 0;
+}
+
 .photo-gallery {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
     gap: 0.6rem;
+    min-width: 0;
 }
 
 .photo-tile {
@@ -456,6 +480,7 @@
 
 .photo-viewer-info,
 .photo-viewer-delete,
+.photo-viewer-lock,
 .photo-viewer-close {
     display: flex;
     align-items: center;
@@ -472,6 +497,7 @@
 }
 
 .photo-viewer-info:hover,
+.photo-viewer-lock:hover,
 .photo-viewer-close:hover {
     border-color: var(--sapphire);
     color: var(--text);
@@ -1308,6 +1334,12 @@
 }
 
 @media (max-width: 420px) {
+    /* three columns on a phone, two on the narrowest screens */
+    .photo-gallery {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.35rem;
+    }
+
     .photo-viewer-meta {
         grid-template-columns: 1fr;
     }
@@ -1324,5 +1356,11 @@
 
     .photo-album-detail-actions {
         flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 300px) {
+    .photo-gallery {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }

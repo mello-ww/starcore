@@ -13,7 +13,7 @@ let confirmStopTimer = null;
 let stopped = false;
 let satellites = [];
 let navSignature = "";
-let route = { name: "overview", satellite: null };
+let route = { name: "overview", satellite: null, section: null };
 let mounted = null;
 let configurationSettings = [];
 let satelliteConfigState = null;
@@ -132,6 +132,20 @@ function hasPage(satellite) {
     return Boolean(satellite.page) || Object.keys(satellite.state || {}).length > 0;
 }
 
+// a satellite whose manifest names another as its host (section_of) is
+// opened as a section of that host's page and gets no navigation entry of
+// its own - presentation only; its routes are as protected as any other
+function isSection(satellite) {
+    return Boolean(satellite.section_of);
+}
+
+function satelliteHash(satellite) {
+    if (isSection(satellite)) {
+        return `#/satellite/${encodeURIComponent(satellite.section_of)}/${encodeURIComponent(satellite.name)}`;
+    }
+    return `#/satellite/${encodeURIComponent(satellite.name)}`;
+}
+
 function satelliteUrl(name, path = "") {
     return `/api/satellites/${encodeURIComponent(name)}${path}`;
 }
@@ -199,14 +213,23 @@ function applyRoute() {
     // overlay in the first place
     closeSidebar();
 
-    const [name, param] = location.hash.replace(/^#\/?/, "").split("/");
+    const [name, param, section] = location.hash.replace(/^#\/?/, "").split("/");
 
     if (name === "satellite" && param) {
-        route = { name: "satellite", satellite: decodeURIComponent(param) };
+        route = { name: "satellite", satellite: decodeURIComponent(param), section: section ? decodeURIComponent(section) : null };
     } else if (name in CORE_PAGES) {
-        route = { name, satellite: null };
+        route = { name, satellite: null, section: null };
     } else {
-        route = { name: "overview", satellite: null };
+        route = { name: "overview", satellite: null, section: null };
+    }
+
+    // a real navigation to the page already showing: let it switch section
+    if (mounted && route.name === "satellite" && mounted.name.toLowerCase() === route.satellite.toLowerCase()
+        && mounted.section !== route.section) {
+        mounted.section = route.section;
+        if (mounted.cleanup && typeof mounted.cleanup.showSection === "function") {
+            mounted.cleanup.showSection(route.section);
+        }
     }
 
     showRoute();
@@ -321,7 +344,7 @@ function homeEmpty(text, actionLabel, onAction) {
 }
 
 function openSatellite(satellite) {
-    location.hash = `#/satellite/${encodeURIComponent(satellite.name)}`;
+    location.hash = satelliteHash(satellite);
 }
 
 function buildHomeIcon(satellite) {
@@ -383,7 +406,8 @@ function buildHomeCard(satellite) {
 }
 
 function renderHomeSatellites() {
-    const signature = satellites
+    const listed = satellites.filter((satellite) => !isSection(satellite));
+    const signature = listed
         .map((satellite) => [satellite.name, satellite.status, satellite.icon, satellite.description,
             satellite.configurable, hasPage(satellite)].join(":"))
         .join("|");
@@ -393,14 +417,14 @@ function renderHomeSatellites() {
     homeSignature = signature;
 
     const grid = document.getElementById("home-satellites");
-    const online = satellites.filter((satellite) => satellite.status === "running").length;
-    setText("home-satellite-count", satellites.length ? `${online} of ${satellites.length} online` : "");
+    const online = listed.filter((satellite) => satellite.status === "running").length;
+    setText("home-satellite-count", listed.length ? `${online} of ${listed.length} online` : "");
 
-    if (satellites.length === 0) {
+    if (listed.length === 0) {
         grid.replaceChildren(homeEmpty("No satellites are loaded on this StarCore."));
     } else {
         // satellites with a page of their own first, then by name
-        const ordered = [...satellites].sort((a, b) =>
+        const ordered = [...listed].sort((a, b) =>
             Number(hasPage(b)) - Number(hasPage(a)) || a.name.localeCompare(b.name));
         grid.replaceChildren(...ordered.map(buildHomeCard));
     }
@@ -419,7 +443,7 @@ function renderHomeSatellites() {
         const view = element("button", "sc-button", "View");
         view.type = "button";
         view.addEventListener("click", () => {
-            location.hash = hasPage(alert.satellite) ? `#/satellite/${encodeURIComponent(alert.satellite.name)}` : "#/satellites";
+            location.hash = hasPage(alert.satellite) ? satelliteHash(alert.satellite) : "#/satellites";
         });
         item.appendChild(view);
         list.appendChild(item);
@@ -497,7 +521,7 @@ function toggleAccentMenu(open) {
 /* ---------- satellites ---------- */
 
 function renderSatelliteNav() {
-    const pages = satellites.filter(hasPage);
+    const pages = satellites.filter((satellite) => hasPage(satellite) && !isSection(satellite));
     const signature = pages.map((satellite) => `${satellite.name}:${satellite.status}:${satellite.icon}`).join("|");
     if (signature === navSignature) {
         return;
@@ -589,10 +613,10 @@ function renderSatelliteCard(satellite) {
     card.appendChild(renderCommands(satellite.commands));
 
     if (hasPage(satellite)) {
-        const link = element("button", "card-link", "Open page →");
+        const link = element("button", "card-link", isSection(satellite) ? `Open in ${satellite.section_of} →` : "Open page →");
         link.type = "button";
         link.addEventListener("click", () => {
-            location.hash = `#/satellite/${encodeURIComponent(satellite.name)}`;
+            location.hash = satelliteHash(satellite);
         });
         card.appendChild(link);
     }
@@ -652,7 +676,7 @@ async function mountSatellitePage(satellite) {
     }
 
     unmountSatellitePage();
-    mounted = { name: satellite.name, cleanup: null };
+    mounted = { name: satellite.name, section: route.section, cleanup: null };
     container.replaceChildren();
 
     if (satellite.page.stylesheet) {
@@ -667,6 +691,8 @@ async function mountSatellitePage(satellite) {
         mounted.cleanup = module.mount({
             element: container,
             satellite,
+            // the section the route names (#/satellite/<name>/<section>), if any
+            section: route.section,
             api: {
                 url: (path) => satelliteUrl(satellite.name, path),
                 get: (path) => getJson(satelliteUrl(satellite.name, path)),
@@ -706,6 +732,11 @@ function renderSatellitePage() {
         if (satellites.length) {
             location.hash = "#/satellites";
         }
+        return;
+    }
+    if (isSection(satellite) && findSatellite(satellite.section_of)) {
+        // an old link to a satellite that now lives inside another page
+        location.replace(satelliteHash(satellite));
         return;
     }
 

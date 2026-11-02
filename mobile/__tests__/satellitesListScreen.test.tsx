@@ -62,6 +62,18 @@ describe('SatellitesListScreen', () => {
     expect(setCachedSatellites).toHaveBeenCalledWith('srv-1', [satelliteA, satelliteB]);
   });
 
+  it('does not list a satellite that lives inside another (the Locked Folder, in Photos)', async () => {
+    const lockedFolder = {...satelliteB, name: 'LockedFolder', section_of: 'Photo'};
+    __mocks.list.mockResolvedValue([satelliteA, lockedFolder]);
+    let tree!: ReturnType<typeof renderer.create>;
+    await act(async () => {
+      tree = renderer.create(<SatellitesListScreen navigation={navigation} route={route} />);
+    });
+
+    expect(texts(tree)).toContain('status');
+    expect(texts(tree)).not.toContain('LockedFolder');
+  });
+
   it('marks a satellite with no mobile UI as such and does not navigate on tap', async () => {
     __mocks.list.mockResolvedValue([satelliteB]);
     let tree!: ReturnType<typeof renderer.create>;

@@ -99,6 +99,10 @@ export function HomeScreen() {
   };
 
   const online = satellites?.filter(satellite => satellite.status === 'running').length ?? 0;
+  // a satellite shown inside another (the Locked Folder, in Photos) gets no card of its own;
+  // the system metric above still counts every satellite
+  const listed = satellites?.filter(satellite => !satellite.section_of) ?? null;
+  const listedOnline = listed?.filter(satellite => satellite.status === 'running').length ?? 0;
   const alerts = satellites ? alertsFor(satellites) : [];
   const loading = !status && !error;
 
@@ -192,12 +196,12 @@ export function HomeScreen() {
 
         <View style={styles.sectionHead}>
           <Text style={type.eyebrow}>SATELLITES</Text>
-          {satellites && satellites.length > 0 && <Text style={type.caption}>{`${online} of ${satellites.length} online`}</Text>}
+          {listed && listed.length > 0 && <Text style={type.caption}>{`${listedOnline} of ${listed.length} online`}</Text>}
         </View>
 
         {loading && [0, 1].map(index => <View key={index} style={[styles.card, styles.skeleton]} />)}
-        {satellites?.length === 0 && <Text style={[type.body, styles.empty]}>No Satellites are loaded on this server.</Text>}
-        {satellites?.map(satellite => (
+        {listed?.length === 0 && <Text style={[type.body, styles.empty]}>No Satellites are loaded on this server.</Text>}
+        {listed?.map(satellite => (
           <View key={satellite.name} style={styles.card}>
             <View style={styles.cardHead}>
               <Icon name={satelliteIcon(satellite.name)} size={20} color={accentColor} />

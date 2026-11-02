@@ -38,6 +38,24 @@ should be run on Linux before relying on those behaviours.
 Not verified: real audio output (the demo library is empty and no speakers were checked),
 any physical Android device, iOS, Linux hosts, and HTTPS with a real certificate.
 
+### Photos grid and Locked Folder in Photos (after the checkpoint)
+
+Verified on the same machine against a demo server whose every satellite configuration was
+redirected to temporary folders (generated test photos, a temporary vault, a test PIN):
+
+| Check | Result |
+| --- | --- |
+| Python tests | 727 tests: 722 passed, 5 skipped (the same 5 as above), 0 failed |
+| Mission Control scripts | 36 files, all parse; API smoke test 35 / 35 |
+| Photos gallery columns (1440 / 1000 / 390 / 300 px wide) | 7 / 5 / 3 / 2, no horizontal overflow |
+| Web Locked Folder in a browser: wrong PIN, unlock, move in from the viewer, relock after the move, on leaving the tab, on reload and on navigating away, move out | All as expected |
+| Android Jest / TypeScript / ESLint / Metro release bundle | 32 suites, 312 tests passed; clean; clean; builds |
+| Android `assembleDebug` (JDK 17, with the new native privacy module) | Builds |
+| Android emulator: Locked section hidden from Home and Satellites lists, PIN unlock, relock on background, biometric enrollment and unlock with a simulated fingerprint, move out and move in, FLAG_SECURE (screen capture comes out blank) | All as expected |
+
+Not verified: biometric unlock on a physical phone, and Android's handling of a changed
+fingerprint enrollment (covered by unit tests only).
+
 ### Implemented
 
 - **Design language**: shared tokens (`mission_control/tokens.css`, mirrored in
@@ -49,6 +67,10 @@ any physical Android device, iOS, Linux hosts, and HTTPS with a real certificate
   to page scrolling on phone widths.
 - **Android app**: multiple servers, sign-in, per-server biometric app lock, Home, Satellites,
   Console, Config and Settings tabs, and native Music and Photos screens.
+- **Locked Folder in Photos**: a tab of Photos on web and Android instead of a satellite of
+  its own; verified moves to and from Photos; private media kept out of Photos' imports,
+  sync, albums and caches; optional, server-verified biometric unlock on Android. See
+  `docs/satellites/locked_folder.md`.
 
 ### Known limitations
 
@@ -59,7 +81,11 @@ any physical Android device, iOS, Linux hosts, and HTTPS with a real certificate
 - Mission Control still carries hidden legacy markup and styles from the previous design
   (the starfield and asteroid belt in `index.html`, their rules in `style.css`).
 - Locked Folder files are protected by access control and a hashed PIN, but not encrypted
-  at rest.
+  at rest. Its counters and unlocks are in memory, so a restart clears a lockout.
+- Without Pillow on the server, Locked Folder (like Photos) shows originals as thumbnails.
+- The Locked Folder location is chosen from Mission Control only; the Android app can create
+  the PIN but not pick the folder, and changes the PIN only from Mission Control.
+- A forgotten Locked Folder PIN can only be reset by editing the server's files.
 - The Signal Bus is not implemented yet (`engine/starcore/signals.py` is empty).
 - Developer Mode and Space Mode do not exist yet.
 
@@ -91,6 +117,22 @@ Potential risks:
   tooling (React Native CLI, Metro, codegen). The one shipped in the app, React Navigation's
   `query-string`/`decode-uri-component` denial of service, is not reachable: the app
   registers no deep links.
+
+Found and fixed while moving the Locked Folder into Photos (each covered by
+`engine/tests/test_locked_folder_security.py`):
+
+- Anyone signed in could repoint or delink the Locked Folder without the PIN, then read the
+  old vault through File Explorer - and reset a PIN lockout the same way. These settings now
+  need the vault unlocked.
+- Signing in again for a fresh session reset the per-session PIN limit. An account-wide
+  limit now backs it up, and parallel guesses can no longer exceed either.
+- A damaged `pin.json` read as "no PIN", letting anyone set a new one. It now keeps the
+  vault locked.
+- Right after a restart, File Explorer's guard let the vault through until something else
+  had touched the Locked Folder. It now creates the runtime itself.
+- Renaming or deleting a folder *containing* the vault was not guarded.
+- Photos could import the vault (or a folder containing it) into the public library, and a
+  photo moved into the vault could come back through phone sync.
 
 Checked and fine: PBKDF2-SHA256 (260,000 iterations, per-secret salt) and constant-time
 comparison for the password and Locked Folder PIN; `HttpOnly; SameSite=Lax` session cookies
@@ -132,7 +174,8 @@ no required third-party Python dependencies.
 - [x] Status
 - [x] Files (File Explorer)
 - [x] Locked Folder (PIN, lockout, isolation from File Explorer)
-    - [ ] Move Locked Folder into Photos
+    - [x] Move Locked Folder into Photos (a Photos tab on web and Android)
+    - [x] Biometric unlock on Android, verified by the server
     - [ ] Encryption at rest
 - [x] Photos
     - [x] Library indexing, thumbnails, albums, favorites, map, recycle bin

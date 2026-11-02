@@ -1,168 +1,308 @@
-.lf-status .facts,
-.lf-status h3,
-.lf-pin h3,
-.lf-browser h3 {
-    margin-top: 0;
+/* Locked Folder - shown as a tab of Photos. Built on the StarCore tokens
+   (mission_control/tokens.css); tiles and the viewer reuse Photo's own
+   .photo-gallery / .photo-tile / .photo-viewer styles. */
+
+.lf {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-4, 16px);
+    min-width: 0;
+}
+
+.lf-card {
+    padding: var(--sc-space-5, 24px);
+    border-radius: var(--sc-radius-card, 16px);
+    background: var(--sc-card, #1b1c20);
+}
+
+.lf-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sc-space-2, 8px);
+    padding: var(--sc-space-7, 48px) var(--sc-space-5, 24px);
+    text-align: center;
+}
+
+.lf-state h3 {
+    margin: var(--sc-space-2, 8px) 0 0;
+    font-size: 1.15rem;
+}
+
+.lf-state > p {
+    max-width: 46ch;
+    margin: 0;
+}
+
+.lf-state-icon {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    color: var(--sc-text-icon, currentColor);
+}
+
+.lf-state-icon svg,
+.lf-mini-lock svg,
+.lf-file-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.lf-state-locked .lf-state-icon,
+.lf-state-setup .lf-state-icon {
+    color: var(--sc-accent);
+}
+
+.lf-state-error .lf-state-icon {
+    color: var(--sc-danger, #ee444b);
+}
+
+.lf-muted {
+    color: var(--sc-text-2, #9b9ca3);
+    font-size: 0.88rem;
+}
+
+.lf-label {
+    margin: 0;
+    color: var(--sc-text-3, #6e6f76);
+    font-family: var(--sc-font-mono, monospace);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.lf-form {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--sc-space-2, 8px);
+    width: 100%;
+    max-width: 420px;
+    margin-top: var(--sc-space-3, 12px);
+}
+
+.lf-form-stack {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+/* in a column the flex basis would set the height, not the width */
+.lf-form-stack .lf-input {
+    flex: none;
+}
+
+.lf-settings .lf-form {
+    max-width: 320px;
+    margin: 0;
+}
+
+.lf-input {
+    flex: 1 1 180px;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--sc-control-strong, #34353b);
+    border-radius: var(--sc-radius-control, 10px);
+    background: var(--sc-field, #141518);
+    color: var(--sc-text, #f2f2f3);
+    font: inherit;
+}
+
+.lf-input:focus-visible {
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 1px;
+}
+
+.lf-pin {
+    font-family: var(--sc-font-mono, monospace);
+    letter-spacing: 0.3em;
+    text-align: center;
+}
+
+.lf-pin::placeholder {
+    font-family: var(--sc-font-sans, inherit);
+    letter-spacing: normal;
+}
+
+.lf-banner {
+    width: 100%;
+    max-width: 520px;
+    margin: 0;
+}
+
+.lf-unlocked > .lf-banner {
+    max-width: none;
+}
+
+.lf-banner[hidden] {
+    display: none;
+}
+
+/* ---------- unlocked ---------- */
+
+.lf-unlocked {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-3, 12px);
+    min-width: 0;
+}
+
+.lf-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sc-space-3, 12px);
+}
+
+.lf-unlocked-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-weight: 600;
+}
+
+.lf-mini-lock {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    color: var(--sc-accent);
 }
 
 .lf-actions {
     display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-top: 0.75rem;
-}
-
-.lf-pin form.stack {
-    max-width: 320px;
-    gap: 0.6rem;
-}
-
-/* the protected browser - the same row/breadcrumb visual language as File
-   Explorer's own page (satellites/native/file_explorer/mission_control/
-   page.css), under its own class names since each satellite's page.css is
-   loaded independently - see docs/satellites.md, "Contributing a Mission
-   Control page" */
-
-.lf-toolbar {
-    display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.6rem;
+    gap: var(--sc-space-2, 8px);
 }
 
-.lf-toolbar label.button {
-    cursor: pointer;
+.lf-actions .sc-gear {
+    width: 15px;
+    height: 15px;
+    margin-right: 6px;
 }
 
-.lf-breadcrumb {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.2rem;
-    padding: 0.5rem 0.7rem;
-    margin-bottom: 0.6rem;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--raised);
-    font-family: var(--mono);
-    font-size: 0.82rem;
-    overflow-x: auto;
+.lf-section-title {
+    margin: var(--sc-space-2, 8px) 0 0;
 }
 
-.lf-crumb {
-    padding: 0.1rem 0.3rem;
-    border: 0;
-    border-radius: 4px;
-    background: none;
-    color: var(--azure);
-    font: inherit;
-    cursor: pointer;
-    white-space: nowrap;
+.lf-video-poster {
+    position: absolute;
+    inset: 0;
+    background: var(--sc-control, #24252a);
 }
 
-.lf-crumb:hover {
-    background: color-mix(in srgb, var(--sc-accent) 12%, transparent);
-    color: var(--ice);
+.lf-empty .lf-state-icon {
+    width: 40px;
+    height: 40px;
 }
 
-.lf-crumb-sep {
-    color: var(--text-faint);
-}
-
-.lf-list {
+.lf-files {
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
     overflow: hidden;
+    border-radius: var(--sc-radius-card, 16px);
+    background: var(--sc-card, #1b1c20);
 }
 
-.lf-row {
+.lf-file {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.55rem 0.75rem;
-    border-bottom: 1px solid var(--line);
+    gap: var(--sc-space-3, 12px);
+    padding: 10px var(--sc-space-4, 16px);
+}
+
+.lf-file + .lf-file {
+    border-top: 1px solid var(--sc-line, #2a2b30);
+}
+
+.lf-file-icon {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    color: var(--sc-text-icon, currentColor);
+}
+
+.lf-file-info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
     min-width: 0;
 }
 
-.lf-row:last-child {
-    border-bottom: 0;
-}
-
-.lf-row:hover {
-    background: var(--raised);
-}
-
-.lf-row-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0;
-    flex: 1 1 220px;
-}
-
-.lf-name {
+.lf-file-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.88rem;
 }
 
-button.lf-name {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--text);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
+.button.lf-danger {
+    color: var(--sc-danger, #ee444b);
 }
 
-button.lf-name:hover {
-    color: var(--azure);
+.button.lf-danger:hover {
+    border-color: var(--sc-danger, #ee444b);
 }
 
-.lf-meta {
-    flex: none;
-    min-width: 72px;
-    color: var(--text-faint);
-    font-family: var(--mono);
-    font-size: 0.74rem;
-    text-align: right;
+/* ---------- settings ---------- */
+
+.lf-settings {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+    gap: var(--sc-space-5, 24px);
+    align-items: start;
 }
 
-.lf-row-actions {
+.lf-settings h3 {
+    grid-column: 1 / -1;
+    margin: 0;
+}
+
+.lf-location {
     display: flex;
-    flex: none;
-    align-items: center;
-    gap: 0.3rem;
-    margin-left: auto;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sc-space-2, 8px);
+    min-width: 0;
 }
 
-.lf-row-actions a.icon-button {
-    text-decoration: none;
-    padding: 0.2rem 0.5rem;
+.lf-path {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    color: var(--sc-text-2, #9b9ca3);
+    font-size: 0.82rem;
 }
 
-@media (max-width: 560px) {
-    .lf-row {
-        flex-direction: column;
+/* ---------- viewer (shares Photo's .photo-viewer) ---------- */
+
+.lf-viewer .photo-viewer-bar-actions .button {
+    min-height: 32px;
+}
+
+.lf-viewer .lf-banner {
+    align-self: center;
+    margin-top: var(--sc-space-3, 12px);
+}
+
+@media (max-width: 600px) {
+    .lf-card {
+        padding: var(--sc-space-4, 16px);
+    }
+
+    .lf-state {
+        padding: var(--sc-space-6, 32px) var(--sc-space-4, 16px);
+    }
+
+    .lf-bar {
         align-items: stretch;
+        flex-direction: column;
     }
 
-    .lf-row-info {
-        flex: 1 1 auto;
+    .lf-viewer .photo-viewer-bar {
+        flex-wrap: wrap;
     }
 
-    .lf-meta {
-        text-align: left;
-        min-width: 0;
-    }
-
-    .lf-row-actions {
-        margin-left: 0;
+    .lf-viewer .photo-viewer-bar-actions {
+        flex-wrap: wrap;
     }
 }

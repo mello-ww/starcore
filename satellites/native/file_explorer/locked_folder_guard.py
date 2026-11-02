@@ -20,16 +20,23 @@ LOCKED_FOLDER_NAME = "LockedFolder"
 
 def _runtime(engine):
     """The LockedFolder satellite's live runtime object, or None if there is
-    nothing to guard against right now (satellite absent, disabled, or the
-    runtime hasn't been created yet - see locked_folder/runtime.py and
-    locked_folder/state.py for why that's rare in practice, and safe here
-    either way: no runtime found means guard() below simply lets everything
-    through, which is correct when there is genuinely no Locked Folder
-    configured, and merely a rare cold-start miss otherwise)."""
+    nothing to guard against (satellite absent or disabled). A runtime that
+    hasn't been created yet is created here, so the first request after a
+    restart is guarded like every other."""
     satellite = engine.registry.get(LOCKED_FOLDER_NAME)
     if satellite is None or not satellite.enabled:
         return None
-    return getattr(satellite, "locked_folder_runtime", None)
+    live = getattr(satellite, "locked_folder_runtime", None)
+    if live is None and satellite.state_provider is not None:
+        # nothing has created the runtime yet (e.g. the first request after a
+        # restart): its state provider is the documented way to warm it up,
+        # and without it this guard would let the vault through
+        try:
+            satellite.state_provider(engine, satellite)
+        except Exception as error:
+            print(f"[WARNING]: the Locked Folder could not be checked ({type(error).__name__}).")
+        live = getattr(satellite, "locked_folder_runtime", None)
+    return live
 
 
 def is_protected(request, target: Path) -> bool:
@@ -56,5 +63,25 @@ def guard(request, target: Path):
 
     return error_response(
         "this location is inside the Locked Folder - unlock it from the Locked Folder page first",
+        status=403,
+    )
+
+
+def guard_tree(request, target: Path):
+    """guard(), plus a refusal for a folder that *contains* the Locked Folder:
+    renaming or deleting one of those would move the vault out from under
+    its configured path (unprotecting it) or erase it, without the PIN.
+    Used by the routes that act on a whole directory tree - rename and delete."""
+    blocked = guard(request, target)
+    if blocked is not None:
+        return blocked
+
+    live = _runtime(request.engine)
+    root = live.configured_root if live is not None else None
+    if root is None or not root.is_relative_to(target) or live.is_unlocked(request.token):
+        return None
+
+    return error_response(
+        "this folder contains the Locked Folder - unlock it from Photos first",
         status=403,
     )

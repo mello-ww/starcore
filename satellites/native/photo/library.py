@@ -163,7 +163,7 @@ class PhotoLibrary:
 
     # ---------- import ----------
 
-    def add_file(self, source, filename: str = None, save: bool = True, physical_path: str = None):
+    def add_file(self, source, filename: str = None, save: bool = True, physical_path: str = None, private=None):
         """Takes a single file into the library.
 
         Returns the new record, or None when that exact image is already stored.
@@ -179,11 +179,19 @@ class PhotoLibrary:
         A directory scan/import (scan()/import_directory()) never sets this;
         those photos simply have no physical album, exactly like a photo
         imported before this concept existed.
+
+        `private` (see private_media.py) refuses media that was moved into the
+        Locked Folder: it is answered exactly like a duplicate, so a phone
+        that still has the photo stops re-sending it, and nothing tells the
+        caller where it went.
         """
         source = Path(source)
-        photo_id = _digest(source)[:ID_LENGTH]
+        full_digest = _digest(source)
+        photo_id = full_digest[:ID_LENGTH]
 
         if photo_id in self._photos:
+            return None
+        if private is not None and private.is_sealed(full_digest):
             return None
 
         # recognized by content, never by filename - the same reason
@@ -246,36 +254,40 @@ class PhotoLibrary:
 
         return photo
 
-    def scan(self, source) -> dict:
-        """Reports what importing a directory would do, without writing anything."""
-        source = self._source(source)
+    def scan(self, source, private=None) -> dict:
+        """Reports what importing a directory would do, without writing anything.
+
+        Anything inside the Locked Folder is skipped without being counted
+        (see private_media.py), and a source inside it is refused outright."""
+        source = self._source(source, private)
         found = duplicates = 0
         seen = set()
 
-        for path in self._candidates(source):
+        for path in self._candidates(source, private):
             found += 1
             try:
-                photo_id = _digest(path)[:ID_LENGTH]
+                full_digest = _digest(path)
             except OSError:
                 continue
+            photo_id = full_digest[:ID_LENGTH]
 
-            if photo_id in self._photos or photo_id in seen:
+            if photo_id in self._photos or photo_id in seen or (private and private.is_sealed(full_digest)):
                 duplicates += 1
             else:
                 seen.add(photo_id)
 
         return {"source": str(source), "found": found, "new": len(seen), "duplicates": duplicates}
 
-    def import_directory(self, source) -> dict:
-        source = self._source(source)
+    def import_directory(self, source, private=None) -> dict:
+        source = self._source(source, private)
         imported = []
         failed = []
         found = duplicates = 0
 
-        for path in self._candidates(source):
+        for path in self._candidates(source, private):
             found += 1
             try:
-                photo = self.add_file(path, save=False)
+                photo = self.add_file(path, save=False, private=private)
             except (images.UnsupportedImage, OSError, ValueError) as error:
                 failed.append({"file": path.name, "reason": str(error)})
                 continue
@@ -362,7 +374,29 @@ class PhotoLibrary:
         self.original_path(photo).unlink(missing_ok=True)
         self._thumbnail_file(photo).unlink(missing_ok=True)
 
-    def _source(self, source) -> Path:
+    def remove_moved(self, photo_id: str) -> None:
+        """Takes a photo out of the library for good because a verified copy
+        now lives elsewhere (the Locked Folder) - unlike erase(), without
+        going through the recycle bin, which would leave a second, visible
+        copy behind. The index is saved first; if deleting the stored file
+        then fails, it is merely an orphan no listing can reach."""
+        photo = self._photos.get(photo_id)
+        if photo is None:
+            raise PhotoNotFound(f"unknown photo '{photo_id}'")
+
+        del self._photos[photo_id]
+        try:
+            self._save()
+        except Exception:
+            self._photos[photo_id] = photo
+            raise
+
+        try:
+            self._delete_stored_files(photo)
+        except OSError as error:
+            print(f"[WARNING]: a moved photo's library copy could not be deleted ({error.strerror}).")
+
+    def _source(self, source, private=None) -> Path:
         if not str(source).strip():
             raise PhotoImportError("no source directory was given")
 
@@ -378,14 +412,21 @@ class PhotoLibrary:
             raise PhotoImportError(f"'{path}' is not a directory")
         if path == self.root or self.root in path.parents:
             raise PhotoImportError("the photo library cannot import itself")
+        if private is not None and private.is_private(path):
+            raise PhotoImportError("the Locked Folder cannot be imported into Photos - "
+                                   "move photos out of it from the Locked Folder instead")
 
         return path
 
-    def _candidates(self, source: Path):
+    def _candidates(self, source: Path, private=None):
         for path in sorted(source.rglob("*")):
             if not path.is_file() or path.suffix.lower() not in _CANDIDATE_SUFFIXES:
                 continue
             if path == self.root or self.root in path.parents:
+                continue
+            # checked on the resolved path, so a link elsewhere in the source
+            # that points into the vault is skipped too
+            if private is not None and private.is_private(path):
                 continue
 
             yield path

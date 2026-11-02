@@ -11,6 +11,7 @@ import com.facebook.soloader.SoLoader
 import com.brentvatne.react.ReactNativeVideoManager
 import com.starcore.mobile.music.MusicPackage
 import com.starcore.mobile.music.PlayerRegistry
+import com.starcore.mobile.privacy.PrivacyPackage
 
 /**
  * Standard React Native application bootstrap - autolinking (via
@@ -18,13 +19,15 @@ import com.starcore.mobile.music.PlayerRegistry
  * and react-native-biometrics (see src/platform/), so neither is
  * hand-registered here. The one exception is the app's own Music package
  * (src/music/native.ts), which has no npm package to autolink from, and
- * its react-native-video plugin hook that gives it the player's session.
+ * its react-native-video plugin hook that gives it the player's session,
+ * and the Privacy package (FLAG_SECURE and image-cache eviction for the
+ * Locked Folder).
  */
 class MainApplication : Application(), ReactApplication {
 
     override val reactNativeHost: ReactNativeHost =
         object : DefaultReactNativeHost(this) {
-            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MusicPackage()
+            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MusicPackage() + PrivacyPackage()
 
             override fun getJSMainModuleName(): String = "index"
 

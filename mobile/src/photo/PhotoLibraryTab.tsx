@@ -4,6 +4,7 @@ import {GestureDetector} from 'react-native-gesture-handler';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {colors, spacing, typography} from '../theme';
 import {getCachedPhotos, setCachedPhotos} from './cache';
+import {onPhotoRemoved} from './photoEvents';
 import {PhotoGrid} from './PhotoGrid';
 import type {Photo} from './types';
 import {useFavorites} from './useFavorites';
@@ -54,6 +55,12 @@ export function PhotoLibraryTab({onOpenPhoto}: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // a photo deleted or locked away from the viewer leaves this grid at once
+  useEffect(
+    () => onPhotoRemoved(photoId => setPhotos(current => (current ? current.filter(photo => photo.id !== photoId) : current))),
+    [],
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);

@@ -66,7 +66,9 @@ export function SatellitesListScreen({navigation}: Props) {
   return (
     <View style={styles.screen}>
       <FlatList
-        data={satellites ?? []}
+        // a satellite shown as a section of another (the Locked Folder, in
+        // Photos) is opened from there, not listed on its own
+        data={(satellites ?? []).filter(item => !item.section_of)}
         keyExtractor={item => item.name}
         contentContainerStyle={[styles.list, {paddingTop: top + space.xl}]}
         ListHeaderComponent={

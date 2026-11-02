@@ -98,6 +98,17 @@ describe('HomeScreen', () => {
     expect(shown).toContain('No mobile interface yet');
   });
 
+  it('gives a satellite shown inside another no card of its own', async () => {
+    const lockedFolder = {...docker, name: 'LockedFolder', status: 'running' as const, section_of: 'Photo'};
+    __mocks.list.mockResolvedValue([music, docker, lockedFolder]);
+    (useAuth as jest.Mock).mockReturnValue({client: clientWith('Ada')});
+    const tree = await render();
+    const shown = texts(tree);
+    expect(shown).not.toContain('LockedFolder');
+    expect(shown).toContain('1 of 2 online');
+    expect(shown).toContain('2/3'); // the system metric still counts it
+  });
+
   it('opens a satellite inside the Satellites tab', async () => {
     (useAuth as jest.Mock).mockReturnValue({client: clientWith('Ada')});
     const tree = await render();

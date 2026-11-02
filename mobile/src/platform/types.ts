@@ -65,6 +65,33 @@ export interface BiometricAuthenticator {
   authenticate(promptMessage: string): Promise<boolean>;
 }
 
+/** What signing one challenge produced. "key-invalid" means the Keystore
+ * key can no longer be used - most often because the enrolled fingerprints
+ * or faces changed, which Android treats as invalidating it. */
+export type SignResult =
+  | {status: 'signed'; signature: string}
+  | {status: 'cancelled'}
+  | {status: 'key-invalid'};
+
+/** A Keystore key that only signs after a strong biometric match - used
+ * for the Locked Folder's biometric unlock, where the server verifies the
+ * signature (see src/lockedFolder/biometricUnlock.ts). The private key
+ * never leaves the device's secure hardware. One key per app install. */
+export interface BiometricSigner {
+  isAvailable(): Promise<BiometricAvailability>;
+
+  keyExists(): Promise<boolean>;
+
+  /** Creates (or replaces) the key pair; resolves its public key as base64
+   * X.509 SubjectPublicKeyInfo, or null if it couldn't be created. */
+  createKey(): Promise<string | null>;
+
+  /** Shows the biometric prompt and signs `payload` with the key. */
+  sign(promptMessage: string, payload: string): Promise<SignResult>;
+
+  deleteKey(): Promise<void>;
+}
+
 /** A human-readable label for StarCore's "Active sessions" list
  * (`device_name` in `AuthStore.create_session` - see docs/api.md). Best
  * effort and never security-sensitive - worst case it's a generic label

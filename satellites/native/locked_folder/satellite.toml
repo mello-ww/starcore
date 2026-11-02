@@ -1,5 +1,6 @@
 name = "LockedFolder"
 version = "1.0.0"
 author = "mellow"
-description = "A PIN- and session-protected storage area, kept off-limits to File Explorer until unlocked."
+description = "A PIN-protected private area for photos and files, opened from Photos."
 icon = "icon.svg"
+section_of = "Photo" # opened as a tab of Photo, not from its own navigation entry

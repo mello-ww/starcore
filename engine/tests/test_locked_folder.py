@@ -459,7 +459,9 @@ class LockedFolderApiTest(unittest.TestCase):
         self.json_request("/api/satellites/LockedFolder/delink", "POST", {})
         self.assertFalse(self.status()[1]["unlocked"])
 
-    def test_delink_clears_a_brute_force_lockout(self):
+    def test_delink_cannot_be_used_to_reset_a_brute_force_lockout(self):
+        # delinking and re-linking used to clear the lockout counters, which
+        # made it a way around the PIN limit - it now needs the vault unlocked
         self.configure_vault()
         self.locked_folder.config.data["max_pin_attempts"] = 2
         self.set_pin("1234")
@@ -468,11 +470,15 @@ class LockedFolderApiTest(unittest.TestCase):
         status, _ = self.unlock("0000")
         self.assertEqual(status, 429)  # locked out
 
-        self.json_request("/api/satellites/LockedFolder/delink", "POST", {})
-        self.configure_vault()  # reconfigure the exact same path
+        status, _ = self.json_request("/api/satellites/LockedFolder/delink", "POST", {})
+        self.assertEqual(status, 403)
+        status, _ = self.json_request(
+            "/api/satellites/LockedFolder/configuration", "POST",
+            {"key": "locked_folder_path", "value": str(self.vault)})
+        self.assertEqual(status, 403)
 
-        status, payload = self.unlock("1234")
-        self.assertEqual(status, 200, "a lockout earned before delinking should not linger afterward")
+        status, _ = self.unlock("1234")
+        self.assertEqual(status, 429, "the lockout must still apply")
 
     def test_after_delink_file_explorer_no_longer_treats_the_old_path_as_protected(self):
         self.configure_vault()
@@ -484,7 +490,9 @@ class LockedFolderApiTest(unittest.TestCase):
     def test_a_new_locked_folder_can_be_configured_after_delinking(self):
         self.configure_vault()
         self.set_pin("1234")
-        self.json_request("/api/satellites/LockedFolder/delink", "POST", {})
+        self.unlock("1234")  # delinking a PIN-protected vault needs it open
+        status, _ = self.json_request("/api/satellites/LockedFolder/delink", "POST", {})
+        self.assertEqual(status, 200)
 
         other_vault = self.directory / "other-vault"
         other_vault.mkdir()
