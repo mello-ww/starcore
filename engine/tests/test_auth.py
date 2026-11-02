@@ -6,11 +6,13 @@ now goes through.
 from http.client import HTTPConnection
 from pathlib import Path
 import json
+import socket
 import tempfile
 import time
 import unittest
 
-from starcore.auth import AuthError, AuthStore
+from starcore.api.server import MAX_OPEN_JSON_BODY
+from starcore.auth import AuthError, AuthStore, LoginThrottle
 from tests.support import start_engine, stop_engine
 
 
@@ -631,6 +633,192 @@ class AuthApiTest(unittest.TestCase):
             self.assertEqual(status, 200)
         finally:
             stop_engine(engine)
+
+    def raw_request(self, engine, head: bytes) -> bytes:
+        """Sends only the request head (no body) and returns what comes back,
+        so a test can declare any Content-Length without sending it."""
+        with socket.create_connection(("127.0.0.1", engine.api.port), timeout=5) as connection:
+            connection.sendall(head)
+            response = b""
+            while True:
+                chunk = connection.recv(4096)
+                if not chunk:
+                    return response
+                response += chunk
+
+    def test_an_oversized_sign_in_body_is_refused_before_it_is_read(self):
+        # declares 100 MB but sends none of it: a server that tried to read
+        # the body would hang here until the timeout instead of answering
+        engine = start_engine(mission_control=True)
+        try:
+            response = self.raw_request(
+                engine,
+                b"POST /api/auth/login HTTP/1.1\r\nHost: localhost\r\n"
+                b"Content-Type: application/json\r\nContent-Length: 100000000\r\n\r\n")
+            self.assertTrue(response.startswith(b"HTTP/1.0 413") or response.startswith(b"HTTP/1.1 413"), response[:40])
+        finally:
+            stop_engine(engine)
+
+    def test_the_sign_in_limit_is_exact(self):
+        engine = start_engine(mission_control=True)
+        try:
+            self.request(engine, "/api/auth/setup", method="POST",
+                         payload={"username": "admin", "password": "a very good password"})
+
+            # one byte over: refused (only the head is sent, so nothing is left unread)
+            response = self.raw_request(
+                engine,
+                b"POST /api/auth/login HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n"
+                b"Content-Length: " + str(MAX_OPEN_JSON_BODY + 1).encode() + b"\r\n\r\n")
+            self.assertIn(b" 413 ", response.split(b"\r\n", 1)[0])
+
+            # exactly at the limit: read and checked as a normal (wrong) sign-in
+            prefix, suffix = b'{"username": "admin", "password": "', b'"}'
+            body = prefix + b"x" * (MAX_OPEN_JSON_BODY - len(prefix) - len(suffix)) + suffix
+            connection = HTTPConnection("127.0.0.1", engine.api.port, timeout=5)
+            try:
+                connection.request("POST", "/api/auth/login", body=body,
+                                   headers={"Content-Type": "application/json"})
+                self.assertEqual(connection.getresponse().status, 401)
+            finally:
+                connection.close()
+        finally:
+            stop_engine(engine)
+
+    def test_an_invalid_content_length_is_a_clean_400(self):
+        engine = start_engine(mission_control=True)
+        try:
+            for value in (b"abc", b"-5"):
+                response = self.raw_request(
+                    engine,
+                    b"POST /api/auth/login HTTP/1.1\r\nHost: localhost\r\n"
+                    b"Content-Type: application/json\r\nContent-Length: " + value + b"\r\n\r\n")
+                self.assertIn(b" 400 ", response.split(b"\r\n", 1)[0], value)
+        finally:
+            stop_engine(engine)
+
+    def test_signed_in_endpoints_accept_bodies_larger_than_the_sign_in_limit(self):
+        engine = start_engine(mission_control=True)
+        try:
+            _, _, cookies = self.request(
+                engine, "/api/auth/setup", method="POST",
+                payload={"username": "admin", "password": "a very good password"})
+            token = self.token_from_set_cookie(cookies)
+
+            # an unknown section is rejected by the configuration itself (400),
+            # which shows the body was read rather than refused for its size
+            status, _, _ = self.request(
+                engine, "/api/configuration", method="POST", cookie=token,
+                payload={"section": "x" * (MAX_OPEN_JSON_BODY * 2), "key": "k", "value": 1})
+            self.assertEqual(status, 400)
+        finally:
+            stop_engine(engine)
+
+    def test_repeated_wrong_passwords_lock_out_further_sign_ins(self):
+        engine = start_engine(mission_control=True)
+        try:
+            self.request(engine, "/api/auth/setup", method="POST",
+                         payload={"username": "admin", "password": "a very good password"})
+            attempts = engine.api._server.login_throttle.max_attempts
+
+            for _ in range(attempts):
+                status, _, _ = self.request(engine, "/api/auth/login", method="POST",
+                                            payload={"username": "admin", "password": "wrong"})
+                self.assertEqual(status, 401)
+
+            # locked out now - even the right password is refused until it expires
+            connection = HTTPConnection("127.0.0.1", engine.api.port, timeout=5)
+            try:
+                connection.request("POST", "/api/auth/login",
+                                   body=json.dumps({"username": "admin", "password": "a very good password"}),
+                                   headers={"Content-Type": "application/json"})
+                response = connection.getresponse()
+                payload = json.loads(response.read())
+                self.assertEqual(response.status, 429)
+                self.assertGreater(int(response.getheader("Retry-After")), 0)
+                self.assertGreater(payload["retry_after"], 0)
+                self.assertIn("Try again", payload["error"])
+            finally:
+                connection.close()
+        finally:
+            stop_engine(engine)
+
+    def test_a_successful_sign_in_resets_the_failure_count(self):
+        engine = start_engine(mission_control=True)
+        try:
+            self.request(engine, "/api/auth/setup", method="POST",
+                         payload={"username": "admin", "password": "a very good password"})
+            attempts = engine.api._server.login_throttle.max_attempts
+
+            for _ in range(2):
+                for _ in range(attempts - 1):
+                    status, _, _ = self.request(engine, "/api/auth/login", method="POST",
+                                                payload={"username": "admin", "password": "wrong"})
+                    self.assertEqual(status, 401)
+                status, _, _ = self.request(engine, "/api/auth/login", method="POST",
+                                            payload={"username": "admin", "password": "a very good password"})
+                self.assertEqual(status, 200)
+        finally:
+            stop_engine(engine)
+
+
+class LoginThrottleTest(unittest.TestCase):
+    def throttle(self, **options):
+        self.now = 1000.0
+        return LoginThrottle(clock=lambda: self.now, **options)
+
+    def test_allows_attempts_up_to_the_limit_then_locks_out(self):
+        throttle = self.throttle(max_attempts=3, base_lockout=30)
+        for _ in range(3):
+            self.assertEqual(throttle.begin("10.0.0.1"), 0)
+        self.assertEqual(throttle.begin("10.0.0.1"), 30)
+
+    def test_a_lockout_expires(self):
+        throttle = self.throttle(max_attempts=2, base_lockout=30)
+        throttle.begin("10.0.0.1")
+        throttle.begin("10.0.0.1")
+        self.now += 29.5
+        self.assertEqual(throttle.begin("10.0.0.1"), 1)
+        self.now += 1
+        self.assertEqual(throttle.begin("10.0.0.1"), 0)
+
+    def test_each_further_lockout_doubles_up_to_the_maximum(self):
+        throttle = self.throttle(max_attempts=1, base_lockout=30, max_lockout=100)
+        waits = []
+        for _ in range(4):
+            throttle.begin("10.0.0.1")
+            wait = throttle.begin("10.0.0.1")
+            waits.append(wait)
+            self.now += wait
+        self.assertEqual(waits, [30, 60, 100, 100])
+
+    def test_success_clears_the_record(self):
+        throttle = self.throttle(max_attempts=2)
+        throttle.begin("10.0.0.1")
+        throttle.succeeded("10.0.0.1")
+        self.assertEqual(throttle.begin("10.0.0.1"), 0)
+        self.assertEqual(throttle.begin("10.0.0.1"), 0)
+
+    def test_addresses_are_tracked_separately(self):
+        throttle = self.throttle(max_attempts=1)
+        throttle.begin("10.0.0.1")
+        self.assertGreater(throttle.begin("10.0.0.1"), 0)
+        self.assertEqual(throttle.begin("10.0.0.2"), 0)
+
+    def test_an_idle_record_starts_fresh(self):
+        throttle = self.throttle(max_attempts=3, forget_after=3600)
+        throttle.begin("10.0.0.1")
+        throttle.begin("10.0.0.1")
+        self.now += 3601
+        self.assertEqual(throttle.begin("10.0.0.1"), 0)
+        self.assertEqual(throttle.begin("10.0.0.1"), 0)
+        self.assertEqual(throttle.begin("10.0.0.1"), 0)
+
+    def test_memory_stays_bounded_with_many_addresses(self):
+        throttle = self.throttle(max_attempts=1)
+        for index in range(LoginThrottle.MAX_TRACKED * 3):
+            throttle.begin(f"10.{index}")
+        self.assertLessEqual(len(throttle._records), LoginThrottle.MAX_TRACKED)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ import ssl
 
 from . import payloads
 from .response import RawBody, Request, Response
-from ..auth import AuthError, AuthStore, SESSION_COOKIE, SESSION_TTL_SECONDS
+from ..auth import AuthError, AuthStore, LoginThrottle, SESSION_COOKIE, SESSION_TTL_SECONDS
 from ..core import SatelliteError
 from ..engine_config import ConfigurationError
 
@@ -30,6 +30,13 @@ LIFECYCLE_ACTIONS = {"enable": True, "disable": False}
 RELOAD_SEGMENT = "reload"
 
 FILE_CHUNK = 64 * 1024
+
+# Largest JSON body read into memory. The sign-in endpoints answer anyone, so
+# they get a small cap; every other endpoint has already required a session
+# (or runs before the first account exists), and gets room for things like an
+# imported M3U playlist. File uploads are not JSON and are streamed instead.
+MAX_OPEN_JSON_BODY = 64 * 1024
+MAX_JSON_BODY = 16 * 1024 * 1024
 
 CONTENT_TYPES = {
     ".css": "text/css; charset=utf-8",
@@ -104,6 +111,7 @@ class ApiServer:
         server.engine = self.engine
         server.web_root = self.web_root
         server.https_enabled = self.https_enabled
+        server.login_throttle = LoginThrottle()
 
         self.port = server.server_address[1]
         self._server = server
@@ -314,7 +322,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                 if body is None:
                     return  # a clean error response was already sent
             else:
-                length = int(self.headers.get("Content-Length", 0) or 0)
+                length = self._content_length()
+                if length is None:
+                    return  # a clean error response was already sent
                 raw = RawBody(self.rfile, length)
 
         query = {key: values[-1] for key, values in parse_qs(urlparse(self.path).query).items()}
@@ -456,6 +466,14 @@ class RequestHandler(BaseHTTPRequestHandler):
         if body is None:
             return  # a clean error response was already sent
 
+        throttle = self.server.login_throttle
+        client = self.client_address[0]
+        wait = throttle.begin(client)
+        if wait:
+            self._send_json({"error": f"Too many sign-in attempts. Try again in {wait} seconds.",
+                             "retry_after": wait}, status=429, headers={"Retry-After": str(wait)})
+            return
+
         username = str(body.get("username", "")) if isinstance(body, dict) else ""
         password = str(body.get("password", "")) if isinstance(body, dict) else ""
         # "kind"/"device_name" are optional labels a non-browser caller (a
@@ -470,6 +488,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         except AuthError as error:
             self._send_json({"error": str(error)}, status=401)
             return
+        throttle.succeeded(client)
 
         # A browser gets the token exactly as before - only via the
         # Set-Cookie header, never in the body it can hand to page script.
@@ -547,8 +566,33 @@ class RequestHandler(BaseHTTPRequestHandler):
         content_type = CONTENT_TYPES.get(target.suffix, "application/octet-stream")
         self._send_bytes(target.read_bytes(), content_type)
 
+    def _content_length(self):
+        """The request's Content-Length (0 when absent), or None after sending
+        a 400 for a value that is not a number or is negative."""
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+        except ValueError:
+            length = -1
+        if length < 0:
+            self.close_connection = True
+            self._send_json({"error": "invalid Content-Length"}, status=400)
+            return None
+        return length
+
     def _read_json_body(self):
-        length = int(self.headers.get("Content-Length", 0) or 0)
+        length = self._content_length()
+        if length is None:
+            return None
+
+        path = urlparse(self.path).path
+        limit = MAX_OPEN_JSON_BODY if path in AUTH_OPEN_ENDPOINTS else MAX_JSON_BODY
+        if length > limit:
+            # checked before reading, so an oversized body never reaches
+            # memory; the unread bytes mean this connection can't be reused
+            self.close_connection = True
+            self._send_json({"error": f"request body is too large (limit {limit} bytes)"}, status=413)
+            return None
+
         raw = self.rfile.read(length) if length else b""
 
         if not raw:

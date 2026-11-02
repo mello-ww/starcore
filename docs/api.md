@@ -207,11 +207,22 @@ the moment they're reachable under `/api/`.
 ```
 POST /api/auth/setup   { "username": "...", "password": "..." }  -> 200 + session, or 409 if already set up
 POST /api/auth/login    { "username": "...", "password": "...",
-                          "kind": "web"|"mobile", "device_name": "..." } -> 200 + session, or 401
+                          "kind": "web"|"mobile", "device_name": "..." } -> 200 + session, 401, or 429
 POST /api/auth/logout   (no body)                                -> 200, ends the current session
 GET  /api/auth/status   (no body)                                -> { "bootstrapped": bool, "authenticated": bool,
                                                                      "username": "..." (only when authenticated) }
 ```
+
+After 5 failed logins in a row from one client address, `login` answers
+`429 {"error": "...", "retry_after": <seconds>}` with a matching `Retry-After` header for 30
+seconds, doubling on each further lockout up to 15 minutes; a successful login resets it.
+This applies even to the right password while locked out. The record is kept in memory per
+address, so behind a reverse proxy every client shares one lockout.
+
+JSON request bodies have a size limit, checked against `Content-Length` before anything is
+read: 64 KB for the four auth endpoints above, 16 MB for every other endpoint. A larger body
+gets `413`, and an invalid `Content-Length` gets `400`. Non-JSON uploads are streamed and not
+subject to this limit.
 
 A successful setup or login sets a `starcore_session` cookie (`HttpOnly`, `SameSite=Lax`,
 and `Secure` automatically when HTTPS is enabled - see below). A client that isn't a browser

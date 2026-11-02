@@ -23,8 +23,10 @@ on this rather than inventing its own notion of "is this really the user").
 from pathlib import Path
 import hashlib
 import json
+import math
 import os
 import secrets
+import threading
 import time
 
 PBKDF2_ITERATIONS = 260_000
@@ -48,6 +50,74 @@ def hash_secret(secret: str, salt: bytes) -> str:
     locked_folder/pin_store.py), which imports this directly rather than
     re-implementing it, per "do not duplicate security-sensitive logic"."""
     return hashlib.pbkdf2_hmac("sha256", secret.encode("utf-8"), salt, PBKDF2_ITERATIONS).hex()
+
+
+class LoginThrottle:
+    """Slows down password guessing against /api/auth/login, per client address.
+
+    After `max_attempts` failed sign-ins in a row, that address is refused for
+    `base_lockout` seconds; each further lockout doubles, up to `max_lockout`.
+    A successful sign-in clears the address's record, and a record left idle
+    for `forget_after` seconds starts fresh.
+
+    An attempt counts as failed from the moment it starts until succeeded()
+    is called, so firing many guesses at once cannot get around the limit
+    while the slow password check runs.
+
+    Kept in memory only: a restart forgets it, the same as the Locked Folder's
+    PIN lockout. Behind a reverse proxy every client shares the proxy's
+    address, so they would also share one lockout.
+    """
+
+    MAX_TRACKED = 4096  # old idle records are dropped beyond this many addresses
+
+    def __init__(self, max_attempts: int = 5, base_lockout: float = 30, max_lockout: float = 900,
+                 forget_after: float = 3600, clock=time.monotonic):
+        self.max_attempts = max_attempts
+        self.base_lockout = base_lockout
+        self.max_lockout = max_lockout
+        self.forget_after = forget_after
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._records = {}  # client address -> {"failures", "lockouts", "locked_until", "last"}
+
+    def begin(self, client: str) -> int:
+        """0 if this client may try now (the attempt is counted), otherwise
+        the whole seconds it must wait before trying again."""
+        with self._lock:
+            now = self._clock()
+            record = self._records.get(client)
+            if record is not None and record["locked_until"] > now:
+                return max(1, math.ceil(record["locked_until"] - now))
+            if record is None or now - record["last"] > self.forget_after:
+                if len(self._records) >= self.MAX_TRACKED:
+                    self._forget_idle(now)
+                record = {"failures": 0, "lockouts": 0, "locked_until": 0.0, "last": now}
+                self._records[client] = record
+
+            record["last"] = now
+            record["failures"] += 1
+            if record["failures"] >= self.max_attempts:
+                record["failures"] = 0
+                record["lockouts"] += 1
+                lockout = min(self.base_lockout * 2 ** (record["lockouts"] - 1), self.max_lockout)
+                record["locked_until"] = now + lockout
+            return 0
+
+    def succeeded(self, client: str):
+        with self._lock:
+            self._records.pop(client, None)
+
+    def _forget_idle(self, now: float):
+        for client, record in list(self._records.items()):
+            if record["locked_until"] <= now:
+                del self._records[client]
+        # still full of live lockouts (many addresses at once): drop the
+        # oldest half so memory stays bounded
+        if len(self._records) >= self.MAX_TRACKED:
+            oldest = sorted(self._records, key=lambda client: self._records[client]["last"])
+            for client in oldest[:len(oldest) // 2]:
+                del self._records[client]
 
 
 class AuthStore:

@@ -65,15 +65,18 @@ any physical Android device, iOS, Linux hosts, and HTTPS with a real certificate
 
 ### Security review (2026-11-02)
 
-Non-destructive review; nothing was changed in response yet.
+Non-destructive review. The two confirmed weaknesses it found have since been fixed:
 
-Confirmed weaknesses:
-
-- **Unbounded JSON request bodies.** `_read_json_body()` reads the whole `Content-Length`
-  into memory, including on `/api/auth/login`, which needs no session. Anyone who can reach
-  the server can exhaust its memory. The default bind address `127.0.0.1` limits exposure.
-- **No sign-in throttling.** `/api/auth/login` has no attempt limit or delay (the Locked
-  Folder PIN does). Exposure beyond localhost makes password guessing possible.
+- **Unbounded JSON request bodies (fixed).** `_read_json_body()` read the whole
+  `Content-Length` into memory, including on `/api/auth/login`, which needs no session. It
+  now checks the declared size before reading: 64 KB for the sign-in endpoints, 16 MB for
+  everything else, `413` above that, and `400` for an invalid `Content-Length`. File
+  uploads are streamed and unaffected.
+- **No sign-in throttling (fixed).** `/api/auth/login` had no attempt limit. Now, after 5
+  failed sign-ins in a row from one client address, that address gets `429` with
+  `Retry-After` for 30 seconds, doubling on each further lockout up to 15 minutes; a
+  successful sign-in resets it. The record is in memory only. Behind a reverse proxy all
+  clients share the proxy's address, and so share one lockout.
 
 Potential risks:
 
@@ -161,7 +164,7 @@ no required third-party Python dependencies.
 
 ## Security
 
-- [ ] Request body size limit and sign-in throttling (see the review above)
+- [x] Request body size limit and sign-in throttling (see the review above)
 - [ ] Hashed session tokens at rest
 - [ ] Periodic security audits, including dependency audits
 - [ ] Encryption improvements (Locked Folder at rest)
