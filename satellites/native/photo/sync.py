@@ -413,41 +413,46 @@ PAGE = """<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>StarCore Photo Sync</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' fill='none' stroke='%2324252b' stroke-width='1.6'%3E%3Cstyle%3E@media (prefers-color-scheme:dark){svg{stroke:%23e6e7eb}}%3C/style%3E%3Ccircle cx='11' cy='12' r='5'/%3E%3Cellipse cx='11' cy='12' rx='9.3' ry='3.3' transform='rotate(-22 11 12)' opacity='.7'/%3E%3C/svg%3E">
 <style>
-:root { color-scheme: dark; }
+:root {
+    color-scheme: dark;
+    --accent: #ee444b; --on-accent: #141215;
+}
 * { box-sizing: border-box; }
 body {
     margin: 0; padding: 1.5rem 1.25rem 3rem;
-    background: #04060d; color: #e7ecf8;
+    background: #101114; color: #ffffff;
     font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; line-height: 1.55;
 }
 header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.5rem; }
 h1 { margin: 0; font-size: 1rem; letter-spacing: 0.02em; }
-p.sub { margin: 0; color: #6e7b99; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.16em; }
-.card { padding: 1.15rem; border: 1px solid #161d33; border-radius: 8px; background: #0a0f1e; }
+p.sub { margin: 0; color: #8b8f9a; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.16em; }
+.card { padding: 1.15rem; border: 1px solid #222329; border-radius: 16px; background: #212228; }
 label.pick {
-    display: block; padding: 1.6rem 1rem; border: 1px dashed #202a47; border-radius: 8px;
-    background: linear-gradient(180deg, #0f52ba, #002fa7); color: #fff;
+    display: block; padding: 1.6rem 1rem; border: 0; border-radius: 10px;
+    background: var(--accent); color: var(--on-accent);
     font-size: 0.95rem; font-weight: 600; text-align: center; cursor: pointer;
 }
 label.pick input { display: none; }
-.muted { color: #98a3be; font-size: 0.85rem; }
+label.pick:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
+.muted { color: #a6a8b1; font-size: 0.85rem; }
 ul { margin: 1.25rem 0 0; padding: 0; list-style: none; }
 li {
     display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0;
-    border-top: 1px solid #161d33;
+    border-top: 1px solid #34363d;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem;
 }
 li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.imported { color: #3ecf8e; }
-.duplicate { color: #6c9bf0; }
-.failed { color: #e4606d; }
-.pending { color: #6e7b99; }
+.imported { color: #e6e7eb; }
+.duplicate { color: #a6a8b1; }
+.failed { color: #ee444b; }
+.pending { color: #8b8f9a; }
 </style>
 </head>
 <body>
 <header>
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#6c9bf0" stroke-width="1.3">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#e6e7eb" stroke-width="1.3">
         <circle cx="11" cy="12" r="5"/>
         <ellipse cx="11" cy="12" rx="9.3" ry="3.3" transform="rotate(-22 11 12)" opacity="0.7"/>
     </svg>
@@ -461,6 +466,19 @@ li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: no
 </div>
 
 <script>
+// the accent this browser picked in Mission Control (same origin), when there is one
+try {
+    const accent = localStorage.getItem("starcore.accent");
+    const presets = {orange: "#f08a3c", green: "#45c486", blue: "#5b95f7", mono: "#e6e7eb"};
+    const hex = /^#[0-9a-f]{6}$/i.test(accent || "") ? accent : presets[accent];
+    if (hex) {
+        const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+        const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.slice(i, i + 2), 16) / 255));
+        const light = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        document.documentElement.style.setProperty("--accent", hex);
+        document.documentElement.style.setProperty("--on-accent", (light + 0.05) / 0.0573 >= 1.05 / (light + 0.05) ? "#141215" : "#ffffff");
+    }
+} catch (error) {}
 const token = new URLSearchParams(location.search).get("token") || "";
 const log = document.getElementById("log");
 

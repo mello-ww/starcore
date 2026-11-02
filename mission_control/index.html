@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mission Control</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' fill='none' stroke='%236c9bf0' stroke-width='1.6'%3E%3Ccircle cx='11' cy='12' r='5'/%3E%3Cellipse cx='11' cy='12' rx='9.3' ry='3.3' transform='rotate(-22 11 12)' opacity='.7'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22' fill='none' stroke='%2324252b' stroke-width='1.6'%3E%3Cstyle%3E@media (prefers-color-scheme:dark){svg{stroke:%23e6e7eb}}%3C/style%3E%3Ccircle cx='11' cy='12' r='5'/%3E%3Cellipse cx='11' cy='12' rx='9.3' ry='3.3' transform='rotate(-22 11 12)' opacity='.7'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/tokens.css">
 <link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/home.css">
@@ -12,7 +12,15 @@
 <script>
 try {
     const accent = localStorage.getItem("starcore.accent");
-    if (accent && accent !== "red") {
+    if (/^#[0-9a-f]{6}$/i.test(accent || "")) {
+        // a custom accent, with the same contrast rule as app.js's onAccentFor()
+        const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+        const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(accent.slice(i, i + 2), 16) / 255));
+        const light = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        const root = document.documentElement.style;
+        root.setProperty("--sc-accent", accent.toLowerCase());
+        root.setProperty("--sc-on-accent", (light + 0.05) / 0.0573 >= 1.05 / (light + 0.05) ? "#141215" : "#ffffff");
+    } else if (accent && accent !== "red") {
         document.documentElement.dataset.accent = accent;
     }
 } catch (error) {}
@@ -186,7 +194,7 @@ try {
                         <path d="M9 2.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor" stroke="none"/>
                     </svg>
                 </button>
-                <div id="accent-menu" class="accent-menu" role="radiogroup" aria-label="Accent colour" hidden></div>
+                <div id="accent-menu" class="accent-menu" role="group" aria-label="Accent colour" hidden></div>
             </div>
             <button id="restart-button" class="sc-icon-button" type="button" title="Restart StarCore" aria-label="Restart StarCore">
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

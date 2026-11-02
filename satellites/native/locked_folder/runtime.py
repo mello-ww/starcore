@@ -35,7 +35,7 @@ import time
 from starcore import runtime_paths
 from starcore.auth import hash_secret
 
-from . import signatures
+from . import signatures, thumbnails
 
 PIN_MIN_LENGTH = 4
 PIN_MAX_LENGTH = 12
@@ -152,6 +152,8 @@ class LockedFolderRuntime:
         self._lock = threading.RLock()
         self._pin = self._load_pin()
         self._unlocked = {}   # session token -> expires (epoch seconds)
+        # video poster frames, memory only - emptied once no session has the vault open
+        self.thumbnails = thumbnails.Cache()
         self._attempts, self._global, self._recovery = self._load_attempts()
         self._challenges = {}  # session token -> {"key_id", "challenge", "expires"}
         self._sealed = self._load_set(self.sealed_path, "digests")
@@ -191,6 +193,7 @@ class LockedFolderRuntime:
         one means every existing unlock was granted under a configuration
         that no longer applies, so none of them should silently carry over."""
         self._unlocked.clear()
+        self.thumbnails.clear()
 
     def reset_attempts(self):
         """Clears every session's own attempt counters - called alongside
@@ -318,6 +321,8 @@ class LockedFolderRuntime:
             return False
         if expires < time.time():
             del self._unlocked[token]
+            if not self._unlocked:
+                self.thumbnails.clear()
             return False
         return True
 
@@ -327,6 +332,8 @@ class LockedFolderRuntime:
 
     def lock(self, token: str):
         self._unlocked.pop(token, None)
+        if not self._unlocked:
+            self.thumbnails.clear()
 
     def expires_at(self, token: str):
         """An ISO timestamp for when this session's unlock expires, or None

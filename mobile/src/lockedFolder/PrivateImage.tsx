@@ -14,11 +14,17 @@ export function PrivateImage({
   token,
   style,
   resizeMode = 'cover',
+  fallback,
+  onLoaded,
 }: {
   url: string;
   token: string | null;
   style?: StyleProp<ImageStyle>;
   resizeMode?: ImageResizeMode;
+  /** Shown instead of the "unavailable" label when the image can't load. */
+  fallback?: React.ReactNode;
+  /** Called once the image has been fetched. */
+  onLoaded?: () => void;
 }) {
   const [uri, setUri] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -28,7 +34,12 @@ export function PrivateImage({
     setUri(null);
     setFailed(false);
     loadDataUri(url, token)
-      .then(data => alive && setUri(data))
+      .then(data => {
+        if (alive) {
+          setUri(data);
+          onLoaded?.();
+        }
+      })
       .catch(() => alive && setFailed(true));
     return () => {
       alive = false;
@@ -37,6 +48,9 @@ export function PrivateImage({
 
   if (uri) {
     return <Image source={{uri}} style={style} resizeMode={resizeMode} />;
+  }
+  if (failed && fallback !== undefined) {
+    return <>{fallback}</>;
   }
   return (
     <View style={[styles.placeholder, style as any]}>

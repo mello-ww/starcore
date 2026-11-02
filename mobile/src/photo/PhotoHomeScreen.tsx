@@ -87,10 +87,10 @@ export function PhotoHomeScreen({navigation}: Props) {
                   name="lock"
                   size={16}
                   style={styles.segmentIcon}
-                  color={section === item.key ? styles.segmentLabelActive.color : styles.segmentLabel.color}
+                  color={section === item.key ? accentStyle.onColor : styles.segmentLabel.color}
                 />
               ) : (
-                <Text style={[typography.body, styles.segmentLabel, section === item.key && styles.segmentLabelActive]}>
+                <Text style={[typography.body, styles.segmentLabel, section === item.key && [styles.segmentLabelActive, accentStyle.onFill]]}>
                   {item.label}
                 </Text>
               )}

@@ -78,7 +78,7 @@ export function LibraryTab() {
       <View style={styles.filters}>
         {FILTERS.map(option => (
           <Pressable key={option.key} onPress={() => setFilter(option.key)} style={[styles.chip, filter === option.key && accentStyle.fill]}>
-            <Text style={[styles.chipLabel, filter === option.key && styles.chipLabelActive]}>{option.label}</Text>
+            <Text style={[styles.chipLabel, filter === option.key && [styles.chipLabelActive, accentStyle.onFill]]}>{option.label}</Text>
           </Pressable>
         ))}
         <Pressable onPress={() => setSort(sort === 'recent' ? 'name' : 'recent')} style={styles.chip}>

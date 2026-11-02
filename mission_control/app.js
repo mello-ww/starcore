@@ -470,35 +470,105 @@ function slidersIcon() {
 
 const ACCENTS = [["red", "Red"], ["orange", "Orange"], ["green", "Green"], ["blue", "Blue"], ["mono", "Mono"]];
 const ACCENT_KEY = "starcore.accent";
+const HEX_PATTERN = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i;
 
-function currentAccent() {
-    return document.documentElement.dataset.accent || "red";
+// "#abc" / "abc" / "#AABBCC" -> "#aabbcc"; anything else -> null
+function normalizeHex(value) {
+    const match = HEX_PATTERN.exec(String(value || "").trim());
+    if (!match) {
+        return null;
+    }
+    const digits = match[1].length === 3 ? [...match[1]].map((c) => c + c).join("") : match[1];
+    return `#${digits.toLowerCase()}`;
 }
 
-function setAccent(name) {
-    if (name === "red") {
-        delete document.documentElement.dataset.accent;
-    } else {
-        document.documentElement.dataset.accent = name;
-    }
+function luminance(hex) {
+    const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.slice(i, i + 2), 16) / 255));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+// the dark StarCore ink (#141215, luminance ~0.0073) or white - whichever contrasts more
+function onAccentFor(hex) {
+    const light = luminance(hex);
+    return (light + 0.05) / 0.0573 >= 1.05 / (light + 0.05) ? "#141215" : "#ffffff";
+}
+
+// a preset's name, or the custom "#rrggbb"
+function currentAccent() {
+    const custom = normalizeHex(document.documentElement.style.getPropertyValue("--sc-accent"));
+    return custom || document.documentElement.dataset.accent || "red";
+}
+
+function currentAccentHex() {
+    return normalizeHex(getComputedStyle(document.documentElement).getPropertyValue("--sc-accent")) || "#ee444b";
+}
+
+function storedAccent() {
     try {
-        localStorage.setItem(ACCENT_KEY, name);
+        return localStorage.getItem(ACCENT_KEY) || "red";
     } catch (error) {
-        // private mode: the choice still applies until the page closes
+        return currentAccent();
     }
-    renderAccentMenu();
+}
+
+// applies a preset name or a custom hex; `save` false only previews it
+function setAccent(value, save = true) {
+    const root = document.documentElement;
+    const hex = normalizeHex(value);
+    if (hex) {
+        delete root.dataset.accent;
+        root.style.setProperty("--sc-accent", hex);
+        root.style.setProperty("--sc-on-accent", onAccentFor(hex));
+    } else {
+        root.style.removeProperty("--sc-accent");
+        root.style.removeProperty("--sc-on-accent");
+        if (value === "red") {
+            delete root.dataset.accent;
+        } else {
+            root.dataset.accent = value;
+        }
+    }
+    if (save) {
+        try {
+            localStorage.setItem(ACCENT_KEY, hex || value);
+        } catch (error) {
+            // private mode: the choice still applies until the page closes
+        }
+    }
+    syncAccentMenu();
+}
+
+function syncAccentMenu() {
+    const menu = document.getElementById("accent-menu");
+    const current = currentAccent();
+    menu.querySelectorAll(".accent-swatch").forEach((swatch) => {
+        swatch.setAttribute("aria-checked", String(swatch.dataset.accent === current));
+    });
+    const hex = currentAccentHex();
+    const picker = menu.querySelector(".accent-custom-picker");
+    const field = menu.querySelector(".accent-custom-hex");
+    if (picker && picker.value !== hex) {
+        picker.value = hex;
+    }
+    if (field && document.activeElement !== field) {
+        field.value = hex.toUpperCase();
+        field.removeAttribute("aria-invalid");
+    }
 }
 
 function renderAccentMenu() {
     const menu = document.getElementById("accent-menu");
-    menu.replaceChildren(...ACCENTS.map(([name, title]) => {
+    const presets = element("div", "accent-presets");
+    presets.setAttribute("role", "radiogroup");
+    presets.setAttribute("aria-label", "Accent presets");
+    presets.append(...ACCENTS.map(([name, title]) => {
         const swatch = element("button", "accent-swatch");
         swatch.type = "button";
         swatch.dataset.accent = name;
         swatch.title = title;
         swatch.setAttribute("role", "radio");
         swatch.setAttribute("aria-label", title);
-        swatch.setAttribute("aria-checked", String(name === currentAccent()));
         swatch.addEventListener("click", () => {
             setAccent(name);
             toggleAccentMenu(false);
@@ -506,6 +576,47 @@ function renderAccentMenu() {
         });
         return swatch;
     }));
+
+    // a custom colour: the picker and HEX field preview live, and save once the value is final
+    const custom = element("div", "accent-custom");
+    const picker = element("input", "accent-custom-picker");
+    picker.type = "color";
+    picker.setAttribute("aria-label", "Custom accent colour");
+    picker.addEventListener("input", () => setAccent(picker.value, false));
+    picker.addEventListener("change", () => setAccent(picker.value));
+
+    const field = element("input", "accent-custom-hex");
+    field.type = "text";
+    field.maxLength = 7;
+    field.spellcheck = false;
+    field.autocomplete = "off";
+    field.placeholder = "#RRGGBB";
+    field.setAttribute("aria-label", "Custom accent HEX value");
+    const commit = () => {
+        const hex = normalizeHex(field.value);
+        // an invalid value falls back to the remembered accent
+        setAccent(hex || storedAccent(), Boolean(hex));
+        field.value = currentAccentHex().toUpperCase();
+        field.removeAttribute("aria-invalid");
+    };
+    field.addEventListener("input", () => {
+        const hex = normalizeHex(field.value);
+        field.setAttribute("aria-invalid", String(!hex));
+        if (hex) {
+            setAccent(hex, false);
+        }
+    });
+    field.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            commit();
+        }
+    });
+    field.addEventListener("change", commit);
+    custom.append(picker, field);
+
+    menu.replaceChildren(presets, custom);
+    syncAccentMenu();
 }
 
 function toggleAccentMenu(open) {
@@ -514,7 +625,7 @@ function toggleAccentMenu(open) {
     document.getElementById("accent-button").setAttribute("aria-expanded", String(open));
     if (open) {
         renderAccentMenu();
-        menu.querySelector('[aria-checked="true"]').focus();
+        (menu.querySelector('[aria-checked="true"]') || menu.querySelector(".accent-custom-hex")).focus();
     }
 }
 

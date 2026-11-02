@@ -74,7 +74,7 @@ export function SearchTab() {
         {QUALITIES.map(option => (
           <Pressable key={option.key} onPress={() => setQuality(option.key)}
             style={[styles.chip, quality === option.key && accentStyle.fill]}>
-            <Text style={[styles.chipLabel, quality === option.key && styles.chipLabelActive]}>{option.label}</Text>
+            <Text style={[styles.chipLabel, quality === option.key && [styles.chipLabelActive, accentStyle.onFill]]}>{option.label}</Text>
           </Pressable>
         ))}
       </View>

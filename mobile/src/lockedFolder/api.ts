@@ -118,6 +118,18 @@ export class LockedFolderApi {
     return `${BASE}/media/file?path=${encodeURIComponent(path)}`;
   }
 
+  /** A video's poster frame, rendered in server memory and never stored;
+   * 404 when there is none (no ffmpeg, unreadable file). */
+  thumbnailPath(path: string): string {
+    return `${BASE}/media/thumbnail?path=${encodeURIComponent(path)}`;
+  }
+
+  /** A video's length in seconds as {duration}, from the same in-memory render
+   * as its poster frame; 404 when there is none. */
+  durationPath(path: string): string {
+    return `${BASE}/media/duration?path=${encodeURIComponent(path)}`;
+  }
+
   async moveIn(photoIds: string[]): Promise<MoveResult> {
     return this.move('move_in', {photo_ids: photoIds});
   }

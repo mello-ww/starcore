@@ -268,8 +268,8 @@ body {
     top: calc(100% + 8px);
     right: 0;
     z-index: 30;
-    display: flex;
-    gap: 10px;
+    display: grid;
+    gap: 12px;
     padding: 12px;
     border: 1px solid var(--sc-line);
     border-radius: 14px;
@@ -279,6 +279,61 @@ body {
 
 .accent-menu[hidden] {
     display: none;
+}
+
+.accent-presets {
+    display: flex;
+    gap: 10px;
+}
+
+.accent-custom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.accent-custom-picker {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--sc-line);
+    border-radius: 8px;
+    background: none;
+    cursor: pointer;
+}
+
+.accent-custom-picker::-webkit-color-swatch-wrapper {
+    padding: 3px;
+}
+
+.accent-custom-picker::-webkit-color-swatch {
+    border: 0;
+    border-radius: 5px;
+}
+
+.accent-custom-hex {
+    flex: 1;
+    width: 0;
+    min-width: 0;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--sc-line);
+    border-radius: 8px;
+    background: var(--sc-field);
+    color: var(--sc-text);
+    font: 13px var(--sc-font-mono);
+    letter-spacing: 0.04em;
+}
+
+.accent-custom-hex:focus-visible,
+.accent-custom-picker:focus-visible {
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 2px;
+}
+
+.accent-custom-hex[aria-invalid="true"] {
+    border-color: var(--sc-danger);
 }
 
 .accent-swatch {

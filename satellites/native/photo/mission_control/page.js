@@ -791,7 +791,12 @@ export function mount(context) {
         image.alt = photo.filename;
         image.loading = "lazy";
         image.decoding = "async";
-        image.addEventListener("error", () => tileEl.classList.add("unavailable"));
+        image.addEventListener("error", () => {
+            tileEl.classList.add("unavailable");
+            if (isVideo) {
+                image.remove();  // no frame: a plain tile with the play badge, not a broken-image icon
+            }
+        });
 
         const caption = el("span", "photo-caption", photo.filename);
         tileEl.append(image, caption);

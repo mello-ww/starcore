@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+import time
 
 from . import images, videos
 
@@ -13,6 +14,7 @@ SATELLITE_NAME = "Photo"
 INDEX_VERSION = 1
 ID_LENGTH = 16
 READ_SIZE = 1024 * 1024
+THUMBNAIL_RETRY_SECONDS = 300  # before a video whose frame failed is tried again
 
 # the extensions a directory scan bothers opening at all - a fast filename
 # prefilter only. What a file actually *is* is always decided by content, in
@@ -60,6 +62,10 @@ class PhotoLibrary:
         self.index_path = self.root / "library.json"
         self.thumbnail_size = int(thumbnail_size)
         self._photos = {}
+        # videos ffmpeg couldn't render a frame for, by content-addressed id,
+        # with the binary tried and when - so the grid doesn't re-run it on
+        # every load, yet retries once ffmpeg is installed or a while has passed
+        self._thumbnail_failures = {}
         self._load()
 
     # ---------- library ----------
@@ -149,6 +155,8 @@ class PhotoLibrary:
         partial = thumbnail.with_name(f".{photo['id']}.{os.getpid()}.part")
 
         is_video = photo.get("media_type") == "video"
+        if is_video and self._thumbnail_failed_recently(photo["id"]):
+            return None
         rendered = (
             videos.thumbnail(original, partial, self.thumbnail_size, duration=photo.get("duration"))
             if is_video else images.thumbnail(original, partial, self.thumbnail_size)
@@ -159,7 +167,17 @@ class PhotoLibrary:
             return thumbnail
 
         partial.unlink(missing_ok=True)
-        return None if is_video else original
+        if is_video:
+            self._thumbnail_failures[photo["id"]] = (videos._load_ffmpeg(), time.monotonic())
+            return None
+        return original
+
+    def _thumbnail_failed_recently(self, photo_id) -> bool:
+        failure = self._thumbnail_failures.get(photo_id)
+        if failure is None:
+            return False
+        binary, at = failure
+        return binary == videos._load_ffmpeg() and time.monotonic() - at < THUMBNAIL_RETRY_SECONDS
 
     # ---------- import ----------
 

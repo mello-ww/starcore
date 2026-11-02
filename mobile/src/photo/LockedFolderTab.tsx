@@ -23,6 +23,7 @@ import {disable, enroll, isEnrolled} from '../lockedFolder/biometricUnlock';
 import {LockedFolderUnlock, formatWait} from '../lockedFolder/LockedFolderUnlock';
 import {PrivateImage} from '../lockedFolder/PrivateImage';
 import {useLockedFolder} from '../lockedFolder/useLockedFolder';
+import {durationLabel} from './duration';
 import {deviceInfo} from '../platform/device';
 import {privacy} from '../platform/privacy';
 import {colors, spacing, tokens, typography, useAccentStyles, useTopInset} from '../theme';
@@ -208,9 +209,11 @@ export function LockedFolderTab({onPhotosChanged}: {onPhotosChanged?: () => void
               accessibilityRole="imagebutton"
               accessibilityLabel={item.name}>
               {item.media_type === 'video' ? (
-                <View style={[styles.tileFill, styles.videoTile]}>
-                  <Icon name="play" size={22} color={colors.text} />
-                </View>
+                <VideoTile
+                  thumbnailUrl={`${baseUrl}${api.thumbnailPath(item.path)}`}
+                  durationUrl={`${baseUrl}${api.durationPath(item.path)}`}
+                  token={token}
+                />
               ) : (
                 <PrivateImage url={fileUrl(item)} token={token} style={styles.tileFill} />
               )}
@@ -498,6 +501,44 @@ function formatTime(iso: string): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+/** A video's poster frame with a play badge and, once the server has rendered
+ * it, the length. Both come from the vault's in-memory render. */
+export function VideoTile({thumbnailUrl, durationUrl, token}: {thumbnailUrl: string; durationUrl: string; token: string | null}) {
+  const [length, setLength] = useState('');
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const loadLength = () => {
+    fetch(durationUrl, {headers: token ? {Authorization: `Bearer ${token}`} : undefined})
+      .then(response => (response.ok ? response.json() : null))
+      .then(body => alive.current && setLength(durationLabel(body?.duration)))
+      .catch(() => {});
+  };
+  return (
+    <View style={styles.tileFill}>
+      <PrivateImage
+        url={thumbnailUrl}
+        token={token}
+        style={styles.tileFill}
+        onLoaded={loadLength}
+        fallback={<View style={[styles.tileFill, styles.videoTile]} />}
+      />
+      <View style={styles.playBadge} pointerEvents="none">
+        <Icon name="play" size={16} color="#fff" style={styles.playIcon} />
+      </View>
+      {length !== '' && (
+        <View style={styles.durationBadge} pointerEvents="none">
+          <Text style={styles.durationLabel}>{length}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 const TILE = (Dimensions.get('window').width - spacing.lg * 2 - GAP * (COLUMNS - 1)) / COLUMNS;
 
 const styles = StyleSheet.create({
@@ -509,7 +550,31 @@ const styles = StyleSheet.create({
   row: {gap: GAP, marginBottom: GAP},
   tile: {width: TILE, height: TILE, borderRadius: 6, overflow: 'hidden'},
   tileFill: {width: '100%', height: '100%'},
-  videoTile: {alignItems: 'center', justifyContent: 'center', backgroundColor: colors.raised},
+  videoTile: {backgroundColor: colors.raised},
+  durationBadge: {
+    position: 'absolute',
+    right: 6,
+    bottom: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    backgroundColor: 'rgba(4,6,13,0.72)',
+  },
+  durationLabel: {color: colors.text, fontSize: 10, fontVariant: ['tabular-nums']},
+  playBadge: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -16,
+    marginLeft: -16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(4,6,13,0.55)',
+  },
+  playIcon: {marginLeft: 2},
   card: {
     alignItems: 'center',
     gap: spacing.sm,

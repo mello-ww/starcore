@@ -484,10 +484,19 @@ export function mount(context) {
         if (item.damaged) {
             tile.classList.add("unavailable");
         } else if (item.media_type === "video") {
+            // a poster frame rendered in server memory only (never stored);
+            // the plain poster stays when there is none (no ffmpeg, odd format)
             const poster = el("span", "lf-video-poster");
+            const frame = el("img");
+            frame.alt = "";
+            frame.loading = "lazy";
+            frame.decoding = "async";
+            frame.addEventListener("error", () => frame.remove());
+            frame.addEventListener("load", () => showDuration(tile, item.path));
+            frame.src = thumbnailUrl(item.path);
             const play = el("span", "photo-tile-play");
             play.innerHTML = PLAY_ICON;
-            tile.append(poster, play);
+            tile.append(poster, frame, play);
         } else {
             const image = el("img");
             image.src = fileUrl(item.path);
@@ -505,6 +514,30 @@ export function mount(context) {
             tile.addEventListener("click", onOpen);
         }
         return tile;
+    }
+
+    // the length comes from the same in-memory render as the poster frame
+    async function showDuration(tile, path) {
+        try {
+            const response = await fetch(api.url(`/media/duration?path=${encodeURIComponent(path)}`));
+            const label = response.ok ? lengthLabel((await response.json()).duration) : "";
+            if (label && tile.isConnected) {
+                tile.appendChild(el("span", "photo-tile-duration", label));
+            }
+        } catch (error) {
+            // no length is fine: the play badge still says it is a video
+        }
+    }
+
+    function lengthLabel(seconds) {
+        if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds < 0) {
+            return "";
+        }
+        const total = Math.round(seconds);
+        const hours = Math.floor(total / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+        const pad = (value) => String(value).padStart(2, "0");
+        return hours ? `${hours}:${pad(minutes)}:${pad(total % 60)}` : `${minutes}:${pad(total % 60)}`;
     }
 
     function buildFileRow(item) {
@@ -893,6 +926,10 @@ export function mount(context) {
 
     function fileUrl(path) {
         return api.url(`/media/file?path=${encodeURIComponent(path)}`);
+    }
+
+    function thumbnailUrl(path) {
+        return api.url(`/media/thumbnail?path=${encodeURIComponent(path)}`);
     }
 }
 

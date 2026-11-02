@@ -22,7 +22,7 @@ import threading
 
 from starcore.api.response import error_response, file_response, json_response, stream_response
 
-from . import configuration, crypto, encryption, vault
+from . import configuration, crypto, encryption, thumbnails, vault
 from .runtime import SecurityStateError, runtime, validate_pin
 
 # settings that would loosen protection or point it somewhere else once a
@@ -306,6 +306,8 @@ def media(request):
     try:
         if not request.path:
             return json_response(vault.list_vault(live, root))
+        if request.path in (("thumbnail",), ("duration",)):
+            return _thumbnail(live, root, request.query.get("path"), duration=request.path == ("duration",))
         if request.path != ("file",):
             return error_response("unknown endpoint", status=404)
 
@@ -330,6 +332,58 @@ def media(request):
     content_type = vault.MEDIA_TYPES.get(target.suffix.lower(), (None, "application/octet-stream"))[1]
     return file_response(target, content_type, cache="private, no-store",
                          download_name=target.name if download else None)
+
+
+def _thumbnail(live, root, relative, duration=False):
+    """GET media/thumbnail?path=... -> a video's poster frame, rendered in
+    memory and never stored on disk or in a browser cache (see thumbnails.py).
+    media/duration?path=... -> {"duration": seconds} from the same cached
+    render. 404 when there is nothing to give (not a video, no ffmpeg,
+    unreadable)."""
+    store = None
+    if encryption.Store.is_object_path(relative):
+        store = encryption.Store.open(live, root)
+        if store is None:
+            return error_response("no such file in the Locked Folder", status=404)
+        source = store.object_path(relative)
+    else:
+        source = vault.resolve_item(root, relative)
+    stat = source.stat()
+    key = (relative, stat.st_size, stat.st_mtime_ns)
+    binary = thumbnails.ffmpeg()
+
+    entry = live.thumbnails.get(key)
+    if entry is None or not entry.usable(binary):
+        entry = None
+        if binary:
+            entry = _render_thumbnail(live, store, relative, source, binary)
+            live.thumbnails.put(key, entry)
+    if entry is None or entry.data is None:
+        return error_response("no thumbnail is available for this file", status=404)
+    if duration:
+        return json_response({"duration": entry.duration})
+    return stream_response(thumbnails.MemoryImage(entry.data), "image/jpeg", cache="private, no-store")
+
+
+def _render_thumbnail(live, store, relative, source, binary):
+    """A thumbnails.Entry for one vault file (a failed one when it is not a
+    video or can't be rendered). An encrypted video is decrypted into the
+    vault's tmp folder for the length of the render and always removed again."""
+    if store is None:
+        if vault.MEDIA_TYPES.get(source.suffix.lower(), ("file",))[0] != "video":
+            return thumbnails.Entry(None, None, binary)
+        return thumbnails.make(source, binary)
+
+    with store.open_file(relative) as opened:
+        name = vault._safe_name(opened.metadata.get("name"))
+    if vault.MEDIA_TYPES.get(_suffix(name), ("file",))[0] != "video":
+        return thumbnails.Entry(None, None, binary)
+    store.clear_staging(older_than=encryption.STAGING_GRACE_SECONDS)  # leftovers of a killed process
+    staging, _ = store.decrypt_to_staging(relative)
+    try:
+        return thumbnails.make(staging, binary)
+    finally:
+        staging.unlink(missing_ok=True)
 
 
 def _suffix(name: str) -> str:

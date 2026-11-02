@@ -82,7 +82,7 @@ function Choice({label, value, options, onChange}: {label: string; value: string
               accessibilityLabel={`${label}: ${option.label}`}
               hitSlop={4}
               style={[styles.option, selected && accentStyle.fill]}>
-              <Text style={[styles.optionLabel, selected && styles.optionLabelSelected]}>{option.label}</Text>
+              <Text style={[styles.optionLabel, selected && [styles.optionLabelSelected, accentStyle.onFill]]}>{option.label}</Text>
             </Pressable>
           );
         })}

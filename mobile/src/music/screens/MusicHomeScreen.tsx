@@ -29,7 +29,7 @@ export function MusicHomeScreen() {
         {SECTIONS.map(item => (
           <Pressable key={item.key} onPress={() => setSection(item.key)} style={[styles.segment, section === item.key && accentStyle.fill]}
             accessibilityRole="tab" accessibilityState={{selected: section === item.key}}>
-            <Text style={[styles.segmentLabel, section === item.key && styles.segmentLabelActive]}>{item.label}</Text>
+            <Text style={[styles.segmentLabel, section === item.key && [styles.segmentLabelActive, accentStyle.onFill]]}>{item.label}</Text>
           </Pressable>
         ))}
       </View>

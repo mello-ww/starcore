@@ -217,7 +217,7 @@ h3 {
 }
 
 .nav-item:hover {
-    background: rgba(43, 91, 215, 0.1);
+    background: color-mix(in srgb, var(--royal) 10%, transparent);
     color: var(--text);
 }
 
@@ -229,7 +229,7 @@ h3 {
     color: #fff;
     background:
         var(--starfield),
-        linear-gradient(90deg, rgba(0, 47, 167, 0.65), rgba(15, 82, 186, 0.16));
+        linear-gradient(90deg, color-mix(in srgb, var(--klein) 65%, transparent), color-mix(in srgb, var(--sapphire) 16%, transparent));
 }
 
 .nav-item.active svg,
@@ -578,7 +578,7 @@ h3 {
 }
 
 .banner.notice {
-    background: rgba(108, 155, 240, 0.08);
+    background: color-mix(in srgb, var(--azure) 8%, transparent);
     color: var(--azure);
 }
 
@@ -1119,7 +1119,7 @@ button.chip:hover {
     justify-content: center;
     padding: 1.25rem;
     background:
-        radial-gradient(circle at 50% 20%, rgba(15, 82, 186, 0.18), transparent 60%),
+        radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--sapphire) 18%, transparent), transparent 60%),
         var(--deep);
 }
 
@@ -1317,7 +1317,7 @@ button.chip:hover {
 }
 
 .dir-picker-crumb:hover {
-    background: rgba(43, 91, 215, 0.12);
+    background: color-mix(in srgb, var(--royal) 12%, transparent);
     color: var(--ice);
 }
 

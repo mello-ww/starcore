@@ -142,7 +142,8 @@ def thumbnail(source, destination, size: int, duration=None) -> bool:
 def _load_ffmpeg():
     global _ffmpeg
 
-    if _ffmpeg is None:
+    # only a found binary is remembered: one installed after startup is picked up
+    if not _ffmpeg:
         _ffmpeg = shutil.which("ffmpeg") or False
 
     return _ffmpeg or None

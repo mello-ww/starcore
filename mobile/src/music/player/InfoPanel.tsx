@@ -44,7 +44,7 @@ export function InfoPanel() {
       <View style={styles.options}>
         {SPEEDS.map(speed => (
           <Pressable key={speed} onPress={() => player.setSpeed(speed)} style={[styles.option, state.speed === speed && accentStyle.fill]}>
-            <Text style={[styles.optionLabel, state.speed === speed && styles.optionLabelActive]}>{speed}×</Text>
+            <Text style={[styles.optionLabel, state.speed === speed && [styles.optionLabelActive, accentStyle.onFill]]}>{speed}×</Text>
           </Pressable>
         ))}
       </View>
@@ -58,7 +58,7 @@ export function InfoPanel() {
           </Pressable>
         ))}
         <Pressable onPress={() => player.setSleep('end')} style={[styles.option, state.sleepAtEnd && accentStyle.fill]}>
-          <Text style={[styles.optionLabel, state.sleepAtEnd && styles.optionLabelActive]}>End of song</Text>
+          <Text style={[styles.optionLabel, state.sleepAtEnd && [styles.optionLabelActive, accentStyle.onFill]]}>End of song</Text>
         </Pressable>
         {(state.sleepAt || state.sleepAtEnd) && (
           <Pressable onPress={() => player.setSleep(null)} style={styles.option}>

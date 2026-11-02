@@ -16,9 +16,9 @@ interface Props {
 
 /** A StarCore action button: accent for the main action, grey otherwise, outlined red for destructive ones. */
 export function Button({title, onPress, disabled, loading, variant = 'primary', style, testID}: Props) {
-  const {color: accent} = useAccent();
+  const {color: accent, onColor} = useAccent();
   const inactive = !!disabled || !!loading;
-  const textColor = variant === 'primary' ? palette.onAccent : variant === 'danger' ? palette.danger : palette.text;
+  const textColor = variant === 'primary' ? onColor : variant === 'danger' ? palette.danger : palette.text;
   return (
     <Pressable
       accessibilityRole="button"

@@ -286,7 +286,7 @@ def move_out(engine, live, root: Path, paths) -> dict:
     with _move_lock:
         if store is not None:
             # a decrypted copy a crash left behind; no other move is using it now
-            store.clear_staging()
+            store.clear_staging(older_than=encryption.STAGING_GRACE_SECONDS)
         for relative in dict.fromkeys(paths):
             try:
                 if encryption.Store.is_object_path(relative):

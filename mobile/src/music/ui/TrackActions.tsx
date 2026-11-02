@@ -138,7 +138,7 @@ function PlaylistPicker({tracks, onDone}: {tracks: Track[]; onDone: () => void})
         <TextInput value={name} onChangeText={setName} placeholder="New playlist" placeholderTextColor={colors.textFaint}
           style={styles.input} onSubmitEditing={create} />
         <Pressable onPress={create} style={[styles.createButton, accentStyle.fill]}>
-          <Text style={styles.createLabel}>Create</Text>
+          <Text style={[styles.createLabel, accentStyle.onFill]}>Create</Text>
         </Pressable>
       </View>
       <ScrollView style={styles.list}>

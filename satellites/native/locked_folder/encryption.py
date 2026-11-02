@@ -38,6 +38,7 @@ from .keys import META_DIR, OBJECT_SUFFIX, OBJECTS, KeyProblem, Keyring, is_encr
 RUNS = "runs"
 BACKUPS = "backups"
 TMP = "tmp"
+STAGING_GRACE_SECONDS = 600  # a decrypted copy younger than this may still be in use
 READ_SIZE = 1024 * 1024
 SPACE_MARGIN = 64 * 1024 * 1024     # free space kept on top of what a run needs
 MAX_ITEMS = 20000
@@ -255,10 +256,15 @@ class Store:
             staging.unlink(missing_ok=True)
             raise
 
-    def clear_staging(self):
+    def clear_staging(self, older_than: float = 0.0):
+        """Removes decrypted copies a crash or kill left behind. `older_than`
+        (seconds) spares copies still being used by a live operation."""
         if self.tmp.is_dir():
+            cutoff = time.time() - older_than
             for leftover in self.tmp.iterdir():
                 try:
+                    if older_than and leftover.stat().st_mtime > cutoff:
+                        continue
                     leftover.unlink()
                 except OSError:
                     pass

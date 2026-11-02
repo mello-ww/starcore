@@ -14,9 +14,9 @@ interface Props {
  * 48dp accessibility minimum) for every primary action in the app, so
  * "what does a button look like" is answered once. */
 export function PrimaryButton({title, onPress, disabled, loading, variant = 'primary'}: Props) {
-  const {color: accent} = useAccent();
+  const {color: accent, onColor} = useAccent();
   const isPrimary = variant === 'primary';
-  const labelColor = isPrimary ? colors.onAccent : colors.text;
+  const labelColor = isPrimary ? onColor : colors.text;
   return (
     <Pressable
       accessibilityRole="button"

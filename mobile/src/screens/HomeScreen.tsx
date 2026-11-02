@@ -4,6 +4,7 @@ import {Pressable, RefreshControl, ScrollView, StyleSheet, Text, View} from 'rea
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
+import {AccentCustomColor} from '../components/AccentCustomColor';
 import {SatellitesApi} from '../satellites/api';
 import {STATUS_LABELS, satelliteIcon, statusDotColor as dotColor} from '../satellites/icons';
 import type {SatelliteSummary} from '../satellites/types';
@@ -49,7 +50,7 @@ export function alertsFor(satellites: SatelliteSummary[]) {
 export function HomeScreen() {
   const {client} = useAuth();
   const {activeServer} = useServers();
-  const {accent, color: accentColor, setAccent} = useAccent();
+  const {accent, color: accentColor, onColor: onAccent, setAccent} = useAccent();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const api = useMemo(() => new SatellitesApi(client), [client]);
@@ -131,24 +132,27 @@ export function HomeScreen() {
         </View>
 
         {picking && (
-          <View style={styles.picker} accessibilityRole="radiogroup" accessibilityLabel="Accent colour">
-            {ACCENTS.map(option => (
-              <Pressable
-                key={option.name}
-                onPress={() => {
-                  setAccent(option.name);
-                  setPicking(false);
-                }}
-                accessibilityRole="radio"
-                accessibilityLabel={option.label}
-                accessibilityState={{checked: option.name === accent}}
-                testID={`accent-${option.name}`}
-                style={styles.swatchTarget}>
-                <View style={[styles.swatchRing, option.name === accent && styles.swatchRingActive]}>
-                  <View style={[styles.swatch, {backgroundColor: option.color}]} />
-                </View>
-              </Pressable>
-            ))}
+          <View style={styles.picker}>
+            <View style={styles.presets} accessibilityRole="radiogroup" accessibilityLabel="Accent colour">
+              {ACCENTS.map(option => (
+                <Pressable
+                  key={option.name}
+                  onPress={() => {
+                    setAccent(option.name);
+                    setPicking(false);
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityLabel={option.label}
+                  accessibilityState={{checked: option.name === accent}}
+                  testID={`accent-${option.name}`}
+                  style={styles.swatchTarget}>
+                  <View style={[styles.swatchRing, option.name === accent && styles.swatchRingActive]}>
+                    <View style={[styles.swatch, {backgroundColor: option.color}]} />
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+            <AccentCustomColor />
           </View>
         )}
 
@@ -220,8 +224,8 @@ export function HomeScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${satellite.name}`}
                 style={({pressed}) => [styles.button, {backgroundColor: accentColor}, pressed && styles.pressed]}>
-                <Icon name="arrow-up-right" size={18} color={palette.onAccent} />
-                <Text style={[type.label, {color: palette.onAccent}]}>Open</Text>
+                <Icon name="arrow-up-right" size={18} color={onAccent} />
+                <Text style={[type.label, {color: onAccent}]}>Open</Text>
               </Pressable>
             ) : (
               <Text style={type.caption}>No mobile interface yet</Text>
@@ -294,12 +298,12 @@ const styles = StyleSheet.create({
   },
   pressed: {opacity: 0.8},
   picker: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: space.sm,
     padding: space.sm,
     borderRadius: radii.card,
     backgroundColor: palette.card,
   },
+  presets: {flexDirection: 'row', justifyContent: 'space-between'},
   swatchTarget: {width: TOUCH_TARGET, height: TOUCH_TARGET, alignItems: 'center', justifyContent: 'center'},
   swatchRing: {
     width: 36,

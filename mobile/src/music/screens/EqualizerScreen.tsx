@@ -62,7 +62,7 @@ export function EqualizerScreen() {
         {Object.keys(PRESETS).map(name => (
           <Pressable key={name} onPress={() => setEq({...eq, preset: name, bands: PRESETS[name], enabled: true})}
             style={[styles.preset, eq.preset === name && accentStyle.fill]}>
-            <Text style={[styles.presetLabel, eq.preset === name && styles.presetLabelActive]}>{name}</Text>
+            <Text style={[styles.presetLabel, eq.preset === name && [styles.presetLabelActive, accentStyle.onFill]]}>{name}</Text>
           </Pressable>
         ))}
       </View>

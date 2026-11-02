@@ -26,7 +26,7 @@ export function CollectionHeader({title, subtitle, details, albumId, mosaic, rou
       <View style={styles.buttons}>
         {onPlay && (
           <Pressable onPress={onPlay} style={[styles.button, accentStyle.fill]} accessibilityLabel="Play">
-            <Text style={[styles.label, styles.primaryLabel]}>▶ Play</Text>
+            <Text style={[styles.label, styles.primaryLabel, accentStyle.onFill]}>▶ Play</Text>
           </Pressable>
         )}
         {onShuffle && (

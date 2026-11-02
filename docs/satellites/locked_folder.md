@@ -454,9 +454,15 @@ Windows password reset (DPAPI's documented behaviour).
   can find the PIN offline. That gives them the PIN, not the files.
 - **The backup is plaintext** until deleted - delete it once the files are checked.
 - **Rollback:** restoring older, genuine copies of security files together isn't detected.
-- **Decrypted copies:** moving a file to Photos puts a decrypted copy in `.starcore-vault/tmp/`
-  for the moment it takes (never a shared temp folder); a crash then leaves it there until the
-  next move to Photos clears it.
+- **Decrypted copies:** moving a file to Photos, or rendering an encrypted video's poster frame,
+  puts a decrypted copy in `.starcore-vault/tmp/` for the moment it takes (never a shared temp
+  folder). It is removed in a `finally`; a killed process leaves it there until the next video
+  thumbnail or move to Photos sweeps copies older than 10 minutes. Streaming the plaintext to
+  FFmpeg instead isn't reliable (an MP4 whose index is at the end can't be read from a pipe), so
+  this temporary plaintext file on disk is a known limitation.
+- **Video thumbnails** (needs FFmpeg on PATH) are rendered to a pipe and held only in server
+  memory (`media/thumbnail`, `media/duration`), never stored, and dropped when the last session
+  locks. A failed frame is retried when FFmpeg is installed (no restart) or after 5 minutes.
 - **No key rotation:** changing the vault key would mean re-encrypting everything.
 
 ## Biometric unlock
