@@ -103,7 +103,7 @@ The script creates the user, clones over HTTPS, runs `uv sync --frozen --extra t
 installs FFmpeg if missing, writes each `config.toml` that doesn't exist yet with the server
 values (Mission Control on `127.0.0.1:8090`, the absolute storage paths above) and installs
 `deploy/systemd/starcore.service`. That unit runs as `starcore`, with the file system read-only
-except the state directory, the checkout's `engine/` and `satellites/native/` (where settings are
+except the state directory, the checkout's `engine/` and `satellites/` (native and link Satellites, where settings are
 saved) and `/srv/starcore`.
 
 Mission Control stays on loopback; `deploy/nginx/starcore-panel.conf` is the HTTPS reverse

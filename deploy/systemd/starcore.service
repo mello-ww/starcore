@@ -28,9 +28,10 @@ UMask=0027
 
 # hardening: everything is read-only except what StarCore must write - its state
 # directory, the config.toml files it saves settings into (written through a temp file
-# in the same folder), and the media folders Music and File Explorer are pointed at
+# in the same folder, for native and link Satellites alike), and the media folders
+# Music and File Explorer are pointed at
 ProtectSystem=strict
-ReadWritePaths=/opt/starcore/app/engine /opt/starcore/app/satellites/native /srv/starcore
+ReadWritePaths=/opt/starcore/app/engine /opt/starcore/app/satellites /srv/starcore
 ProtectHome=yes
 PrivateTmp=yes
 PrivateDevices=yes
