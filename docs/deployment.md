@@ -109,7 +109,7 @@ saved) and `/srv/starcore`.
 Mission Control stays on loopback; `deploy/nginx/starcore-panel.conf` is the HTTPS reverse
 proxy for it (the Certbot-managed lines are kept as Certbot wrote them). Besides proxying it
 allows 2 GB uploads, turns buffering off so streams and long-polls flow, marks the session cookie
-`Secure`, sends HSTS, and refuses `/api/cli/run` from outside. Behind the proxy every client
+`Secure`, sends HSTS, and refuses everything under `/api/cli/` (the one-shot CLI bridge) from outside. Behind the proxy every client
 reaches StarCore from 127.0.0.1, so sign-in throttling is shared by everyone rather than per
 address - stricter, never weaker.
 
