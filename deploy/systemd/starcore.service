@@ -1,16 +1,52 @@
 [Unit]
 Description=StarCore
-After=network.target
+Documentation=https://github.com/mello-ww/starcore/blob/main/docs/deployment.md
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-# replace with an unprivileged user that owns the checkout below
+# a dedicated, unprivileged system user (deploy/linux/install.sh creates it) - never a login
+# or sudo-capable account, since Mission Control is reachable from the network
 User=starcore
-# both paths must point at the checkout's engine/ directory and its venv
-WorkingDirectory=/opt/starcore/engine
-ExecStart=/opt/starcore/engine/.venv/bin/python -m starcore
+Group=starcore
+# the checkout install.sh clones, and the venv `uv sync` built inside it
+WorkingDirectory=/opt/starcore/app/engine
+ExecStart=/opt/starcore/app/engine/.venv/bin/python -m starcore
 Restart=on-failure
 RestartSec=5
+TimeoutStopSec=30
+
+# accounts, sessions, the audit log, Status history and Locked Folder state live here,
+# outside the checkout (see "Runtime data location" in docs/deployment.md)
+StateDirectory=starcore
+StateDirectoryMode=0700
+Environment=STARCORE_DATA_DIR=/var/lib/starcore
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+UMask=0027
+
+# hardening: everything is read-only except what StarCore must write - its state
+# directory, the config.toml files it saves settings into (written through a temp file
+# in the same folder), and the media folders Music and File Explorer are pointed at
+ProtectSystem=strict
+ReadWritePaths=/opt/starcore/app/engine /opt/starcore/app/satellites/native /srv/starcore
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 
 [Install]
 WantedBy=multi-user.target

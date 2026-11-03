@@ -80,38 +80,38 @@ Any of the following triggers the same graceful shutdown - Mission Control's API
 
 ## Linux
 
-### systemd (optional)
+### Linux server (systemd)
 
-A unit template is provided at `deploy/systemd/starcore.service`:
-
-```ini
-[Unit]
-Description=StarCore
-After=network.target
-
-[Service]
-Type=simple
-# replace with an unprivileged user that owns the checkout below
-User=starcore
-# both paths must point at the checkout's engine/ directory and its venv
-WorkingDirectory=/opt/starcore/engine
-ExecStart=/opt/starcore/engine/.venv/bin/python -m starcore
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Edit `User`, `WorkingDirectory` and `ExecStart` for the actual install location, then:
+`deploy/linux/install.sh` installs StarCore as a permanent service. It is idempotent and only
+prepares: it never starts or restarts anything and never touches nginx.
 
 ```
-sudo cp deploy/systemd/starcore.service /etc/systemd/system/
-sudo systemctl daemon-reload
+sudo bash deploy/linux/install.sh            # first install
+sudo bash deploy/linux/install.sh --update   # fast-forward to origin/main (never a merge or reset)
 sudo systemctl enable --now starcore
 ```
 
-`Restart=on-failure` restarts StarCore if it crashes, but not after a clean stop (`systemctl stop`) - StarCore always exits with status 0 on a graceful shutdown, so it won't fight `systemctl stop` or loop on an intentional restart.
+| Path | What |
+|---|---|
+| `/opt/starcore/app` | the checkout, owned by the unprivileged `starcore` system user |
+| `/opt/starcore/python` | uv-managed Python 3.13, outside any home directory |
+| `/var/lib/starcore` | accounts, sessions, audit log, Status history, Photo and Music libraries, Locked Folder state (`STARCORE_DATA_DIR`, mode 0700) |
+| `/srv/starcore/music`, `/srv/starcore/files` | what Music scans and File Explorer browses |
+
+The script creates the user, clones over HTTPS, runs `uv sync --frozen --extra thumbnails
+--extra encryption` (naming both extras: a plain `uv sync` removes whichever isn't named),
+installs FFmpeg if missing, writes each `config.toml` that doesn't exist yet with the server
+values (Mission Control on `127.0.0.1:8090`, the absolute storage paths above) and installs
+`deploy/systemd/starcore.service`. That unit runs as `starcore`, with the file system read-only
+except the state directory, the checkout's `engine/` and `satellites/native/` (where settings are
+saved) and `/srv/starcore`.
+
+Mission Control stays on loopback; `deploy/nginx/starcore-panel.conf` is the HTTPS reverse
+proxy for it (the Certbot-managed lines are kept as Certbot wrote them). Besides proxying it
+allows 2 GB uploads, turns buffering off so streams and long-polls flow, marks the session cookie
+`Secure`, sends HSTS, and refuses `/api/cli/run` from outside. Behind the proxy every client
+reaches StarCore from 127.0.0.1, so sign-in throttling is shared by everyone rather than per
+address - stricter, never weaker.
 
 systemd is entirely optional; nothing about running StarCore in a terminal for development requires it.
 
