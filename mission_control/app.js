@@ -271,8 +271,92 @@ function showRoute() {
 
 /* ---------- core ---------- */
 
+// ---------- About / build info ----------
+// Everything here comes from the Engine's /api/status "build" (see
+// engine/starcore/build_info.py): the VERSION file plus Git, never a value
+// typed into this page. A field the Engine couldn't determine stays "-".
+
+let buildInfo = null;
+
+function buildCommitText(build) {
+    if (!build.commit) {
+        return "-";
+    }
+    return build.dirty ? `${build.commit} + local changes` : build.commit;
+}
+
+function buildInfoText(build) {
+    return [
+        "StarCore build info",
+        `Engine version: ${build.version} (${build.channel})`,
+        `Build: ${build.build ?? "unknown"}`,
+        `Commit: ${buildCommitText(build) === "-" ? "unknown" : buildCommitText(build)}`,
+        `Build date: ${build.date ? build.date.slice(0, 10) : "unknown"}`,
+        "Client: Mission Control (web)",
+    ].join("\n");
+}
+
+function renderBuild(build) {
+    if (!build) {
+        return;
+    }
+    buildInfo = build;
+    setText("about-version", build.version);
+    setText("about-channel", build.channel);
+    setText("about-build", build.build ?? "-");
+    setText("about-commit", buildCommitText(build));
+    setText("about-date", build.date ? build.date.slice(0, 10) : "-");
+    const label = document.getElementById("sidebar-version");
+    label.textContent = `v${build.version}`;
+    label.title = buildInfoText(build).split("\n").slice(1, 4).join(" \u00b7 ");
+    label.hidden = false;
+}
+
+async function copyText(text) {
+    // navigator.clipboard needs a secure context (HTTPS or localhost) and a
+    // browser may still refuse it; a plain-HTTP LAN address, or a refusal,
+    // falls back to the older selection-based copy
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return;
+        } catch (error) {
+            // permission denied - try the fallback below
+        }
+    }
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    const copied = document.execCommand("copy");
+    area.remove();
+    if (!copied) {
+        throw new Error("copy is not available in this browser");
+    }
+}
+
+async function handleCopyBuildInfo() {
+    if (!buildInfo) {
+        return;
+    }
+    const note = document.getElementById("about-copied");
+    try {
+        await copyText(buildInfoText(buildInfo));
+        note.textContent = "Copied";
+    } catch (error) {
+        note.textContent = `Could not copy: ${error.message}`;
+    }
+    note.hidden = false;
+    clearTimeout(handleCopyBuildInfo.timer);
+    handleCopyBuildInfo.timer = setTimeout(() => { note.hidden = true; }, 2500);
+}
+
 function renderCore(status) {
     document.title = `${status.engine} Mission Control`;
+    renderBuild(status.build);
 
     const state = document.getElementById("core-state");
     state.textContent = status.running ? "running" : "stopped";
@@ -1931,6 +2015,7 @@ document.getElementById("home-health").addEventListener("click", () => {
     location.hash = status ? satelliteHash(status) : "#/satellite/Status";
 });
 document.getElementById("configuration-form").addEventListener("submit", handleConfigurationSubmit);
+document.getElementById("about-copy").addEventListener("click", handleCopyBuildInfo);
 document.getElementById("satellite-config-form").addEventListener("submit", handleSatelliteConfigSubmit);
 document.getElementById("satellite-config-close").addEventListener("click", closeSatelliteConfig);
 document.getElementById("satellite-config-overlay").addEventListener("click", (event) => {
@@ -2035,7 +2120,7 @@ function startApp() {
     pollTimer = setInterval(refresh, REFRESH_MS);
 }
 
-function setAuthMode(bootstrapped) {
+function setAuthMode(bootstrapped, setupCodeRequired = false) {
     document.getElementById("auth-title").textContent = bootstrapped
         ? "Sign in" : "Create the administrator account";
     document.getElementById("auth-subtitle").textContent = bootstrapped
@@ -2043,6 +2128,11 @@ function setAuthMode(bootstrapped) {
         : "This StarCore install has no administrator account yet. Create one to continue - it's the only account needed to manage everything below.";
     document.getElementById("auth-submit").textContent = bootstrapped ? "Sign in" : "Create account";
     document.getElementById("auth-password").autocomplete = bootstrapped ? "current-password" : "new-password";
+    // a fresh install reached from another device (or through the HTTPS
+    // proxy) only accepts setup with the one-time code from its startup output
+    const codeNeeded = !bootstrapped && setupCodeRequired;
+    document.getElementById("auth-setup-code-field").hidden = !codeNeeded;
+    document.getElementById("auth-setup-code").required = codeNeeded;
 }
 
 // gates the whole app behind a session: shown once at boot, before anything
@@ -2070,7 +2160,7 @@ async function initAuth() {
 
     showAppShell(false);
     document.getElementById("auth-overlay").hidden = false;
-    setAuthMode(status.bootstrapped);
+    setAuthMode(status.bootstrapped, status.setup_code_required);
     document.getElementById("auth-username").focus();
 
     document.getElementById("auth-form").addEventListener("submit", async (event) => {
@@ -2084,7 +2174,11 @@ async function initAuth() {
         submit.disabled = true;
 
         try {
-            await postJson(status.bootstrapped ? "/api/auth/login" : "/api/auth/setup", { username, password });
+            const body = { username, password };
+            if (!status.bootstrapped && status.setup_code_required) {
+                body.setup_code = document.getElementById("auth-setup-code").value.trim();
+            }
+            await postJson(status.bootstrapped ? "/api/auth/login" : "/api/auth/setup", body);
             document.getElementById("auth-overlay").hidden = true;
             showAppShell(true);
             startApp();

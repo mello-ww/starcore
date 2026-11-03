@@ -1,6 +1,6 @@
 {
   "name": "starcore-mobile",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "private": true,
   "description": "StarCore's native mobile client - Android first, iOS-ready. Talks to the same StarCore server API Mission Control uses; no backend logic lives here. See README.md.",
   "scripts": {

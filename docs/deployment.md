@@ -110,8 +110,9 @@ Mission Control stays on loopback; `deploy/nginx/starcore-panel.conf` is the HTT
 proxy for it (the Certbot-managed lines are kept as Certbot wrote them). Besides proxying it
 allows 2 GB uploads, turns buffering off so streams and long-polls flow, marks the session cookie
 `Secure`, sends HSTS, and refuses everything under `/api/cli/` (the one-shot CLI bridge) from outside. Behind the proxy every client
-reaches StarCore from 127.0.0.1, so sign-in throttling is shared by everyone rather than per
-address - stricter, never weaker.
+reaches StarCore from 127.0.0.1, but StarCore keys sign-in throttling on the `X-Real-IP` nginx
+sets, so each client has its own lockout, and treats proxied requests as remote for first-run
+setup and the CLI bridge.
 
 systemd is entirely optional; nothing about running StarCore in a terminal for development requires it.
 
@@ -292,12 +293,19 @@ StarCore ships with a single-administrator authentication system - see "Authenti
 `docs/api.md` for the full mechanics (endpoints, sessions, password hashing). What matters for
 deployment:
 
-- A fresh install has no administrator account, and the API is deliberately open until one is
-  created - Mission Control shows a setup screen for exactly this reason. **Create the
-  administrator account before binding `server.host` to anything other than `127.0.0.1`.**
-  There is no way to reach the setup screen remotely and lock everyone else out - the first
-  visitor to complete it becomes the administrator - so do this from the machine itself, or
-  over a connection you already trust, before opening the port up.
+- A fresh install has no administrator account. Until one exists, the API answers only a
+  client on the machine itself that connects directly; anyone else, including visitors coming
+  through a reverse proxy, sees only the setup screen, and it asks for the one-time setup code
+  StarCore prints at startup:
+
+  ```
+  No administrator account yet. Create it in Mission Control - from any device
+  other than this machine, also enter this one-time setup code: K7QM-2XRA-9PDF
+  ```
+
+  On a Linux server that is `journalctl -u starcore | grep "setup code"`. The code changes on
+  every start and stops working once the administrator exists. Creating the account offline
+  with `AuthStore.bootstrap` (as for the first Linux install) remains possible too.
 - Once the account exists, every API endpoint other than `/api/auth/*` requires a valid
   session, enforced entirely server-side (`ApiServer._authorized()`) - Mission Control hiding
   a button never was, and still isn't, the actual protection.

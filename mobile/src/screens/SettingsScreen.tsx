@@ -6,6 +6,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
 import {useDeveloperMode} from '../developer/DeveloperModeContext';
 import {useServers} from '../servers/ServersContext';
+import {AboutCard, VersionFootnote} from '../components/AboutCard';
 import {Button} from '../components/Button';
 import {ScreenTitle} from '../components/ScreenTitle';
 import {Surface} from '../components/Surface';
@@ -137,7 +138,11 @@ export function SettingsScreen({navigation}: Props) {
         </View>
       </Surface>
 
+      <AboutCard />
+
       <Button title="Log out" variant="secondary" onPress={() => logout()} />
+
+      <VersionFootnote />
     </ScrollView>
   );
 }

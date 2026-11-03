@@ -12,6 +12,7 @@ import com.brentvatne.react.ReactNativeVideoManager
 import com.starcore.mobile.music.MusicPackage
 import com.starcore.mobile.music.PlayerRegistry
 import com.starcore.mobile.privacy.PrivacyPackage
+import com.starcore.mobile.buildinfo.BuildInfoPackage
 
 /**
  * Standard React Native application bootstrap - autolinking (via
@@ -21,13 +22,13 @@ import com.starcore.mobile.privacy.PrivacyPackage
  * (src/music/native.ts), which has no npm package to autolink from, and
  * its react-native-video plugin hook that gives it the player's session,
  * and the Privacy package (FLAG_SECURE and image-cache eviction for the
- * Locked Folder).
+ * Locked Folder), and BuildInfo (Settings > About).
  */
 class MainApplication : Application(), ReactApplication {
 
     override val reactNativeHost: ReactNativeHost =
         object : DefaultReactNativeHost(this) {
-            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MusicPackage() + PrivacyPackage()
+            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MusicPackage() + PrivacyPackage() + BuildInfoPackage()
 
             override fun getJSMainModuleName(): String = "index"
 

@@ -17,7 +17,7 @@ The API consists of REST endpoints and a WebSocket interface.
 The Engine currently serves an HTTP API. It is started with the Core and configured through the `[server]` section of `engine/config.toml`. Everything is read-only except the three control endpoints below.
 
 ```
-GET  /api/status                  current Core status
+GET  /api/status                  current Core status, including "build": {version, channel, build, commit, dirty, date}
 GET  /api/satellites              every loaded Satellite
 GET  /api/satellites/<name>       a single Satellite, matched case-insensitively
 GET  /api/commands                every registered CLI command and its metadata
@@ -195,12 +195,15 @@ The same server also serves the Mission Control frontend from the `mission_contr
 
 StarCore ships with a single-administrator authentication system (`starcore/auth.py`) -
 deliberately not a multi-user account system; see "Authentication architecture" below for
-why. Until an administrator account exists, the API is intentionally open (see
-`ApiServer._authorized()` docstring in `starcore/api/server.py`) so that `/api/auth/setup`
-itself - and Mission Control's setup screen - are reachable with no session at all. This is
-exactly why the default bind address is `127.0.0.1`: exposing a freshly-installed,
-not-yet-configured StarCore beyond localhost is a decision for whoever deploys it to make
-deliberately, not something the API alone makes safe.
+why. Until an administrator account exists, the API is open only to a client on the same
+machine that connects directly - not through a reverse proxy (see `ApiServer._authorized()`
+in `starcore/api/server.py`). Every other client - the LAN, or the internet through a proxy,
+which also connects from 127.0.0.1 but adds `X-Real-IP`, `X-Forwarded-For` or `Forwarded` -
+gets `401 {"setup_required": true}` from everything except the four auth endpoints, and
+`/api/auth/setup` asks it for the one-time **setup code** StarCore prints at startup while no
+administrator exists (`journalctl -u starcore` on a Linux server). A wrong code gets `403`;
+guesses are throttled per client like sign-ins. The code is new on every start and stops
+working once the administrator exists.
 
 Once an administrator account exists (`GET /api/auth/status` reports `"bootstrapped": true`),
 every endpoint above other than the four always-open auth endpoints (`AUTH_OPEN_ENDPOINTS` in
@@ -210,19 +213,24 @@ Explorer, Photo, Music, Locked Folder and Console shutdown/restart are all prote
 the moment they're reachable under `/api/`.
 
 ```
-POST /api/auth/setup   { "username": "...", "password": "..." }  -> 200 + session, or 409 if already set up
+POST /api/auth/setup   { "username": "...", "password": "...",
+                          "setup_code": "XXXX-XXXX-XXXX" (only when not on this machine) }
+                                                                 -> 200 + session, 403 (setup code), 409 if already set up, or 429
 POST /api/auth/login    { "username": "...", "password": "...",
                           "kind": "web"|"mobile", "device_name": "..." } -> 200 + session, 401, or 429
 POST /api/auth/logout   (no body)                                -> 200, ends the current session
 GET  /api/auth/status   (no body)                                -> { "bootstrapped": bool, "authenticated": bool,
-                                                                     "username": "..." (only when authenticated) }
+                                                                     "username": "..." (only when authenticated),
+                                                                     "setup_code_required": bool (only before setup) }
 ```
 
 After 5 failed logins in a row from one client address, `login` answers
 `429 {"error": "...", "retry_after": <seconds>}` with a matching `Retry-After` header for 30
 seconds, doubling on each further lockout up to 15 minutes; a successful login resets it.
 This applies even to the right password while locked out. The record is kept in memory per
-address, so behind a reverse proxy every client shares one lockout.
+client address. Behind a reverse proxy on the same machine, that is the real client's address
+from `X-Real-IP` (or the last `X-Forwarded-For` entry), so one client's failed guesses never
+lock anyone else out; those headers are ignored from any other peer, which could forge them.
 
 JSON request bodies have a size limit, checked against `Content-Length` before anything is
 read: 64 KB for the four auth endpoints above, 16 MB for every other endpoint. A larger body

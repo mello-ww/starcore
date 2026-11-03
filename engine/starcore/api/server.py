@@ -2,6 +2,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread, Timer
 from urllib.parse import parse_qs, quote, unquote, urlparse
+import hmac
+import ipaddress
 import itertools
 import json
 import ssl
@@ -32,6 +34,22 @@ LIFECYCLE_ACTIONS = {"enable": True, "disable": False}
 RELOAD_SEGMENT = "reload"
 
 FILE_CHUNK = 64 * 1024
+
+# headers a reverse proxy adds to say who it is forwarding for. A request from
+# this machine that carries one of them came through a proxy (nginx sets both
+# X-Real-IP and X-Forwarded-For - see deploy/nginx/starcore-panel.conf), so it
+# is treated as the remote client it really is, never as a local one
+FORWARDING_HEADERS = ("X-Real-IP", "X-Forwarded-For", "Forwarded")
+
+
+def _is_loopback(address: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return ip.is_loopback
 
 # Largest JSON body read into memory. The sign-in endpoints answer anyone, so
 # they get a small cap; every other endpoint has already required a session
@@ -114,6 +132,8 @@ class ApiServer:
         server.web_root = self.web_root
         server.https_enabled = self.https_enabled
         server.login_throttle = LoginThrottle()
+        # guesses at the first-run setup code (see RequestHandler._handle_auth_setup)
+        server.setup_throttle = LoginThrottle()
 
         self.port = server.server_address[1]
         self._server = server
@@ -227,20 +247,25 @@ class RequestHandler(BaseHTTPRequestHandler):
         Every /api/ path (other than the always-open auth endpoints in
         AUTH_OPEN_ENDPOINTS - status/setup/login/logout) needs a valid
         session once an administrator account exists. Before that - a fresh,
-        not-yet-configured install - the API is intentionally still open, the
-        same way the frontend's own setup screen has to be reachable with no
-        session at all. This is exactly why the default bind address stays
-        127.0.0.1 (see engine/config.toml): exposing an unconfigured StarCore
-        beyond localhost is the administrator's decision to make, not
-        something this alone makes safe. Sends the 401 itself on failure, so
-        callers only need to check the return value and return.
+        not-yet-configured install - the API is open only to a client on
+        this very machine that isn't coming through a reverse proxy
+        (_direct_local), the way development and the one-shot CLI use it.
+        Anyone else - the LAN, or the internet through a proxy, which
+        connects from 127.0.0.1 too - gets 401 until the administrator
+        exists, and can only reach the setup screen, which then asks for the
+        one-time setup code StarCore printed at startup. Sends the 401 itself
+        on failure, so callers only need to check the return value and return.
         """
         if not path.startswith("/api/") or path in AUTH_OPEN_ENDPOINTS:
             return True
 
         engine = self.server.engine
         if not engine.auth.is_bootstrapped:
-            return True
+            if self._direct_local():
+                return True
+            self._send_json({"error": "StarCore has no administrator account yet - create it first.",
+                             "setup_required": True}, status=401)
+            return False
 
         token = AuthStore.token_from_request(self.headers.get("Cookie", ""), self.headers.get("Authorization", ""))
         if engine.auth.validate_session(token):
@@ -249,6 +274,34 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         self._send_json({"error": "authentication required"}, status=401)
         return False
+
+    def _proxied(self) -> bool:
+        """True if this request reached StarCore through a reverse proxy
+        on this machine (it connects from loopback, and says whom it is
+        forwarding for)."""
+        return _is_loopback(self.client_address[0]) and any(
+            self.headers.get(name) for name in FORWARDING_HEADERS)
+
+    def _direct_local(self) -> bool:
+        """True only for a client on this machine talking to StarCore
+        directly - a browser on the server itself, the CLI, a test."""
+        return _is_loopback(self.client_address[0]) and not self._proxied()
+
+    def _client_address(self) -> str:
+        """The address sign-in throttling is keyed on: the real client's,
+        even behind a reverse proxy, so one client's failed guesses never
+        lock everyone else out. Forwarding headers are only believed from a
+        proxy on this machine - anyone else could simply make them up.
+        X-Real-IP is what nginx sets from the connection it accepted; the
+        last X-Forwarded-For entry is the one the nearest proxy appended."""
+        peer = self.client_address[0]
+        if not _is_loopback(peer):
+            return peer
+        real = self.headers.get("X-Real-IP", "").strip()
+        if real:
+            return real
+        forwarded = self.headers.get("X-Forwarded-For", "").split(",")[-1].strip()
+        return forwarded or peer
 
     def do_PUT(self):
         self._method_not_allowed()
@@ -415,7 +468,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         engine = self.server.engine
         # checked before the body is read, so a caller without the token
         # never gets anything parsed or run
-        if not bridge.accepts(engine, self.headers.get(bridge.HEADER, ""), self.client_address[0]):
+        # a request a proxy forwarded is never "this machine", whatever its token
+        if self._proxied() or not bridge.accepts(engine, self.headers.get(bridge.HEADER, ""), self.client_address[0]):
             self.close_connection = True
             self._send_json({"error": "not available"}, status=403)
             return
@@ -458,6 +512,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         token = AuthStore.token_from_request(self.headers.get("Cookie", ""), self.headers.get("Authorization", ""))
         authenticated = engine.auth.validate_session(token)
         payload = {"bootstrapped": engine.auth.is_bootstrapped, "authenticated": authenticated}
+        if not engine.auth.is_bootstrapped:
+            # the setup screen asks for the one-time code only when it's needed
+            payload["setup_code_required"] = not self._direct_local()
         if authenticated:
             # only ever the caller's own account, so a greeting can use it
             payload["username"] = engine.auth.session_username(token)
@@ -469,13 +526,42 @@ class RequestHandler(BaseHTTPRequestHandler):
         if body is None:
             return  # a clean error response was already sent
 
-        username = str(body.get("username", "")) if isinstance(body, dict) else ""
-        password = str(body.get("password", "")) if isinstance(body, dict) else ""
+        if not isinstance(body, dict):
+            body = {}
+        if engine.auth.is_bootstrapped:
+            self._send_json({"error": "StarCore already has an administrator account"}, status=409)
+            return
+
+        # Anyone who can reach a fresh install could otherwise claim it, so a
+        # client that isn't on this machine directly (the LAN, or the internet
+        # through a reverse proxy) must also prove it can read StarCore's own
+        # startup output: the one-time code printed there (see
+        # StarCore.start). Guesses are throttled per client like sign-ins.
+        if not self._direct_local():
+            throttle = self.server.setup_throttle
+            client = self._client_address()
+            wait = throttle.begin(client)
+            if wait:
+                self._send_json({"error": f"Too many attempts. Try again in {wait} seconds.",
+                                 "retry_after": wait}, status=429, headers={"Retry-After": str(wait)})
+                return
+            expected = getattr(engine, "setup_code", None)
+            given = "".join(ch for ch in str(body.get("setup_code", "")).upper() if ch.isalnum())
+            if not expected or not hmac.compare_digest(given, expected.replace("-", "")):
+                self._send_json({"error": "That setup code is not correct. StarCore prints it in its "
+                                          "startup output (journalctl -u starcore on a Linux server).",
+                                 "setup_code_required": True}, status=403)
+                return
+            throttle.succeeded(client)
+
+        username = str(body.get("username", ""))
+        password = str(body.get("password", ""))
         try:
             token = engine.auth.bootstrap(username, password)
         except AuthError as error:
             self._send_json({"error": str(error)}, status=409)
             return
+        engine.setup_code = None
 
         self._send_json({"message": "Administrator account created."},
                          headers={"Set-Cookie": self._session_cookie(token)})
@@ -487,7 +573,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             return  # a clean error response was already sent
 
         throttle = self.server.login_throttle
-        client = self.client_address[0]
+        client = self._client_address()
         wait = throttle.begin(client)
         if wait:
             self._send_json({"error": f"Too many sign-in attempts. Try again in {wait} seconds.",

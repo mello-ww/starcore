@@ -17,6 +17,66 @@ react {
     nodeExecutableAndArgs = [System.getenv("NODE_BINARY") ?: "node"]
 }
 
+// ---------- version and build metadata ----------
+// The release version comes from the repository's top-level VERSION file -
+// the same file the Engine reads (engine/starcore/build_info.py) - so the app
+// and the server can never disagree about which release they belong to.
+// Commit, build number and dirty state come from Git at build time; a value
+// Git can't provide is left empty and shown as "unknown", never made up.
+def repoRoot = file("../../..")
+def starcoreVersion = new File(repoRoot, "VERSION").text.trim()
+def versionParts = (starcoreVersion =~ /^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?$/)
+if (!versionParts.matches()) {
+    throw new GradleException("VERSION must look like 0.1.0 or 0.1.0-alpha.1, not '${starcoreVersion}'")
+}
+def (versionMajor, versionMinor, versionPatch) = (1..3).collect { versionParts.group(it).toInteger() }
+def preReleaseLabel = versionParts.group(4)
+def preReleaseNumber = versionParts.group(5)?.toInteger() ?: 0
+if (versionMinor > 99 || versionPatch > 99 || preReleaseNumber > 99) {
+    throw new GradleException("minor, patch and pre-release numbers must stay below 100 for versionCode")
+}
+// Android installs an update only when its versionCode is higher, so it follows the
+// release order: 0.1.0-alpha.1 (100101) < 0.1.0-alpha.2 < 0.1.0-beta.1 (100201)
+// < 0.1.0-rc.1 (100301) < 0.1.0 (100900) < 0.1.1-alpha.1 (101101)
+def preReleaseRank = [alpha: 1, beta: 2, rc: 3]
+def starcoreVersionCode = ((versionMajor * 100 + versionMinor) * 100 + versionPatch) * 1000 +
+        (preReleaseLabel ? preReleaseRank[preReleaseLabel] * 100 + preReleaseNumber : 900)
+
+def gitOutput = { List<String> args ->
+    try {
+        def process = (["git", "-C", repoRoot.absolutePath] + args).execute()
+        def output = process.text.trim()
+        process.waitFor() == 0 && output ? output : null
+    } catch (Exception ignored) {
+        null
+    }
+}
+def starcoreCommit = gitOutput(["rev-parse", "--short=7", "HEAD"]) ?: ""
+def starcoreBuildNumber = starcoreCommit ? (gitOutput(["rev-list", "--count", "HEAD"]) ?: "") : ""
+def starcoreDirty = starcoreCommit ? gitOutput(["status", "--porcelain", "--untracked-files=no"]) != null : false
+// day precision: exact enough for a bug report, and BuildConfig (so the Java
+// compile) changes once a day rather than on every incremental debug build
+def starcoreBuildDate = new Date().format("yyyy-MM-dd", TimeZone.getTimeZone("UTC"))
+
+// ---------- release signing ----------
+// Never committed. The first of these that exists is used:
+//   1. the file named by the STARCORE_KEYSTORE_PROPERTIES environment variable
+//   2. mobile/android/keystore.properties (gitignored)
+//   3. ~/.starcore/signing/keystore.properties - outside any checkout, so a
+//      `git clean` can never delete the one key every future update needs
+// holding storeFile, storePassword, keyAlias and keyPassword (see
+// docs/releasing.md). Without one, a release build is left unsigned and
+// says so - it is never silently signed with the debug key.
+def keystorePropertiesFile = [
+        System.getenv("STARCORE_KEYSTORE_PROPERTIES"),
+        rootProject.file("keystore.properties").path,
+        "${System.getProperty("user.home")}/.starcore/signing/keystore.properties",
+].findResult { it && new File(it).isFile() ? new File(it) : null }
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile != null) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -28,8 +88,15 @@ android {
         applicationId "com.starcore.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "0.1.0"
+        versionCode starcoreVersionCode
+        versionName starcoreVersion
+
+        // read by BuildInfoModule.kt and shown in Settings > About
+        buildConfigField "String", "STARCORE_CHANNEL", "\"${preReleaseLabel ?: "stable"}\""
+        buildConfigField "String", "STARCORE_COMMIT", "\"${starcoreCommit}\""
+        buildConfigField "String", "STARCORE_BUILD_NUMBER", "\"${starcoreBuildNumber}\""
+        buildConfigField "boolean", "STARCORE_DIRTY", "${starcoreDirty}"
+        buildConfigField "String", "STARCORE_BUILD_DATE", "\"${starcoreBuildDate}\""
 
         // Resolves AndroidManifest.xml's ${MAPS_API_KEY} placeholder (see
         // the comment there) from android/gradle.properties - left blank
@@ -39,19 +106,34 @@ android {
         manifestPlaceholders = [MAPS_API_KEY: (project.findProperty("MAPS_API_KEY") ?: "")]
     }
 
+    signingConfigs {
+        if (keystoreProperties["storeFile"]) {
+            release {
+                storeFile new File(keystoreProperties["storeFile"])
+                storePassword keystoreProperties["storePassword"]
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword keystoreProperties["keyPassword"]
+            }
+        }
+    }
+
     // Debug builds use the Android Gradle Plugin's own automatic debug
     // signing config (a key it generates locally at `~/.android/debug.keystore`
     // the first time it's needed) - deliberately not overridden here, so
     // there is no keystore file of any kind for this project to ship or
     // gitignore just to run `npm run android` locally.
     //
-    // A release build needs its own real keystore, generated locally by
-    // whoever builds it, and its own signingConfig pointed at it - never
-    // committed to this repository. See README.md, "Release builds", and
-    // the Android section of the repository's own .gitignore.
+    // A release build is signed with the release key described above -
+    // never committed to this repository. See docs/releasing.md and the
+    // Android section of the repository's own .gitignore.
     buildTypes {
         release {
             minifyEnabled false
+            if (signingConfigs.findByName("release") != null) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.warn("StarCore: no release keystore found - the release APK will be UNSIGNED (see docs/releasing.md)")
+            }
         }
     }
 }

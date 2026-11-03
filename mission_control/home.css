@@ -871,3 +871,31 @@ body[data-route="overview"] #updated {
     font-size: 13px;
     font-weight: 400;
 }
+
+/* ---------- build label & About ---------- */
+
+.sidebar-version {
+    margin-left: auto;
+    color: var(--sc-text-3, var(--sc-text-2));
+    font-family: var(--sc-font-mono, var(--mono));
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+.about-note {
+    margin: 0.85rem 0;
+    font-size: 0.8rem;
+}
+
+#about-copied {
+    margin-left: 0.6rem;
+    font-size: 0.8rem;
+}
+
+#view-configuration > .panel + .panel {
+    margin-top: 1.1rem; /* same rhythm as .stack */
+}

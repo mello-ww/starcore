@@ -63,8 +63,18 @@ instead of the app itself, asking for a username and password to create that fir
 after that, Mission Control shows a login screen to anyone without a valid session, and a
 "Log out" button next to "Stop StarCore" in the topbar ends the current session and returns
 to the login screen. Until an administrator account is created, the setup screen itself is
-reachable with no session, by design - see the "Authentication architecture" note in
-`docs/api.md`.
+reachable with no session, by design. Opened from any device other than the server itself
+(including through the HTTPS proxy), it also asks for the one-time setup code StarCore prints
+at startup - see "Authentication" in `docs/api.md`.
+
+## About and build information
+
+Configuration > About shows the version, release channel, build number, commit and build date
+of the running Engine (Mission Control is served by it, so they share one version), and the
+sidebar shows the version at its bottom. **Copy build info** copies the same details as plain
+text for a bug report - nothing about the server's address, accounts or paths. Everything comes
+from `/api/status` "build" (`engine/starcore/build_info.py`: the `VERSION` file and Git); see
+`docs/releasing.md`.
 
 ## Developer Mode
 
@@ -91,7 +101,7 @@ port = 8080
 
 `[server]` is only read once, when the Core starts, so a saved change never applies to the process that's already running - the Configuration page, the CLI and the API all say so plainly ("restart required") rather than implying the change is live. Restart StarCore for a saved `[server]` change to take effect.
 
-By default `host = "127.0.0.1"` keeps Mission Control reachable only from the machine it runs on. Setting `host = "0.0.0.0"` makes it reachable from other devices on the same private network - see "Private LAN access" in the deployment documentation for how to do that safely, including the firewall changes it typically requires. Mission Control has no authentication yet, so a LAN-reachable instance is trusted the way any other unauthenticated device on that network would be; it should never be exposed to the public internet.
+By default `host = "127.0.0.1"` keeps Mission Control reachable only from the machine it runs on. Setting `host = "0.0.0.0"` makes it reachable from other devices on the same private network - see "Private LAN access" in the deployment documentation for how to do that safely, including the firewall changes it typically requires. Every API request still needs a session once the administrator exists; to reach Mission Control from the internet, put it behind the HTTPS reverse proxy described in the deployment documentation rather than exposing its port directly.
 
 ## Satellites in Mission Control
 

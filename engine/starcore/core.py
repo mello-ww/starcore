@@ -1,3 +1,4 @@
+import secrets
 import threading
 import time
 from pathlib import Path
@@ -12,6 +13,17 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8080
 
 
+
+# no 0/O or 1/I/L, so it reads back unambiguously from a terminal or a log
+SETUP_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def new_setup_code() -> str:
+    """A fresh one-time first-run setup code, e.g. "K7QM-2XRA-9PDF" (about 60
+    bits - far beyond reach with guesses throttled per client)."""
+    chars = "".join(secrets.choice(SETUP_CODE_ALPHABET) for _ in range(12))
+    return "-".join(chars[i:i + 4] for i in range(0, 12, 4))
+
 class SatelliteError(Exception):
     """Raised by the satellite management API for a request it cannot carry out.
 
@@ -23,7 +35,7 @@ class SatelliteError(Exception):
     """
 
 
-from . import runtime_paths
+from . import build_info, runtime_paths
 from .auth import AuthStore
 from .engine_config import Configuration
 from .satellite_loader import SatelliteLoader, SatelliteLoadError
@@ -70,6 +82,10 @@ class StarCore:
             ENGINE_DIR / "data" / "auth.json",
             runtime_paths.data_dir() / "auth.json",
         ))
+        # one-time code a remote first-run setup must present (set in start(),
+        # cleared once the administrator exists) - see
+        # RequestHandler._handle_auth_setup
+        self.setup_code = None
         # state-changing and refused commands - see starcore/cli/audit.py
         self.audit = AuditLog(runtime_paths.data_dir() / "audit.log")
         # set only while the one-shot CLI may reach this process - see
@@ -119,6 +135,10 @@ class StarCore:
             print("Mission Control is disabled.")
         elif self.api.start():
             print(f"Mission Control available at {self.api.url}")
+            if not self.auth.is_bootstrapped:
+                self.setup_code = new_setup_code()
+                print("No administrator account yet. Create it in Mission Control - from any device")
+                print(f"other than this machine, also enter this one-time setup code: {self.setup_code}")
 
         print("\nStarCore is ready.")
 
@@ -294,6 +314,8 @@ class StarCore:
                 "link": link_count,
             },
             "commands": len(self.command_registry.all()),
+            # version, channel, build number, commit and date - see build_info.py
+            "build": build_info.info(),
             "mission_control": {
                 "enabled": self.mission_control_enabled,
                 "running": self.api.running,

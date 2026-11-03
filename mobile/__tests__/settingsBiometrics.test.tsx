@@ -47,6 +47,9 @@ describe('SettingsScreen biometric toggle', () => {
       biometricUnlockEnabled: false,
       enableBiometricUnlock,
       disableBiometricUnlock,
+      // Settings > About asks the connected Engine for its version; left
+      // pending here, since these tests are about the biometric switch
+      client: {get: jest.fn(() => new Promise(() => {}))},
       ...overrides,
     });
     (useServers as jest.Mock).mockReturnValue({activeServer: {id: 's1', name: 'Home'}});

@@ -91,6 +91,10 @@ mobile/android/**/*.keystore
 mobile/android/**/*.jks
 mobile/android/keystore.properties
 
+# release artifacts built by mobile/scripts/build-release.ps1 - published as
+# GitHub release assets, never committed
+/dist/
+
 # iOS - not part of this block (Android-first; see mobile/README.md), but
 # ignored ahead of time so adding the platform later never risks a signing
 # certificate, provisioning profile, or Xcode's own local user state

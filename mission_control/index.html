@@ -55,6 +55,11 @@ try {
             <span>Password</span>
             <input id="auth-password" type="password" autocomplete="current-password" required minlength="8">
         </label>
+        <label class="field" id="auth-setup-code-field" hidden>
+            <span>Setup code</span>
+            <input id="auth-setup-code" type="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX">
+            <small class="muted">Printed in StarCore's startup output - on a Linux server, <code>journalctl -u starcore</code>.</small>
+        </label>
         <p id="auth-error" class="banner error" hidden></p>
         <button id="auth-submit" class="button button-primary" type="submit">Sign in</button>
     </form>
@@ -150,6 +155,7 @@ try {
     <div class="sidebar-foot">
         <i class="pulse" id="pulse"></i>
         <span id="link-state">connecting</span>
+        <span class="sidebar-version" id="sidebar-version" hidden></span>
     </div>
 </aside>
 
@@ -353,6 +359,22 @@ try {
                 Revoking one signs that device out immediately.</p>
             <p id="sessions-error" class="banner error" hidden></p>
             <div id="sessions-list" class="stack"></div>
+        </section>
+
+        <section class="panel" aria-labelledby="about-title">
+            <p class="eyebrow" id="about-title">About</p>
+            <dl class="facts" id="about-facts">
+                <div><dt>Version</dt><dd id="about-version">-</dd></div>
+                <div><dt>Channel</dt><dd id="about-channel">-</dd></div>
+                <div><dt>Build</dt><dd id="about-build">-</dd></div>
+                <div><dt>Commit</dt><dd id="about-commit">-</dd></div>
+                <div><dt>Build date</dt><dd id="about-date">-</dd></div>
+            </dl>
+            <p class="muted about-note">Mission Control is served by the StarCore Engine, so they share one version.</p>
+            <div>
+                <button id="about-copy" class="button" type="button">Copy build info</button>
+                <span id="about-copied" class="muted" role="status" hidden>Copied</span>
+            </div>
         </section>
     </section>
 

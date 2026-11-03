@@ -20,6 +20,21 @@ describe('normalizeServerUrl', () => {
   it('trims surrounding whitespace', () => {
     expect(normalizeServerUrl('  192.168.1.20:8090  ')).toBe('http://192.168.1.20:8090');
   });
+
+  it('assumes HTTPS for a public host name typed without a scheme', () => {
+    expect(normalizeServerUrl('starcore-panel.duckdns.org')).toBe('https://starcore-panel.duckdns.org');
+    expect(normalizeServerUrl('StarCore.Example.com/')).toBe('https://StarCore.Example.com');
+  });
+
+  it('keeps plain HTTP for LAN names, IPs and explicit ports', () => {
+    expect(normalizeServerUrl('localhost:8090')).toBe('http://localhost:8090');
+    expect(normalizeServerUrl('starcore')).toBe('http://starcore');
+    expect(normalizeServerUrl('starcore.local')).toBe('http://starcore.local');
+    expect(normalizeServerUrl('nas.home.arpa')).toBe('http://nas.home.arpa');
+    expect(normalizeServerUrl('10.0.0.5')).toBe('http://10.0.0.5');
+    expect(normalizeServerUrl('[fe80::1]:8090')).toBe('http://[fe80::1]:8090');
+    expect(normalizeServerUrl('myhost.duckdns.org:8090')).toBe('http://myhost.duckdns.org:8090');
+  });
 });
 
 /**

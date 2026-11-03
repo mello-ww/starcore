@@ -264,11 +264,17 @@ React Native test renderer involved, so they run under plain Jest/Node.
 
 ## Release builds
 
-Not part of this foundation block. A release build needs its own keystore,
-generated locally (`keytool -genkeypair ...` or Android Studio's "Generate
-Signed Bundle") and referenced from a local, gitignored
-`android/keystore.properties` - never committed, and never the debug
-signing config `android/app/build.gradle` uses today for `npm run android`.
+`pwsh scripts/build-release.ps1 -JavaHome <jdk17>` builds the signed,
+standalone release APK (JS bundle embedded - no Metro, USB or ADB) into
+`dist/` at the repository root. The release key is kept outside the
+checkout (`~/.starcore/signing/keystore.properties` by default, or
+`STARCORE_KEYSTORE_PROPERTIES`, or a gitignored `android/keystore.properties`)
+and never committed. Version, `versionCode`, commit and build date come from
+the repository's `VERSION` file and Git. See `docs/releasing.md` for signing,
+publishing, upgrades and rollback.
+
+A debug build (`npm run android`) and a release build are signed with
+different keys, so one can only replace the other after uninstalling it.
 
 ## Project data and `.gitignore`
 

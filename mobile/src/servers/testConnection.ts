@@ -1,16 +1,39 @@
 import {StarCoreClient} from '../api/client';
 
-/** Accepts an address with or without an explicit scheme - see "Accept
- * addresses with or without http://" in the task brief. Defaults to plain
- * HTTP, matching StarCore's own LAN-first deployment default
- * (docs/deployment.md); an address that already names a scheme is left
- * alone (aside from trimming a trailing slash) so HTTPS still works. */
+/** True for an address that only makes sense on a private network - an
+ * IP literal, `localhost`, a single-label name (`starcore`) or a
+ * local-only suffix (`.local`, `.lan`, `.home`, `.internal`, `.home.arpa`) -
+ * or for any address with an explicit port, which points straight at a
+ * StarCore listener rather than at an HTTPS reverse proxy. */
+function looksLocal(address: string): boolean {
+  const host = address.split('/')[0];
+  if (/^\[.*\]/.test(host) || /:\d+$/.test(host)) {
+    return true; // an IPv6 literal, or host:port
+  }
+  const name = host.toLowerCase();
+  return (
+    /^\d{1,3}(\.\d{1,3}){3}$/.test(name) ||
+    name === 'localhost' ||
+    !name.includes('.') ||
+    /\.(local|lan|home|internal|home\.arpa)$/.test(name)
+  );
+}
+
+/** Accepts an address with or without an explicit scheme. Without one, a
+ * public host name (`starcore.example.com`, a DuckDNS name) is assumed to be
+ * behind HTTPS - so not even the first request goes out unencrypted - while
+ * a LAN address or `host:port` keeps StarCore's LAN-first plain-HTTP default
+ * (docs/deployment.md). An address that already names a scheme is left
+ * alone (aside from trimming a trailing slash). */
 export function normalizeServerUrl(input: string): string {
   const trimmed = input.trim().replace(/\/+$/, '');
   if (!trimmed) {
     return trimmed;
   }
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `${looksLocal(trimmed) ? 'http' : 'https'}://${trimmed}`;
 }
 
 export type ConnectionCheck = {ok: true; resolvedBaseUrl: string} | {ok: false; message: string};
