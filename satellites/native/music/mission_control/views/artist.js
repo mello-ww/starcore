@@ -5,15 +5,12 @@ import { startRadio } from "../ui/actions.js";
 import { artwork } from "../ui/artwork.js";
 import { button, el, iconButton, plural } from "../ui/dom.js";
 import { albumCard, header, playButtons, shelf, trackList } from "../ui/lists.js";
-import { followArtwork } from "../theme.js";
-import { player } from "../player/player.js";
 
 export async function render({ node, parts, alive }) {
     const artist = await api.get(`artists/${encode(parts[0])}`);
     if (!alive()) {
         return;
     }
-    followArtwork(artist.artwork);
     const context = `artist:${artist.id}`;
     const allTracks = async () => (await api.get(`tracks${api.query({ artist: artist.id, sort: "album" })}`)).tracks;
     const follow = button(store.isLiked("artist", artist.id) ? "Following" : "Follow", "mu-chip mu-follow", async () => {
@@ -54,5 +51,4 @@ export async function render({ node, parts, alive }) {
         section.append(chips);
         node.append(section);
     }
-    return () => followArtwork(player().engine.track ? player().engine.track.album_id : null);
 }

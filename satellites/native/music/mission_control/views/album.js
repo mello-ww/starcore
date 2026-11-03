@@ -5,15 +5,12 @@ import { albumMenu, addToPlaylist, startRadio } from "../ui/actions.js";
 import { artwork } from "../ui/artwork.js";
 import { button, el, iconButton, longDuration, plural } from "../ui/dom.js";
 import { albumCard, header, likeButton, link, playButtons, qualityBadge, shelf, trackList } from "../ui/lists.js";
-import { followArtwork } from "../theme.js";
-import { player } from "../player/player.js";
 
 export async function render({ node, parts, alive }) {
     const album = await api.get(`albums/${encode(parts[0])}`);
     if (!alive()) {
         return;
     }
-    followArtwork(album.artwork ? album.id : null);
     const context = `album:${album.id}`;
     const meta = [
         album.artist_id ? link(album.artist, `artist/${encode(album.artist_id)}`) : album.artist,
@@ -79,5 +76,4 @@ export async function render({ node, parts, alive }) {
     if (album.more_by_artist.length) {
         node.append(shelf(`More by ${album.artist}`, album.more_by_artist.map((other) => albumCard(other, [other.year, other.type].filter(Boolean).join(" · ")))));
     }
-    return () => followArtwork(player().engine.track ? player().engine.track.album_id : null);
 }

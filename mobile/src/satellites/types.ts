@@ -20,6 +20,9 @@ export interface SatelliteSummary {
    * Locked Folder lives in Photos), so it gets no list entry of its own.
    * Presentation only - its routes are as protected as any other. */
   section_of?: string | null;
+  /** What the Satellite publishes about itself (its state.py) - free-form,
+   * except where a screen knows one Satellite's shape (Home's Status card). */
+  state?: Record<string, unknown>;
 }
 
 /** The declarative UI schema a Satellite's "mobile" route answers with -
@@ -45,16 +48,22 @@ export type UiAction = {
  * has an explicit `default` that skips whatever doesn't match - see its
  * own docstring.
  */
-export type UiItem =
+export type UiItem = (
   | {type: 'text'; value: string; style?: 'heading' | 'body' | 'caption'}
   | {type: 'status'; label: string; value: string}
   | {type: 'list'; items: Array<{title: string; subtitle?: string}>}
-  | {type: 'button'; label: string; action: UiAction};
+  | {type: 'button'; label: string; action: UiAction}
+) & {
+  /** Shown only in Developer Mode - a display hint, never a permission. */
+  developer?: boolean;
+};
 
 export interface UiSection {
   type: 'card';
   title?: string;
   items: UiItem[];
+  /** Shown only in Developer Mode - see UiItem.developer. */
+  developer?: boolean;
 }
 
 export interface UiScreen {

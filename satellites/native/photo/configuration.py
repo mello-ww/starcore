@@ -127,10 +127,12 @@ def _validate_retention_days(value) -> int:
 SETTINGS = {
     "sync_host": {
         "validate": _validate_host,
+        "developer": True,
         "description": "Address Photo Sync listens on for phone uploads. 0.0.0.0 allows other devices on the local network.",
     },
     "sync_port": {
         "validate": _validate_port,
+        "developer": True,
         "description": "Port Photo Sync listens on.",
     },
     "photo_directory": {
@@ -153,6 +155,7 @@ SETTINGS = {
     },
     "sync_default_path": {
         "validate": lambda value: _validate_server_relative_path(value, "sync_default_path"),
+        "developer": True,
         "description": "Where a phone-synced photo or video lands (and which physical album it joins) when "
                         "its phone folder doesn't match any configured source path.",
     },
@@ -217,8 +220,9 @@ def describe(satellite) -> dict:
             "live_value": live,
             "pending_restart": pending_restart,
         }
-        if "type" in meta:
-            setting["type"] = meta["type"]
+        for optional in ("type", "developer"):
+            if optional in meta:
+                setting[optional] = meta[optional]
         settings.append(setting)
 
     return {

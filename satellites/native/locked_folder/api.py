@@ -162,6 +162,9 @@ def status(request):
         # docs/satellites/locked_folder.md, "The configured directory can disappear"
         "path_exists": root.is_dir() if root is not None else None,
         "pin_set": live.pin_set,
+        # when the stored PIN was last set, so "incorrect PIN" on a vault someone believes is new
+        # can be told apart from a missing setup step; a date, never anything about the PIN itself
+        "pin_set_at": live.pin_set_at(),
         "pin_unreadable": live.pin_unreadable,
         "unlocked": unlocked,
         "expires_at": expires,

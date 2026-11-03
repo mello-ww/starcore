@@ -17,6 +17,10 @@ export const palette = {
   onAccent: '#141215',
   danger: '#ee444b',
   warn: '#f0b43c',
+
+  /** The second series of a two-series chart (upload, disk writes); the first is the accent.
+   * Checked against every accent preset on the card colour for colour-blind separation. */
+  chart2: '#7d808a',
 } as const;
 
 export const ACCENTS = [

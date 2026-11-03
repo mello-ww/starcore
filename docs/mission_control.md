@@ -37,6 +37,12 @@ Pages are addressable: `#/overview`, `#/satellites`, `#/console`, `#/configurati
 
 Mission Control polls the API every 5 seconds. If the Core becomes unreachable it keeps the last known values and shows an error message.
 
+Home also carries a **Status** summary - overall health, CPU, memory, satellites online and the
+most important warnings - when the Status Satellite is loaded and enabled. It comes from the
+state Status publishes, which already arrives with that 5-second `/api/satellites` poll, so it
+adds no request of its own; clicking it opens the Status page (`#/satellite/Status`), whose
+sections are addressable too (`#/satellite/Status/history`). See `docs/satellites/status.md`.
+
 ## Stopping and restarting StarCore
 
 The topbar's "Stop StarCore" button requests a graceful shutdown of the Core through the API - the same shutdown a terminal CLI `exit` triggers. It asks for confirmation before sending the request, and once StarCore has stopped the page stops polling and disables the Console and Restart button.
@@ -59,6 +65,14 @@ after that, Mission Control shows a login screen to anyone without a valid sessi
 to the login screen. Until an administrator account is created, the setup screen itself is
 reachable with no session, by design - see the "Authentication architecture" note in
 `docs/api.md`.
+
+## Developer Mode
+
+The terminal icon at the top right turns Developer Mode on and off. It is off by default and
+remembered per account in this browser. While it is on, Mission Control also shows the Console,
+Mission Control's address and port, Satellite reload buttons and versions, and each Satellite's
+advanced settings and diagnostics. It only changes what is shown: every action is still checked
+by the server. See docs/satellites.md, "Developer Mode".
 
 ## Configuration
 

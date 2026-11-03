@@ -9,6 +9,7 @@ import ssl
 from . import payloads
 from .response import RawBody, Request, Response
 from ..auth import AuthError, AuthStore, LoginThrottle, SESSION_COOKIE, SESSION_TTL_SECONDS
+from ..cli import bridge
 from ..core import SatelliteError
 from ..engine_config import ConfigurationError
 
@@ -190,6 +191,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
 
         try:
+            if path == bridge.ENDPOINT:
+                # the one-shot CLI's own channel - its per-run token, never a session
+                self._handle_cli()
+                return
             if not self._authorized(path):
                 return
             if path == "/api/auth/setup":
@@ -400,11 +405,25 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "'command' must be a non-empty string"}, status=400)
             return
 
-        result = payloads.execute(self.server.engine, command)
+        result = payloads.execute(self.server.engine, command, token=self._session_token)
         # a command that failed on its own terms (unknown name, printed
         # "[ERROR]: ...") is still a normal 200 - only an exception that
         # escaped the command function itself counts as a server error
         self._send_json(result, status=500 if result["error"] else 200)
+
+    def _handle_cli(self):
+        engine = self.server.engine
+        # checked before the body is read, so a caller without the token
+        # never gets anything parsed or run
+        if not bridge.accepts(engine, self.headers.get(bridge.HEADER, ""), self.client_address[0]):
+            self.close_connection = True
+            self._send_json({"error": "not available"}, status=403)
+            return
+        body = self._read_json_body()
+        if body is None:
+            return  # a clean error response was already sent
+        status, payload = bridge.handle(engine, body)
+        self._send_json(payload, status=status)
 
     def _handle_configuration_update(self):
         body = self._read_json_body()
@@ -586,7 +605,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             return None
 
         path = urlparse(self.path).path
-        limit = MAX_OPEN_JSON_BODY if path in AUTH_OPEN_ENDPOINTS else MAX_JSON_BODY
+        limit = MAX_OPEN_JSON_BODY if path in AUTH_OPEN_ENDPOINTS or path == bridge.ENDPOINT else MAX_JSON_BODY
         if length > limit:
             # checked before reading, so an oversized body never reaches
             # memory; the unread bytes mean this connection can't be reused

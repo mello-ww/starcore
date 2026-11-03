@@ -218,6 +218,10 @@ class PhotoTrashApiTest(unittest.TestCase):
         self.satellite.config.data["storage"] = str(self.directory / "library")
         self.satellite.config.data["photo_directory"] = ""
         self.satellite.config.data["trash_retention_days"] = 30
+        # configuration.update() persists through satellite.config.set(), which
+        # writes straight to config.path - redirected so this test never
+        # touches the real satellites/native/photo/config.toml
+        self.satellite.config.path = self.directory / "config.toml"
 
     def tearDown(self):
         shutil.rmtree(self.directory, ignore_errors=True)

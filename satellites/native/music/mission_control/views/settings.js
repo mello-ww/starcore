@@ -30,6 +30,12 @@ function section(title, description) {
     return node;
 }
 
+// advanced: shown only in StarCore's Developer Mode (a visibility preference, never a permission)
+function developer(node) {
+    node.dataset.developer = "";
+    return node;
+}
+
 function row(label, control, hint) {
     const node = el("label", "mu-setting");
     const text = el("span", "mu-setting-label", label);
@@ -88,7 +94,7 @@ function playback(transcoding) {
         row("Streaming quality", choice("streaming_quality", qualities), transcoding
             ? "Lossy originals are never re-encoded upward. Transcoding is only used when it makes the stream smaller."
             : "FFmpeg isn't available on this server, so everything streams in its original quality."),
-        row("Transcode format", choice("transcode_format", [["opus", "Opus"], ["aac", "AAC"], ["mp3", "MP3"]])),
+        developer(row("Transcode format", choice("transcode_format", [["opus", "Opus"], ["aac", "AAC"], ["mp3", "MP3"]]))),
         row("ReplayGain", choice("replaygain", [["off", "Off"], ["track", "Track gain"], ["album", "Album gain"]]), "Uses gain tags from your files. Peaks are never pushed past full scale."),
         row("Normalize loudness", toggle("normalize"), "A gentle compressor for files without ReplayGain tags. Changes the sound."),
         row("Crossfade", slider("crossfade", 0, 12, 1, (value) => (value ? `${value} s` : "Off"))),
@@ -168,26 +174,35 @@ function equalizer() {
     return node;
 }
 
-// the picker starts on StarCore's own accent (a #rrggbb token) when Music has none of its own
+// a custom colour starts on StarCore's current accent (a #rrggbb token)
 function starcoreAccent() {
     const value = getComputedStyle(document.documentElement).getPropertyValue("--sc-accent").trim();
-    return /^#[0-9a-f]{6}$/i.test(value) ? value : "#ee444b";
+    return /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : "#ee444b";
 }
 
 function appearance() {
     const node = section("Appearance");
     const accent = el("span", "mu-accent-pick");
     const mode = el("select", "mu-select");
-    mode.append(new Option("From the artwork", "artwork"), new Option("Fixed colour", "fixed"));
+    mode.setAttribute("aria-label", "Accent colour");
+    mode.append(new Option("StarCore accent", "starcore"), new Option("From the artwork (player only)", "artwork"),
+        new Option("Custom colour", "custom"));
     const colour = el("input");
     colour.type = "color";
-    const current = store.preference("accent", "artwork");
-    mode.value = current === "artwork" ? "artwork" : "fixed";
-    colour.value = current === "artwork" ? starcoreAccent() : current;
-    colour.hidden = mode.value === "artwork";
+    colour.setAttribute("aria-label", "Custom accent colour");
+    const current = String(store.preference("accent", "starcore") || "starcore");
+    const custom = /^#[0-9a-f]{6}$/i.test(current);
+    mode.value = custom ? "custom" : current === "artwork" ? "artwork" : "starcore";
+    colour.value = custom ? current : starcoreAccent();
+    colour.hidden = mode.value !== "custom";
+    // only an explicit custom pick stores a colour: following StarCore never pins today's accent
     mode.addEventListener("change", () => {
-        colour.hidden = mode.value === "artwork";
-        set("accent", mode.value === "artwork" ? "artwork" : colour.value);
+        colour.hidden = mode.value !== "custom";
+        if (mode.value === "custom") {
+            colour.value = starcoreAccent();
+            return; // stored once a colour is actually picked
+        }
+        set("accent", mode.value);
     });
     colour.addEventListener("input", () => set("accent", colour.value));
     accent.append(mode, colour);
@@ -252,6 +267,9 @@ async function server(alive) {
     for (const [label, value] of [["Songs", summary.tracks], ["Albums", summary.albums], ["Artists", summary.artists], ["Playing time", longDuration(summary.duration)],
         ["Size", size(summary.size_bytes)], ["Lossless", summary.lossless], ["Hi-Res", summary.hires], ["Missing files", summary.missing], ["Transcoding", summary.transcoding ? "Available" : "Unavailable"]]) {
         const tile = el("div", "mu-tile");
+        if (label === "Missing files" || label === "Transcoding") {
+            developer(tile);
+        }
         tile.append(el("dt", null, label), el("dd", null, String(value)));
         facts.append(tile);
     }
@@ -296,7 +314,13 @@ async function server(alive) {
         });
         const field = el("label", "mu-setting mu-setting-wide");
         field.append(el("span", "mu-setting-label", setting.key.replace(/_/g, " ")), control, status);
-        form.append(field);
+        form.append(setting.developer ? developer(field) : field);
+    }
+    const advanced = config.settings.filter((setting) => setting.developer).length;
+    if (advanced) {
+        const hint = el("p", "mu-hint", `${advanced} advanced library and transcoding settings are shown in Developer Mode.`);
+        hint.dataset.developerHint = "";
+        form.append(hint);
     }
     node.append(form, await scanner(alive), duplicates());
     return node;

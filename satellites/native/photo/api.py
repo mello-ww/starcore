@@ -13,6 +13,8 @@ from .private_media import policy
 # photos are addressed by the digest of their content, so a stored file can be
 # cached by the browser for as long as it likes
 IMMUTABLE = "private, max-age=604800"
+# an original served in place of a thumbnail: revalidated every time, see _serve_media()
+FALLBACK = "private, no-cache"
 
 
 def routes() -> dict:
@@ -347,8 +349,13 @@ def _serve_media(photo_library, photo, thumbnail: bool):
         return error_response(f"no thumbnail is available for '{photo['id']}' "
                                "(ffmpeg isn't installed on this StarCore server)", status=404)
 
-    served_type = "image/jpeg" if path.suffix == ".jpg" else photo_library.content_type(photo)
-    return file_response(path, served_type, IMMUTABLE)
+    if path.suffix == ".jpg" and path.parent.parent == photo_library.thumbnails_dir:
+        return file_response(path, "image/jpeg", IMMUTABLE)
+
+    # No thumbnail could be rendered (no Pillow), so this is the original standing in for one.
+    # It must not be cached under the thumbnail URL: once Pillow is installed, browsers and
+    # the app's image cache would otherwise keep the full-size original for a week.
+    return file_response(path, photo_library.content_type(photo), FALLBACK)
 
 
 def trash_route(request):

@@ -5,10 +5,12 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
 import {AccentCustomColor} from '../components/AccentCustomColor';
+import {DeveloperModeButton} from '../developer/DeveloperModeButton';
 import {SatellitesApi} from '../satellites/api';
 import {STATUS_LABELS, satelliteIcon, statusDotColor as dotColor} from '../satellites/icons';
 import type {SatelliteSummary} from '../satellites/types';
 import {useServers} from '../servers/ServersContext';
+import {StatusWidget} from '../status/StatusWidget';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 
 const {palette, radii, space, type, ACCENTS} = tokens;
@@ -33,6 +35,9 @@ export function formatUptime(seconds: number): string {
   const minutes = Math.floor((total % 3600) / 60);
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
+
+/** Satellites with a native screen of their own instead of the generic declarative one. */
+const DEDICATED_SCREENS: Record<string, string> = {Photo: 'PhotoHome', Music: 'MusicHome', Status: 'StatusHome'};
 
 export function alertsFor(satellites: SatelliteSummary[]) {
   return satellites
@@ -93,11 +98,11 @@ export function HomeScreen() {
   };
 
   const open = (satellite: SatelliteSummary) => {
-    const screen =
-      satellite.name === 'Photo' ? 'PhotoHome' : satellite.name === 'Music' ? 'MusicHome' : 'SatelliteDetail';
+    const screen = DEDICATED_SCREENS[satellite.name] ?? 'SatelliteDetail';
     const params = screen === 'SatelliteDetail' ? {name: satellite.name} : undefined;
     navigation.navigate('Satellites', {screen, params, initial: false});
   };
+  const statusSatellite = satellites?.find(satellite => satellite.name === 'Status');
 
   const online = satellites?.filter(satellite => satellite.status === 'running').length ?? 0;
   // a satellite shown inside another (the Locked Folder, in Photos) gets no card of its own;
@@ -129,6 +134,7 @@ export function HomeScreen() {
             style={({pressed}) => [styles.iconButton, pressed && styles.pressed]}>
             <Icon name="droplet" size={20} color={palette.textIcon} />
           </Pressable>
+          <DeveloperModeButton />
         </View>
 
         {picking && (
@@ -197,6 +203,8 @@ export function HomeScreen() {
             </>
           )}
         </View>
+
+        {!error && statusSatellite && <StatusWidget satellite={statusSatellite} onOpen={() => open(statusSatellite)} />}
 
         <View style={styles.sectionHead}>
           <Text style={type.eyebrow}>SATELLITES</Text>

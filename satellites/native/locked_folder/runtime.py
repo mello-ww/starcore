@@ -252,6 +252,15 @@ class LockedFolderRuntime:
         # So does an encrypted vault whose pin.json went missing.
         return self._pin is not None or self.pin_unreadable or self.vault_encrypted()
 
+    def pin_set_at(self):
+        """When pin.json was last written (ISO 8601, UTC), or None without one. Read from the
+        file's own timestamp: the PIN record itself carries no date, and its format stays as is."""
+        try:
+            written = self.pin_path.stat().st_mtime
+        except OSError:
+            return None
+        return datetime.fromtimestamp(written, timezone.utc).isoformat(timespec="seconds")
+
     def set_pin(self, pin: str, bind=None):
         """Sets a new PIN. `bind` is given by a recovery-key reset, which proved
         it holds the vault key; otherwise the vault's own binder is used."""

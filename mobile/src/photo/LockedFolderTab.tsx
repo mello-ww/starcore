@@ -151,7 +151,15 @@ export function LockedFolderTab({onPhotosChanged}: {onPhotosChanged?: () => void
   } else if (!status.pin_set) {
     body = <CreatePin api={api} onCreated={refresh} />;
   } else if (!status.unlocked) {
-    body = <LockedFolderUnlock api={api} biometricDeps={biometricDeps} onUnlocked={refresh} />;
+    body = (
+      <LockedFolderUnlock
+        api={api}
+        biometricDeps={biometricDeps}
+        onUnlocked={refresh}
+        intro={unlockIntro(status)}
+        forgotHelp={status.encryption?.recovery_key ? undefined : forgottenPinHelp(status)}
+      />
+    );
   } else {
     body = (
       <>
@@ -640,3 +648,26 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(4,6,13,0.6)',
   },
 });
+
+/** Says when the PIN was set: "Incorrect PIN" on a vault someone thinks is new is otherwise baffling. */
+export function unlockIntro(status: LockedFolderStatus): string {
+  const date = status.pin_set_at ? new Date(status.pin_set_at) : null;
+  if (!date || Number.isNaN(date.getTime())) {
+    return 'Enter your PIN to see what’s inside.';
+  }
+  const day = date.toLocaleDateString(undefined, {day: 'numeric', month: 'long', year: 'numeric'});
+  return `Enter the PIN set for this Locked Folder on ${day}.`;
+}
+
+/** The supported way out of a forgotten PIN when there is no recovery key. */
+export function forgottenPinHelp(status: LockedFolderStatus): string {
+  const encrypted = status.encryption?.state && status.encryption.state !== 'off';
+  if (encrypted) {
+    return 'No recovery key was created for this Locked Folder, so a forgotten PIN can’t be reset.';
+  }
+  return (
+    'This Locked Folder isn’t encrypted and has no recovery key, so its PIN can’t be reset from here. ' +
+    'Whoever runs the StarCore server can delete pin.json from StarCore’s data folder ' +
+    '(satellites/LockedFolder) and restart StarCore, then create a new PIN. The files in the folder are not touched.'
+  );
+}

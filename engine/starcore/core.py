@@ -33,7 +33,8 @@ from .manifest import SatelliteManifest
 from .command_registry import CommandRegistry
 from .command_loader import CommandLoader
 from .api import ApiServer
-from .cli.parser import parse
+from .cli import runner
+from .cli.audit import AuditLog
 
 
 class StarCore:
@@ -69,6 +70,12 @@ class StarCore:
             ENGINE_DIR / "data" / "auth.json",
             runtime_paths.data_dir() / "auth.json",
         ))
+        # state-changing and refused commands - see starcore/cli/audit.py
+        self.audit = AuditLog(runtime_paths.data_dir() / "audit.log")
+        # set only while the one-shot CLI may reach this process - see
+        # starcore/cli/bridge.py; never handed to a web or mobile client
+        self.control_token = None
+        self._loaded = False
         https_cert = server_config.get("https_cert", "")
         https_key = server_config.get("https_key", "")
         self.api = ApiServer(
@@ -96,18 +103,7 @@ class StarCore:
         print("Loading configuration...")
         print("Configuration loaded.\n")
 
-        print("Discovering satellites...")
-        self.loader._discover_directory(self.native_path, "native")
-        self.loader._discover_directory(self.link_path, "link")
-        print(f"Satellites discovered: {len(self.registry.all())}")
-        for satellite in self.registry.all():
-            print(f"- {satellite.manifest.name} v{satellite.manifest.version} ({satellite.type})")
-
-        print("\nDiscovering commands...")
-        self.command_loader.discover()
-        for satellite in self.registry.all():
-            self.command_loader.discover_satellite(satellite)
-        print(f"\nCommands discovered: {len(self.command_registry.all())}")
+        self.load()
 
         self._started_at = time.time()
         self._running = True
@@ -125,6 +121,30 @@ class StarCore:
             print(f"Mission Control available at {self.api.url}")
 
         print("\nStarCore is ready.")
+
+    def load(self):
+        """Discovers satellites and commands without starting anything.
+
+        start() runs this first; the one-shot CLI runs only this when no
+        StarCore is running, so read-only commands still work offline
+        (see starcore/cli/bridge.py). Safe to call more than once.
+        """
+        if self._loaded:
+            return
+        self._loaded = True
+
+        print("Discovering satellites...")
+        self.loader._discover_directory(self.native_path, "native")
+        self.loader._discover_directory(self.link_path, "link")
+        print(f"Satellites discovered: {len(self.registry.all())}")
+        for satellite in self.registry.all():
+            print(f"- {satellite.manifest.name} v{satellite.manifest.version} ({satellite.type})")
+
+        print("\nDiscovering commands...")
+        self.command_loader.discover()
+        for satellite in self.registry.all():
+            self.command_loader.discover_satellite(satellite)
+        print(f"\nCommands discovered: {len(self.command_registry.all())}")
 
 
     def stop(self):
@@ -151,8 +171,24 @@ class StarCore:
         self.restart_requested = True
         self.stop()
 
-    def execute_command(self, command: str):
-        return parse(command, self, self.command_registry)
+    def execute_command(self, command: str, interactive: bool = False):
+        """Runs one line as the operator at this terminal and prints its output.
+
+        Returns what an older single-function command returned (the terminal
+        loop prints that, as it always has); a typed command prints its own
+        output and returns None. Exit codes and structured results are on
+        run_command() instead.
+        """
+        outcome = self.run_command(command, runner.terminal_context(self, interactive=interactive))
+        if outcome.stdout:
+            print(outcome.stdout, end="")
+        if outcome.stderr:
+            print(outcome.stderr, end="")
+        return outcome.result
+
+    def run_command(self, command, context):
+        """Runs a command line (a string or a list of tokens) for `context` - see starcore/cli/runner.py."""
+        return runner.run(self, command, context)
 
     def _require_satellite(self, name: str) -> Satellite:
         satellite = self.registry.get(name)
@@ -227,6 +263,21 @@ class StarCore:
                 error = f"reloaded but could not start: {message}"
 
         return {"satellite": reloaded, "error": error}
+
+    def health(self) -> dict:
+        """The engine, Mission Control and every satellite as pass/fail checks -
+        what `engine health` and the Status satellite both report."""
+        from .api.payloads import satellite_status
+
+        checks = [{"check": "engine", "ok": self._running, "detail": "running" if self._running else "not running"}]
+        if self.mission_control_enabled:
+            checks.append({"check": "mission control", "ok": self.api.running,
+                           "detail": self.api.url if self.api.running else "not running"})
+        for satellite in self.registry.all():
+            state = satellite_status(self, satellite)
+            checks.append({"check": f"satellite {satellite.manifest.name}", "ok": state != "error",
+                           "detail": satellite.last_error or state})
+        return {"healthy": all(check["ok"] for check in checks), "checks": checks}
 
     def status(self) -> dict:
         satellites = self.registry.all()

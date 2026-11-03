@@ -217,7 +217,7 @@ function applyRoute() {
 
     if (name === "satellite" && param) {
         route = { name: "satellite", satellite: decodeURIComponent(param), section: section ? decodeURIComponent(section) : null };
-    } else if (name in CORE_PAGES) {
+    } else if (name in CORE_PAGES && (developerMode || !DEVELOPER_ROUTES.has(name))) {
         route = { name, satellite: null, section: null };
     } else {
         route = { name: "overview", satellite: null, section: null };
@@ -451,6 +451,57 @@ function renderHomeSatellites() {
     box.replaceChildren(list);
 }
 
+/* ---------- home: the Status summary ---------- */
+
+const HEALTH_LABELS = { ok: "Healthy", warning: "Warning", critical: "Critical" };
+const HEALTH_DOTS = { ok: "on", warning: "warn", critical: "off" };
+
+function healthPercent(value) {
+    if (typeof value !== "number") {
+        return "—";
+    }
+    return `${value < 10 || (value >= 90 && value < 100) ? value.toFixed(1) : Math.round(value)}%`;
+}
+
+function setHealthBar(id, value, warnAt, criticalAt) {
+    const bar = document.getElementById(id);
+    const known = typeof value === "number";
+    bar.style.width = known ? `${Math.max(0, Math.min(100, value))}%` : "0";
+    bar.className = known && value >= criticalAt ? "critical" : known && value >= warnAt ? "warn" : "";
+}
+
+// the Status satellite publishes a small summary as its state, so this reuses the
+// /api/satellites answer the regular poll already has - no request of its own
+function renderHomeHealth() {
+    const status = satellites.find((satellite) => satellite.name === "Status");
+    const section = document.getElementById("home-health-section");
+    section.hidden = !status || !status.enabled;
+    if (section.hidden) {
+        return;
+    }
+    const state = status.state || {};
+    const health = HEALTH_LABELS[state.health] ? state.health : null;
+    document.getElementById("home-health-dot").className = `home-dot ${health ? HEALTH_DOTS[health] : ""}`;
+    const count = Number(state.warning_count) || 0;
+    setText("home-health-label", health
+        ? `${HEALTH_LABELS[health]}${count ? ` · ${count} warning${count === 1 ? "" : "s"}` : ""}`
+        : "No readings yet");
+    setText("home-health-cpu", healthPercent(state.cpu_percent));
+    setText("home-health-memory", healthPercent(state.memory_percent));
+    setHealthBar("home-health-cpu-bar", state.cpu_percent, 90, 98);
+    setHealthBar("home-health-memory-bar", state.memory_percent, 90, 97);
+    setText("home-health-satellites", typeof state.satellites_total === "number"
+        ? `${state.satellites_online}/${state.satellites_total}` : "—");
+
+    const list = document.getElementById("home-health-warnings");
+    list.replaceChildren(...(Array.isArray(state.warnings) ? state.warnings : []).slice(0, 3).map((title) => {
+        const item = element("li");
+        item.appendChild(element("i", "home-dot"));
+        item.appendChild(element("span", null, String(title)));
+        return item;
+    }));
+}
+
 function openIcon() {
     const svg = shape("svg", { viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", "stroke-width": "1.6",
         "stroke-linecap": "round", "stroke-linejoin": "round", width: "15", height: "15", "aria-hidden": "true" });
@@ -631,6 +682,85 @@ function toggleAccentMenu(open) {
 
 /* ---------- satellites ---------- */
 
+/* ---------- Developer Mode ----------
+   A visibility preference, never a permission: it decides whether advanced settings, diagnostics
+   and developer tools are shown. Every route keeps its own server-side authentication and
+   authorization, whatever this says. Off by default, remembered per account in this browser.
+
+   The shared mechanism, for the shell and every Satellite page alike:
+   - mark any element data-developer: shown only in Developer Mode (one CSS rule, home.css);
+     data-developer-hint: shown only outside it (say where the hidden thing lives);
+   - a setting a Satellite describes with "developer": true is marked that way in every form;
+   - a Satellite page's mount context has `developer` ({enabled, subscribe}) for anything that
+     has to react in code, such as leaving a section that just disappeared. */
+const DEVELOPER_KEY = "starcore.developerMode";
+const DEVELOPER_ROUTES = new Set(["console"]);
+const developerListeners = new Set();
+let developerMode = false;
+
+function developerStorageKey() {
+    return `${DEVELOPER_KEY}.${accountName || "-"}`;
+}
+
+function storedDeveloperMode() {
+    try {
+        return localStorage.getItem(developerStorageKey()) === "on";
+    } catch (error) {
+        return false;
+    }
+}
+
+function setDeveloperMode(enabled, save = true) {
+    developerMode = Boolean(enabled);
+    document.documentElement.dataset.developerMode = developerMode ? "on" : "off";
+    const button = document.getElementById("developer-button");
+    button.setAttribute("aria-pressed", String(developerMode));
+    button.title = developerMode ? "Developer Mode is on" : "Developer Mode";
+    if (save) {
+        try {
+            localStorage.setItem(developerStorageKey(), developerMode ? "on" : "off");
+        } catch (error) {
+            // storage unavailable: still applies for this visit
+        }
+    }
+    if (!developerMode && DEVELOPER_ROUTES.has(route.name)) {
+        location.hash = "#/";
+    }
+    for (const listener of [...developerListeners]) {
+        try {
+            listener(developerMode);
+        } catch (error) {
+            console.error(error);
+        }
+    }
+}
+
+// what a Satellite page receives as context.developer
+const developerContext = {
+    get enabled() {
+        return developerMode;
+    },
+    subscribe(listener) {
+        developerListeners.add(listener);
+        return () => developerListeners.delete(listener);
+    },
+};
+
+// marks a node built from a setting the Satellite described as developer-only
+function markDeveloper(node, setting) {
+    if (setting && setting.developer) {
+        node.dataset.developer = "";
+    }
+    return node;
+}
+
+function developerHint(count, noun = "setting") {
+    const hint = element("p", "hint developer-hint",
+        `${count} advanced ${noun}${count === 1 ? " is" : "s are"} shown in Developer Mode.`);
+    hint.dataset.developerHint = "";
+    return hint;
+}
+
 function renderSatelliteNav() {
     const pages = satellites.filter((satellite) => hasPage(satellite) && !isSection(satellite));
     const signature = pages.map((satellite) => `${satellite.name}:${satellite.status}:${satellite.icon}`).join("|");
@@ -716,12 +846,16 @@ function renderSatelliteCard(satellite) {
 
     card.appendChild(head);
 
-    card.appendChild(element("p", "card-meta", `v${satellite.version} · ${satellite.author}`));
+    const meta = element("p", "card-meta", `v${satellite.version} · ${satellite.author}`);
+    meta.dataset.developer = "";
+    card.appendChild(meta);
     if (satellite.description) {
         card.appendChild(element("p", "description", satellite.description));
     }
 
-    card.appendChild(renderCommands(satellite.commands));
+    const commands = renderCommands(satellite.commands);
+    commands.dataset.developer = "";
+    card.appendChild(commands);
 
     if (hasPage(satellite)) {
         const link = element("button", "card-link", isSection(satellite) ? `Open in ${satellite.section_of} →` : "Open page →");
@@ -804,6 +938,8 @@ async function mountSatellitePage(satellite) {
             satellite,
             // the section the route names (#/satellite/<name>/<section>), if any
             section: route.section,
+            // Developer Mode, for code that must react to it - see "Developer Mode" above
+            developer: developerContext,
             api: {
                 url: (path) => satelliteUrl(satellite.name, path),
                 get: (path) => getJson(satelliteUrl(satellite.name, path)),
@@ -892,6 +1028,7 @@ async function refresh() {
 
         renderCore(status);
         renderHomeSatellites();
+        renderHomeHealth();
         renderSatelliteList();
         renderSatelliteNav();
         if (route.name === "satellite") {
@@ -1211,6 +1348,7 @@ function buildReloadButton(satellite) {
     const button = element("button", "icon-button");
     button.type = "button";
     button.title = `Reload ${satellite.name}`;
+    button.dataset.developer = "";  // lifecycle detail: Developer Mode only
     button.disabled = pending;
     button.appendChild(reloadIcon());
     button.addEventListener("click", (event) => {
@@ -1358,7 +1496,11 @@ function renderSatelliteConfig(payload) {
     const fields = document.getElementById("satellite-config-fields");
     fields.replaceChildren();
     for (const setting of satelliteConfigState.settings) {
-        fields.appendChild(buildConfigField(setting));
+        fields.appendChild(markDeveloper(buildConfigField(setting), setting));
+    }
+    const advanced = satelliteConfigState.settings.filter((setting) => setting.developer).length;
+    if (advanced) {
+        fields.appendChild(developerHint(advanced));
     }
 
     const note = document.getElementById("satellite-config-note");
@@ -1783,6 +1925,11 @@ document.getElementById("console-form").addEventListener("submit", (event) => {
 });
 
 document.getElementById("console-clear").addEventListener("click", resetConsole);
+// the whole Status summary opens the Status page; its "Open Status" link is the keyboard route
+document.getElementById("home-health").addEventListener("click", () => {
+    const status = findSatellite("Status");
+    location.hash = status ? satelliteHash(status) : "#/satellite/Status";
+});
 document.getElementById("configuration-form").addEventListener("submit", handleConfigurationSubmit);
 document.getElementById("satellite-config-form").addEventListener("submit", handleSatelliteConfigSubmit);
 document.getElementById("satellite-config-close").addEventListener("click", closeSatelliteConfig);
@@ -1816,6 +1963,9 @@ document.addEventListener("keydown", (event) => {
 document.getElementById("stop-button").addEventListener("click", handleStopClick);
 document.getElementById("restart-button").addEventListener("click", handleRestartClick);
 document.getElementById("logout-button").addEventListener("click", handleLogoutClick);
+document.getElementById("developer-button").addEventListener("click", () => {
+    setDeveloperMode(!developerMode);
+});
 document.getElementById("accent-button").addEventListener("click", () => {
     toggleAccentMenu(document.getElementById("accent-menu").hidden);
 });
@@ -1862,6 +2012,14 @@ async function loadAccount() {
         accountName = status.username || "";
     } catch (error) {
         accountName = "";
+    }
+    // per account: known only now, so a deep link to a developer page is checked again here
+    setDeveloperMode(storedDeveloperMode(), false);
+    applyRoute();
+    // a page that mounted before this was known may have fallen back from a developer section
+    if (developerMode && mounted && route.section && mounted.cleanup
+        && typeof mounted.cleanup.showSection === "function") {
+        mounted.cleanup.showSection(route.section);
     }
     if (route.name === "overview") {
         setText("page-title", greeting());

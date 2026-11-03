@@ -285,7 +285,11 @@ export function mount(context) {
     }
 
     function buildLocked(message) {
-        const card = buildState("locked", "Locked Folder is locked", "Enter your PIN to see what's inside.");
+        // say when the PIN was set: "incorrect PIN" on a vault someone thinks is new is otherwise baffling
+        const setOn = pinSetDate(status.pin_set_at);
+        const card = buildState("locked", "Locked Folder is locked", setOn
+            ? `Enter the PIN set for this Locked Folder on ${setOn}.`
+            : "Enter your PIN to see what's inside.");
         const form = el("form", "lf-form");
         const pin = pinInput("PIN");
         const submit = button("Unlock", "button button-primary");
@@ -314,9 +318,36 @@ export function mount(context) {
                 forgot.replaceWith(buildRecoveryForm());
             });
             card.appendChild(forgot);
+        } else {
+            // no recovery key: say plainly what the supported way out is, instead of leaving
+            // "Incorrect PIN" as the only answer
+            const forgot = button("Forgot your PIN?", "lf-link");
+            forgot.addEventListener("click", () => {
+                forgot.replaceWith(el("p", "lf-muted lf-forgot-help", forgottenPinHelp()));
+            });
+            card.appendChild(forgot);
         }
         queueMicrotask(() => pin.focus());
         return card;
+    }
+
+    function forgottenPinHelp() {
+        const encrypted = status.encryption && status.encryption.state && status.encryption.state !== "off";
+        if (encrypted) {
+            return "No recovery key was created for this Locked Folder, so a forgotten PIN can't be reset.";
+        }
+        return "This Locked Folder isn't encrypted and has no recovery key, so its PIN can't be reset "
+            + "from here. Whoever runs the StarCore server can delete pin.json from StarCore's data folder "
+            + "(satellites/LockedFolder) and restart StarCore, then create a new PIN here. The files in the "
+            + "folder are not touched.";
+    }
+
+    function pinSetDate(iso) {
+        const date = iso ? new Date(iso) : null;
+        if (!date || Number.isNaN(date.getTime())) {
+            return "";
+        }
+        return date.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
     }
 
     function countdown(error, submit, input, seconds) {

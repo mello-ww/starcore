@@ -3,6 +3,7 @@ import {BackHandler, StatusBar, View} from 'react-native';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {AuthProvider} from './auth/AuthContext';
+import {DeveloperModeProvider} from './developer/DeveloperModeContext';
 import {OnboardingNavigator} from './navigation/OnboardingNavigator';
 import {configureBackgroundFetch, triggerForegroundSync} from './photo/backgroundSyncTask';
 import {RootNavigator} from './navigation/RootNavigator';
@@ -45,12 +46,20 @@ export default function App() {
         <AccentProvider>
           <StatusBar barStyle="light-content" backgroundColor={colors.void} />
           <ServersProvider>
-            <ServersGate />
+            <ActiveServerDeveloperMode>
+              <ServersGate />
+            </ActiveServerDeveloperMode>
           </ServersProvider>
         </AccentProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
+}
+
+/** Developer Mode is remembered per server, so it follows whichever one is active. */
+function ActiveServerDeveloperMode({children}: {children: React.ReactNode}) {
+  const {activeServer} = useServers();
+  return <DeveloperModeProvider serverId={activeServer?.id}>{children}</DeveloperModeProvider>;
 }
 
 function ServersGate() {

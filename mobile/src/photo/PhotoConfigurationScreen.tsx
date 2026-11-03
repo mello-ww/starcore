@@ -1,12 +1,18 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {StarSwitch} from '../components/StarSwitch';
+import {useDeveloperMode} from '../developer/DeveloperModeContext';
 import {colors, radius, spacing, typography, useAccentStyles} from '../theme';
 import {configureBackgroundFetch, runBackgroundSync} from './backgroundSyncTask';
 import {requestMediaLibraryPermission} from './mediaPermission';
 import {getSyncState, setSyncEnabled, setWifiOnly} from './syncState';
 import type {ConfigurationSetting, SourcePathMapping} from './types';
 import {usePhotoApi} from './usePhotoApi';
+
+/** Whether Photo describes this setting as advanced (shown in Developer Mode only). */
+function isDeveloperSetting(settings: ConfigurationSetting[] | null, key: string): boolean {
+  return Boolean(settings?.find(setting => setting.key === key)?.developer);
+}
 
 function settingValue<T>(settings: ConfigurationSetting[], key: string, fallback: T): T {
   const setting = settings.find(item => item.key === key);
@@ -27,6 +33,7 @@ function settingValue<T>(settings: ConfigurationSetting[], key: string, fallback
 export function PhotoConfigurationScreen() {
   const accentStyle = useAccentStyles();
   const {api, serverId} = usePhotoApi();
+  const {enabled: developer} = useDeveloperMode();
   const [settings, setSettings] = useState<ConfigurationSetting[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mappings, setMappings] = useState<SourcePathMapping[]>([]);
@@ -201,13 +208,15 @@ export function PhotoConfigurationScreen() {
       </Section>
 
       <Section title="Other settings">
-        <ConfigRow
-          label="Default sync destination"
-          hint="Physical album a synced file joins when its phone folder matches no mapping above."
-          value={defaultPath}
-          onChangeText={setDefaultPath}
-          onSave={saveDefaultPath}
-        />
+        {(developer || !isDeveloperSetting(settings, 'sync_default_path')) && (
+          <ConfigRow
+            label="Default sync destination"
+            hint="Physical album a synced file joins when its phone folder matches no mapping above."
+            value={defaultPath}
+            onChangeText={setDefaultPath}
+            onSave={saveDefaultPath}
+          />
+        )}
         <ConfigRow
           label="Recycle bin retention (days)"
           value={retentionDays}

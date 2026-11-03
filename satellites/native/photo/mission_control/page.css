@@ -1364,3 +1364,8 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
+
+.photo-tools-note {
+    margin-top: 0.85rem;
+    color: var(--sc-text-dim, var(--text-dim));
+}

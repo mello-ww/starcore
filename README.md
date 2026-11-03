@@ -51,6 +51,15 @@ The interactive CLI starts the same Core:
 python -m starcore.cli.main
 ```
 
+To run a single command and exit - from a script, or while StarCore runs elsewhere - pass it as arguments:
+
+```
+python -m starcore help
+python -m starcore engine health --json
+```
+
+See the CLI documentation for every command, `--json`, exit codes and permissions.
+
 See the Deployment documentation for installing, running as a Linux service and Windows unattended startup.
 
 ## Documentation

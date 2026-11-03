@@ -55,7 +55,7 @@ A single PIN (4-12 digits, `validate_pin()` in `runtime.py`) unlocks the Locked 
 the caller's current session.
 
 ```
-GET  /api/satellites/LockedFolder/status                      -> { "configured", "pin_set", "pin_unreadable", "unlocked", "expires_at", "biometric_devices", "security", "encryption", ... }
+GET  /api/satellites/LockedFolder/status                      -> { "configured", "pin_set", "pin_set_at", "pin_unreadable", "unlocked", "expires_at", "biometric_devices", "security", "encryption", ... }
 POST /api/satellites/LockedFolder/pin      { "pin": "...", "current_pin": "..." }  -> set or change the PIN
 POST /api/satellites/LockedFolder/unlock   { "pin": "..." }                       -> unlock this session
 POST /api/satellites/LockedFolder/lock     {}                                     -> lock this session immediately
@@ -165,6 +165,11 @@ A forgotten PIN can be reset with the **recovery key**, if one was created when 
 was encrypted (see "Recovery key"). For an unencrypted vault there is no recovery: whoever
 administers the server can delete `pin.json` (which then lets anyone signed in set a new PIN),
 which is exactly the weakness encryption and its bindings close.
+
+`status.pin_set_at` is when `pin.json` was last written (its file time; the PIN record itself
+has no date). The locked screen shows it ("Enter the PIN set for this Locked Folder on …"), so
+an existing PIN is never mistaken for a first-time setup that went wrong. Without a recovery
+key, "Forgot your PIN?" explains the server-side reset above instead of offering a form.
 
 ### The configured directory can disappear
 

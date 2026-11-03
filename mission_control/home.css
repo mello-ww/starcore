@@ -495,6 +495,140 @@ body[data-route="overview"] #updated {
     gap: 14px;
 }
 
+.home-section[hidden] {
+    display: none;
+}
+
+/* ---------- Status summary ---------- */
+
+.home-health {
+    display: grid;
+    grid-template-columns: minmax(180px, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: 16px 40px;
+    padding: 20px 24px;
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+
+.home-health:hover {
+    background: #26272e;
+}
+
+.home-health-state {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    color: var(--sc-text);
+    font: 600 22px/1.2 var(--sc-font-display);
+}
+
+.home-health-state .home-dot.warn {
+    background: var(--sc-warn);
+}
+
+.home-health-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px;
+    margin: 0;
+}
+
+.home-health-metrics dt {
+    color: var(--sc-text-3);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.home-health-metrics dd {
+    margin: 6px 0 8px;
+    color: var(--sc-text);
+    font: 600 22px/1 var(--sc-font-display);
+}
+
+.home-health-bar {
+    display: block;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: var(--sc-control-strong);
+}
+
+.home-health-bar i {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--sc-text-icon);  /* severity, not identity: neutral until a threshold */
+    transition: width 400ms ease;
+}
+
+.home-health-bar i.warn {
+    background: var(--sc-warn);
+}
+
+.home-health-bar i.critical {
+    background: var(--sc-danger);
+}
+
+.home-health-note {
+    color: var(--sc-text-2);
+    font-size: 13px;
+}
+
+.home-health-warnings {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.home-health-warnings:empty {
+    display: none;
+}
+
+.home-health-warnings li {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--sc-control);
+    color: var(--sc-text-2);
+    font-size: 13px;
+}
+
+.home-health-warnings li .home-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--sc-warn);
+}
+
+@media (max-width: 760px) {
+    .home-health {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 18px 20px;
+    }
+
+    .home-health-metrics {
+        gap: 16px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-health-bar i {
+        transition: none;
+    }
+}
+
 .home-section-head {
     display: flex;
     align-items: baseline;
@@ -711,4 +845,29 @@ body[data-route="overview"] #updated {
     .sidebar .nav-item .satellite-icon .icon-mask {
         display: block;
     }
+}
+
+/* ---------- Developer Mode ----------
+   A visibility preference only (see app.js, "Developer Mode"): anything marked data-developer -
+   in the shell or on a Satellite's own page - is shown only while it's on, and data-developer-hint
+   (where to find what's hidden) only while it's off. Every route stays protected server-side. */
+:root:not([data-developer-mode="on"]) [data-developer],
+:root[data-developer-mode="on"] [data-developer-hint] {
+    display: none !important;
+}
+
+.developer-toggle[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--sc-accent) 18%, var(--sc-control));
+    color: var(--sc-accent);
+}
+
+.developer-toggle[aria-pressed="true"]:hover {
+    color: var(--sc-accent);
+}
+
+.developer-hint {
+    margin: 0.25rem 0 0;
+    color: var(--sc-text-2);
+    font-size: 13px;
+    font-weight: 400;
 }

@@ -85,6 +85,9 @@ export function mount(context) {
     let configState = null;     // { settings } from the last /configuration read - see buildConfigPanel()
 
     const summary = el("dl", "tiles");
+    // why thumbnails are originals or videos have no frame: both are optional tools on the server
+    const toolsNote = el("p", "photo-notice photo-notice-ok photo-tools-note");
+    toolsNote.hidden = true;
     const tabBar = buildTabBar();
     const photosPanel = buildPhotosPanel();
     const albumsPanel = buildAlbumsPanel();
@@ -108,7 +111,7 @@ export function mount(context) {
     notice.hidden = true;
 
     const body = el("div", "stack");
-    body.append(summary, tabBar, notice, photosPanel.element, albumsPanel.element, mapPanel.element, lockedPanel,
+    body.append(summary, toolsNote, tabBar, notice, photosPanel.element, albumsPanel.element, mapPanel.element, lockedPanel,
         configPanel.element);
     root.replaceChildren(buildHead(), body);
 
@@ -429,6 +432,7 @@ export function mount(context) {
             facts.appendChild(row);
         }
 
+        facts.dataset.developer = "";  // upload counters: Developer Mode only
         syncPanel.replaceChildren(el("p", "eyebrow", "Phone sync"), state, facts);
 
         if (address) {
@@ -441,6 +445,7 @@ export function mount(context) {
 
         if (status.events.length) {
             const log = el("ul", "photo-sync-log");
+            log.dataset.developer = "";  // the upload log: Developer Mode only
             for (const event of status.events) {
                 const item = document.createElement("li");
                 item.append(
@@ -566,6 +571,24 @@ export function mount(context) {
             tile("Thumbnails", libraryInfo.thumbnails ? "cached" : "originals", libraryInfo.thumbnails),
             tile("Phone sync", status.running ? "listening" : "off", status.running),
         );
+        renderToolsNote(libraryInfo);
+    }
+
+    function renderToolsNote(libraryInfo) {
+        const missing = [];
+        if (!libraryInfo.thumbnails && libraryInfo.images) {
+            missing.push("Pillow isn't installed on the StarCore server, so the gallery loads every "
+                + "photo at full size instead of a small thumbnail.");
+        }
+        if (!libraryInfo.video_thumbnails && libraryInfo.videos) {
+            missing.push("FFmpeg isn't installed on the StarCore server, so videos show a placeholder "
+                + "instead of a preview frame.");
+        }
+        toolsNote.hidden = missing.length === 0;
+        toolsNote.textContent = missing.length
+            ? `${missing.join(" ")} Install ${missing.length > 1 ? "them" : "it"} and restart StarCore; `
+              + "nothing in the library changes."
+            : "";
     }
 
     function tile(label, value, state) {
@@ -1803,8 +1826,16 @@ export function mount(context) {
             if (field.hint) {
                 wrapper.appendChild(el("p", "hint", field.hint));
             }
+            // a setting Photo describes as advanced: shown in Developer Mode only
+            if (settingDescription(field.key)?.developer) {
+                wrapper.dataset.developer = "";
+            }
             otherSettings.appendChild(wrapper);
         }
+    }
+
+    function settingDescription(key) {
+        return (configState?.settings || []).find((item) => item.key === key);
     }
 
     /* ---------- viewer ---------- */

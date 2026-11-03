@@ -17,7 +17,6 @@ same as library.py's own tolerant-loading convention.
 from datetime import datetime, timezone
 from pathlib import Path
 import json
-import os
 import secrets
 
 NAME_MAX_LENGTH = 120
@@ -55,11 +54,13 @@ class AlbumNotFound(AlbumError):
 def albums(satellite):
     """The album store of a satellite, kept per storage root so tests stay
     isolated - mirrors library()'s own per-root caching in library.py."""
-    from .library import storage_root
+    from .library import _creating, storage_root
     root = storage_root(satellite)
 
-    if root not in _stores:
-        _stores[root] = AlbumStore(root)
+    # the gallery asks for /albums and /albums/favorites at the same moment: one store per root
+    with _creating:
+        if root not in _stores:
+            _stores[root] = AlbumStore(root)
 
     return _stores[root]
 
@@ -197,10 +198,8 @@ class AlbumStore:
             self._albums = loaded
 
     def _save(self):
-        self.root.mkdir(parents=True, exist_ok=True)
-        partial = self.index_path.with_suffix(".part")
-        partial.write_text(json.dumps({"version": INDEX_VERSION, "albums": self._albums}, indent=2), encoding="utf-8")
-        os.replace(partial, self.index_path)
+        from .library import write_index
+        write_index(self.index_path, {"version": INDEX_VERSION, "albums": self._albums})
 
 
 def physical_albums(satellite, photo_library) -> list:

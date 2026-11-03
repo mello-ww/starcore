@@ -14,6 +14,10 @@ Mobile UI  ->  Existing StarCore API  ->  StarCore Engine  ->  Satellites
 - A working Android project (`android/`) and React Native app (`src/`).
 - Connect-to-server, login, secure session storage and restore, logout.
 - A foundation for biometric unlock (Settings screen toggle).
+- Developer Mode (`src/developer/`): the terminal icon at the top right of each tab, or the
+  switch in Settings. Off by default and remembered per server on this device; it shows the
+  Console and Config tabs and anything a Satellite marks `developer: true`. A display
+  preference only - see docs/satellites.md, "Developer Mode".
 - Bottom-tab navigation with placeholder screens for Locked Folder, Files
   and Photos - the shell those later blocks fill in, not built yet.
 - Tests for the session/authentication logic (`__tests__/`).
@@ -96,6 +100,19 @@ Wi-Fi/cellular detection, and private-storage downloads under
 play/pause and seek, not next/previous; there is no crossfade or true gapless
 playback (one player, tracks are loaded back to back); and remote control
 through StarCore Connect only runs while the app is in the foreground.
+
+### Status
+
+`src/status/` is the Status satellite's native screen (Overview, Hardware,
+Network, Services, History), opened from the Satellites tab or from Home's
+Status card. One poller (`hooks.ts`) reads `/api/satellites/status/metrics`
+at the server's own sampling interval, and only while the screen is focused
+and the app is in the foreground; when a request fails, the last reading
+stays on screen under an offline banner. History charts are columns built
+from Views (the app has no SVG library), laid on a fixed time grid so gaps
+stay gaps. Home's Status card reads the summary the satellite publishes in
+the satellite list Home already loads, so it costs no request of its own.
+See `docs/satellites/status.md`.
 
 ## Connecting to a server
 

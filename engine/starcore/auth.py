@@ -163,6 +163,12 @@ class AuthStore:
     def is_bootstrapped(self) -> bool:
         return self._data["user"] is not None
 
+    @property
+    def username(self):
+        """The account's name, or None before setup - never anything secret."""
+        user = self._data["user"]
+        return user["username"] if user else None
+
     def bootstrap(self, username: str, password: str) -> str:
         """Creates the first (and, for now, only) user. Returns a fresh session
         token, the same way login() does, so setup doubles as a first login.

@@ -89,7 +89,11 @@ it is a Satellite endpoint like any other, not a second API.
 { "command": "status", "output": "...", "error": null }
 ```
 
-An unknown command is not treated as a server error: it comes back as a normal `200` with the registry's own "not found" message in `output`. Only an exception escaping the command itself produces `error` and a `500`.
+An unknown command is not treated as a server error: it comes back as a normal `200` with the registry's own "not found" message in `output`. Only an exception escaping the command itself produces `error` and a `500`. The response also carries the command's `exit_code` (see the CLI documentation). The console runs as a remote caller: read-only commands and those explicitly marked remote (Music playback, likes and playlist edits) run; anything else that changes state - scans, imports, configuration, lifecycle - is refused with exit code 3 and must be run from StarCore's terminal or the one-shot CLI.
+
+`GET /api/commands` lists every command; a typed namespace also carries `commands`, the schema of each subcommand a remote console may run.
+
+`POST /api/cli/run` is the one-shot CLI's own channel to a running StarCore. It accepts only the per-run token from `control.json` in the data directory (header `X-StarCore-Control`) and only from this machine - never a session - and answers `403` otherwise. See "How the one-shot CLI reaches the running StarCore" in the CLI documentation.
 
 `POST /api/shutdown` requests a graceful shutdown of the Core - the same shutdown the terminal CLI's `exit` triggers - and stops Mission Control as part of it. It responds immediately with `{"message": "..."}`; the Core stops shortly after.
 
@@ -132,7 +136,8 @@ Satellite's own `api.py` - `assets` is served read-only from the Satellite's
 Everything else below a Satellite comes from the mapping its `api.py` returns, and the Core
 neither knows nor cares what those routes do. Only GET and POST reach them. The Satellites
 documentation describes the handler contract, and the Photo and Music documentation are
-worked examples.
+worked examples. The Status Satellite's read-only monitoring routes (`metrics`, `history`,
+`diagnostics`) are described in `docs/satellites/status.md`.
 
 ```
 POST /api/satellites/<name>/enable    starts the Satellite and marks it enabled

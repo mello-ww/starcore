@@ -30,7 +30,9 @@ def current_session(request) -> str:
 
 PREFERENCE_DEFAULTS = {
     "theme": "system",
-    "accent": "artwork",
+    # "starcore" follows StarCore's global accent; "artwork" (the player follows the cover) and
+    # a "#rrggbb" colour are explicit choices for Music only
+    "accent": "starcore",
     "density": "comfortable",
     "streaming_quality": "original",
     "cellular_quality": "normal",
@@ -72,6 +74,13 @@ PREFERENCE_TYPES = {
 }
 
 
+# Music's colour picker used to start on StarCore's accent, so switching it to "Fixed colour"
+# while StarCore was still red stored that red as Music's own colour - and Music then ignored
+# every later global accent change. That exact value is read as "follow StarCore" (nothing is
+# rewritten in the database); with StarCore on red it looks exactly the same.
+PINNED_STARCORE_RED = "#ee444b"
+
+
 class PreferenceError(ValueError):
     pass
 
@@ -83,6 +92,8 @@ class Preferences:
     def all(self, user: str) -> dict:
         stored = {row["key"]: loads(row["value"]) for row in self.db.all(
             "SELECT key, value FROM preferences WHERE user = ?", (user,))}
+        if str(stored.get("accent", "")).lower() == PINNED_STARCORE_RED:
+            stored["accent"] = "starcore"
         return {key: stored.get(key, default) for key, default in PREFERENCE_DEFAULTS.items()}
 
     def get(self, user: str, key: str):
@@ -109,9 +120,9 @@ def validate(key: str, value):
         return value
     if key == "accent":
         text = str(value)
-        if text != "artwork" and not (len(text) == 7 and text.startswith("#")
+        if text not in ("starcore", "artwork") and not (len(text) == 7 and text.startswith("#")
                                       and all(char in "0123456789abcdefABCDEF" for char in text[1:])):
-            raise PreferenceError("'accent' must be 'artwork' or a #rrggbb colour")
+            raise PreferenceError("'accent' must be 'starcore', 'artwork' or a #rrggbb colour")
         return text
     if key == "equalizer":
         if not isinstance(value, dict):

@@ -4,6 +4,7 @@ import sys
 import threading
 
 from ..core import StarCore
+from . import bridge
 
 # SIGBREAK only exists on Windows; SIGTERM exists wherever signal.signal is usable.
 # Python's default handling of SIGTERM is immediate termination, which would skip
@@ -47,7 +48,7 @@ def _read_commands(engine: StarCore):
         if command == "exit":
             break
 
-        result = engine.execute_command(command)
+        result = engine.execute_command(command, interactive=True)
         if result is not None:
             print(result)
 
@@ -74,12 +75,14 @@ def main():
     engine = StarCore()
     _install_stop_signals(engine)
     engine.start()
+    bridge.publish(engine)
 
     try:
         run(engine)
     except KeyboardInterrupt:
         pass
     finally:
+        bridge.withdraw(engine)
         engine.stop()
 
     if engine.restart_requested:

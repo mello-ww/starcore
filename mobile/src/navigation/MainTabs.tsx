@@ -3,6 +3,7 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import React from 'react';
 import Icon from 'react-native-vector-icons/Feather';
 import {SETTINGS_ICON} from '../components/SettingsButton';
+import {useDeveloperMode} from '../developer/DeveloperModeContext';
 import {ConfigScreen} from '../screens/ConfigScreen';
 import {ConnectScreen} from '../screens/ConnectScreen';
 import {ConsoleScreen} from '../screens/ConsoleScreen';
@@ -18,6 +19,7 @@ import {PhotoConfigurationScreen} from '../photo/PhotoConfigurationScreen';
 import {PhotoHomeScreen} from '../photo/PhotoHomeScreen';
 import {PhotoTrashTab} from '../photo/PhotoTrashTab';
 import {PhotoViewerScreen} from '../photo/PhotoViewerScreen';
+import {StatusHomeScreen} from '../status/StatusHomeScreen';
 import {MusicProvider} from '../music/MusicProvider';
 import {FullPlayer} from '../music/player/FullPlayer';
 import {MiniPlayer} from '../music/player/MiniPlayer';
@@ -64,6 +66,8 @@ export type SatellitesStackParamList = {
   MusicSettings: undefined;
   MusicEqualizer: undefined;
   MusicDownloads: undefined;
+  /** "Status" gets its own native screen too - see src/status/StatusHomeScreen.tsx. */
+  StatusHome: undefined;
 };
 
 export type SettingsStackParamList = {
@@ -113,6 +117,7 @@ function SatellitesStack() {
       <SatellitesStackNav.Screen name="MusicSettings" component={MusicSettingsScreen} options={{title: ''}} />
       <SatellitesStackNav.Screen name="MusicEqualizer" component={EqualizerScreen} options={{title: 'Equalizer'}} />
       <SatellitesStackNav.Screen name="MusicDownloads" component={DownloadsScreen} options={{title: 'Downloads'}} />
+      <SatellitesStackNav.Screen name="StatusHome" component={StatusHomeScreen} options={{title: ''}} />
     </SatellitesStackNav.Navigator>
   );
 }
@@ -177,6 +182,9 @@ function tabIcon(name: keyof MainTabParamList) {
  */
 export function MainTabs() {
   const {color: accent} = useAccent();
+  // Console and Config are developer tools: their tabs exist only in Developer Mode (their
+  // routes stay as protected as ever - see DeveloperModeContext)
+  const {enabled: developer} = useDeveloperMode();
   return (
     <MusicProvider>
       <Tab.Navigator
@@ -195,8 +203,8 @@ export function MainTabs() {
       }}>
       <Tab.Screen name="Overview" component={HomeScreen} options={{title: 'Home', tabBarIcon: tabIcon('Overview')}} />
       <Tab.Screen name="Satellites" component={SatellitesStack} options={{tabBarIcon: tabIcon('Satellites')}} />
-      <Tab.Screen name="Console" component={ConsoleScreen} options={{tabBarIcon: tabIcon('Console')}} />
-      <Tab.Screen name="Config" component={ConfigScreen} options={{tabBarIcon: tabIcon('Config')}} />
+      {developer && <Tab.Screen name="Console" component={ConsoleScreen} options={{tabBarIcon: tabIcon('Console')}} />}
+      {developer && <Tab.Screen name="Config" component={ConfigScreen} options={{tabBarIcon: tabIcon('Config')}} />}
       <Tab.Screen name="Settings" component={SettingsStack} options={{tabBarIcon: tabIcon('Settings')}} />
       </Tab.Navigator>
     </MusicProvider>

@@ -118,7 +118,8 @@ reset.
   Mission Control only; the Android app can create the PIN and shows problems, but doesn't
   pick the folder or recover.
 - The Signal Bus is not implemented yet (`engine/starcore/signals.py` is empty).
-- Developer Mode and Space Mode do not exist yet.
+- Space Mode does not exist yet. Developer Mode is a visibility preference only (see
+  docs/satellites.md); File Explorer has nothing behind it yet.
 
 ### Security review (2026-11-02)
 
@@ -199,7 +200,7 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] Authentication
 - [x] StarCore design language and accent presets
 - [x] Satellite pages, configuration dialogs and lifecycle controls
-- [ ] Developer Mode
+- [x] Developer Mode
 - [ ] Space Mode
 
 ## Android app
@@ -214,6 +215,19 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 ## Native Satellites
 
 - [x] Status
+    - [x] Real CPU, memory, swap, storage, disk I/O, network, system and service readings on Linux
+          and Windows, standard library only; unavailable readings say why
+    - [x] Background sampler with a bounded history (1h, 24h, 7d, 30d) and downsampling
+    - [x] Warnings and an overall health state
+    - [x] Mission Control dashboard (Overview, Hardware, Network, Services, History, Diagnostics)
+          and a Home summary that adds no polling
+    - [x] Native Android screens and a Home summary
+    - [x] CLI: `status`, `status hardware`, `status network`, `status services`, `status history`
+    - [ ] GPU, fan, battery and power readings
+    - [ ] CPU temperature on Windows (needs vendor tools or administrator WMI access)
+    - [ ] Monitoring other machines (the Ollama/Open WebUI server, Wings nodes) - the snapshot and
+          history formats already carry a node name
+    - [ ] Verified on a real Linux host (Linux readings are tested against a fake /proc and /sys)
 - [x] Files (File Explorer)
 - [x] Locked Folder (PIN, lockout, isolation from File Explorer)
     - [x] Move Locked Folder into Photos (a Photos tab on web and Android)

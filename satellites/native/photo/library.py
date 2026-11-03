@@ -5,7 +5,9 @@ from pathlib import Path
 import hashlib
 import json
 import os
+import secrets
 import shutil
+import threading
 import time
 
 from . import images, videos
@@ -22,6 +24,8 @@ THUMBNAIL_RETRY_SECONDS = 300  # before a video whose frame failed is tried agai
 _CANDIDATE_SUFFIXES = set(images.FORMATS) | set(videos.FORMATS)
 
 _libraries = {}
+_creating = threading.RLock()
+_writing = threading.Lock()
 
 
 class PhotoImportError(Exception):
@@ -37,8 +41,10 @@ def library(satellite):
     """The library of a satellite, kept per storage root so tests stay isolated."""
     root = storage_root(satellite)
 
-    if root not in _libraries:
-        _libraries[root] = PhotoLibrary(root, satellite.config.get("thumbnail_size", 480))
+    # requests arrive on several threads at once: two must never each build their own copy
+    with _creating:
+        if root not in _libraries:
+            _libraries[root] = PhotoLibrary(root, satellite.config.get("thumbnail_size", 480))
 
     return _libraries[root]
 
@@ -46,6 +52,21 @@ def library(satellite):
 def library_for(engine):
     satellite = engine.registry.get(SATELLITE_NAME)
     return library(satellite) if satellite else None
+
+
+def write_index(path: Path, data: dict) -> None:
+    """Writes a JSON index aside and moves it into place. Each write gets its own staging
+    name and writes are serialized: on Windows, two requests renaming the same staging
+    file at once fail with "file in use" (WinError 32)."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _writing:
+        partial = path.with_name(f".{path.name}.{secrets.token_hex(4)}.part")
+        try:
+            partial.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            os.replace(partial, path)
+        finally:
+            partial.unlink(missing_ok=True)
 
 
 def storage_root(satellite) -> Path:
@@ -152,7 +173,7 @@ class PhotoLibrary:
         # rendered aside and moved into place, so a request arriving while another
         # is still writing never reads half a file
         thumbnail.parent.mkdir(parents=True, exist_ok=True)
-        partial = thumbnail.with_name(f".{photo['id']}.{os.getpid()}.part")
+        partial = thumbnail.with_name(f".{photo['id']}.{secrets.token_hex(4)}.part")
 
         is_video = photo.get("media_type") == "video"
         if is_video and self._thumbnail_failed_recently(photo["id"]):
@@ -242,7 +263,7 @@ class PhotoLibrary:
 
         # copied aside first, so an interrupted import cannot leave a half written
         # file under a name the index would consider complete
-        partial = destination.with_name(f".{photo_id}.part")
+        partial = destination.with_name(f".{photo_id}.{secrets.token_hex(4)}.part")
         shutil.copy2(source, partial)
         os.replace(partial, destination)
 
@@ -477,10 +498,7 @@ class PhotoLibrary:
             self._photos = photos
 
     def _save(self):
-        self.root.mkdir(parents=True, exist_ok=True)
-        partial = self.index_path.with_suffix(".part")
-        partial.write_text(json.dumps({"version": INDEX_VERSION, "photos": self._photos}, indent=2), encoding="utf-8")
-        os.replace(partial, self.index_path)
+        write_index(self.index_path, {"version": INDEX_VERSION, "photos": self._photos})
 
 
 def _backfill_metadata(photo: dict) -> None:

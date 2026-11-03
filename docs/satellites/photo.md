@@ -149,6 +149,15 @@ says which of the two is in use. Install it with `pip install pillow` to enable 
 A thumbnail that fails to render falls back to the original for that photo alone, so one
 unusual file cannot empty the gallery.
 
+An original served in place of a thumbnail is sent with `Cache-Control: private, no-cache`,
+never the week-long cache a rendered thumbnail gets: otherwise browsers and the app would keep
+the full-size files under the thumbnail URL after Pillow is installed. When Pillow (photos) or
+FFmpeg (video frames) is missing, the Photos page says so above the tabs.
+
+With uv, install Pillow with **all** the extras you use, for example
+`uv sync --extra thumbnails --extra encryption`: `uv sync` removes extras that aren't named,
+and a Locked Folder that is encrypted stays locked without `cryptography`.
+
 A video's thumbnail is a single frame, rendered by shelling out to
 [ffmpeg](https://ffmpeg.org/) (`videos.thumbnail()`) **when it is installed**, seeking to
 roughly the midpoint of the clip (capped at one second in, for a very short video). Unlike a

@@ -180,7 +180,7 @@
     align-items: center;
     justify-content: center;
     background: var(--mu-accent);
-    color: var(--sc-on-accent, #141215);
+    color: var(--mu-on-accent);
 }
 
 .mu-liked-art path {
@@ -274,7 +274,7 @@
     border: 0;
     border-radius: 50%;
     background: var(--mu-accent);
-    color: var(--sc-on-accent, #141215);
+    color: var(--mu-on-accent);
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
     opacity: 0;
     transform: translateY(6px);
@@ -398,7 +398,7 @@
     border: 0;
     border-radius: 50%;
     background: var(--mu-accent);
-    color: var(--sc-on-accent, #141215);
+    color: var(--mu-on-accent);
     cursor: pointer;
     transition: transform 140ms ease;
 }

@@ -47,7 +47,7 @@ export function ConsoleScreen() {
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.log} contentContainerStyle={[styles.logContent, {paddingTop: top + space.xl}]}>
-        <ScreenTitle eyebrow="StarCore" title="Console" subtitle="Runs commands on this server, as the terminal CLI does." />
+        <ScreenTitle eyebrow="StarCore" title="Console" subtitle="Runs commands on this server, as the terminal CLI does." developerToggle />
         <Surface style={styles.output}>
           {history.length === 0 && <Text style={styles.idle}>Run a StarCore command to see its output here.</Text>}
           {history.map((entry, index) => (

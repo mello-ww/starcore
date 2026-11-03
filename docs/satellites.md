@@ -281,6 +281,47 @@ A Satellite with no `"mobile"` route simply isn't offered on the mobile app's Sa
 as anything more than a name and a status - the same graceful fallback a Satellite without
 `mission_control/page.js` already gets on the desktop.
 
+## Developer Mode
+
+Developer Mode is one switch, the terminal icon at the top right of Mission Control and of the
+Android app's tabs (also under Settings on Android). It decides whether advanced settings,
+diagnostics and developer tools are **shown**. It is off by default and remembered per account
+in each browser, and per server on each phone.
+
+It is a visibility preference, **never a permission**. The server neither knows nor checks it:
+every route keeps its own authentication and authorization, a signed-in caller can still read or
+change a "developer" setting through the API, and nothing secret (tokens, keys, PINs) is ever
+added to a response because it might be shown. Hide only what is advanced; never hide what a
+user needs day to day, or security information (Locked Folder's lockout and problems stay visible).
+
+A Satellite opts in without a toggle of its own, in whichever of these it uses:
+
+- **Settings**: add `"developer": True` to a setting your `configuration` route describes. The
+  generic configuration dialog, and any page or screen that renders the settings, shows it only
+  in Developer Mode, with a line saying how many advanced settings are hidden.
+- **Mission Control page**: put a `data-developer` attribute on any element (one rule in
+  `mission_control/home.css` hides it), and `data-developer-hint` on a short note that should show
+  only outside Developer Mode. For anything that must react in code, `mount()`'s context has
+  `developer`: `developer.enabled` and `developer.subscribe(fn)` (returns an unsubscribe function),
+  for example to leave a section that just disappeared - Status's Diagnostics tab does this.
+- **Mobile interface**: add `"developer": true` to a section or an item of the `"mobile"` route's
+  screen; the app leaves it out unless Developer Mode is on.
+
+Applied so far:
+
+| Where | Shown only in Developer Mode |
+|---|---|
+| Mission Control | the Console; Mission Control's address and port (Configuration keeps Active sessions); Satellite reload buttons; each Satellite card's version, author and commands |
+| Android | the Console and Config tabs |
+| Music | exclude, min_duration, missing_metadata, scan_interval, ffmpeg, transcode_workers, transcode_cache_mb; transcode format; the Missing files and Transcoding tiles |
+| Photos | sync_host, sync_port, sync_default_path; phone sync's upload counters and log |
+| Status | the Diagnostics tab; Platform and Python on the generic mobile screen |
+
+File Explorer has nothing advanced on its page yet. Its `root`, the boundary every request is
+confined to, is changed in its `config.toml` only, and stays that way: showing a setting is not a
+reason to add a route that changes it. Docker Links, Wings and AI Satellites use the same three
+hooks; nothing in the shell needs to change for them.
+
 ## Satellites with several modules
 
 A Satellite directory is importable as a package, so a Satellite that outgrows a single
@@ -315,6 +356,10 @@ Both categories share the same lifecycle and extension model. The only differenc
 
 ## Worked examples
 
+- **Status** (`satellites/native/status/`, `docs/satellites/status.md`) - a background service
+  (its metric sampler) feeding one cached snapshot to its routes, its published state (the Home
+  summary), its CLI namespace and a Mission Control page with charts; a bounded SQLite history
+  in StarCore's data directory; platform readings behind one backend interface.
 - **Photo** (`satellites/native/photo/`, `docs/satellites/photo.md`) - state, routes, a Mission Control
   page, a background service (its phone-sync listener) and Satellite configuration, all
   together.

@@ -2,6 +2,7 @@ import React from 'react';
 import {Alert, StyleSheet, Text, View} from 'react-native';
 import {Card} from '../components/Card';
 import {PrimaryButton} from '../components/PrimaryButton';
+import {visibleToDeveloper, useDeveloperMode} from '../developer/DeveloperModeContext';
 import {colors, spacing, typography} from '../theme';
 import type {UiAction, UiItem, UiScreen} from './types';
 
@@ -23,9 +24,14 @@ export function DeclarativeScreen({
   screen: UiScreen;
   onAction: (action: UiAction) => void | Promise<void>;
 }) {
+  // anything the Satellite marked `developer: true` appears only in Developer Mode
+  const {enabled: developer} = useDeveloperMode();
+  const sections = visibleToDeveloper(screen.sections, developer)
+    .map(section => ({...section, items: visibleToDeveloper(section.items, developer)}))
+    .filter(section => section.items.length > 0 || section.title);
   return (
     <View style={styles.content}>
-      {screen.sections.map((section, sectionIndex) => (
+      {sections.map((section, sectionIndex) => (
         <Card key={sectionIndex} style={styles.card}>
           {section.title ? <Text style={typography.heading}>{section.title}</Text> : null}
           {section.items.map((item, itemIndex) => (

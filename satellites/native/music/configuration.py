@@ -117,36 +117,43 @@ SETTINGS = {
     },
     "exclude": {
         "validate": _validate_patterns,
+        "developer": True,
         "description": "Glob patterns of files or folders never indexed, relative to a source "
                         "(for example '*/Podcasts/*'), separated by ';'.",
         "type": "list",
     },
     "min_duration": {
         "validate": _number(0, 3600),
+        "developer": True,
         "description": "Skip audio shorter than this many seconds (0 indexes everything).",
     },
     "missing_metadata": {
         "validate": _choice(MISSING_METADATA),
+        "developer": True,
         "description": "How untagged files are named: 'filename' uses the file name, 'folders' reads "
                         "Artist/Album/NN Title from the folder layout.",
         "options": list(MISSING_METADATA),
     },
     "scan_interval": {
         "validate": _number(0, 7 * 24 * 60),
+        "developer": True,
         "description": "Rescan every configured source every this many minutes while StarCore runs "
                         "(0 turns scheduled scans off).",
     },
     "ffmpeg": {
         "validate": _validate_binary,
+        "developer": True,
         "description": "FFmpeg used for optional transcoding: 'ffmpeg' on PATH or an absolute path. "
                         "Without it every track streams in its original quality.",
     },
     "transcode_workers": {
         "validate": _number(1, 8),
+        "developer": True,
         "description": "How many transcodes may run at once.",
     },
     "transcode_cache_mb": {
         "validate": _number(64, 1_000_000),
+        "developer": True,
         "description": "Disk space transcoded copies may use before the oldest are removed.",
     },
 }
@@ -180,7 +187,7 @@ def describe(satellite) -> dict:
             "live_value": value,
             "pending_restart": False,
         }
-        for optional in ("type", "options"):
+        for optional in ("type", "options", "developer"):
             if optional in meta:
                 setting[optional] = meta[optional]
         settings.append(setting)

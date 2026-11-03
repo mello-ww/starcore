@@ -181,6 +181,22 @@ class Connect:
         with self._condition:
             return self._sequence
 
+    def wait_for_state(self, user: str, device_id: str, since: int, timeout: float):
+        """The first state a device reports after `since`, or None once `timeout` passes.
+
+        Lets a controller (the CLI) confirm a command took effect without
+        registering as a device or marking the target as seen."""
+        deadline = time.monotonic() + max(0.0, min(float(timeout), WAIT_LIMIT))
+        with self._condition:
+            while True:
+                for event in self._events.get(user, ()):
+                    if event["seq"] > since and event.get("type") == "state" and event.get("device") == device_id:
+                        return event["state"]
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return None
+                self._condition.wait(remaining)
+
     def events(self, user: str, device_id: str, since: int, timeout: float = 25) -> dict:
         self._owned(user, device_id)
         self.touch(user, device_id)

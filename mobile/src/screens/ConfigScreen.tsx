@@ -77,7 +77,7 @@ export function ConfigScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.content, {paddingTop: top + space.xl}]}>
-      <ScreenTitle eyebrow="StarCore" title="Config" subtitle="Configuration of this StarCore server." />
+      <ScreenTitle eyebrow="StarCore" title="Config" subtitle="Configuration of this StarCore server." developerToggle />
       {error && <Text style={styles.error}>{error}</Text>}
       {(settings ?? []).map(setting => (
         <Surface key={setting.path} style={styles.card}>

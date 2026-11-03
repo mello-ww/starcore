@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {StyleSheet, Text, TextInput, View} from 'react-native';
+import {Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {colors, spacing, tokens, typography, useAccentStyles} from '../theme';
@@ -18,12 +18,15 @@ export function LockedFolderUnlock({
   onUnlocked,
   intro = 'Enter your PIN to see what’s inside.',
   autoBiometrics = true,
+  forgotHelp,
 }: {
   api: LockedFolderApi;
   biometricDeps: BiometricDeps;
   onUnlocked: () => void;
   intro?: string;
   autoBiometrics?: boolean;
+  /** What to do about a forgotten PIN, behind a "Forgot your PIN?" link. */
+  forgotHelp?: string;
 }) {
   const accentStyle = useAccentStyles();
   const [pin, setPin] = useState('');
@@ -31,6 +34,7 @@ export function LockedFolderUnlock({
   const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(0);
   const [enrolled, setEnrolled] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
   const tried = useRef(false);
 
   useEffect(() => {
@@ -139,6 +143,19 @@ export function LockedFolderUnlock({
           <PrimaryButton title="Use biometrics" variant="secondary" onPress={tryBiometrics} disabled={busy || wait > 0} />
         )}
       </View>
+      {forgotHelp ? (
+        showForgot ? (
+          <Text style={[typography.caption, styles.center]}>{forgotHelp}</Text>
+        ) : (
+          <Pressable
+            onPress={() => setShowForgot(true)}
+            accessibilityRole="button"
+            hitSlop={12}
+            style={styles.forgot}>
+            <Text style={[typography.caption, accentStyle.text]}>Forgot your PIN?</Text>
+          </Pressable>
+        )
+      ) : null}
     </View>
   );
 }
@@ -152,6 +169,11 @@ export function formatWait(seconds: number): string {
 }
 
 const styles = StyleSheet.create({
+  forgot: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
   card: {
     alignItems: 'center',
     gap: spacing.sm,

@@ -33,7 +33,13 @@
 }
 
 :root {
+    /* Music follows StarCore's accent unless its own setting says otherwise (theme.js sets these
+       inline on the root then): a colour for Music only, or, in "artwork" mode, the playing cover's
+       colour for the now-playing controls only. The on-* tokens are the text colour that reads on each. */
     --mu-accent: var(--sc-accent, rgb(238, 68, 75));
+    --mu-on-accent: var(--sc-on-accent, #141215);
+    --mu-player-accent: var(--mu-accent);
+    --mu-player-on-accent: var(--mu-on-accent);
     --mu-radius: var(--radius, 8px);
     --mu-bar-height: 84px;
 }

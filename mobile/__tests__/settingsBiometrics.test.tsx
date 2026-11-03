@@ -23,6 +23,20 @@ const route = {} as any;
  * onValueChange handler is the last line of defense if that contract is ever
  * violated, so it needs its own coverage independent of session.ts's tests.
  */
+
+// Settings also has the Developer Mode switch: these tests are about the biometric one
+function biometricSwitches(tree: any) {
+  return tree.root.findAll((node: any) => node.type === Switch && node.props.testID === 'biometric-unlock-switch');
+}
+
+function biometricSwitch(tree: any) {
+  const [found] = biometricSwitches(tree);
+  if (!found) {
+    throw new Error('no biometric switch');
+  }
+  return found;
+}
+
 describe('SettingsScreen biometric toggle', () => {
   function setUp(overrides?: Partial<ReturnType<typeof useAuth>>) {
     const enableBiometricUnlock = jest.fn().mockResolvedValue('enabled');
@@ -44,7 +58,7 @@ describe('SettingsScreen biometric toggle', () => {
     const {tree, enableBiometricUnlock} = setUp();
 
     await act(async () => {
-      tree.root.findByType(Switch).props.onValueChange(true);
+      biometricSwitch(tree).props.onValueChange(true);
     });
 
     expect(enableBiometricUnlock).toHaveBeenCalled();
@@ -57,7 +71,7 @@ describe('SettingsScreen biometric toggle', () => {
     const {tree} = setUp({enableBiometricUnlock});
 
     await act(async () => {
-      await tree.root.findByType(Switch).props.onValueChange(true);
+      await biometricSwitch(tree).props.onValueChange(true);
     });
 
     expect(enableBiometricUnlock).toHaveBeenCalled();
@@ -71,19 +85,19 @@ describe('SettingsScreen biometric toggle', () => {
     const {tree} = setUp({enableBiometricUnlock});
 
     await act(async () => {
-      await tree.root.findByType(Switch).props.onValueChange(true);
+      await biometricSwitch(tree).props.onValueChange(true);
     });
 
     const texts = tree.root.findAllByType(Text).map((node: any) => node.props.children).flat().filter(Boolean);
     expect(texts).toEqual(expect.arrayContaining(['Keystore write failed']));
-    expect(tree.root.findByType(Switch).props.disabled).toBe(false);
+    expect(biometricSwitch(tree).props.disabled).toBe(false);
   });
 
   it('disables biometric unlock cleanly', async () => {
     const {tree, disableBiometricUnlock} = setUp({biometricUnlockEnabled: true});
 
     await act(async () => {
-      await tree.root.findByType(Switch).props.onValueChange(false);
+      await biometricSwitch(tree).props.onValueChange(false);
     });
 
     expect(disableBiometricUnlock).toHaveBeenCalled();
@@ -94,7 +108,7 @@ describe('SettingsScreen biometric toggle', () => {
     const {tree} = setUp({biometricUnlockEnabled: true, disableBiometricUnlock});
 
     await act(async () => {
-      await tree.root.findByType(Switch).props.onValueChange(false);
+      await biometricSwitch(tree).props.onValueChange(false);
     });
 
     const texts = tree.root.findAllByType(Text).map((node: any) => node.props.children).flat().filter(Boolean);
@@ -104,19 +118,19 @@ describe('SettingsScreen biometric toggle', () => {
   it('does not render the biometric card when biometrics are unavailable', () => {
     const {tree} = setUp({biometricsAvailable: false});
 
-    expect(tree.root.findAllByType(Switch)).toHaveLength(0);
+    expect(biometricSwitches(tree)).toHaveLength(0);
   });
 
   it('does not render the biometric card when there is no sensor', () => {
     const {tree} = setUp({biometricsAvailable: false, biometricsUnavailableReason: 'no-hardware'});
 
-    expect(tree.root.findAllByType(Switch)).toHaveLength(0);
+    expect(biometricSwitches(tree)).toHaveLength(0);
   });
 
   it('shows a disabled switch and explains when no fingerprint is enrolled', () => {
     const {tree} = setUp({biometricsAvailable: false, biometricsUnavailableReason: 'not-enrolled'});
 
-    expect(tree.root.findByType(Switch).props.disabled).toBe(true);
+    expect(biometricSwitch(tree).props.disabled).toBe(true);
     expect(textOf(tree)).toMatch(/No fingerprint is enrolled/);
   });
 
@@ -127,8 +141,8 @@ describe('SettingsScreen biometric toggle', () => {
       biometricUnlockEnabled: true,
     });
 
-    expect(tree.root.findByType(Switch).props.value).toBe(true);
-    expect(tree.root.findByType(Switch).props.disabled).toBe(true);
+    expect(biometricSwitch(tree).props.value).toBe(true);
+    expect(biometricSwitch(tree).props.disabled).toBe(true);
   });
 
   it.each([
@@ -140,7 +154,7 @@ describe('SettingsScreen biometric toggle', () => {
     const {tree} = setUp({enableBiometricUnlock});
 
     await act(async () => {
-      await tree.root.findByType(Switch).props.onValueChange(true);
+      await biometricSwitch(tree).props.onValueChange(true);
     });
 
     expect(textOf(tree)).toMatch(message);
@@ -151,10 +165,10 @@ describe('SettingsScreen biometric toggle', () => {
     const {tree} = setUp({enableBiometricUnlock});
 
     await act(async () => {
-      await tree.root.findByType(Switch).props.onValueChange(true);
+      await biometricSwitch(tree).props.onValueChange(true);
     });
 
-    expect(tree.root.findByType(Switch).props.value).toBe(false);
+    expect(biometricSwitch(tree).props.value).toBe(false);
   });
 
   it('lets the lock be turned off after a password login when biometrics are unavailable', async () => {
@@ -165,11 +179,11 @@ describe('SettingsScreen biometric toggle', () => {
       passwordRecoveryAvailable: true,
     });
 
-    expect(tree.root.findByType(Switch).props.disabled).toBe(false);
+    expect(biometricSwitch(tree).props.disabled).toBe(false);
     expect(textOf(tree)).toMatch(/signed in with your password/);
 
     await act(async () => {
-      await tree.root.findByType(Switch).props.onValueChange(false);
+      await biometricSwitch(tree).props.onValueChange(false);
     });
 
     expect(disableBiometricUnlock).toHaveBeenCalled();
@@ -183,7 +197,7 @@ describe('SettingsScreen biometric toggle', () => {
       passwordRecoveryAvailable: false,
     });
 
-    expect(tree.root.findByType(Switch).props.disabled).toBe(true);
+    expect(biometricSwitch(tree).props.disabled).toBe(true);
   });
 
   it('shows nothing when cancelling a disable', async () => {
@@ -191,7 +205,7 @@ describe('SettingsScreen biometric toggle', () => {
     const {tree} = setUp({biometricUnlockEnabled: true, disableBiometricUnlock});
 
     await act(async () => {
-      await tree.root.findByType(Switch).props.onValueChange(false);
+      await biometricSwitch(tree).props.onValueChange(false);
     });
 
     expect(disableBiometricUnlock).toHaveBeenCalled();

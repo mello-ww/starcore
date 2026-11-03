@@ -80,6 +80,15 @@ pitch, lyric offset, history and discovery switches, queue end behaviour, downlo
 and quality, offline cache size, visualiser) live in the database, per account, behind
 `GET/POST preferences`, and are validated server-side (`users.py`).
 
+The accent preference is `"starcore"` by default: Music uses StarCore's global accent
+(`--sc-accent`, and `--sc-on-accent` for text on it) and follows every change to it live.
+`"#rrggbb"` is a colour for Music only, with its own contrast-checked text colour.
+`"artwork"` is opt-in and colours only the now-playing controls (play buttons, the full
+player's seek bar, the visualiser and sung lyrics) from the playing track's cover; the rest
+of Music keeps the global accent. Earlier versions started the colour picker on StarCore's red
+and stored it as soon as "Fixed colour" was chosen, which pinned Music to red. A stored
+`#ee444b` is therefore read as `"starcore"` (the database is not rewritten).
+
 ## Supported formats
 
 MP3, FLAC, WAV, MP4/M4A (AAC and ALAC), Ogg Vorbis and Opus. Tags, technical details and

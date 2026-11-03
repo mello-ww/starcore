@@ -2,9 +2,17 @@ import * as api from "./api.js";
 import * as store from "./store.js";
 
 const palettes = new Map();
-let currentAlbum = null; // the album whose cover colours Music when the accent follows artwork
+let playingAlbum = null; // the playing track's album: its cover colours the player in "artwork" mode
 const themed = new Set();
 const media = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
+
+// Music's accent preference: "starcore" (default) follows StarCore's global accent, "#rrggbb" is a
+// colour for Music only, and "artwork" also follows StarCore except in the player, which takes
+// the playing cover's colour. Anything not yet loaded or unknown reads as "starcore".
+function accentMode() {
+    const value = String(store.preference("accent", "starcore") || "starcore").toLowerCase();
+    return value === "artwork" || /^#[0-9a-f]{6}$/.test(value) ? value : "starcore";
+}
 
 export function register(node) {
     themed.add(node);
@@ -27,11 +35,12 @@ export function apply() {
         node.dataset.muTheme = theme;
         node.dataset.muDensity = density;
     }
-    const accent = store.preference("accent", "artwork");
-    if (accent && accent !== "artwork") {
-        setAccent(hexToRgb(accent));
+    const mode = accentMode();
+    setColour("--mu-accent", "--mu-on-accent", mode.startsWith("#") ? hexToRgb(mode) : null);
+    if (mode === "artwork") {
+        followArtwork(playingAlbum);
     } else {
-        followArtwork(currentAlbum);
+        setColour("--mu-player-accent", "--mu-player-on-accent", null);
     }
 }
 
@@ -45,15 +54,28 @@ function hexToRgb(hex) {
     return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 }
 
-// Music's own accent (a picked colour or the cover's) lives in --mu-accent and only colours Music.
-// With none set, page.css falls back to StarCore's --sc-accent, so the global choice applies live.
-function setAccent(rgb) {
+// Sets one of Music's own colours, with the text colour that reads on it; null removes it, and
+// page.css then falls back to StarCore's --sc-accent / --sc-on-accent, so the global choice
+// applies live without anything here listening for it.
+function setColour(property, onProperty, rgb) {
     const root = document.documentElement.style;
     if (rgb) {
-        root.setProperty("--mu-accent", `rgb(${rgb.join(",")})`);
+        root.setProperty(property, `rgb(${rgb.join(",")})`);
+        root.setProperty(onProperty, onColourFor(rgb));
     } else {
-        root.removeProperty("--mu-accent");
+        root.removeProperty(property);
+        root.removeProperty(onProperty);
     }
+}
+
+// StarCore's dark ink or white, whichever has more contrast (the same rule Mission Control uses)
+export function onColourFor(rgb) {
+    const [r, g, b] = rgb.map((channel) => {
+        const value = channel / 255;
+        return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    const light = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return (light + 0.05) / 0.0573 >= 1.05 / (light + 0.05) ? "#141215" : "#ffffff";
 }
 
 // the most saturated colours of the cover, sampled small; artwork is same-origin so the canvas stays readable
@@ -114,13 +136,14 @@ function lift(rgb) {
     return rgb;
 }
 
+// called by the player bar whenever the playing album changes
 export async function followArtwork(albumId) {
-    currentAlbum = albumId || null;
-    if (store.preference("accent", "artwork") !== "artwork") {
+    playingAlbum = albumId || null;
+    if (accentMode() !== "artwork") {
         return;
     }
-    const colours = await palette(albumId);
-    if (currentAlbum === (albumId || null) && store.preference("accent", "artwork") === "artwork") {
-        setAccent(colours ? colours.primary : null);
+    const colours = await palette(playingAlbum);
+    if (playingAlbum === (albumId || null) && accentMode() === "artwork") {
+        setColour("--mu-player-accent", "--mu-player-on-accent", colours ? colours.primary : null);
     }
 }

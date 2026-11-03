@@ -8,6 +8,8 @@ export interface LockedFolderStatus {
   path: string | null;
   path_exists: boolean | null;
   pin_set: boolean;
+  /** When the stored PIN was last set (ISO 8601), or null when there is none. */
+  pin_set_at?: string | null;
   pin_unreadable?: boolean;
   unlocked: boolean;
   expires_at: string | null;

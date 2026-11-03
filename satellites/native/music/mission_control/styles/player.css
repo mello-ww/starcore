@@ -94,13 +94,13 @@
 .mu-play {
     width: 38px;
     height: 38px;
-    background: var(--mu-accent);
-    color: var(--sc-on-accent, #141215);
+    background: var(--mu-player-accent);
+    color: var(--mu-player-on-accent);
 }
 
 .mu-play:hover {
-    background: var(--mu-accent);
-    color: var(--sc-on-accent, #141215);
+    background: var(--mu-player-accent);
+    color: var(--mu-player-on-accent);
     filter: brightness(1.08);
     transform: scale(1.06);
 }
@@ -371,7 +371,7 @@
 .mu-visualizer {
     width: min(52vh, 100%, 520px);
     height: 72px;
-    color: var(--mu-accent); /* read by the canvas visualizer, so keep it a plain colour */
+    color: var(--mu-player-accent); /* read by the canvas visualizer, so keep it a plain colour */
 }
 
 .mu-visualizer[hidden] {
@@ -410,7 +410,7 @@
 }
 
 .mu-full .mu-range {
-    background: linear-gradient(90deg, var(--mu-accent) var(--progress), rgba(127, 127, 127, 0.4) var(--progress));
+    background: linear-gradient(90deg, var(--mu-player-accent) var(--progress), rgba(127, 127, 127, 0.4) var(--progress));
 }
 
 .mu-transport-large .mu-icon-button {
@@ -421,8 +421,8 @@
 .mu-transport-large .mu-play {
     width: 64px;
     height: 64px;
-    background: var(--mu-accent);
-    color: var(--sc-on-accent, #141215);
+    background: var(--mu-player-accent);
+    color: var(--mu-player-on-accent);
 }
 
 .mu-full-extras {
@@ -544,7 +544,7 @@
 }
 
 .mu-lyric-line.active .mu-lyric-word.sung {
-    color: var(--mu-accent);
+    color: var(--mu-player-accent);
 }
 
 .mu-lyric-translation {

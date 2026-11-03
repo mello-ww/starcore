@@ -4,6 +4,7 @@ import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {StarSwitch} from '../components/StarSwitch';
 import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
+import {useDeveloperMode} from '../developer/DeveloperModeContext';
 import {useServers} from '../servers/ServersContext';
 import {Button} from '../components/Button';
 import {ScreenTitle} from '../components/ScreenTitle';
@@ -42,6 +43,7 @@ export function SettingsScreen({navigation}: Props) {
   } = useAuth();
   const {activeServer} = useServers();
   const {color: accent} = useAccent();
+  const {enabled: developer, setEnabled: setDeveloper} = useDeveloperMode();
   const top = useTopInset();
   const [busy, setBusy] = useState(false);
   const [bioError, setBioError] = useState<string | null>(null);
@@ -72,7 +74,7 @@ export function SettingsScreen({navigation}: Props) {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.content, {paddingTop: top + space.xl}]}>
-      <ScreenTitle eyebrow="StarCore" title="Settings" subtitle="Preferences for this app on this device." />
+      <ScreenTitle eyebrow="StarCore" title="Settings" subtitle="Preferences for this app on this device." developerToggle />
 
       <Pressable
         onPress={() => navigation.navigate('Servers')}
@@ -120,6 +122,20 @@ export function SettingsScreen({navigation}: Props) {
           ) : null}
         </Surface>
       )}
+
+      <Surface style={styles.card}>
+        <View style={styles.row}>
+          <Icon name="terminal" size={20} color={accent} />
+          <View style={styles.rowText}>
+            <Text style={type.title}>Developer Mode</Text>
+            <Text style={type.caption}>
+              Shows advanced settings, diagnostics and the Console and Config tabs. It changes only what this
+              device shows - what you're allowed to do stays the same.
+            </Text>
+          </View>
+          <StarSwitch value={developer} onValueChange={setDeveloper} testID="developer-mode-switch" />
+        </View>
+      </Surface>
 
       <Button title="Log out" variant="secondary" onPress={() => logout()} />
     </ScrollView>

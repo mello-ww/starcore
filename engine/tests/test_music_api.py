@@ -356,6 +356,22 @@ class ListeningTest(MusicApiCase):
         self.assertEqual(self.call("preferences", {"bob": 1}, token=self.bob)[0], 400)
         self.assertEqual(self.call("preferences", token=self.bob)[1]["theme"], "system")
 
+    def test_music_follows_the_starcore_accent_unless_told_otherwise(self):
+        # the default no longer recolours Music from album art: that is an explicit choice
+        self.assertEqual(self.call("preferences")[1]["accent"], "starcore")
+        self.assertEqual(self.call("preferences", {"accent": "artwork"})[1]["accent"], "artwork")
+        self.assertEqual(self.call("preferences", {"accent": "#3366ff"})[1]["accent"], "#3366ff")
+        self.assertEqual(self.call("preferences", {"accent": "starcore"})[1]["accent"], "starcore")
+
+    def test_a_pinned_copy_of_the_old_default_red_reads_as_following_starcore(self):
+        # Music's old picker stored StarCore's red the moment it was switched to a fixed colour,
+        # after which no global accent change reached Music. Read as "starcore", not rewritten.
+        self.call("preferences", {"accent": "#EE444B"})
+        self.assertEqual(self.call("preferences")[1]["accent"], "starcore")
+        db = module("library").library(self.satellite).db
+        stored = db.all("SELECT value FROM preferences WHERE key = 'accent'")
+        self.assertEqual([row["value"] for row in stored], ['"#EE444B"'])
+
 
 class ConnectTest(MusicApiCase):
     def register(self, device, kind="web", token=None):

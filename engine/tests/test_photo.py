@@ -843,7 +843,7 @@ class PhotoSatelliteTest(unittest.TestCase):
         status, payload = self.json_request("/api/satellites/status/anything")
 
         self.assertEqual(status, 404)
-        self.assertIsNone(self.engine.registry.get("Status").page)
+        self.assertNotIn("anything", self.engine.registry.get("Status").routes)
 
 
 class PhotoAlbumsTest(unittest.TestCase):

@@ -51,31 +51,37 @@ SETTINGS = {
         "validate": _validate_host,
         "description": "Mission Control bind address",
         "restart_required": True,
+        "developer": True,
     },
     ("server", "port"): {
         "validate": _validate_port,
         "description": "Mission Control port",
         "restart_required": True,
+        "developer": True,
     },
     ("server", "enabled"): {
         "validate": _validate_bool,
         "description": "Whether Mission Control starts at all",
         "restart_required": True,
+        "developer": True,
     },
     ("server", "https_enabled"): {
         "validate": _validate_bool,
         "description": "Serve Mission Control over HTTPS instead of plain HTTP",
         "restart_required": True,
+        "developer": True,
     },
     ("server", "https_cert"): {
         "validate": _validate_optional_path,
         "description": "Path to the TLS certificate file (PEM), used when https_enabled is true",
         "restart_required": True,
+        "developer": True,
     },
     ("server", "https_key"): {
         "validate": _validate_optional_path,
         "description": "Path to the TLS private key file (PEM), used when https_enabled is true",
         "restart_required": True,
+        "developer": True,
     },
 }
 
@@ -98,6 +104,8 @@ def describe(configuration: "Configuration") -> list:
             "value": configuration.section(section).get(key),
             "description": meta["description"],
             "restart_required": meta["restart_required"],
+            # shown only in Developer Mode - a display hint, never a permission
+            "developer": meta.get("developer", False),
         }
         for (section, key), meta in SETTINGS.items()
     ]

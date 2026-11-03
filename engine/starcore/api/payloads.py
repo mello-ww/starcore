@@ -1,7 +1,5 @@
-from contextlib import redirect_stdout
-import io
-
 from .. import engine_config
+from ..cli import runner
 
 
 def describe_satellite(engine, satellite) -> dict:
@@ -16,7 +14,7 @@ def describe_satellite(engine, satellite) -> dict:
         "section_of": satellite.manifest.section_of,
         "type": satellite.type,
         "enabled": bool(satellite.config.get("enabled", True)),
-        "status": _satellite_status(engine, satellite),
+        "status": satellite_status(engine, satellite),
         "commands": describe_commands(engine, source=satellite.manifest.name),
         "state": satellite.state(engine),
         "page": satellite.page,
@@ -34,7 +32,7 @@ def describe_satellite(engine, satellite) -> dict:
     }
 
 
-def _satellite_status(engine, satellite) -> str:
+def satellite_status(engine, satellite) -> str:
     """One of "running" / "stopped" / "disabled" / "error", entirely generic.
 
     - "error": the satellite's last start/stop hook failed. Takes priority
@@ -71,14 +69,22 @@ def describe_commands(engine, source=None) -> list:
             continue
 
         metadata = entry["metadata"]
-        commands.append({
+        described = {
             "name": name,
             "source": entry["source"],
             "description": metadata.get("description", ""),
             "usage": metadata.get("usage", ""),
             "category": metadata.get("category", ""),
             "aliases": metadata.get("aliases", []),
-        })
+        }
+        namespace = entry.get("namespace")
+        if namespace is not None:
+            # the typed schema of each subcommand, limited to what a remote
+            # console may actually run - see starcore/cli/runner.py
+            context = runner.remote_context(engine)
+            described["commands"] = [command.schema() for command in namespace.unique()
+                                     if runner.refusal(engine, command, namespace, context) is None]
+        commands.append(described)
 
     return commands
 
@@ -119,18 +125,17 @@ def _live_state(engine, setting: dict) -> dict:
     return {"live_value": live, "pending_restart": live is not None and live != setting["value"]}
 
 
-def execute(engine, command: str) -> dict:
-    # captures stdout the same way the terminal CLI's own loop does
-    # (`if result is not None: print(result)`), so the console shows exactly
-    # what a terminal would have shown for the same command
-    buffer = io.StringIO()
+def execute(engine, command: str, token: str = "") -> dict:
+    """Runs a console command for a signed-in Mission Control or mobile session.
 
+    Same parser, output and exit codes as the terminal, but as a remote
+    caller: only read-only commands and those that opt in to remote use
+    (see starcore/cli/runner.py) run here - a state-changing command never
+    becomes reachable from a browser just because it exists.
+    """
     try:
-        with redirect_stdout(buffer):
-            result = engine.execute_command(command)
-            if result is not None:
-                print(result)
+        outcome = engine.run_command(command, runner.remote_context(engine, token))
     except Exception as error:
-        return {"command": command, "output": buffer.getvalue(), "error": str(error)}
+        return {"command": command, "output": "", "error": str(error), "exit_code": 1}
 
-    return {"command": command, "output": buffer.getvalue(), "error": None}
+    return {"command": command, "output": outcome.output, "error": None, "exit_code": outcome.exit_code}

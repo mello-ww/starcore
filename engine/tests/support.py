@@ -5,6 +5,7 @@ import shutil
 import tempfile
 
 from starcore.auth import AuthStore
+from starcore.cli.audit import AuditLog
 from starcore.core import StarCore
 
 CONFIG_TEMPLATE = """[engine]
@@ -35,6 +36,8 @@ def start_engine(mission_control=False, services=False, host="127.0.0.1", port=0
     # engine/data/auth.json - so one test bootstrapping a user (or creating a
     # session) can never leak into, or be affected by, any other test
     engine.auth = AuthStore(directory / "auth.json")
+    # the same for the command audit log (see starcore/cli/audit.py)
+    engine.audit = AuditLog(directory / "audit.log")
     shutil.rmtree(directory, ignore_errors=True)
 
     with redirect_stdout(io.StringIO()):

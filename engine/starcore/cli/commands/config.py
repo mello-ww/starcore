@@ -5,6 +5,8 @@ COMMAND = {
     "usage": "config [<section.key> <value>]",
     "aliases": [],
     "category": "Core",
+    # changes are audited with their values: settings and paths, never secrets
+    "audit_arguments": True,
     "examples": [
         "config",
         "config server.host 0.0.0.0",

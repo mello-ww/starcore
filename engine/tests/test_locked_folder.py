@@ -13,6 +13,7 @@ starts its own fresh engine and its own fresh admin session rather than
 sharing one across the class.
 """
 
+from datetime import datetime
 from http.client import HTTPConnection
 from pathlib import Path
 from unittest import mock
@@ -167,6 +168,26 @@ class LockedFolderApiTest(unittest.TestCase):
 
         _, status_payload = self.status()
         self.assertTrue(status_payload["pin_set"])
+
+    def test_status_says_when_an_existing_pin_was_set(self):
+        # a vault someone thinks is new, but with a PIN from months ago, must show the unlock
+        # screen (never setup) - and say when that PIN was set, so "incorrect PIN" makes sense
+        self.configure_vault()
+        _, before = self.status()
+        self.assertFalse(before["pin_set"])
+        self.assertIsNone(before["pin_set_at"])
+
+        self.set_pin("1234")
+        pin_file = self.directory / "lf-data" / "pin.json"
+        months_ago = time.time() - 60 * 24 * 3600
+        os.utime(pin_file, (months_ago, months_ago))
+        _, after = self.status()
+
+        self.assertTrue(after["pin_set"])
+        self.assertFalse(after["unlocked"])
+        set_at = datetime.fromisoformat(after["pin_set_at"])
+        self.assertAlmostEqual(set_at.timestamp(), months_ago, delta=2)
+        self.assertNotIn("1234", json.dumps(after))
 
     def test_a_pin_must_be_digits_only(self):
         self.configure_vault()

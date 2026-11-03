@@ -89,6 +89,8 @@ export interface ConfigurationSetting {
   value: unknown;
   label?: string;
   description?: string;
+  /** Shown only in Developer Mode - a display hint, never a permission. */
+  developer?: boolean;
 }
 
 export interface ConfigurationResponse {

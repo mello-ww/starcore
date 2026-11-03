@@ -3,6 +3,7 @@ import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View}
 import Icon from 'react-native-vector-icons/Feather';
 import {ScreenTitle} from '../../components/ScreenTitle';
 import {StarSwitch} from '../../components/StarSwitch';
+import {useDeveloperMode} from '../../developer/DeveloperModeContext';
 import {Surface} from '../../components/Surface';
 import {tokens, TOUCH_TARGET, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
@@ -119,6 +120,7 @@ function Link({icon, label, onPress, danger}: {icon: string; label: string; onPr
 export function MusicSettingsScreen() {
   const accentStyle = useAccentStyles();
   const {preferences, updatePreferences, api, downloads} = useMusic();
+  const {enabled: developer} = useDeveloperMode(); // transcode format is an advanced setting
   const go = useMusicNavigation();
   if (!preferences) {
     return (
@@ -137,7 +139,9 @@ export function MusicSettingsScreen() {
       <Group title="Streaming" note="Anything but Original needs FFmpeg on the server; without it the original file is streamed.">
         <Choice label="Wi-Fi quality" value={preferences.streaming_quality} options={QUALITY} onChange={value => set({streaming_quality: value as any})} />
         <Choice label="Cellular quality" value={preferences.cellular_quality} options={QUALITY} onChange={value => set({cellular_quality: value as any})} />
-        <Choice label="Transcode format" value={preferences.transcode_format} options={FORMAT} onChange={value => set({transcode_format: value as any})} />
+        {developer && (
+          <Choice label="Transcode format" value={preferences.transcode_format} options={FORMAT} onChange={value => set({transcode_format: value as any})} />
+        )}
       </Group>
 
       <Group title="Playback" note="Crossfade and gapless playback are not available on Android yet; tracks play back to back.">

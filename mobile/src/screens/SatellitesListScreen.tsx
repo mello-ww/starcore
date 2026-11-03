@@ -73,7 +73,7 @@ export function SatellitesListScreen({navigation}: Props) {
         contentContainerStyle={[styles.list, {paddingTop: top + space.xl}]}
         ListHeaderComponent={
           <View style={styles.header}>
-            <ScreenTitle eyebrow={activeServer?.name ? `StarCore · ${activeServer.name}` : 'StarCore'} title="Satellites" />
+            <ScreenTitle eyebrow={activeServer?.name ? `StarCore · ${activeServer.name}` : 'StarCore'} title="Satellites" developerToggle />
             {isCache && <Text style={[type.caption, styles.offline]}>Showing cached data - offline</Text>}
             {error && <Text style={styles.error}>{error}</Text>}
           </View>
@@ -96,7 +96,9 @@ export function SatellitesListScreen({navigation}: Props) {
                 ? navigation.navigate('PhotoHome')
                 : item.name === 'Music'
                   ? navigation.navigate('MusicHome')
-                  : navigation.navigate('SatelliteDetail', {name: item.name})
+                  : item.name === 'Status'
+                    ? navigation.navigate('StatusHome')
+                    : navigation.navigate('SatelliteDetail', {name: item.name})
             }>
             <Surface style={styles.card}>
               <View style={styles.row}>

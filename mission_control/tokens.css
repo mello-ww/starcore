@@ -18,6 +18,9 @@
     --sc-on-accent: #141215;
     --sc-danger: #ee444b;
     --sc-warn: #f0b43c;
+    /* a chart's second series beside the accent; separable from every accent preset,
+       including for colour-blind readers (checked with the data-viz palette validator) */
+    --sc-chart-2: #7d808a;
 
     --sc-font-sans: "Inter", "Manrope", "Segoe UI Variable Text", "Segoe UI", Roboto, system-ui, sans-serif;
     --sc-font-display: "Space Grotesk", "Manrope", "Inter", "Segoe UI Variable Display", "Segoe UI", Roboto, system-ui, sans-serif;

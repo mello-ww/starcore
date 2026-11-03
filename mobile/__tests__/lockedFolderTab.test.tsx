@@ -109,6 +109,22 @@ describe('LockedFolderTab', () => {
     expect(api.media).not.toHaveBeenCalled();
   });
 
+  it('says when an existing PIN was set and how a forgotten one is recovered', async () => {
+    // a PIN set months ago on a vault the user believes is new: unlock, never setup
+    const api = fakeApi({...baseStatus, pin_set_at: '2026-09-05T11:23:10+00:00', encryption: {state: 'off', recovery_key: false}});
+    useApi(api);
+    const tree = await render();
+    const intro = texts(tree).find(text => text.startsWith('Enter the PIN set for this Locked Folder on'));
+    expect(intro).toBeDefined();
+    expect(intro).toMatch(/2026/);
+    expect(api.setPin).not.toHaveBeenCalled();
+
+    const forgot = tree.root.findAll((node: any) => node.props.accessibilityRole === 'button'
+      && node.findAllByType(Text).some((text: any) => text.props.children === 'Forgot your PIN?'))[0];
+    await act(async () => forgot.props.onPress());
+    expect(texts(tree).some(text => text.includes('delete pin.json') && text.includes('not touched'))).toBe(true);
+  });
+
   it('keeps the screen secure while it is open', async () => {
     useApi(fakeApi(baseStatus));
     const tree = await render();
