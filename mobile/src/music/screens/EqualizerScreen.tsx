@@ -5,6 +5,7 @@ import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import {audioEffects} from '../native';
 import type {Equalizer} from '../types';
+import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 export const BANDS = ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k'];
 
@@ -101,6 +102,7 @@ export function EqualizerScreen() {
         Effects run on the phone's own audio session through Android's equalizer, so they change what you hear,
         downloads included. Lossless sources are still decoded losslessly; the equalizer then shapes the output.
       </Text>
+      <FloatingPlayerSpacer />
     </ScrollView>
   );
 }

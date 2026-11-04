@@ -7,6 +7,7 @@ import {Artwork, Mosaic} from '../ui/Artwork';
 import {trackCount} from '../ui/format';
 import {useMusicNavigation} from '../ui/navigation';
 import {useLoad} from '../ui/useLoad';
+import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 type Filter = 'playlists' | 'albums' | 'artists';
 const FILTERS: {key: Filter; label: string}[] = [
@@ -94,6 +95,7 @@ export function LibraryTab() {
         )}
       </View>
       <FlatList
+        ListFooterComponent={<FloatingPlayerSpacer />}
         data={rows}
         keyExtractor={row => row.key}
         contentContainerStyle={styles.list}

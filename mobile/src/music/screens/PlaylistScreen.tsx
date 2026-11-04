@@ -10,6 +10,7 @@ import {TrackActions} from '../ui/TrackActions';
 import {TrackRow} from '../ui/TrackRow';
 import {useLoad} from '../ui/useLoad';
 import {CollectionHeader} from './CollectionHeader';
+import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'MusicPlaylist'>;
 
@@ -94,6 +95,7 @@ export function PlaylistScreen({route, navigation}: Props) {
       ))}
       <TrackActions tracks={actions} onClose={() => setActions(null)}
         playlistEntry={playlist.smart ? undefined : {playlistId: playlist.id, onRemoved: reload}} />
+      <FloatingPlayerSpacer />
     </ScrollView>
   );
 }

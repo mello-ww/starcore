@@ -11,7 +11,8 @@ import {Button} from '../components/Button';
 import {ScreenTitle} from '../components/ScreenTitle';
 import {Surface} from '../components/Surface';
 import {tokens, useAccent, useTopInset} from '../theme';
-import type {SettingsStackParamList} from '../navigation/MainTabs';
+import type {SettingsStackParamList} from '../navigation/MainTabs';
+import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const {palette, space, type} = tokens;
 
@@ -143,6 +144,7 @@ export function SettingsScreen({navigation}: Props) {
       <Button title="Log out" variant="secondary" onPress={() => logout()} />
 
       <VersionFootnote />
+      <FloatingPlayerSpacer />
     </ScrollView>
   );
 }

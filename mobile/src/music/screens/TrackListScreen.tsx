@@ -11,6 +11,7 @@ import {TrackActions} from '../ui/TrackActions';
 import {TrackRow} from '../ui/TrackRow';
 import {useLoad} from '../ui/useLoad';
 import {CollectionHeader} from './CollectionHeader';
+import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'MusicTracks'>;
 
@@ -58,7 +59,7 @@ export function TrackListScreen({route, navigation}: Props) {
           onShuffle={() => player.playTracks(data.tracks, Math.floor(Math.random() * data.tracks.length), context, true)} />
       }
       ListEmptyComponent={<Text style={typography.caption}>Nothing here yet - play some music and come back.</Text>}
-      ListFooterComponent={<TrackActions tracks={actions} onClose={() => setActions(null)} />}
+      ListFooterComponent={<><TrackActions tracks={actions} onClose={() => setActions(null)} /><FloatingPlayerSpacer /></>}
       renderItem={({item, index}) => (
         <TrackRow track={item} onPress={() => player.playTracks(data.tracks, index, context, false)} onMore={() => setActions([item])} />
       )}

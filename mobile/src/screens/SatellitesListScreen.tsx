@@ -13,6 +13,7 @@ import {DEDICATED_SCREENS} from './HomeScreen';
 import {Surface} from '../components/Surface';
 import {tokens, useAccent, useTopInset} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
+import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const {palette, space, type} = tokens;
 
@@ -71,6 +72,7 @@ export function SatellitesListScreen({navigation}: Props) {
   return (
     <View style={styles.screen}>
       <FlatList
+        ListFooterComponent={<FloatingPlayerSpacer />}
         // a satellite shown as a section of another (the Locked Folder, in
         // Photos) is opened from there, not listed on its own
         data={(satellites ?? []).filter(item => !item.section_of)}

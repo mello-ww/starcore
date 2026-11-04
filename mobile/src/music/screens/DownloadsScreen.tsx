@@ -3,7 +3,8 @@ import {Alert, FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import {bytes} from '../ui/format';
-import {TrackRow} from '../ui/TrackRow';
+import {TrackRow} from '../ui/TrackRow';
+import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 export function DownloadsScreen() {
   const accentStyle = useAccentStyles();
@@ -20,6 +21,7 @@ export function DownloadsScreen() {
 
   return (
     <FlatList
+      ListFooterComponent={<FloatingPlayerSpacer />}
       data={entries}
       keyExtractor={entry => entry.track.id}
       contentContainerStyle={styles.content}

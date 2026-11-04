@@ -3,6 +3,7 @@ import {Dimensions, RefreshControl, SectionList, StyleSheet, Text, View} from 'r
 import {spacing, typography, useAccentStyles} from '../theme';
 import type {Photo} from './types';
 import {PhotoThumbnail} from './PhotoThumbnail';
+import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 export const DEFAULT_COLUMNS = 3;
 export const MIN_COLUMNS = 2;
@@ -112,6 +113,7 @@ export function PhotoGrid({
 
   return (
     <SectionList
+      ListFooterComponent={<FloatingPlayerSpacer />}
       sections={sections}
       keyExtractor={(row, index) => `${row[0]?.id ?? 'row'}-${index}`}
       contentContainerStyle={styles.content}

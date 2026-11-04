@@ -27,6 +27,7 @@ import {FullPlayer} from '../music/player/FullPlayer';
 import {MiniPlayer} from '../music/player/MiniPlayer';
 import {MusicDisc, MusicFlight} from '../music/player/MusicDisc';
 import {TopBarSlot, TopBarSlotProvider} from '../components/TopBarSlot';
+import {FloatingPlayerInsetProvider} from '../components/FloatingPlayerInset';
 import {AlbumScreen} from '../music/screens/AlbumScreen';
 import {ArtistScreen} from '../music/screens/ArtistScreen';
 import {DownloadsScreen} from '../music/screens/DownloadsScreen';
@@ -199,9 +200,12 @@ export function MainTabs() {
   const {enabled: developer} = useDeveloperMode();
   // the mini-player floats over the screens just above the tab bar, so it needs the bar's height
   const [tabBarHeight, setTabBarHeight] = useState(0);
+  // and the screens leave its measured height (0 while it is hidden) at the end of their scrolling
+  const [playerHeight, setPlayerHeight] = useState(0);
   return (
     <MusicProvider>
       <TopBarSlotProvider component={MusicDisc}>
+      <FloatingPlayerInsetProvider value={playerHeight > 0 ? playerHeight + tokens.space.sm : 0}>
       <View style={styles.fill}>
       <Tab.Navigator
       tabBar={props => (
@@ -226,11 +230,15 @@ export function MainTabs() {
       </Tab.Navigator>
       {/* drawn over the screens rather than inside the tab bar's area, so what is underneath
           shows around its rounded edges */}
-      <View pointerEvents="box-none" style={[styles.floating, {bottom: tabBarHeight}]}>
+      <View
+        pointerEvents="box-none"
+        style={[styles.floating, {bottom: tabBarHeight}]}
+        onLayout={event => setPlayerHeight(Math.round(event.nativeEvent.layout.height))}>
         <MiniPlayer />
       </View>
       <MusicFlight />
       </View>
+      </FloatingPlayerInsetProvider>
       </TopBarSlotProvider>
     </MusicProvider>
   );

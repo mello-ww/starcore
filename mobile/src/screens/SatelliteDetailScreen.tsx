@@ -6,7 +6,8 @@ import {SatellitesApi} from '../satellites/api';
 import {DeclarativeScreen} from '../satellites/DeclarativeScreen';
 import type {UiScreen} from '../satellites/types';
 import {colors, spacing, useAccentStyles} from '../theme';
-import type {SatellitesStackParamList} from '../navigation/MainTabs';
+import type {SatellitesStackParamList} from '../navigation/MainTabs';
+import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'SatelliteDetail'>;
 
@@ -79,6 +80,7 @@ export function SatelliteDetailScreen({route, navigation}: Props) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentStyle.color} />}>
       {error && <Text style={styles.error}>{error}</Text>}
       <DeclarativeScreen screen={screen} onAction={runAction} />
+      <FloatingPlayerSpacer />
     </ScrollView>
   );
 }

@@ -11,7 +11,8 @@ import {HardwareSection} from './sections/HardwareSection';
 import {HistorySection} from './sections/HistorySection';
 import {NetworkSection} from './sections/NetworkSection';
 import {OverviewSection} from './sections/OverviewSection';
-import {ServicesSection} from './sections/ServicesSection';
+import {ServicesSection} from './sections/ServicesSection';
+import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const {palette, radii, space, type} = tokens;
 
@@ -143,6 +144,7 @@ export function StatusHomeScreen() {
         {data && section === 'network' && <NetworkSection data={data} />}
         {data && section === 'services' && <ServicesSection data={data} />}
         {section === 'history' && <HistorySection api={api} active={active} snapshot={data} />}
+        <FloatingPlayerSpacer />
       </ScrollView>
     </View>
   );

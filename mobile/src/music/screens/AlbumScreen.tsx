@@ -11,7 +11,8 @@ import {Shelf} from '../ui/Shelf';
 import {TrackActions} from '../ui/TrackActions';
 import {TrackRow} from '../ui/TrackRow';
 import {useLoad} from '../ui/useLoad';
-import {CollectionHeader} from './CollectionHeader';
+import {CollectionHeader} from './CollectionHeader';
+import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'MusicAlbum'>;
 
@@ -64,6 +65,7 @@ export function AlbumScreen({route}: Props) {
         key: other.id, title: other.album, subtitle: other.year ? String(other.year) : undefined,
         albumId: other.artwork ? other.id : null, onPress: () => go.album(other.id)}))} />
       <TrackActions tracks={actions} onClose={() => setActions(null)} />
+      <FloatingPlayerSpacer />
     </ScrollView>
   );
 }

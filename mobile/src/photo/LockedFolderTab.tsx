@@ -26,7 +26,8 @@ import {useLockedFolder} from '../lockedFolder/useLockedFolder';
 import {durationLabel} from './duration';
 import {deviceInfo} from '../platform/device';
 import {privacy} from '../platform/privacy';
-import {colors, spacing, tokens, typography, useAccentStyles, useTopInset} from '../theme';
+import {colors, spacing, tokens, typography, useAccentStyles, useTopInset} from '../theme';
+import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const COLUMNS = 3;
 const MAX_TIMER = 2 ** 31 - 1;
@@ -207,7 +208,7 @@ export function LockedFolderTab({onPhotosChanged}: {onPhotosChanged?: () => void
           keyExtractor={item => item.path}
           numColumns={COLUMNS}
           ListHeaderComponent={<View style={styles.headerSpace}>{body}</View>}
-          ListFooterComponent={files.length ? <FileList files={files} /> : null}
+          ListFooterComponent={<>{files.length ? <FileList files={files} /> : null}<FloatingPlayerSpacer /></>}
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.gridContent}
           renderItem={({item, index}) => (
@@ -232,6 +233,7 @@ export function LockedFolderTab({onPhotosChanged}: {onPhotosChanged?: () => void
         <ScrollView contentContainerStyle={styles.content}>
           {body}
           {unlockedView && files.length > 0 && <FileList files={files} />}
+          <FloatingPlayerSpacer />
         </ScrollView>
       )}
       {viewing !== null && media[viewing] && (

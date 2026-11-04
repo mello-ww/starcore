@@ -6,6 +6,7 @@ import {Button} from '../components/Button';
 import {Surface} from '../components/Surface';
 import {tokens, useAccent} from '../theme';
 import type {SettingsStackParamList} from '../navigation/MainTabs';
+import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const {palette, space, type} = tokens;
 
@@ -58,7 +59,7 @@ export function ServersScreen({navigation}: Props) {
             </Surface>
           );
         }}
-        ListFooterComponent={<Button title="Add server" onPress={() => navigation.navigate('AddServer')} />}
+        ListFooterComponent={<><Button title="Add server" onPress={() => navigation.navigate('AddServer')} /><FloatingPlayerSpacer /></>}
         ListFooterComponentStyle={styles.footer}
       />
     </View>

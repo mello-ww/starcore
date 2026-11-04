@@ -16,6 +16,7 @@ import {SatelliteWidgets} from '../satellites/ui/Widgets';
 import {useServers} from '../servers/ServersContext';
 import {StatusWidget} from '../status/StatusWidget';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
+import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const {palette, radii, space, type, ACCENTS} = tokens;
 
@@ -284,6 +285,7 @@ export function HomeScreen() {
             )}
           </>
         )}
+        <FloatingPlayerSpacer />
       </ScrollView>
     </View>
   );

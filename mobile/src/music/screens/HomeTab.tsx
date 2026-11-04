@@ -8,7 +8,8 @@ import {Shelf, type ShelfItem} from '../ui/Shelf';
 import {TrackActions} from '../ui/TrackActions';
 import {TrackRow} from '../ui/TrackRow';
 import {trackCount} from '../ui/format';
-import {useLoad} from '../ui/useLoad';
+import {useLoad} from '../ui/useLoad';
+import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 export function HomeTab() {
   const accentStyle = useAccentStyles();
@@ -80,6 +81,7 @@ export function HomeTab() {
         ),
       )}
       <TrackActions tracks={actions} onClose={() => setActions(null)} />
+      <FloatingPlayerSpacer />
     </ScrollView>
   );
 }

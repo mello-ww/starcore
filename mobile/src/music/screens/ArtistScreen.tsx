@@ -10,7 +10,8 @@ import {Shelf, type ShelfItem} from '../ui/Shelf';
 import {TrackActions} from '../ui/TrackActions';
 import {TrackRow} from '../ui/TrackRow';
 import {useLoad} from '../ui/useLoad';
-import {CollectionHeader} from './CollectionHeader';
+import {CollectionHeader} from './CollectionHeader';
+import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'MusicArtist'>;
 
@@ -59,6 +60,7 @@ export function ArtistScreen({route}: Props) {
       <Shelf title="Similar in your library" items={artist.similar.map(other => ({key: other.id, title: other.name,
         subtitle: other.reason, round: true, onPress: () => go.artist(other.id)}))} />
       <TrackActions tracks={actions} onClose={() => setActions(null)} />
+      <FloatingPlayerSpacer />
     </ScrollView>
   );
 }

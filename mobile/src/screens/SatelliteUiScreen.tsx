@@ -15,6 +15,7 @@ import {
 import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
+import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const {palette, radii, space, type} = tokens;
 
@@ -430,6 +431,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
             <UiPageBlocks key={`${pageId}:${paramsKey}`} blocks={page.blocks} scope={scope} context={context} template={template} />
           </View>
         )}
+        <FloatingPlayerSpacer />
       </ScrollView>
       {toast && (
         <View pointerEvents="none" style={[styles.toast, toast.error && styles.toastError]} accessibilityLiveRegion="polite">

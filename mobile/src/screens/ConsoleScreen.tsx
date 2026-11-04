@@ -4,7 +4,8 @@ import {useAuth} from '../auth/AuthContext';
 import {Button} from '../components/Button';
 import {ScreenTitle} from '../components/ScreenTitle';
 import {Surface} from '../components/Surface';
-import {fonts, tokens, useAccent, useTopInset} from '../theme';
+import {fonts, tokens, useAccent, useTopInset} from '../theme';
+import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const {palette, radii, space, type} = tokens;
 
@@ -76,6 +77,8 @@ export function ConsoleScreen() {
         />
         <Button title="Run" onPress={run} disabled={running || !command.trim()} loading={running} />
       </View>
+      {/* the command line stays clear of the floating player */}
+      <FloatingPlayerSpacer />
     </KeyboardAvoidingView>
   );
 }

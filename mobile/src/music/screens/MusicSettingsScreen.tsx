@@ -9,6 +9,7 @@ import {tokens, TOUCH_TARGET, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import type {MusicPreferences} from '../types';
 import {useMusicNavigation} from '../ui/navigation';
+import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 const {palette, space, type} = tokens;
 
@@ -185,6 +186,7 @@ export function MusicSettingsScreen() {
           }
         />
       </Group>
+      <FloatingPlayerSpacer />
     </ScrollView>
   );
 }

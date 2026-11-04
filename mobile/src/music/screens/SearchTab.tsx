@@ -7,6 +7,7 @@ import {useMusicNavigation} from '../ui/navigation';
 import {Shelf} from '../ui/Shelf';
 import {TrackActions} from '../ui/TrackActions';
 import {TrackRow} from '../ui/TrackRow';
+import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 const QUALITIES = [
   {key: '', label: 'Any quality'},
@@ -138,6 +139,7 @@ export function SearchTab() {
         </>
       )}
       <TrackActions tracks={actions} onClose={() => setActions(null)} />
+      <FloatingPlayerSpacer />
     </ScrollView>
   );
 }

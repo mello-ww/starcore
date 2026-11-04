@@ -6,6 +6,7 @@ import {colors, radius, spacing, typography, useAccentStyles} from '../theme';
 import {PhotoThumbnail} from './PhotoThumbnail';
 import type {AlbumSummary} from './types';
 import {usePhotoApi} from './usePhotoApi';
+import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 interface Props {
   onOpenAlbum: (album: AlbumSummary) => void;
@@ -179,6 +180,7 @@ export function PhotoAlbumsTab({onOpenAlbum, onOpenTrash}: Props) {
           </Card>
         </Pressable>
       </Section>
+      <FloatingPlayerSpacer />
     </ScrollView>
   );
 }
