@@ -7,7 +7,7 @@ import {configureBackgroundFetch, runBackgroundSync} from './backgroundSyncTask'
 import {requestMediaLibraryPermission} from './mediaPermission';
 import {getSyncState, setSyncEnabled, setWifiOnly} from './syncState';
 import type {ConfigurationSetting, SourcePathMapping} from './types';
-import {usePhotoApi} from './usePhotoApi';
+import {usePhotoApi} from './usePhotoApi';
 import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 /** Whether Photo describes this setting as advanced (shown in Developer Mode only). */

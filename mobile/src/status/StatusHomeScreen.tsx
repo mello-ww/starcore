@@ -11,7 +11,7 @@ import {HardwareSection} from './sections/HardwareSection';
 import {HistorySection} from './sections/HistorySection';
 import {NetworkSection} from './sections/NetworkSection';
 import {OverviewSection} from './sections/OverviewSection';
-import {ServicesSection} from './sections/ServicesSection';
+import {ServicesSection} from './sections/ServicesSection';
 import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const {palette, radii, space, type} = tokens;

@@ -11,7 +11,7 @@ import {Shelf} from '../ui/Shelf';
 import {TrackActions} from '../ui/TrackActions';
 import {TrackRow} from '../ui/TrackRow';
 import {useLoad} from '../ui/useLoad';
-import {CollectionHeader} from './CollectionHeader';
+import {CollectionHeader} from './CollectionHeader';
 import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'MusicAlbum'>;

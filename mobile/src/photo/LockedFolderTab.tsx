@@ -26,7 +26,7 @@ import {useLockedFolder} from '../lockedFolder/useLockedFolder';
 import {durationLabel} from './duration';
 import {deviceInfo} from '../platform/device';
 import {privacy} from '../platform/privacy';
-import {colors, spacing, tokens, typography, useAccentStyles, useTopInset} from '../theme';
+import {colors, spacing, tokens, typography, useAccentStyles, useTopInset} from '../theme';
 import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const COLUMNS = 3;

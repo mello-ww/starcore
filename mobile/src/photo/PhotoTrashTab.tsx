@@ -3,7 +3,7 @@ import {Alert, Dimensions, FlatList, Image, Pressable, StyleSheet, Text, View} f
 import {colors, radius, spacing, typography} from '../theme';
 import {durationLabel} from './duration';
 import type {Photo} from './types';
-import {usePhotoApi} from './usePhotoApi';
+import {usePhotoApi} from './usePhotoApi';
 import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const COLUMNS = 3;

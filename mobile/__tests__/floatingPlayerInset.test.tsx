@@ -3,7 +3,7 @@ import renderer, {act} from 'react-test-renderer';
 import {FloatingPlayerInsetProvider, FloatingPlayerSpacer} from '../src/components/FloatingPlayerInset';
 
 function render(value: number) {
-  let tree: renderer.ReactTestRenderer | undefined;
+  let tree: ReturnType<typeof renderer.create> | undefined;
   act(() => {
     tree = renderer.create(
       <FloatingPlayerInsetProvider value={value}>

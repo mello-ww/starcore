@@ -4,7 +4,7 @@ import {useAuth} from '../auth/AuthContext';
 import {Button} from '../components/Button';
 import {ScreenTitle} from '../components/ScreenTitle';
 import {Surface} from '../components/Surface';
-import {fonts, tokens, useTopInset} from '../theme';
+import {fonts, tokens, useTopInset} from '../theme';
 import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const {palette, radii, space, type} = tokens;
