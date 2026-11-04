@@ -10,7 +10,7 @@ import {useMusic} from '../MusicProvider';
 import type {MusicPreferences} from '../types';
 import {useMusicNavigation} from '../ui/navigation';
 
-const {palette, radii, space, type} = tokens;
+const {palette, space, type} = tokens;
 
 type Option = {value: string; label: string};
 
@@ -210,9 +210,7 @@ const styles = StyleSheet.create({
   option: {
     minHeight: 36,
     paddingHorizontal: space.md,
-    borderRadius: radii.control,
-    borderWidth: 1,
-    borderColor: palette.controlStrong,
+    borderRadius: 999,
     backgroundColor: palette.control,
     justifyContent: 'center',
   },

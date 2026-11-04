@@ -1,6 +1,6 @@
 import React from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {colors, radius, spacing, typography, useAccentStyles} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic, usePlayerState} from '../MusicProvider';
 import {bytes} from '../ui/format';
 
@@ -97,7 +97,7 @@ export function InfoPanel() {
 const styles = StyleSheet.create({
   heading: {marginTop: spacing.lg},
   options: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginVertical: spacing.sm},
-  option: {paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.lineBright},
+  option: {paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.raised},
   optionLabelActive: {color: colors.onSelected, fontWeight: '700'},
   optionLabel: {color: colors.text, fontSize: 13},
   line: {paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line},

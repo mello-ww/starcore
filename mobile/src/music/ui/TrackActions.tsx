@@ -158,8 +158,8 @@ const styles = StyleSheet.create({
   sheet: {backgroundColor: colors.surface, padding: spacing.lg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg},
   item: {minHeight: TOUCH_TARGET, justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line},
   createRow: {flexDirection: 'row', gap: spacing.sm, marginVertical: spacing.md},
-  input: {flex: 1, minHeight: TOUCH_TARGET, color: colors.text, backgroundColor: colors.raised, borderRadius: radius.md, paddingHorizontal: spacing.md},
-  createButton: {borderRadius: radius.md, paddingHorizontal: spacing.md, minHeight: TOUCH_TARGET, justifyContent: 'center'},
+  input: {flex: 1, minHeight: TOUCH_TARGET, color: colors.text, backgroundColor: colors.raised, borderRadius: 999, paddingHorizontal: spacing.md},
+  createButton: {borderRadius: 999, paddingHorizontal: spacing.md, minHeight: TOUCH_TARGET, justifyContent: 'center'},
   createLabel: {color: colors.onAccent, fontWeight: '700'},
   list: {maxHeight: 320},
 });

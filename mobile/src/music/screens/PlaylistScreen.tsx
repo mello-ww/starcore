@@ -2,7 +2,7 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useState} from 'react';
 import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import type {SatellitesStackParamList} from '../../navigation/MainTabs';
-import {colors, radius, spacing, typography, useAccentStyles} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import type {Track} from '../types';
 import {longDuration} from '../ui/format';
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   loading: {marginTop: spacing.xl},
   error: {color: colors.alert, padding: spacing.md},
   editor: {gap: spacing.sm, marginBottom: spacing.md},
-  input: {backgroundColor: colors.raised, color: colors.text, borderRadius: radius.md, paddingHorizontal: spacing.md},
+  input: {backgroundColor: colors.raised, color: colors.text, borderRadius: 999, paddingHorizontal: spacing.md},
   editorButtons: {flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.lg},
   link: {fontSize: 15},
   entry: {flexDirection: 'row', alignItems: 'center'},

@@ -1,6 +1,6 @@
 import React, {useMemo, useState} from 'react';
 import {Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
-import {colors, radius, spacing, typography, useAccentStyles} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import type {Album, Artist, Playlist} from '../types';
 import {Artwork, Mosaic} from '../ui/Artwork';
@@ -118,12 +118,12 @@ export function LibraryTab() {
 const styles = StyleSheet.create({
   screen: {flex: 1},
   filters: {flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.md},
-  chip: {paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.lineBright},
+  chip: {paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.raised},
   chipLabelActive: {color: colors.onSelected, fontWeight: '700'},
   chipLabel: {color: colors.text, fontSize: 13},
   tools: {flexDirection: 'row', gap: spacing.sm, padding: spacing.md},
-  input: {flex: 1, backgroundColor: colors.raised, color: colors.text, borderRadius: radius.md, paddingHorizontal: spacing.md},
-  add: {width: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.raised, borderRadius: radius.md},
+  input: {flex: 1, backgroundColor: colors.raised, color: colors.text, borderRadius: 999, paddingHorizontal: spacing.md},
+  add: {width: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.raised, borderRadius: 999},
   addLabel: {color: colors.text, fontSize: 22},
   list: {paddingHorizontal: spacing.md, paddingBottom: 120},
   row: {flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm},

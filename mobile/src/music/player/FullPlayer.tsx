@@ -2,7 +2,7 @@ import React, {useMemo, useState} from 'react';
 import {ActivityIndicator, Modal, PanResponder, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ModalSafeArea} from '../../components/ModalSafeArea';
-import {colors, spacing, touchTarget, typography, useAccentStyles} from '../../theme';
+import {colors, spacing, touchTarget, typography, useAccent, useAccentStyles} from '../../theme';
 import {useMusic, usePlayerState} from '../MusicProvider';
 import {Artwork} from '../ui/Artwork';
 import {useMusicNavigation} from '../ui/navigation';
@@ -34,6 +34,9 @@ export function FullPlayer() {
 
 function PlayerBody() {
   const accentStyle = useAccentStyles();
+  const {color: accent, onColor} = useAccent();
+  // an active toggle: a soft accent pill behind the accent glyph
+  const tint = {backgroundColor: `${accent}29`};
   const {player, setFullPlayer, liked, setLiked} = useMusic();
   const state = usePlayerState();
   const go = useMusicNavigation();
@@ -110,24 +113,27 @@ function PlayerBody() {
         <SeekBar position={position} duration={duration} onSeek={seconds => player.seek(seconds)} />
 
         <View style={styles.controls}>
-          <Pressable onPress={() => player.setShuffle(!state.queue.shuffle)} style={styles.touch} accessibilityRole="button" accessibilityLabel="Shuffle">
+          <Pressable onPress={() => player.setShuffle(!state.queue.shuffle)} style={[styles.toggle, state.queue.shuffle && tint]} accessibilityRole="button" accessibilityLabel="Shuffle">
             <Text style={[styles.small, state.queue.shuffle && accentStyle.text]}>⇄</Text>
           </Pressable>
           <Pressable onPress={() => player.previous()} style={styles.touch} accessibilityRole="button" accessibilityLabel="Previous"><Text style={styles.big}>⏮</Text></Pressable>
-          <Pressable onPress={() => player.toggle()} style={styles.play} accessibilityLabel={playing ? 'Pause' : 'Play'}>
-            {state.buffering && state.playing && !remote ? <ActivityIndicator color={colors.void} /> :
-              <Text style={styles.playGlyph}>{playing ? '❚❚' : '▶'}</Text>}
+          <Pressable onPress={() => player.toggle()} style={[styles.play, {backgroundColor: accent}]} accessibilityLabel={playing ? 'Pause' : 'Play'}>
+            {state.buffering && state.playing && !remote ? <ActivityIndicator color={onColor} /> :
+              <Text style={[styles.playGlyph, {color: onColor}]}>{playing ? '❚❚' : '▶'}</Text>}
           </Pressable>
           <Pressable onPress={() => player.next()} style={styles.touch} accessibilityRole="button" accessibilityLabel="Next"><Text style={styles.big}>⏭</Text></Pressable>
-          <Pressable onPress={() => player.cycleRepeat()} style={styles.touch} accessibilityRole="button" accessibilityLabel={`Repeat ${state.queue.repeat}`}>
+          <Pressable onPress={() => player.cycleRepeat()} style={[styles.toggle, state.queue.repeat !== 'off' && tint]} accessibilityRole="button" accessibilityLabel={`Repeat ${state.queue.repeat}`}>
             <Text style={[styles.small, state.queue.repeat !== 'off' && accentStyle.text]}>{state.queue.repeat === 'one' ? '↻1' : '↻'}</Text>
           </Pressable>
         </View>
 
         <View style={styles.tabs}>
           {(['lyrics', 'queue', 'devices', 'info'] as Panel[]).map(name => (
-            <Pressable key={name} onPress={() => setPanel(panel === name ? 'artwork' : name)} style={styles.tabTouch} accessibilityRole="tab">
-              <Text style={[styles.tab, panel === name && accentStyle.text]}>{name === 'devices' ? 'Devices' : name[0].toUpperCase() + name.slice(1)}</Text>
+            <Pressable key={name} onPress={() => setPanel(panel === name ? 'artwork' : name)} style={styles.tabTouch} accessibilityRole="tab"
+              accessibilityState={{selected: panel === name}}>
+              <View style={[styles.tabPill, panel === name && {backgroundColor: accent}]}>
+              <Text style={[styles.tab, panel === name && {color: onColor, fontWeight: '700'}]}>{name === 'devices' ? 'Devices' : name[0].toUpperCase() + name.slice(1)}</Text>
+              </View>
             </Pressable>
           ))}
         </View>
@@ -141,7 +147,9 @@ const styles = StyleSheet.create({
   screen: {flex: 1, backgroundColor: colors.deep, paddingHorizontal: spacing.lg},
   top: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
   touch: touchTarget,
-  tabTouch: {minHeight: 48, minWidth: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm},
+  toggle: {...touchTarget, borderRadius: 24, alignItems: 'center', justifyContent: 'center'},
+  tabPill: {minHeight: 34, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.raised, alignItems: 'center', justifyContent: 'center'},
+  tabTouch: {minHeight: 48, minWidth: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs},
   chevron: {color: colors.text, fontSize: 26},
   middle: {flex: 1, marginBottom: spacing.md},
   artwork: {flex: 1, alignItems: 'center', justifyContent: 'center'},
@@ -154,7 +162,7 @@ const styles = StyleSheet.create({
   small: {color: colors.textDim, fontSize: 22},
   big: {color: colors.text, fontSize: 30},
   play: {width: 68, height: 68, borderRadius: 34, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center'},
-  playGlyph: {color: colors.void, fontSize: 24},
+  playGlyph: {fontSize: 24},
   tabs: {flexDirection: 'row', justifyContent: 'space-around'},
-  tab: {color: colors.textDim, fontSize: 14},
+  tab: {color: colors.textDim, fontSize: 14, fontWeight: '600'},
 });

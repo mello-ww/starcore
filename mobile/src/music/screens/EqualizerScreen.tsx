@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {StarSwitch} from '../../components/StarSwitch';
-import {colors, radius, spacing, typography, useAccentStyles} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import {audioEffects} from '../native';
 import type {Equalizer} from '../types';
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   content: {padding: spacing.md, paddingBottom: 120, backgroundColor: colors.void, gap: spacing.md},
   row: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
   presets: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs},
-  preset: {paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.lineBright},
+  preset: {paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.raised},
   presetLabelActive: {color: colors.onSelected, fontWeight: '700'},
   presetLabel: {color: colors.text, fontSize: 13, textTransform: 'capitalize'},
   bands: {flexDirection: 'row', justifyContent: 'space-between'},

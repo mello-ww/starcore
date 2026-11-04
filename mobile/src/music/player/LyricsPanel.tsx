@@ -60,14 +60,15 @@ export function LyricsPanel({trackId}: {trackId: string}) {
       <View style={styles.tools}>
         {lyrics.synced && (
           <>
-            <Pressable onPress={() => nudge(-250)} hitSlop={6}><Text style={accentStyle.text}>−0.25s</Text></Pressable>
+            <Pressable onPress={() => nudge(-250)} hitSlop={6} style={styles.pill}><Text style={accentStyle.text}>−0.25s</Text></Pressable>
             <Text style={typography.label}>{offset > 0 ? '+' : ''}{(offset / 1000).toFixed(2)}s</Text>
-            <Pressable onPress={() => nudge(250)} hitSlop={6}><Text style={accentStyle.text}>+0.25s</Text></Pressable>
+            <Pressable onPress={() => nudge(250)} hitSlop={6} style={styles.pill}><Text style={accentStyle.text}>+0.25s</Text></Pressable>
           </>
         )}
         {lyrics.languages.map(code => (
-          <Pressable key={code} onPress={() => setLanguage(code)}>
-            <Text style={[accentStyle.text, (lyrics.language === code) && styles.current]}>{code}</Text>
+          <Pressable key={code} onPress={() => setLanguage(code)} style={[styles.pill, lyrics.language === code && accentStyle.fill]}
+            accessibilityState={{selected: lyrics.language === code}}>
+            <Text style={lyrics.language === code ? [styles.current, accentStyle.onFill] : styles.idle}>{code}</Text>
           </Pressable>
         ))}
       </View>
@@ -103,7 +104,9 @@ export function LyricsPanel({trackId}: {trackId: string}) {
 const styles = StyleSheet.create({
   panel: {flex: 1},
   message: {padding: spacing.lg, textAlign: 'center'},
-  tools: {flexDirection: 'row', gap: spacing.md, alignItems: 'center', paddingBottom: spacing.sm},
+  tools: {flexDirection: 'row', gap: spacing.sm, alignItems: 'center', paddingBottom: spacing.sm},
+  pill: {paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.raised},
+  idle: {color: colors.textDim, fontWeight: '600'},
   current: {fontWeight: '700'},
   scroll: {flex: 1},
   line: {minHeight: LINE_HEIGHT, justifyContent: 'center'},

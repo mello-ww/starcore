@@ -15,7 +15,7 @@ export function QueuePanel() {
       <View style={styles.header}>
         <Text style={typography.heading}>Next up · {next.length}</Text>
         {next.length > 0 && (
-          <Pressable onPress={() => player.clearUpcoming()} hitSlop={8}><Text style={accentStyle.text}>Clear</Text></Pressable>
+          <Pressable onPress={() => player.clearUpcoming()} hitSlop={8} style={styles.pill}><Text style={accentStyle.text}>Clear</Text></Pressable>
         )}
       </View>
       <FlatList
@@ -46,6 +46,7 @@ export function QueuePanel() {
 }
 
 const styles = StyleSheet.create({
+  pill: {paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.raised},
   panel: {flex: 1},
   header: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm},
   row: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},

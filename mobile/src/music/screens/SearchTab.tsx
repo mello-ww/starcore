@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
-import {colors, radius, spacing, typography, useAccentStyles} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
 import type {SearchResult, Track} from '../types';
 import {useMusicNavigation} from '../ui/navigation';
@@ -144,10 +144,10 @@ export function SearchTab() {
 
 const styles = StyleSheet.create({
   content: {padding: spacing.md, paddingBottom: 120},
-  input: {backgroundColor: colors.raised, color: colors.text, borderRadius: radius.md, paddingHorizontal: spacing.md,
+  input: {backgroundColor: colors.raised, color: colors.text, borderRadius: 999, paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm, fontSize: 16},
   filters: {flexDirection: 'row', gap: spacing.sm, marginVertical: spacing.md},
-  chip: {paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.lineBright},
+  chip: {paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.raised},
   chipLabelActive: {color: colors.onSelected, fontWeight: '700'},
   chipLabel: {color: colors.text, fontSize: 13},
   row: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},

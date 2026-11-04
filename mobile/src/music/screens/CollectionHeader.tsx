@@ -1,6 +1,6 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {colors, radius, spacing, typography, useAccentStyles} from '../../theme';
+import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {Artwork, Mosaic} from '../ui/Artwork';
 
 interface Props {
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   header: {alignItems: 'center', paddingVertical: spacing.lg, gap: spacing.xs},
   title: {textAlign: 'center', marginTop: spacing.md},
   buttons: {flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.md},
-  button: {paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.lineBright},
+  button: {paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: colors.raised},
   primaryLabel: {color: colors.onAccent, fontWeight: '700'},
   label: {color: colors.text, fontWeight: '600'},
 });

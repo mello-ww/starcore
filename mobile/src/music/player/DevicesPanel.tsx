@@ -56,7 +56,7 @@ export function DevicesPanel() {
         const current = state.remote ? state.remote.device === device.id : device.id === deviceId;
         return (
           <Pressable key={device.id} onPress={() => select(device)} disabled={!device.online && device.id !== deviceId}
-            style={[styles.device, !device.online && styles.offline]}>
+            style={[styles.device, current && {backgroundColor: `${accentStyle.text.color}1f`}, !device.online && styles.offline]}>
             <Text style={styles.icon}>{device.kind === 'web' ? '🖥' : device.kind === 'mobile' ? '📱' : '🔊'}</Text>
             <View style={styles.text}>
               <Text style={[typography.body, current && [styles.current, accentStyle.text]]}>
@@ -79,7 +79,8 @@ export function DevicesPanel() {
 
 const styles = StyleSheet.create({
   error: {color: colors.alert, marginVertical: spacing.sm},
-  device: {flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md},
+  device: {flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.md,
+    marginBottom: spacing.xs, borderRadius: 16, backgroundColor: colors.raised},
   offline: {opacity: 0.5},
   icon: {fontSize: 22},
   text: {flex: 1},
