@@ -1,21 +1,22 @@
 /* the persistent bar, side drawers and the full-screen player */
 
+/* a floating bubble, clear of the window's edges */
 .mu-bar {
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: var(--mu-bar-inset);
+    right: var(--mu-bar-inset);
+    bottom: var(--mu-bar-inset);
     z-index: 900;
     display: grid;
     grid-template-columns: minmax(180px, 1fr) minmax(320px, 1.6fr) minmax(180px, 1fr);
     align-items: center;
     gap: 1rem;
     height: var(--mu-bar-height);
-    padding: 0 1rem;
-    border-top: 1px solid var(--mu-line);
+    padding: 0 0.9rem 0 0.7rem;
+    border: 1px solid var(--mu-line);
+    border-radius: 24px;
     background: var(--mu-surface);
-    backdrop-filter: blur(12px);
-    animation: mu-rise 200ms ease both;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 
 .mu-bar[hidden] {
@@ -152,7 +153,118 @@
 }
 
 .mu-bar-tools .on {
+    background: color-mix(in srgb, var(--mu-accent) 16%, transparent);
     color: var(--mu-accent);
+}
+
+.mu-transport .mu-toggle.on {
+    background: color-mix(in srgb, var(--mu-player-accent) 16%, transparent);
+}
+
+.mu-retract {
+    margin-left: 0.25rem;
+    background: var(--mu-raised);
+}
+
+/* ---------- the now-playing disc ---------- */
+
+.mu-now-disc {
+    position: relative;
+    flex: none;
+    /* the size of Mission Control's top-bar buttons */
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--mu-raised);
+    cursor: pointer;
+    transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+}
+
+.mu-now-disc[hidden] {
+    display: none;
+}
+
+.mu-now-disc:hover {
+    transform: scale(1.06);
+}
+
+.mu-now-disc-art {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: 50%;
+    animation: mu-spin 6s linear infinite;
+    animation-play-state: paused;
+}
+
+.mu-now-disc-art .mu-art {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+}
+
+.mu-now-disc.spinning .mu-now-disc-art {
+    animation-play-state: running;
+}
+
+/* the spindle hole, with a hairline groove: the one nod to a record */
+.mu-now-disc-hole {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    background: var(--sc-bg, #101114);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.14);
+}
+
+/* open: the cover is down in the bar, the disc keeps an accent ring to put it away again */
+.mu-now-disc.open {
+    box-shadow: 0 0 0 2px var(--mu-accent);
+}
+
+.mu-now-disc.open .mu-now-disc-art {
+    opacity: 0.55;
+}
+
+.mu-now-disc.landing .mu-now-disc-art {
+    opacity: 0;
+}
+
+.mu-now-disc-floating {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 950;
+}
+
+.mu-now-disc-ghost {
+    position: fixed;
+    z-index: 1000;
+    overflow: hidden;
+    pointer-events: none;
+    transform-origin: 0 0;
+    will-change: transform;
+}
+
+.mu-now-disc-ghost .mu-art {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+}
+
+@keyframes mu-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mu-now-disc-art {
+        animation: none;
+    }
 }
 
 .mu-volume {
@@ -165,7 +277,7 @@
 .mu-drawer {
     position: fixed;
     right: 12px;
-    bottom: calc(var(--mu-bar-height) + 10px);
+    bottom: calc(var(--mu-bar-height) + var(--mu-bar-inset) * 2);
     z-index: 950;
     width: min(380px, calc(100vw - 24px));
     max-height: min(70vh, 620px);

@@ -14,6 +14,27 @@ import { seekBar } from "./seek.js";
 
 let bar = null;
 
+// The bar can be put away: it then lives in the top bar as the playing cover, a spinning disc.
+const COLLAPSED_KEY = "starcore.music.playerCollapsed";
+
+function readCollapsed() {
+    try {
+        return localStorage.getItem(COLLAPSED_KEY) === "1";
+    } catch {
+        return false;
+    }
+}
+
+function writeCollapsed(value) {
+    try {
+        localStorage.setItem(COLLAPSED_KEY, value ? "1" : "0");
+    } catch {
+        // a private window: the choice lasts for this page only
+    }
+}
+
+const reducedMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 export function sleepMenu(anchor) {
     const instance = player();
     const sleeping = instance.sleep;
@@ -156,18 +177,119 @@ export function mountBar() {
         }
     });
     const expand = iconButton("expand", "Full-screen player", () => openFullscreen());
-    tools.append(lyrics, queue, devices, sleep, volumeControl(), more, expand);
+    const retract = iconButton("retract", "Put the player away", () => setCollapsed(true), "mu-icon-button mu-retract");
+    tools.append(lyrics, queue, devices, sleep, volumeControl(), more, expand, retract);
     element.append(now, center, tools);
     document.body.appendChild(element);
     bar = { element, drawer: null };
 
+    // the disc: in Mission Control's top bar when it offers a slot, else floating at the top right
+    const disc = el("button", "mu-now-disc");
+    disc.type = "button";
+    disc.hidden = true;
+    const discArt = el("span", "mu-now-disc-art");
+    disc.append(discArt, el("span", "mu-now-disc-hole"));
+    disc.addEventListener("click", () => setCollapsed(!collapsed));
+    register(disc);
+    const slot = document.getElementById("topbar-extras");
+    if (slot) {
+        slot.append(disc);
+    } else {
+        disc.classList.add("mu-now-disc-floating");
+        document.body.appendChild(disc);
+    }
+
+    let collapsed = readCollapsed();
+    let visible = false;
+    let flying = null;
+
+    function layout() {
+        element.hidden = !visible || collapsed;
+        document.body.classList.toggle("mu-has-bar", visible && !collapsed);
+        disc.hidden = !visible;
+        disc.classList.toggle("open", !collapsed);
+        disc.setAttribute("aria-expanded", String(!collapsed));
+        disc.setAttribute("aria-label", collapsed ? "Show the player" : "Put the player away");
+        disc.title = collapsed ? "Show the player" : "Put the player away";
+    }
+
+    // The cover travels between the disc and the bar: down and larger as the bar rises, back up
+    // and spinning as it sinks. Without motion (or a cover), the bar simply appears or goes.
+    function setCollapsed(value) {
+        if (value === collapsed) {
+            return;
+        }
+        if (flying) {
+            flying.forEach((animation) => animation.finish());
+        }
+        const from = disc.getBoundingClientRect();
+        collapsed = value;
+        writeCollapsed(value);
+        if (value && drawerOpen()) {
+            drawer(bar.drawer.kind);
+        }
+        if (reducedMotion() || !visible || !from.width || !art.firstChild) {
+            layout();
+            return;
+        }
+        if (value) {
+            const target = art.getBoundingClientRect();
+            const sink = element.animate([{ transform: "none", opacity: 1 }, { transform: "translateY(calc(100% + 24px))", opacity: 0 }],
+                { duration: 280, easing: "cubic-bezier(.4,0,.6,1)" });
+            const ghost = flight(target, from, true);
+            flying = [sink, ghost];
+            sink.onfinish = () => {
+                layout();
+                flying = null;
+            };
+        } else {
+            layout();
+            const target = art.getBoundingClientRect();
+            const rise = element.animate([{ transform: "translateY(calc(100% + 24px))", opacity: 0 }, { transform: "none", opacity: 1 }],
+                { duration: 380, delay: 60, easing: "cubic-bezier(.2,.8,.2,1)", fill: "backwards" });
+            const ghost = flight(from, target, false);
+            flying = [rise, ghost];
+            rise.onfinish = () => {
+                flying = null;
+            };
+        }
+    }
+
+    function drawerOpen() {
+        return Boolean(bar.drawer);
+    }
+
+    // a copy of the cover flown from one rectangle to another; the real ones wait, hidden
+    function flight(from, to, toDisc) {
+        const ghost = el("div", "mu-now-disc-ghost");
+        ghost.append(art.firstChild.cloneNode(true));
+        Object.assign(ghost.style, { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` });
+        document.body.appendChild(ghost);
+        const dx = to.left - from.left;
+        const dy = to.top - from.top;
+        const scale = to.width / from.width;
+        art.style.visibility = "hidden";
+        disc.classList.add("landing");
+        const animation = ghost.animate([
+            { transform: "none", borderRadius: toDisc ? "14px" : "50%" },
+            { transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotate(${toDisc ? 360 : -360}deg)`, borderRadius: toDisc ? "50%" : "14px" },
+        ], { duration: toDisc ? 420 : 520, easing: "cubic-bezier(.2,.8,.2,1)", fill: "forwards" });
+        animation.onfinish = () => {
+            ghost.remove();
+            art.style.visibility = "";
+            disc.classList.remove("landing");
+        };
+        return animation;
+    }
+
     function update() {
         const instance = player();
         const track = instance.remote ? instance.remote.track : instance.engine.track || instance.current;
-        const visible = Boolean(track) || Boolean(instance.remote);
-        element.hidden = !visible;
-        document.body.classList.toggle("mu-has-bar", visible);
+        visible = Boolean(track) || Boolean(instance.remote);
+        layout();
+        disc.classList.toggle("spinning", Boolean(instance.playing));
         if (!track) {
+            discArt.replaceChildren();
             title.textContent = instance.remote ? `Connected to ${instance.remote.device.name}` : "";
             subtitle.textContent = "";
             art.replaceChildren();
@@ -177,6 +299,7 @@ export function mountBar() {
         if (art.dataset.album !== track.album_id) {
             art.dataset.album = track.album_id || "";
             art.replaceChildren(artwork(track.album_id, 96, "mu-art"));
+            discArt.replaceChildren(artwork(track.album_id, 96, "mu-art"));
             followArtwork(track.album_id);
         }
         title.textContent = track.title || "";
@@ -218,7 +341,7 @@ export function mountBar() {
         sleep.classList.toggle("on", Boolean(instance.sleep));
     }
 
-    for (const name of ["track", "queue", "remote"]) {
+    for (const name of ["track", "queue", "remote", "state"]) {
         player().on(name, update);
     }
     for (const name of ["state", "blocked", "sleep", "remote", "track"]) {
