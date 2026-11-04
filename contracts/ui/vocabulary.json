@@ -1,0 +1,51 @@
+{
+  "contract": "starcore.ui",
+  "version": "1.0",
+  "description": "The closed vocabulary of StarCore UI contract v1.0 - see docs/ui-contract.md. The Engine (engine/starcore/ui_contract.py), Mission Control (mission_control/ui/contract.js) and the Android app (mobile/src/satellites/ui/contract.ts) each test that they implement exactly this list.",
+  "blocks": {
+    "heading": {"required": ["text"], "optional": []},
+    "text": {"required": ["text"], "optional": ["style"]},
+    "field": {"required": ["label", "value"], "optional": ["format", "unit", "tone"]},
+    "metric": {"required": ["label", "value"], "optional": ["format", "unit", "max", "tone"]},
+    "card": {"required": ["blocks"], "optional": ["title"]},
+    "list": {"required": ["items", "item"], "optional": ["empty", "action"]},
+    "button": {"required": ["label", "action"], "optional": ["style"]},
+    "toggle": {"required": ["label", "value", "action"], "optional": ["description"]},
+    "slider": {"required": ["label", "value", "min", "max", "action"], "optional": ["step", "format", "unit"]},
+    "form": {"required": ["fields", "submit"], "optional": []},
+    "file-browser": {"required": ["capability"], "optional": ["select", "action", "label"]}
+  },
+  "common_block_keys": ["type", "id", "visible", "required", "developer"],
+  "text_styles": ["body", "caption", "mono"],
+  "button_styles": ["primary", "secondary", "danger"],
+  "tones": ["neutral", "ok", "warn", "danger"],
+  "formats": ["text", "number", "integer", "percent", "bytes", "duration"],
+  "form_field_kinds": ["text", "number", "select", "toggle"],
+  "file_browser_select": ["none", "directory", "file"],
+  "action_then": ["refresh", "back"],
+  "methods": ["GET", "POST"],
+  "icons": [
+    "activity", "box", "camera", "check", "circle", "clock", "cpu", "file", "file-text",
+    "folder", "grid", "hard-drive", "home", "image", "info", "layers", "list", "lock",
+    "music", "plus", "settings", "sliders", "star", "zap"
+  ],
+  "satellite_capabilities": {
+    "files.browse": {
+      "versions": [1],
+      "operations": {
+        "list": "GET ?path=<absolute path, or empty for the roots> -> {path, parent, entries: [{name, type: dir|file, size, modified}]}; at the roots an entry's name is itself an absolute path"
+      }
+    }
+  },
+  "client_capabilities": {
+    "_note": "Device features a client may offer a document beyond rendering blocks. Reserved names only in 1.0: no 1.0 block uses one, so neither client claims any yet, and a document that requires one is shown as needing a newer app.",
+    "reserved": ["device.biometrics", "device.background-tasks", "media.audio-playback", "secure.screen"]
+  },
+  "limits": {
+    "document_bytes": 262144,
+    "pages": 32,
+    "blocks_per_page": 200,
+    "nesting_depth": 4,
+    "min_refresh_seconds": 2
+  }
+}

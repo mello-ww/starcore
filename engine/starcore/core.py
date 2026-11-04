@@ -91,6 +91,9 @@ class StarCore:
         # set only while the one-shot CLI may reach this process - see
         # starcore/cli/bridge.py; never handed to a web or mobile client
         self.control_token = None
+        # Satellite folders rediscover() found on disk that aren't loaded -
+        # new code is only ever loaded at startup (or by reload_satellite)
+        self.pending_satellites = []
         self._loaded = False
         https_cert = server_config.get("https_cert", "")
         https_key = server_config.get("https_key", "")
@@ -284,6 +287,68 @@ class StarCore:
                 error = f"reloaded but could not start: {message}"
 
         return {"satellite": reloaded, "error": error}
+
+    def rediscover(self) -> dict:
+        """Refreshes Satellite *metadata* from disk; never loads or reloads code.
+
+        For every loaded Satellite, re-reads its ui.json and the presentational
+        parts of its satellite.toml (icon_name, provides) - plain files, so
+        this is safe while everything keeps running. Anything that would need
+        new code is only reported:
+
+        - "pending": a Satellite folder on disk that isn't loaded yet. Loading
+          it means importing its Python, which happens at the next restart -
+          rediscovery never hot-loads code.
+        - "reload_required": a loaded Satellite whose name or version changed
+          on disk - its code has changed too, so only reload_satellite (an
+          explicit, per-Satellite action) or a restart applies it.
+        - "missing": a loaded Satellite whose folder or manifest is gone. It
+          keeps running as it is until StarCore restarts.
+        """
+        updated, reload_required, missing, errors = [], [], [], []
+        loaded_paths = set()
+
+        for satellite in self.registry.all():
+            name = satellite.manifest.name
+            loaded_paths.add(satellite.path.resolve())
+            if not (satellite.path / "satellite.toml").is_file():
+                missing.append(name)
+                continue
+            try:
+                manifest, ui = self.loader.read_metadata(satellite.path)
+            except SatelliteLoadError as error:
+                errors.append({"satellite": name, "error": str(error)})
+                continue
+            if manifest.name != name or manifest.version != satellite.manifest.version:
+                reload_required.append(name)
+                continue
+            before = (satellite.manifest.icon_name, satellite.manifest.provides,
+                      satellite.ui.revision if satellite.ui else None, satellite.ui.error if satellite.ui else None)
+            satellite.manifest.icon_name = manifest.icon_name
+            satellite.manifest.provides = manifest.provides
+            satellite.ui = ui
+            after = (manifest.icon_name, manifest.provides, ui.revision if ui else None, ui.error if ui else None)
+            if before != after:
+                updated.append(name)
+
+        pending = []
+        for directory, satellite_type in ((self.native_path, "native"), (self.link_path, "link")):
+            if not directory.is_dir():
+                continue
+            for candidate in sorted(directory.iterdir()):
+                if not (candidate / "satellite.toml").is_file() or candidate.resolve() in loaded_paths:
+                    continue
+                try:
+                    manifest = self.loader.read_manifest(candidate)
+                except SatelliteLoadError as error:
+                    errors.append({"folder": candidate.name, "error": str(error)})
+                    continue
+                pending.append({"name": manifest.name, "type": satellite_type, "folder": candidate.name})
+        self.pending_satellites = pending
+
+        from .api.payloads import catalog_revision
+        return {"revision": catalog_revision(self), "updated": updated, "pending": pending,
+                "reload_required": reload_required, "missing": missing, "errors": errors}
 
     def health(self) -> dict:
         """The engine, Mission Control and every satellite as pass/fail checks -

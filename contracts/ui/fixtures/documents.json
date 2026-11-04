@@ -1,0 +1,100 @@
+{
+  "_about": "Whole documents. `valid` must load; each `invalid` entry must be refused by the Engine with an error mentioning `error`. Entries with \"client\": true must also be refused by both clients' own checks (contract compatibility and structure), since a client cannot assume every server validated what it sends.",
+  "valid": [
+    {
+      "name": "smallest",
+      "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": []}}}
+    },
+    {
+      "name": "newer-minor-with-unknown-block",
+      "_why": "A Satellite written for 1.4 still loads on an Engine and clients that know 1.0: blocks they don't know are skipped.",
+      "document": {"contract": "starcore.ui/1.4", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "heading", "text": "Hi"},
+        {"type": "chart", "series": "$.history"}
+      ]}}}
+    },
+    {
+      "name": "every-block",
+      "document": {
+        "contract": "starcore.ui/1.0",
+        "title": "Every block",
+        "requires": {"client": [], "capabilities": ["files.browse"]},
+        "entry": "home",
+        "navigation": [{"page": "home", "label": "Home", "icon": "home"}, {"page": "rows", "label": "Rows", "icon": "list"}],
+        "pages": {
+          "home": {
+            "title": "Home",
+            "source": {"route": "summary", "refresh": 5},
+            "blocks": [
+              {"type": "heading", "text": "$.name"},
+              {"type": "text", "text": "Caption", "style": "caption"},
+              {"type": "field", "label": "Count", "value": "$.count", "format": "integer", "tone": "$.tone"},
+              {"type": "metric", "label": "Level", "value": "$.level", "format": "percent", "max": 100},
+              {"type": "card", "title": "Controls", "blocks": [
+                {"type": "toggle", "label": "On", "value": "$.on", "action": {"route": "settings", "body": {"on": "$value"}, "then": "refresh"}},
+                {"type": "slider", "label": "Level", "value": "$.level", "min": 0, "max": 100, "step": 5, "unit": "%",
+                 "action": {"route": "settings", "body": {"level": "$value"}}},
+                {"type": "button", "label": "Reset", "style": "danger", "action": {"route": "reset", "confirm": "Reset?", "then": "refresh"}}
+              ]},
+              {"type": "form", "fields": [
+                {"key": "title", "label": "Title", "kind": "text", "required": true, "placeholder": "Name"},
+                {"key": "size", "label": "Size", "kind": "select", "options": [{"value": "s", "label": "Small"}, {"value": "l", "label": "Large"}]},
+                {"key": "n", "label": "N", "kind": "number"},
+                {"key": "flag", "label": "Flag", "kind": "toggle", "value": true}
+              ], "submit": {"label": "Add", "action": {"route": "rows", "body": {"title": "$form.title"}, "then": {"navigate": "row", "params": {"id": "$.id"}}}}},
+              {"type": "file-browser", "capability": "files.browse", "select": "directory", "label": "Pick a folder",
+               "action": {"route": "selection", "body": {"path": "$value"}, "then": "refresh"}},
+              {"type": "text", "text": "Shown in Developer Mode", "developer": true, "visible": "$.debug"}
+            ]
+          },
+          "rows": {
+            "title": "Rows",
+            "source": {"route": "rows"},
+            "blocks": [
+              {"type": "list", "items": "$.rows", "empty": "Nothing yet.",
+               "item": {"title": "$.title", "subtitle": "$.updated", "value": "$.size", "format": {"value": "bytes"}, "icon": "file"},
+               "action": {"navigate": "row", "params": {"id": "$.id"}}}
+            ]
+          },
+          "row": {
+            "title": "$.title",
+            "params": ["id"],
+            "source": {"route": "rows/{$params.id}"},
+            "blocks": [
+              {"type": "field", "label": "Id", "value": "$params.id"},
+              {"type": "button", "label": "Delete", "style": "danger", "action": {"route": "rows/{$params.id}/delete", "method": "POST", "confirm": "Delete?", "then": "back"}}
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "invalid": [
+    {"name": "not-an-object", "document": [], "error": "must be an object", "client": true},
+    {"name": "no-contract", "document": {"entry": "home", "pages": {"home": {"blocks": []}}}, "error": "contract", "client": true},
+    {"name": "other-major", "document": {"contract": "starcore.ui/2.0", "entry": "home", "pages": {"home": {"blocks": []}}}, "error": "contract", "client": true},
+    {"name": "malformed-contract", "document": {"contract": "starcore.ui/one", "entry": "home", "pages": {"home": {"blocks": []}}}, "error": "contract", "client": true},
+    {"name": "no-pages", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {}}, "error": "pages", "client": true},
+    {"name": "entry-missing", "document": {"contract": "starcore.ui/1.0", "entry": "nope", "pages": {"home": {"blocks": []}}}, "error": "entry", "client": true},
+    {"name": "entry-needs-params", "document": {"contract": "starcore.ui/1.0", "entry": "row", "pages": {"row": {"params": ["id"], "blocks": []}}}, "error": "entry"},
+    {"name": "bad-page-id", "document": {"contract": "starcore.ui/1.0", "entry": "Home Page", "pages": {"Home Page": {"blocks": []}}}, "error": "page id"},
+    {"name": "unknown-block-same-minor", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "chart"}]}}}, "error": "unknown block type"},
+    {"name": "missing-required-key", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "slider", "label": "x", "value": 1, "min": 0, "action": {"route": "a"}}]}}}, "error": "max"},
+    {"name": "unknown-key", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "heading", "text": "x", "colour": "red"}]}}}, "error": "colour"},
+    {"name": "absolute-route", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "Stop", "action": {"route": "/api/shutdown"}}]}}}, "error": "route"},
+    {"name": "parent-route", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "x", "action": {"route": "../Music/library"}}]}}}, "error": "route"},
+    {"name": "core-owned-route", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "x", "action": {"route": "disable"}}]}}}, "error": "route"},
+    {"name": "external-url", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"source": {"route": "https://evil.example/x"}, "blocks": []}}}, "error": "route"},
+    {"name": "navigate-unknown-page", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "x", "action": {"navigate": "ghost"}}]}}}, "error": "ghost"},
+    {"name": "navigation-unknown-page", "document": {"contract": "starcore.ui/1.0", "entry": "home", "navigation": [{"page": "ghost", "label": "Ghost"}], "pages": {"home": {"blocks": []}}}, "error": "ghost"},
+    {"name": "unknown-icon", "document": {"contract": "starcore.ui/1.0", "entry": "home", "navigation": [{"page": "home", "label": "Home", "icon": "rocket-ship"}], "pages": {"home": {"blocks": []}}}, "error": "icon"},
+    {"name": "bad-binding-root", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "heading", "text": "$secret.token"}]}}}, "error": "binding"},
+    {"name": "refresh-too-fast", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"source": {"route": "a", "refresh": 0.1}, "blocks": []}}}, "error": "refresh"},
+    {"name": "too-deep", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [
+      {"type": "card", "blocks": [{"type": "card", "blocks": [{"type": "card", "blocks": [{"type": "card", "blocks": [{"type": "card", "blocks": []}]}]}]}]}
+    ]}}}, "error": "nested"},
+    {"name": "bad-format", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "field", "label": "x", "value": 1, "format": "currency"}]}}}, "error": "format"},
+    {"name": "unknown-capability-block", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "file-browser", "capability": "media.gallery"}]}}}, "error": "capability"},
+    {"name": "select-without-options", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "form", "fields": [{"key": "a", "label": "A", "kind": "select"}], "submit": {"label": "Go", "action": {"route": "a"}}}]}}}, "error": "options"}
+  ]
+}

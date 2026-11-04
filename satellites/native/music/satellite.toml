@@ -3,3 +3,5 @@ version = "1.0.0"
 author = "mellow"
 description = "Local music library satellite."
 icon = "icon.svg"
+# from the shared icon set every client can draw (contracts/ui/vocabulary.json)
+icon_name = "music"

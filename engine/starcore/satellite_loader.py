@@ -6,6 +6,7 @@ from .satellite_registry import SatelliteRegistry
 from .manifest import SatelliteManifest
 from .satellite_config import SatelliteConfig
 from .module_loader import load_module_from_file, register_package
+from . import ui_contract
 
 
 class SatelliteLoadError(Exception):
@@ -53,7 +54,14 @@ class SatelliteLoader:
         """
         return self._build_satellite(satellite.path, satellite.type)
 
-    def _build_satellite(self, satellite_dir: Path, satellite_type: str) -> Satellite:
+    def read_metadata(self, satellite_dir: Path):
+        """(manifest, ui definition) read from disk exactly as discovery
+        does, without importing any of the Satellite's code - what
+        StarCore.rediscover() refreshes. Raises SatelliteLoadError."""
+        manifest = self.read_manifest(satellite_dir)
+        return manifest, ui_contract.load_definition(satellite_dir, manifest.name)
+
+    def read_manifest(self, satellite_dir: Path) -> SatelliteManifest:
         manifest_path = satellite_dir / "satellite.toml"
         if not manifest_path.exists():
             raise SatelliteLoadError(f"satellite.toml not found for satellite in {satellite_dir}")
@@ -68,6 +76,7 @@ class SatelliteLoader:
                 description=manifest_data["description"],
                 icon=manifest_data.get("icon"),
                 section_of=manifest_data.get("section_of") or None,
+                icon_name=manifest_data.get("icon_name") or None,
             )
         except (tomllib.TOMLDecodeError, KeyError) as error:
             raise SatelliteLoadError(f"satellite.toml for satellite in {satellite_dir} is invalid ({error})")
@@ -76,6 +85,17 @@ class SatelliteLoader:
             print(f"[WARNING]: icon '{manifest.icon}' declared for satellite '{manifest.name}' "
                   f"was not found under mission_control/. Falling back to the generic icon.")
             manifest.icon = None
+        if manifest.icon_name and manifest.icon_name not in ui_contract.ICONS:
+            print(f"[WARNING]: icon_name '{manifest.icon_name}' of satellite '{manifest.name}' is not in "
+                  f"the shared icon set. Clients fall back to a generic icon.")
+            manifest.icon_name = None
+        manifest.provides, problems = ui_contract.normalise_provides(manifest_data.get("provides"))
+        for problem in problems:
+            print(f"[WARNING]: satellite '{manifest.name}': {problem}. That capability is not offered.")
+        return manifest
+
+    def _build_satellite(self, satellite_dir: Path, satellite_type: str) -> Satellite:
+        manifest = self.read_manifest(satellite_dir)
 
         config_path = satellite_dir / "config.toml"
         defaults_path = satellite_dir / "config.default.toml"
@@ -101,7 +121,8 @@ class SatelliteLoader:
         routes = self._load_routes(satellite_dir, package, manifest.name)
         page = self._load_page(satellite_dir)
         lifecycle = self._load_lifecycle(satellite_dir, package, manifest.name)
-        return Satellite(manifest, config, satellite_type, satellite_dir, state_provider, routes, page, lifecycle)
+        ui = ui_contract.load_definition(satellite_dir, manifest.name)
+        return Satellite(manifest, config, satellite_type, satellite_dir, state_provider, routes, page, lifecycle, ui)
 
     def _load_state_provider(self, satellite_dir: Path, package: str, satellite_name: str):
         state_path = satellite_dir / "state.py"

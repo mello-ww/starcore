@@ -105,6 +105,17 @@ By default `host = "127.0.0.1"` keeps Mission Control reachable only from the ma
 
 ## Satellites in Mission Control
 
+A Satellite's page is its own `mission_control/page.js` when it ships one. Otherwise, a
+Satellite with a `ui.json` gets a page drawn by Mission Control's shared renderer
+(`mission_control/ui/renderer.js`, mounted exactly like a `page.js`): its navigation as tabs,
+its blocks, live data from its routes, and actions that call them. The renderer knows the
+[UI contract](ui-contract.md), never a Satellite. A new revision of the document (after an
+update or a rediscovery) remounts the page.
+
+The Satellites page has a **Rediscover** button: StarCore re-reads every Satellite's
+`ui.json` and manifest metadata from disk, without loading any code, and says what changed -
+including any new Satellite folder, which loads at the next restart.
+
 Satellites are never hardcoded into the Core or into the frontend. A Satellite appears in Mission Control as soon as the Engine discovers it, and it decides for itself what it contributes: state, routes of its own, a page of its own, or nothing at all. Mission Control renders published state as generic labelled values, and hands a Satellite that ships a page the container to draw in. Both are described in the Satellites documentation.
 
 ### Satellite status and icons
@@ -145,10 +156,11 @@ see `docs/satellites/photo.md` - and the underlying mechanism is documented for 
 A setting a Satellite describes with `"type": "path"` (Photo's `photo_directory` and Music's
 `library` - see `docs/satellites/photo.md` and `docs/satellites/music.md`) gets a "Browse…" button next to its
 field in the modal, opening a small directory picker. The picker is itself completely
-generic: it browses through the FileExplorer Satellite's own `entries` route - the same one
-its own Mission Control page uses - and simply hands back whatever absolute path was chosen.
-It only appears when a Satellite named `FileExplorer` is present and enabled; a `"path"`
-field always still accepts a typed path directly, with or without it.
+generic: it browses through whichever enabled Satellite provides the `files.browse`
+capability (File Explorer, with its `entries` route - see [UI contract](ui-contract.md)) and
+simply hands back whatever absolute path was chosen. It only appears when such a provider is
+present and enabled; a `"path"` field always still accepts a typed path directly, with or
+without it.
 
 ## API
 

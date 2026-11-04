@@ -98,8 +98,14 @@ export function HomeScreen() {
   };
 
   const open = (satellite: SatelliteSummary) => {
-    const screen = DEDICATED_SCREENS[satellite.name] ?? 'SatelliteDetail';
-    const params = screen === 'SatelliteDetail' ? {name: satellite.name} : undefined;
+    const declarative = !DEDICATED_SCREENS[satellite.name] && Boolean(satellite.ui?.revision);
+    const screen = DEDICATED_SCREENS[satellite.name] ?? (declarative ? 'SatelliteUi' : 'SatelliteDetail');
+    const params =
+      screen === 'SatelliteUi'
+        ? {name: satellite.name, revision: satellite.ui?.revision}
+        : screen === 'SatelliteDetail'
+          ? {name: satellite.name}
+          : undefined;
     navigation.navigate('Satellites', {screen, params, initial: false});
   };
   const statusSatellite = satellites?.find(satellite => satellite.name === 'Status');
@@ -216,7 +222,7 @@ export function HomeScreen() {
         {listed?.map(satellite => (
           <View key={satellite.name} style={styles.card}>
             <View style={styles.cardHead}>
-              <Icon name={satelliteIcon(satellite.name)} size={20} color={accentColor} />
+              <Icon name={satelliteIcon(satellite.name, satellite.icon_name)} size={20} color={accentColor} />
               <Text style={[type.title, styles.cardTitle]} numberOfLines={1}>
                 {satellite.name}
               </Text>
@@ -226,7 +232,7 @@ export function HomeScreen() {
             <Text style={[type.body, styles.cardDesc]} numberOfLines={2}>
               {satellite.description}
             </Text>
-            {satellite.mobile_ui ? (
+            {satellite.mobile_ui || satellite.ui?.revision ? (
               <Pressable
                 onPress={() => open(satellite)}
                 accessibilityRole="button"

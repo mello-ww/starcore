@@ -3,6 +3,36 @@
 All notable changes to StarCore. Versions follow [semver](https://semver.org/); the version
 itself lives in the `VERSION` file (see `docs/releasing.md`).
 
+## Unreleased
+
+### Added
+
+- **UI contract 1.0** (`docs/ui-contract.md`). A Satellite can describe its interface in a
+  `ui.json`, using pages, navigation and 11 blocks bound to its own routes' data, and get a
+  page in Mission Control and a screen in the Android app with no client code of its own.
+  Each client renders it with its own components; neither runs code it receives.
+- **Satellite capabilities.** A Satellite declares what it offers others under `[provides]`.
+  File Explorer provides `files.browse`, used by the shared `file-browser` block and by
+  Mission Control's folder picker, which no longer looks for File Explorer by name.
+- **Catalog and rediscovery.**
+  - `GET /api/catalog` lists every capability's providers.
+  - `GET /api/satellites` adds `catalog_revision` and, for each Satellite, `icon_name`,
+    `provides` and `ui`.
+  - `GET /api/satellites/<name>/ui` serves the document with an ETag.
+  - A **Rediscover** button (`POST /api/catalog/rediscover`) re-reads that metadata from disk
+    without loading code; a new Satellite folder is reported and loads at the next restart.
+- **Icons on Android** come from each Satellite's `icon_name` (shared icon set).
+- **Shared contract tests** (`contracts/ui/`): the Engine, Mission Control and the Android app
+  check the same vocabulary and fixtures. `test_client_modularity.py` fails when generic
+  client code names a Satellite.
+- **Showcase** example Satellite (`examples/satellites/native/showcase/`), using every block.
+
+### Changed
+
+- Mission Control's files and Satellite assets are served `no-cache` with an ETag (revalidated)
+  instead of `no-store`.
+- The Android Satellites list refreshes when you return to it.
+
 ## 0.1.0-alpha.1 - unreleased
 
 The first Alpha: a stable, reproducible checkpoint of the Engine, Mission Control, the native

@@ -32,8 +32,11 @@ export class StarCoreClient {
     private getToken: TokenProvider = async () => null,
   ) {}
 
-  get(path: string): Promise<{status: number; body: any; finalUrl: string}> {
-    return this.request('GET', path, undefined, true);
+  /** `headers` adds request headers, e.g. If-None-Match to revalidate a
+   * cached UI document (satellites/ui/api.ts) - a 304 comes back as
+   * status 304 with an empty body. */
+  get(path: string, headers?: Record<string, string>): Promise<{status: number; body: any; finalUrl: string}> {
+    return this.request('GET', path, undefined, true, headers);
   }
 
   post(
@@ -92,12 +95,18 @@ export class StarCoreClient {
     }
   }
 
-  private async request(method: 'GET' | 'POST', path: string, body: unknown, authenticate: boolean) {
+  private async request(
+    method: 'GET' | 'POST',
+    path: string,
+    body: unknown,
+    authenticate: boolean,
+    extraHeaders?: Record<string, string>,
+  ) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {...extraHeaders};
       if (body !== undefined) {
         headers['Content-Type'] = 'application/json';
       }

@@ -19,10 +19,12 @@ const NATIVE = {
   buildType: 'release',
 };
 
+type TestTree = ReturnType<typeof renderer.create>;
+
 const ENGINE_BUILD = {version: '0.1.0-alpha.1', channel: 'alpha', build: 66, commit: '59b971c', dirty: false, date: '2026-11-03T22:15:10+01:00'};
 
-function textOf(tree: renderer.ReactTestRenderer, testID: string): string {
-  const node = tree.root.find(n => n.props.testID === testID && n.type === Text);
+function textOf(tree: TestTree, testID: string): string {
+  const node = tree.root.find((n: any) => n.props.testID === testID && n.type === Text);
   return ([] as unknown[]).concat(node.props.children).join('');
 }
 
@@ -30,7 +32,7 @@ beforeEach(() => {
   NativeModules.StarCoreBuildInfo = {...NATIVE};
 });
 
-const mounted: renderer.ReactTestRenderer[] = [];
+const mounted: TestTree[] = [];
 
 afterEach(() => {
   // unmounting clears AboutCard's "Copied" timer before the test ends
@@ -89,7 +91,7 @@ describe('buildInfoReport', () => {
 describe('AboutCard', () => {
   async function render(get: jest.Mock) {
     (useAuth as jest.Mock).mockReturnValue({client: {get}});
-    let tree!: renderer.ReactTestRenderer;
+    let tree!: TestTree;
     await act(async () => {
       tree = renderer.create(<AboutCard />);
     });
@@ -114,7 +116,7 @@ describe('AboutCard', () => {
   it('copies the build report', async () => {
     const setString = jest.spyOn(Clipboard, 'setString').mockImplementation(() => {});
     const tree = await render(jest.fn().mockResolvedValue({status: 200, body: {build: ENGINE_BUILD}}));
-    const button = tree.root.find(n => n.props.title === 'Copy build info' && typeof n.props.onPress === 'function');
+    const button = tree.root.find((n: any) => n.props.title === 'Copy build info' && typeof n.props.onPress === 'function');
     await act(async () => {
       button.props.onPress();
     });

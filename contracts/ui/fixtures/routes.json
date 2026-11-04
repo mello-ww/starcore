@@ -1,0 +1,30 @@
+{
+  "_about": "Which resolved routes a client may call - always beneath the Satellite (or capability provider) it belongs to. docs/ui-contract.md, 'Actions'.",
+  "safe": [
+    "summary",
+    "items/a",
+    "items/item%207",
+    "items/a/rename",
+    "entries?path=%2Fhome%2Fuser",
+    "search?q=New%20note&n=3",
+    "settings_v2/level-1"
+  ],
+  "unsafe": [
+    "",
+    "/api/shutdown",
+    "../Music/library",
+    "items/../../status",
+    "items/./a",
+    "items//a",
+    "https://example.com/x",
+    "javascript:alert(1)",
+    "items\\a",
+    "items/a#frag",
+    "items a",
+    "assets/page.js",
+    "enable",
+    "disable",
+    "reload",
+    "ui"
+  ]
+}

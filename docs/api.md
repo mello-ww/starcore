@@ -18,8 +18,10 @@ The Engine currently serves an HTTP API. It is started with the Core and configu
 
 ```
 GET  /api/status                  current Core status, including "build": {version, channel, build, commit, dirty, date}
-GET  /api/satellites              every loaded Satellite
+GET  /api/satellites              every loaded Satellite, and the catalog revision
 GET  /api/satellites/<name>       a single Satellite, matched case-insensitively
+GET  /api/catalog                 the UI contract this Engine speaks and every Satellite capability's providers
+POST /api/catalog/rediscover      re-read Satellite metadata (ui.json, icon_name, provides) from disk - never code
 GET  /api/commands                every registered CLI command and its metadata
 GET  /api/configuration           the configurable settings and their current value
 POST /api/commands/execute        run a registered command
@@ -56,9 +58,17 @@ Responses are JSON. A Satellite entry contains its manifest information, its typ
   "commands": [{ "name": "status", "source": "Status", "description": "..." }],
   "state": { "refresh_rate": 1 },
   "configurable": false,
-  "mobile_ui": false
+  "mobile_ui": false,
+  "icon_name": "activity",
+  "provides": {},
+  "ui": null
 }
 ```
+
+`GET /api/satellites` answers `{"satellites": [...], "catalog_revision": "..."}`. The
+revision is a hash of what every Satellite *is* - names, versions, pages, routes, icons,
+capabilities, interface revisions, enabled - and not of its live state, so a client can tell
+from it alone whether anything it cached is out of date.
 
 `status` is one of `"running"`, `"stopped"`, `"disabled"` or `"error"` - computed entirely
 generically (see `_satellite_status()` in `starcore/api/payloads.py`), never by branching on
@@ -82,6 +92,43 @@ mobile app's Satellites screen uses to decide whether opening that Satellite sho
 screen or just its name and status. See "Exposing a mobile interface" in the Satellites
 documentation for the declarative UI schema itself (`GET /api/satellites/<name>/mobile`) -
 it is a Satellite endpoint like any other, not a second API.
+
+`icon_name` is a name from the shared icon set every client draws natively, or `null`.
+`provides` lists the Satellite capabilities it offers others, as `{capability: {version,
+operations}}`. `ui` describes its declarative interface (`ui.json`):
+`{"contract": "starcore.ui/1.0", "revision": "...", "error": null}` when the Engine validated
+one; `{"contract": null, "revision": null, "error": "..."}` when it refused it; `null` when
+there is none. See [UI contract](ui-contract.md) for all three.
+
+`GET /api/catalog` answers with an `ETag`, and `304` to a matching `If-None-Match`:
+
+```json
+{
+  "contract": {"name": "starcore.ui", "version": "1.0", "majors": [1], "capabilities": {"files.browse": [1]}},
+  "revision": "e0628e6a610cf53b",
+  "capabilities": {
+    "files.browse": [{"satellite": "FileExplorer", "version": 1, "operations": {"list": "entries"}, "enabled": true}]
+  },
+  "pending": []
+}
+```
+
+`POST /api/catalog/rediscover` re-reads every loaded Satellite's `ui.json` and the
+presentational parts of its `satellite.toml`, and looks for Satellite folders that aren't
+loaded. It never imports or reloads code:
+
+```json
+{"revision": "...", "updated": ["Showcase"], "pending": [{"name": "Notes", "type": "native", "folder": "notes"}],
+ "reload_required": [], "missing": [], "errors": []}
+```
+
+A pending Satellite loads at the next restart. One whose name or version changed on disk
+needs its reload (below). One whose folder is gone keeps running until StarCore restarts.
+
+Mission Control's own files and Satellite assets are served with `Cache-Control: no-cache`
+and an `ETag`: a browser keeps a copy but revalidates it every time, so an update is seen at
+once and an unchanged file costs a `304`. JSON responses stay `no-store`, except the UI
+document and the catalog above.
 
 `POST /api/commands/execute` takes `{"command": "<name> [args...]"}` and runs it through `StarCore.execute_command()` - the same call the terminal CLI makes - so behavior and output match the terminal exactly. It responds with the captured output and, if the command raised, an error:
 
@@ -128,11 +175,14 @@ A Satellite can serve routes and Mission Control assets of its own, mounted belo
 ```
 GET|POST /api/satellites/<name>/<route>/...   a route the Satellite provides
 GET      /api/satellites/<name>/assets/...    the Satellite's Mission Control files
+GET      /api/satellites/<name>/ui            its validated ui.json: {satellite, revision, document}
 ```
 
-`assets`, `enable`, `disable` and `reload` are reserved by the Core and never reach a
+`assets`, `ui`, `enable`, `disable` and `reload` are reserved by the Core and never reach a
 Satellite's own `api.py` - `assets` is served read-only from the Satellite's
-`mission_control/` directory, and the other three are the generic lifecycle controls below.
+`mission_control/` directory, `ui` is its UI contract document (`ETag` = its revision, `304`
+to a matching `If-None-Match`, `404` when it has none, `422` with the reason when the Engine
+refused it), and the other three are the generic lifecycle controls below.
 Everything else below a Satellite comes from the mapping its `api.py` returns, and the Core
 neither knows nor cares what those routes do. Only GET and POST reach them. The Satellites
 documentation describes the handler contract, and the Photo and Music documentation are

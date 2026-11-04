@@ -1,0 +1,41 @@
+{
+  "_about": "Value formatting - docs/ui-contract.md, 'Formats'. {value, format, unit?} -> expected display text.",
+  "cases": [
+    {"value": null, "format": "text", "expected": "—"},
+    {"value": "hello", "format": "text", "expected": "hello"},
+    {"value": true, "format": "text", "expected": "Yes"},
+    {"value": false, "format": "text", "expected": "No"},
+    {"value": 3.14159, "format": "text", "expected": "3.14"},
+    {"value": {"a": 1}, "format": "text", "expected": "—"},
+    {"value": 2, "format": "number", "expected": "2"},
+    {"value": 2.5, "format": "number", "expected": "2.5"},
+    {"value": 1234.5678, "format": "number", "expected": "1234.57"},
+    {"value": 21.5, "format": "number", "unit": "°C", "expected": "21.5 °C"},
+    {"value": 7.6, "format": "integer", "expected": "8"},
+    {"value": "n/a", "format": "number", "expected": "n/a"},
+    {"value": 42, "format": "percent", "expected": "42%"},
+    {"value": 7.34, "format": "percent", "expected": "7.3%"},
+    {"value": 512, "format": "bytes", "expected": "512 B"},
+    {"value": 1536, "format": "bytes", "expected": "1.5 KB"},
+    {"value": 1048576, "format": "bytes", "expected": "1 MB"},
+    {"value": 5368709120, "format": "bytes", "expected": "5 GB"},
+    {"value": 12, "format": "duration", "expected": "12s"},
+    {"value": 303, "format": "duration", "expected": "5m 3s"},
+    {"value": 300, "format": "duration", "expected": "5m"},
+    {"value": 3720, "format": "duration", "expected": "1h 2m"},
+    {"value": 90000, "format": "duration", "expected": "1d 1h"},
+    {"value": 5, "format": "no-such-format", "expected": "5"},
+    {"value": 9, "expected": "9"}
+  ],
+  "visible": [
+    {"value": null, "expected": false},
+    {"value": false, "expected": false},
+    {"value": 0, "expected": false},
+    {"value": "", "expected": false},
+    {"value": [], "expected": false},
+    {"value": true, "expected": true},
+    {"value": 1, "expected": true},
+    {"value": "x", "expected": true},
+    {"value": [0], "expected": true}
+  ]
+}

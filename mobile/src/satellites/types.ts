@@ -23,6 +23,15 @@ export interface SatelliteSummary {
   /** What the Satellite publishes about itself (its state.py) - free-form,
    * except where a screen knows one Satellite's shape (Home's Status card). */
   state?: Record<string, unknown>;
+  /** A name from the shared icon set (contracts/ui/vocabulary.json). Absent
+   * on servers older than UI contract 1.0. */
+  icon_name?: string | null;
+  /** Satellite capabilities it provides to others - see docs/ui-contract.md. */
+  provides?: Record<string, {version: number; operations: Record<string, string>}>;
+  /** Its declarative interface (ui.json): a revision when the Engine
+   * validated one, an error when it refused it, null when there is none.
+   * Absent on servers older than UI contract 1.0. */
+  ui?: {contract: string | null; revision: string | null; error: string | null} | null;
 }
 
 /** The declarative UI schema a Satellite's "mobile" route answers with -

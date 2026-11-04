@@ -9,9 +9,15 @@ A Satellite can:
 - expose API endpoints
 - emit Signals
 - store data
+- describe its interface for every client (`ui.json` - see [UI contract](ui-contract.md))
+- provide capabilities other Satellites' interfaces can use (`[provides]`)
 - contribute pages to Mission Control
 - provide CLI commands (see CLI)
 - publish state to Mission Control
+
+Clients know UI contracts and capabilities, not individual Satellites: a new Satellite that
+describes its interface with `ui.json` works in Mission Control and the Android app without
+any change to either.
 
 ## Publishing state
 
@@ -95,6 +101,7 @@ A Satellite can also declare an icon in its `satellite.toml`:
 
 ```toml
 icon = "icon.svg"
+icon_name = "camera"
 ```
 
 naming a file under its own `mission_control/` directory. It's validated at load time - a
@@ -105,6 +112,11 @@ new is needed to serve it. `describe_satellite()` reports it as `icon`, or `null
 Satellite didn't declare one; Mission Control falls back to a generic icon in that case. The
 Core holds no name-to-icon mapping of its own - a Satellite that wants a recognizable mark in
 the sidebar and on its card provides its own image, the same way it provides its own page.
+
+`icon_name` names an icon from the shared set every client draws natively
+(`contracts/ui/vocabulary.json`, Feather glyph names). The Android app can't draw a
+Satellite's own SVG, so this is the icon it shows; a name outside the set is dropped with a
+warning, and clients fall back to a generic icon.
 
 A Satellite whose interface lives inside another Satellite's page can say so:
 
@@ -145,6 +157,38 @@ rebuilt as part of a reload; only its already-imported submodules (anything a `s
 `api.py` reaches with `from .library import ...`) keep the code they had at the last
 successful (re)load, the same way any other Python import caching works.
 
+## Describing an interface
+
+A Satellite that ships a `ui.json` beside its `satellite.toml` gets a page in Mission Control
+and a screen in the Android app, drawn by each client's shared renderer from the same
+description: pages, navigation tabs, and blocks (fields, metrics, lists, buttons, toggles,
+sliders, forms, the shared file browser) bound to the JSON its own routes return. It is the
+default way to give a new Satellite an interface. The full specification is
+[UI contract](ui-contract.md); the example Satellite `examples/satellites/native/showcase/`
+uses every block.
+
+The file is static and read without importing any code, so the Engine validates it at load
+time (a refused document is reported, with the reason, in the Satellite's `ui.error`) and
+rediscovery can refresh it while StarCore runs. Its actions are ordinary requests to the
+Satellite's own routes, relative to `/api/satellites/<name>/`: a document can never reach
+another Satellite or a Core endpoint, and a route keeps every check of its own.
+
+## Providing a capability
+
+A Satellite can provide a service that other Satellites' interfaces use without knowing it:
+
+```toml
+[provides."files.browse"]
+version = 1
+operations = { list = "entries" }
+```
+
+Each operation maps to one of its own routes. The Engine lists providers in
+`GET /api/catalog`, and shared blocks are bound to the capability, never to a Satellite: any
+`ui.json` can embed a `file-browser`, and Mission Control's folder picker uses the same
+capability. The known capabilities and their protocols are in "Shared blocks and Satellite
+capabilities" in [UI contract](ui-contract.md).
+
 ## Contributing a Mission Control page
 
 A Satellite that ships `mission_control/page.js` gets its own page in Mission Control,
@@ -160,9 +204,16 @@ function, if any, is called when the user navigates away. An optional
 `mission_control/page.css` next to it is loaded with the page, and everything under
 `mission_control/` is served read-only from `/api/satellites/<name>/assets/`.
 
+A `page.js` is a trusted, first-party extension for the web only: it runs with the full
+rights of the signed-in page, and the Android app can't use it. Music, Photo, Status, the
+Locked Folder and File Explorer use one today. A new Satellite should describe its
+interface with `ui.json` instead (see "Describing an interface" above), and use `page.js`
+only for what the shared blocks can't express yet. If a Satellite ships both, Mission Control
+uses `page.js` and the Android app uses `ui.json`.
+
 A Satellite without a page still gets one: Mission Control renders whatever it publishes
-through `state.py` as generic labelled values. A Satellite that provides neither is listed
-on the Satellites page but has no page of its own.
+through `state.py` as generic labelled values. A Satellite that provides none of these is
+listed on the Satellites page but has no page of its own.
 
 ## Exposing configuration
 
@@ -199,14 +250,12 @@ POST /api/satellites/<name>/configuration  {"key": ..., "value": ...}
 A setting descriptor may also carry an optional `"type"`. The only value defined so far is
 `"path"`, meaning the setting is a filesystem directory (Photo's `photo_directory` and
 Music's `library` both use it - see `docs/satellites/photo.md`); Mission Control's generic modal reacts
-to it by adding a "Browse…" button next to the field, backed by the FileExplorer
-Satellite's own `entries` route, so a directory can be picked instead of typed. This is the
-one, narrow exception to Mission Control never hardcoding a Satellite's name into its
-generic code: it delegates to whichever Satellite is named `"FileExplorer"` (if any is
-present and enabled) because that Satellite's entire purpose is generic filesystem
-browsing, not because the picker branches on who asked. A Satellite with a `"path"`-typed
-setting still works with no FileExplorer present or enabled - the field simply has no
-Browse button, and typing a path directly still works.
+to it by adding a "Browse…" button next to the field, so a directory can be picked instead
+of typed. The picker browses through whichever enabled Satellite provides the `files.browse`
+capability (File Explorer does - see "Providing a capability" above); it used to look for a
+Satellite named `"FileExplorer"`, and no longer names one. A Satellite with a `"path"`-typed
+setting still works with no provider present or enabled - the field simply has no Browse
+button, and typing a path directly still works.
 
 A rejected value answers with the Core's usual `error_response` (HTTP 400, `{"error":
 "..."}`), which Mission Control's modal renders as a validation error next to the field
@@ -232,6 +281,12 @@ any key an installation's `config.toml` is missing from it, and never touches a 
 already there - see `docs/deployment.md`, "Keeping configuration up to date".
 
 ## Exposing a mobile interface
+
+> **Superseded by `ui.json`.** This is UI contract "v0": still supported, so every existing
+> Satellite keeps working, but limited to four item types and Android only. A new Satellite
+> should describe its interface with `ui.json` (see "Describing an interface" above), which
+> both clients render. A Satellite with a validated `ui.json` opens in the Android app's
+> shared renderer even if it also has a `mobile` route.
 
 A Satellite that wants a screen in StarCore's mobile app names one of its `api.py` routes
 `"mobile"`, the same way `"configuration"` gets it a Config button in Mission Control:
@@ -377,5 +432,10 @@ Both categories share the same lifecycle and extension model. The only differenc
   not a directory, ...) into a clean, specific response instead of a crash or a bare 500 -
   and a real filesystem root or drive can never be renamed or deleted through it - but there
   is no sandboxed root to stay inside of, by design. It is also what Mission Control's
-  generic "path"-typed configuration fields (see "Exposing configuration" above) delegate to
-  for their directory picker, through this same `entries` route.
+  generic "path"-typed configuration fields (see "Exposing configuration" above) browse
+  through, as the provider of the `files.browse` capability backed by this same `entries` route.
+- **Showcase** (`examples/satellites/native/showcase/`) - an interface described entirely in
+  `ui.json` (every block of UI contract 1.0, navigation, detail pages, a form, sliders and the
+  shared file browser) over a few in-memory routes, with no client code of its own. It lives
+  outside `satellites/` so it is never loaded on a real install; copy it into
+  `satellites/native/` to try it.

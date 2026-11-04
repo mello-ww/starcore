@@ -189,6 +189,24 @@ This is local to the device end-to-end: StarCore's server never receives a
 fingerprint, a face scan, or any biometric template - it only ever sees the
 same session token it would from a password login, exactly as before.
 
+## Satellite interfaces
+
+The app knows UI contracts and capabilities, not individual Satellites. A
+Satellite that ships a `ui.json` (UI contract 1.0, see
+[`docs/ui-contract.md`](../docs/ui-contract.md)) opens in
+`src/screens/SatelliteUiScreen.tsx`, which draws its pages, navigation and
+blocks with this app's own components (`src/satellites/ui/`) - no app change
+is needed for a new one. Documents are cached per server and revalidated by
+revision; page data is always live, and a refused session is never answered
+from the cache. The rules shared with the Engine and Mission Control are in
+`src/satellites/ui/contract.ts`, tested against `contracts/ui/` by
+`__tests__/uiContract.test.ts`.
+
+Music, Photos (with the Locked Folder) and Status keep their dedicated screens
+until the shared blocks reach parity with them, and the older `mobile` route
+(`DeclarativeScreen`) still works. Satellite icons come from each Satellite's
+`icon_name`.
+
 ## Project structure
 
 ```

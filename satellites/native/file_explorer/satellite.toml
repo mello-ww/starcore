@@ -3,3 +3,12 @@ version = "1.0.0"
 author = "mellow"
 description = "Browse, upload and manage files anywhere on this machine that StarCore itself can reach."
 icon = "icon.svg"
+# from the shared icon set every client can draw (contracts/ui/vocabulary.json)
+icon_name = "folder"
+
+# a Satellite capability others can use without knowing this Satellite: any
+# interface with a file-browser block, and Mission Control's folder picker,
+# browse through whichever Satellite provides files.browse (docs/ui-contract.md)
+[provides."files.browse"]
+version = 1
+operations = { list = "entries" }

@@ -193,6 +193,8 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] HTTPS with a provided certificate
 - [ ] Storage (satellites keep their own SQLite and JSON stores today)
 - [ ] Signal Bus
+- [x] UI contract 1.0: validated `ui.json`, revisions and ETags, the capability catalog, metadata-only rediscovery (`docs/ui-contract.md`)
+- [ ] UI contract next: templates, `chart`/`table`/`image` blocks, Home widgets, discovered sections, dates in formats
 
 ## Mission Control
 
@@ -201,6 +203,7 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] StarCore design language and accent presets
 - [x] Satellite pages, configuration dialogs and lifecycle controls
 - [x] Developer Mode
+- [x] Shared renderer for UI contract documents, Rediscover button, folder picker through `files.browse`
 - [ ] Space Mode
 
 ## Android app
@@ -208,6 +211,9 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] Multiple servers, sign-in and per-server biometric app lock
 - [x] StarCore design language with live accent
 - [x] Native Music and Photos, declarative screens for other satellites
+- [x] Shared renderer for UI contract documents; icons from `icon_name`
+- [ ] Rediscover and cache controls in the app
+- [ ] Move Status, then Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/ui-contract.md`, "Migration")
 - [ ] Light theme
 - [ ] Icons instead of text glyphs for the remaining Music controls
 - [ ] Audio playback validated on a real device

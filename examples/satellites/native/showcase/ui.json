@@ -1,0 +1,79 @@
+{
+  "_note": "Every block of StarCore UI contract 1.0, rendered by Mission Control and the Android app with no code of this Satellite's own. See docs/ui-contract.md.",
+  "contract": "starcore.ui/1.0",
+  "title": "Showcase",
+  "entry": "overview",
+  "navigation": [
+    {"page": "overview", "label": "Overview", "icon": "home"},
+    {"page": "items", "label": "Items", "icon": "list"},
+    {"page": "files", "label": "Files", "icon": "folder"}
+  ],
+  "pages": {
+    "overview": {
+      "title": "Overview",
+      "source": {"route": "summary", "refresh": 5},
+      "blocks": [
+        {"type": "text", "text": "A test Satellite: everything on these pages comes from its ui.json and its routes. Nothing is stored on disk.", "style": "caption"},
+        {"type": "card", "title": "Live data", "blocks": [
+          {"type": "metric", "label": "Level", "value": "$.level", "format": "percent", "max": 100},
+          {"type": "metric", "label": "Running for", "value": "$.uptime", "format": "duration"},
+          {"type": "field", "label": "Counter", "value": "$.counter", "format": "integer", "tone": "$.counter_tone"},
+          {"type": "field", "label": "Chosen folder", "value": "$.selected"},
+          {"type": "field", "label": "Last action", "value": "$.last_action"}
+        ]},
+        {"type": "card", "title": "Controls", "blocks": [
+          {"type": "toggle", "label": "Enabled", "description": "Turns the counter buttons on or off.", "value": "$.enabled",
+           "action": {"route": "settings", "body": {"enabled": "$value"}, "then": "refresh"}},
+          {"type": "slider", "label": "Level", "value": "$.level", "min": 0, "max": 100, "step": 5, "format": "percent",
+           "action": {"route": "settings", "body": {"level": "$value"}, "then": "refresh"}},
+          {"type": "button", "label": "Increment", "style": "primary", "visible": "$.enabled",
+           "action": {"route": "counter/increment", "then": "refresh"}},
+          {"type": "text", "text": "Turn on Enabled to change the counter.", "style": "caption", "visible": "$.disabled"},
+          {"type": "button", "label": "Reset", "style": "danger",
+           "action": {"route": "reset", "confirm": "Reset the counter, level and items?", "then": "refresh"}}
+        ]},
+        {"type": "text", "text": "$.diagnostics", "style": "mono", "developer": true}
+      ]
+    },
+    "items": {
+      "title": "Items",
+      "source": {"route": "items"},
+      "blocks": [
+        {"type": "list", "items": "$.items", "empty": "No items yet - add one below.",
+         "item": {"title": "$.title", "subtitle": "$.note", "value": "$.size", "format": {"value": "bytes"}, "icon": "$.icon"},
+         "action": {"navigate": "item", "params": {"id": "$.id"}}},
+        {"type": "card", "title": "Add an item", "blocks": [
+          {"type": "form", "fields": [
+            {"key": "title", "label": "Title", "kind": "text", "required": true, "placeholder": "Something to remember"},
+            {"key": "size", "label": "Size", "kind": "select", "value": "small",
+             "options": [{"value": "small", "label": "Small"}, {"value": "medium", "label": "Medium"}, {"value": "large", "label": "Large"}]},
+            {"key": "copies", "label": "Copies", "kind": "number", "value": 1},
+            {"key": "pinned", "label": "Pinned", "kind": "toggle", "value": false}
+          ], "submit": {"label": "Add item", "action": {"route": "items", "then": {"navigate": "item", "params": {"id": "$.id"}}}}}
+        ]}
+      ]
+    },
+    "item": {
+      "title": "$.title",
+      "params": ["id"],
+      "source": {"route": "items/{$params.id}"},
+      "blocks": [
+        {"type": "field", "label": "Size", "value": "$.size", "format": "bytes"},
+        {"type": "field", "label": "Copies", "value": "$.copies", "format": "integer"},
+        {"type": "field", "label": "Pinned", "value": "$.pinned"},
+        {"type": "slider", "label": "Priority", "value": "$.priority", "min": 1, "max": 5, "step": 1, "format": "integer",
+         "action": {"route": "items/{$params.id}/priority", "body": {"priority": "$value"}, "then": "refresh"}},
+        {"type": "button", "label": "Delete item", "style": "danger",
+         "action": {"route": "items/{$params.id}/delete", "confirm": "Delete this item?", "then": "back"}}
+      ]
+    },
+    "files": {
+      "title": "Files",
+      "blocks": [
+        {"type": "text", "text": "This browser is a shared block bound to the files.browse capability. Showcase doesn't know which Satellite provides it.", "style": "caption"},
+        {"type": "file-browser", "capability": "files.browse", "select": "directory", "label": "Use this folder",
+         "action": {"route": "selection", "body": {"path": "$value"}, "then": {"navigate": "overview"}}}
+      ]
+    }
+  }
+}

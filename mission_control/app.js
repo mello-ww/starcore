@@ -126,10 +126,34 @@ function greeting() {
     return accountName ? `Welcome back, ${accountName}` : "Welcome back";
 }
 
-// a satellite earns its own page by shipping one, or by publishing state through
-// the state.py convention; satellites that do neither stay list-only
+// a satellite earns its own page by shipping one (page.js), by describing one
+// declaratively (ui.json, drawn by ui/renderer.js), or by publishing state
+// through the state.py convention; satellites that do none of these stay list-only
 function hasPage(satellite) {
-    return Boolean(satellite.page) || Object.keys(satellite.state || {}).length > 0;
+    return Boolean(satellite.page) || hasUiDocument(satellite) || Object.keys(satellite.state || {}).length > 0;
+}
+
+// a ui.json the Engine validated - an entry with only an "error" has none to draw
+function hasUiDocument(satellite) {
+    return Boolean(satellite.ui && satellite.ui.revision);
+}
+
+// what a mounted page was built from: a page.js, or one revision of a ui.json -
+// a new revision (after an update or a rediscovery) remounts the page
+function pageRevision(satellite) {
+    return satellite.page ? "page.js" : hasUiDocument(satellite) ? satellite.ui.revision : null;
+}
+
+// the first enabled Satellite providing a capability, from GET /api/satellites -
+// generic code asks for what it needs ("files.browse"), never for a Satellite
+function findCapabilityProvider(capability) {
+    for (const satellite of satellites) {
+        const entry = satellite.provides && satellite.provides[capability];
+        if (entry && satellite.enabled && entry.version === 1) {
+            return { satellite, operations: entry.operations || {} };
+        }
+    }
+    return null;
 }
 
 // a satellite whose manifest names another as its host (section_of) is
@@ -1000,20 +1024,27 @@ function renderSatelliteList() {
 // navigates away
 async function mountSatellitePage(satellite) {
     const container = document.getElementById("satellite-page");
-    if (mounted && mounted.name === satellite.name) {
+    const revision = pageRevision(satellite);
+    if (mounted && mounted.name === satellite.name && mounted.revision === revision) {
         return;
     }
 
     unmountSatellitePage();
-    mounted = { name: satellite.name, section: route.section, cleanup: null };
+    mounted = { name: satellite.name, section: route.section, revision, cleanup: null };
     container.replaceChildren();
 
-    if (satellite.page.stylesheet) {
+    if (satellite.page && satellite.page.stylesheet) {
         loadStylesheet(satelliteUrl(satellite.name, `/assets/${satellite.page.stylesheet}`));
     }
 
+    // a Satellite's own page.js, or else the shared renderer for its ui.json -
+    // both mounted through the same context, so neither is special-cased below
+    const moduleUrl = satellite.page
+        ? satelliteUrl(satellite.name, `/assets/${satellite.page.module}`)
+        : "/ui/renderer.js";
+
     try {
-        const module = await import(satelliteUrl(satellite.name, `/assets/${satellite.page.module}`));
+        const module = await import(moduleUrl);
         if (!mounted || mounted.name !== satellite.name) {
             return;  // the user navigated away while the module was loading
         }
@@ -1071,8 +1102,9 @@ function renderSatellitePage() {
         return;
     }
 
-    document.getElementById("satellite-generic").hidden = Boolean(satellite.page);
-    if (satellite.page) {
+    const rendered = Boolean(satellite.page) || hasUiDocument(satellite);
+    document.getElementById("satellite-generic").hidden = rendered;
+    if (rendered) {
         setText("page-title", satellite.name);
         mountSatellitePage(satellite);
         return;
@@ -1093,6 +1125,43 @@ function renderSatellitePage() {
 
     document.getElementById("satellite-state").replaceChildren(renderState(satellite.state));
     document.getElementById("satellite-commands").replaceChildren(renderCommands(satellite.commands));
+}
+
+// Rediscover: the Engine re-reads every Satellite's ui.json and manifest
+// metadata (never its code) and reports folders that need a restart to load
+function describeRediscovery(result) {
+    const parts = [];
+    if (result.updated.length) {
+        parts.push(`Updated ${result.updated.join(", ")}.`);
+    }
+    if (result.pending.length) {
+        parts.push(`Found ${result.pending.map((item) => item.name).join(", ")} - restart StarCore to load ${result.pending.length === 1 ? "it" : "them"}.`);
+    }
+    if (result.reload_required.length) {
+        parts.push(`${result.reload_required.join(", ")} changed on disk - reload ${result.reload_required.length === 1 ? "it" : "them"} to apply.`);
+    }
+    if (result.missing.length) {
+        parts.push(`${result.missing.join(", ")} ${result.missing.length === 1 ? "is" : "are"} no longer on disk and keep${result.missing.length === 1 ? "s" : ""} running until StarCore restarts.`);
+    }
+    for (const problem of result.errors) {
+        parts.push(`${problem.satellite || problem.folder}: ${problem.error}`);
+    }
+    return parts.length ? parts.join(" ") : "Everything is up to date.";
+}
+
+async function handleRediscoverClick() {
+    const button = document.getElementById("rediscover-button");
+    const output = document.getElementById("rediscover-result");
+    button.disabled = true;
+    try {
+        output.textContent = describeRediscovery(await postJson("/api/catalog/rediscover"));
+    } catch (error) {
+        output.textContent = `Rediscovery failed: ${error.message}`;
+    } finally {
+        output.hidden = false;
+        button.disabled = false;
+    }
+    refresh();
 }
 
 /* ---------- polling ---------- */
@@ -1648,12 +1717,10 @@ function buildConfigField(setting) {
     wrapper.appendChild(fieldLabel);
 
     // a "path"-typed setting gets a "Browse…" button that opens a directory
-    // picker backed by the FileExplorer satellite's own /entries route - the
-    // one, narrow exception to never hardcoding a satellite's name into this
-    // generic form, since it's delegating to the satellite whose whole job is
-    // generic filesystem browsing, not branching per caller (see docs/satellites.md)
-    const fileExplorer = setting.type === "path" ? findSatellite("FileExplorer") : null;
-    if (fileExplorer && fileExplorer.enabled) {
+    // picker backed by whichever Satellite provides the files.browse
+    // capability (docs/ui-contract.md) - this form never names one
+    const browser = setting.type === "path" ? findCapabilityProvider("files.browse") : null;
+    if (browser && browser.operations.list) {
         const row = element("div", "config-field-row");
         const browse = element("button", "button", "Browse…");
         browse.type = "button";
@@ -1715,8 +1782,8 @@ async function handleSatelliteConfigSubmit(event) {
 /* ---------- directory picker ----------
  *
  * Opened from any "path"-typed configuration field (see buildConfigField
- * above). It browses through the FileExplorer satellite's own /entries
- * route - the same one its own Mission Control page uses - so a directory
+ * above). It browses through the files.browse capability's "list"
+ * operation - whichever Satellite provides it - so a directory
  * can be chosen without retyping a path by hand. Nothing here is specific to
  * Photo, Music, or any other caller: it just hands back whatever absolute
  * path the user picked. */
@@ -1745,7 +1812,12 @@ async function loadDirectoryPicker(path, fallbackToRoots = false) {
     list.replaceChildren(element("p", "dir-picker-empty", "Loading…"));
 
     try {
-        const payload = await getJson(satelliteUrl("FileExplorer", `/entries?path=${encodeURIComponent(path)}`));
+        const browser = findCapabilityProvider("files.browse");
+        if (!browser || !browser.operations.list) {
+            throw new Error("No enabled Satellite provides files.browse any more.");
+        }
+        const payload = await getJson(satelliteUrl(browser.satellite.name,
+            `/${browser.operations.list}?path=${encodeURIComponent(path)}`));
         renderDirectoryPicker(payload);
     } catch (error) {
         if (fallbackToRoots && path !== "") {
@@ -1793,8 +1865,8 @@ function renderDirectoryPicker(payload) {
     for (const entry of directories) {
         // at the roots level an entry's name IS the absolute path already
         // (e.g. "/", or "C:\") - everywhere else it's a bare name that has to
-        // be joined onto the directory being shown (see FileExplorer's own
-        // page.js, which follows this same convention for the same reason)
+        // be joined onto the directory being shown (the files.browse protocol,
+        // which every provider follows - see docs/ui-contract.md)
         const target = payload.path === "" ? entry.name : joinDirectoryPickerPath(payload.path, entry.name);
         const row = element("button", "dir-picker-row");
         row.type = "button";
@@ -2046,6 +2118,7 @@ document.addEventListener("keydown", (event) => {
     }
 });
 document.getElementById("stop-button").addEventListener("click", handleStopClick);
+document.getElementById("rediscover-button").addEventListener("click", handleRediscoverClick);
 document.getElementById("restart-button").addEventListener("click", handleRestartClick);
 document.getElementById("logout-button").addEventListener("click", handleLogoutClick);
 document.getElementById("developer-button").addEventListener("click", () => {

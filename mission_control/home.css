@@ -899,3 +899,17 @@ body[data-route="overview"] #updated {
 #view-configuration > .panel + .panel {
     margin-top: 1.1rem; /* same rhythm as .stack */
 }
+
+/* Satellites page: Rediscover and what it found */
+.rediscover {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.rediscover p {
+    margin: 0;
+    font-size: 13px;
+}

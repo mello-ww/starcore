@@ -63,6 +63,10 @@ export function SatellitesListScreen({navigation}: Props) {
     load();
   }, [load]);
 
+  // and again on coming back to this tab, so an updated Satellite (a new
+  // ui.json revision, say) is picked up without restarting the app
+  useEffect(() => navigation.addListener?.('focus', load), [navigation, load]);
+
   return (
     <View style={styles.screen}>
       <FlatList
@@ -78,11 +82,16 @@ export function SatellitesListScreen({navigation}: Props) {
             {error && <Text style={styles.error}>{error}</Text>}
           </View>
         }
-        renderItem={({item}) => (
+        renderItem={({item}) => {
+          // a ui.json the Engine validated (UI contract 1.0) - drawn by the
+          // generic SatelliteUiScreen, so a new Satellite needs no app change
+          const declarative = Boolean(item.ui?.revision);
+          const openable = item.mobile_ui || declarative;
+          return (
           <Pressable
-            disabled={!item.mobile_ui}
+            disabled={!openable}
             accessibilityRole="button"
-            accessibilityLabel={item.mobile_ui ? `Open ${item.name}` : `${item.name}, no mobile interface yet`}
+            accessibilityLabel={openable ? `Open ${item.name}` : `${item.name}, no mobile interface yet`}
             style={({pressed}) => pressed && styles.pressed}
             onPress={() =>
               // "Photo" gets its own dedicated screens (grid, folders,
@@ -98,25 +107,28 @@ export function SatellitesListScreen({navigation}: Props) {
                   ? navigation.navigate('MusicHome')
                   : item.name === 'Status'
                     ? navigation.navigate('StatusHome')
-                    : navigation.navigate('SatelliteDetail', {name: item.name})
+                    : declarative
+                      ? navigation.navigate('SatelliteUi', {name: item.name, revision: item.ui?.revision})
+                      : navigation.navigate('SatelliteDetail', {name: item.name})
             }>
             <Surface style={styles.card}>
               <View style={styles.row}>
-                <Icon name={satelliteIcon(item.name)} size={20} color={accent} />
+                <Icon name={satelliteIcon(item.name, item.icon_name)} size={20} color={accent} />
                 <Text style={[type.title, styles.name]} numberOfLines={1}>
                   {item.name}
                 </Text>
                 <View style={[styles.dot, {backgroundColor: statusDotColor(item.status)}]} />
                 <Text style={type.caption}>{STATUS_LABELS[item.status] ?? item.status}</Text>
-                {item.mobile_ui && <Icon name="chevron-right" size={20} color={palette.text3} />}
+                {openable && <Icon name="chevron-right" size={20} color={palette.text3} />}
               </View>
               <Text style={type.body} numberOfLines={2}>
                 {item.description}
               </Text>
-              {!item.mobile_ui && <Text style={styles.noUi}>No mobile interface yet</Text>}
+              {!openable && <Text style={styles.noUi}>No mobile interface yet</Text>}
             </Surface>
           </Pressable>
-        )}
+          );
+        }}
         ListEmptyComponent={
           satellites !== null ? <Text style={type.body}>No Satellites are loaded on this server.</Text> : null
         }

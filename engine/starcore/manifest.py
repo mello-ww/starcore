@@ -1,6 +1,6 @@
 class SatelliteManifest:
     def __init__(self, name: str, version: str, author: str, description: str, icon: str = None,
-                 section_of: str = None):
+                 section_of: str = None, icon_name: str = None, provides: dict = None):
         self.name = name
         self.version = version
         self.author = author
@@ -17,3 +17,13 @@ class SatelliteManifest:
         # navigation and open the host instead. Never an access control -
         # every route stays as protected as any other.
         self.section_of = section_of
+        # optional name from the shared icon set (contracts/ui/vocabulary.json)
+        # that every client can draw natively - the Android app can't draw a
+        # Satellite's own SVG, so without this it shows a generic icon
+        self.icon_name = icon_name
+        # Satellite capabilities this one provides to others, normalised by
+        # ui_contract.normalise_provides: {"files.browse": {"version": 1,
+        # "operations": {"list": "entries"}}}. Shared blocks (a file browser,
+        # later a media picker) are bound to a capability, never to the
+        # Satellite that happens to provide it - see docs/ui-contract.md.
+        self.provides = provides or {}

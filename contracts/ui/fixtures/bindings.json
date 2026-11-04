@@ -1,0 +1,38 @@
+{
+  "_about": "Binding resolution - docs/ui-contract.md, 'Bindings'. Each client must give exactly `expected` for `expr` in `context`.",
+  "context": {
+    "data": {"name": "Alpha", "count": 3, "on": false, "nested": {"level": 40}, "rows": [{"id": "a"}, {"id": "b"}]},
+    "page": {"title": "Overview", "total": 12},
+    "params": {"id": "item 7"},
+    "value": 55,
+    "form": {"title": "New note"}
+  },
+  "resolve": [
+    {"expr": "plain text", "expected": "plain text"},
+    {"expr": 42, "expected": 42},
+    {"expr": true, "expected": true},
+    {"expr": null, "expected": null},
+    {"expr": "$.name", "expected": "Alpha"},
+    {"expr": "$.count", "expected": 3},
+    {"expr": "$.on", "expected": false},
+    {"expr": "$.nested.level", "expected": 40},
+    {"expr": "$.rows.1.id", "expected": "b"},
+    {"expr": "$.missing", "expected": null},
+    {"expr": "$.nested.missing.deeper", "expected": null},
+    {"expr": "$page.total", "expected": 12},
+    {"expr": "$params.id", "expected": "item 7"},
+    {"expr": "$value", "expected": 55},
+    {"expr": "$form.title", "expected": "New note"},
+    {"expr": "$$literal", "expected": "$literal"},
+    {"expr": "$unknown.root", "expected": null},
+    {"expr": {"enabled": "$value", "label": "$.name", "fixed": 1}, "expected": {"enabled": 55, "label": "Alpha", "fixed": 1}},
+    {"expr": ["$.count", "x"], "expected": [3, "x"]}
+  ],
+  "templates": [
+    {"template": "items", "expected": "items"},
+    {"template": "items/{$params.id}", "expected": "items/item%207"},
+    {"template": "items/{$.rows.0.id}/rename", "expected": "items/a/rename"},
+    {"template": "entries?path={$.missing}", "expected": "entries?path="},
+    {"template": "search?q={$form.title}&n={$.count}", "expected": "search?q=New%20note&n=3"}
+  ]
+}

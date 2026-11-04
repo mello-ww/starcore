@@ -5,7 +5,8 @@ from .satellite_config import SatelliteConfig
 
 class Satellite:
     def __init__(self, manifest: SatelliteManifest, config: SatelliteConfig, satellite_type: str, path: Path,
-                 state_provider=None, routes: dict = None, page: dict = None, lifecycle: dict = None):
+                 state_provider=None, routes: dict = None, page: dict = None, lifecycle: dict = None,
+                 ui=None):
         self.manifest = manifest
         self.config = config
         self.type = satellite_type
@@ -14,6 +15,9 @@ class Satellite:
         self.routes = routes or {}
         self.page = page
         self.lifecycle = lifecycle or {}
+        # its ui.json (ui_contract.UiDefinition), or None - metadata only, so
+        # StarCore.rediscover() can refresh it without touching any code
+        self.ui = ui
         # None until a start/stop hook has actually run once - a satellite with
         # no background service (see has_service) never gets a True/False value
         # and is simply "running" whenever it's enabled, since there's nothing

@@ -4,3 +4,5 @@ author = "mellow"
 # this part is optional
 description = "Docker container support satellite."
 icon = "icon.svg"
+# from the shared icon set every client can draw (contracts/ui/vocabulary.json)
+icon_name = "box"

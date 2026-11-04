@@ -1,0 +1,6 @@
+name = "Showcase"
+version = "1.0.0"
+author = "StarCore"
+description = "A test Satellite that exercises every block of UI contract 1.0. Its data lives in memory only."
+# from the shared icon set every client can draw (contracts/ui/vocabulary.json)
+icon_name = "layers"

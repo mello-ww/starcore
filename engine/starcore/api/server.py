@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread, Timer
 from urllib.parse import parse_qs, quote, unquote, urlparse
+from hashlib import sha256
 import hmac
 import ipaddress
 import itertools
@@ -21,7 +22,9 @@ AUTH_PREFIX = "/api/auth/"
 # else under /api/auth/ (notably /api/auth/sessions and its /revoke) is just
 # as protected as any other satellite route once an administrator exists
 AUTH_OPEN_ENDPOINTS = {"/api/auth/status", "/api/auth/setup", "/api/auth/login", "/api/auth/logout"}
-WRITE_ENDPOINTS = ("/api/commands/execute", "/api/shutdown", "/api/restart",
+CATALOG_ENDPOINT = "/api/catalog"
+REDISCOVER_ENDPOINT = "/api/catalog/rediscover"
+WRITE_ENDPOINTS = ("/api/commands/execute", "/api/shutdown", "/api/restart", REDISCOVER_ENDPOINT,
                    "/api/auth/setup", "/api/auth/login", "/api/auth/logout", "/api/auth/sessions/revoke")
 
 # reserved below a satellite, so a satellite cannot claim any of these as a
@@ -32,6 +35,8 @@ WRITE_ENDPOINTS = ("/api/commands/execute", "/api/shutdown", "/api/restart",
 ASSETS_SEGMENT = "assets"
 LIFECYCLE_ACTIONS = {"enable": True, "disable": False}
 RELOAD_SEGMENT = "reload"
+# the Satellite's declarative interface document (ui.json) - see docs/ui-contract.md
+UI_SEGMENT = "ui"
 
 FILE_CHUNK = 64 * 1024
 
@@ -69,6 +74,11 @@ CONTENT_TYPES = {
     ".webp": "image/webp",
     ".ico": "image/x-icon",
 }
+
+
+def _etag(payload) -> str:
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return f'"{sha256(canonical.encode("utf-8")).hexdigest()[:16]}"'
 
 
 def _content_disposition(filename: str) -> str:
@@ -233,6 +243,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._handle_restart()
             elif path == "/api/configuration":
                 self._handle_configuration_update()
+            elif path == REDISCOVER_ENDPOINT:
+                self._send_json(self.server.engine.rediscover())
             elif path.startswith(SATELLITE_PREFIX):
                 self._handle_satellite(path, "POST")
             else:
@@ -322,7 +334,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         if path == "/api/status":
             self._send_json(engine.status())
         elif path == "/api/satellites":
-            self._send_json({"satellites": payloads.describe_satellites(engine)})
+            self._send_json(payloads.describe_satellite_list(engine))
+        elif path == CATALOG_ENDPOINT:
+            payload = payloads.describe_catalog(engine)
+            self._send_revalidatable_json(payload, _etag(payload))
         elif path.startswith(SATELLITE_PREFIX):
             self._handle_satellite(path, "GET")
         elif path == "/api/commands":
@@ -352,6 +367,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         if segments[1] == ASSETS_SEGMENT:
             if method == "GET":
                 self._handle_asset(satellite, segments[2:])
+            else:
+                self._method_not_allowed()
+            return
+
+        if segments[1] == UI_SEGMENT and len(segments) == 2:
+            if method == "GET":
+                self._handle_ui_document(satellite)
             else:
                 self._method_not_allowed()
             return
@@ -431,6 +453,21 @@ class RequestHandler(BaseHTTPRequestHandler):
         # escaping a run command is reported as a 500 by /api/commands/execute
         self._send_json(payload, status=500 if result["error"] else 200)
 
+    def _handle_ui_document(self, satellite):
+        """GET /api/satellites/<name>/ui - its validated ui.json. The ETag is
+        the document's revision (also in the Satellite's entry), so a client
+        holding the current one gets a bodiless 304."""
+        definition = satellite.ui
+        if definition is None:
+            self._send_json({"error": f"satellite '{satellite.manifest.name}' has no UI document"}, status=404)
+            return
+        if definition.error:
+            self._send_json({"error": definition.error}, status=422)
+            return
+        payload = {"satellite": satellite.manifest.name, "revision": definition.revision,
+                   "document": definition.document}
+        self._send_revalidatable_json(payload, f'"{definition.revision}"')
+
     def _handle_asset(self, satellite, segments: list):
         root = satellite.assets_path.resolve()
         if not root.is_dir() or not segments:
@@ -446,7 +483,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._send_text(f"Not found: {'/'.join(segments)}", status=404)
             return
 
-        self._send_bytes(target.read_bytes(), CONTENT_TYPES.get(target.suffix, "application/octet-stream"))
+        self._send_revalidatable(target.read_bytes(), CONTENT_TYPES.get(target.suffix, "application/octet-stream"))
 
     def _handle_execute(self):
         body = self._read_json_body()
@@ -670,7 +707,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         content_type = CONTENT_TYPES.get(target.suffix, "application/octet-stream")
-        self._send_bytes(target.read_bytes(), content_type)
+        self._send_revalidatable(target.read_bytes(), content_type)
 
     def _content_length(self):
         """The request's Content-Length (0 when absent), or None after sending
@@ -831,14 +868,43 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         return start, min(end, size - 1)
 
-    def _send_json(self, payload, status: int = 200, headers: dict = None):
+    def _send_json(self, payload, status: int = 200, headers: dict = None, cache: str = None):
         try:
             body = json.dumps(payload, indent=2).encode("utf-8")
         except (TypeError, ValueError) as error:
             status = 500
             body = json.dumps({"error": f"response could not be serialized: {error}"}).encode("utf-8")
 
-        self._send_bytes(body, "application/json; charset=utf-8", status, headers=headers)
+        self._send_bytes(body, "application/json; charset=utf-8", status, cache=cache, headers=headers)
+
+    def _send_revalidatable_json(self, payload, etag: str):
+        if self._etag_matches(etag):
+            self._send_not_modified(etag)
+            return
+        self._send_json(payload, headers={"ETag": etag}, cache="no-cache")
+
+    def _send_revalidatable(self, body: bytes, content_type: str):
+        """Static files (Mission Control's own, and a Satellite's assets):
+        "no-cache" means a browser keeps a copy but asks every time, so an
+        updated page.js is picked up at once and an unchanged one costs a 304
+        instead of a full download."""
+        etag = f'"{sha256(body).hexdigest()[:16]}"'
+        if self._etag_matches(etag):
+            self._send_not_modified(etag)
+            return
+        self._send_bytes(body, content_type, cache="no-cache", headers={"ETag": etag})
+
+    def _etag_matches(self, etag: str) -> bool:
+        header = self.headers.get("If-None-Match", "")
+        candidates = {value.strip().removeprefix("W/") for value in header.split(",")}
+        return etag in candidates or "*" in candidates
+
+    def _send_not_modified(self, etag: str):
+        self._responded = True
+        self.send_response(304)
+        self.send_header("ETag", etag)
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
 
     def _send_text(self, message: str, status: int = 200):
         self._send_bytes(message.encode("utf-8"), "text/plain; charset=utf-8", status)

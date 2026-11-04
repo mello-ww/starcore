@@ -1,4 +1,4 @@
-from .. import engine_config
+from .. import engine_config, ui_contract
 from ..cli import runner
 
 
@@ -29,6 +29,70 @@ def describe_satellite(engine, satellite) -> dict:
         # an entry it can open on the Satellites screen, or is listed with no
         # interface of its own yet.
         "mobile_ui": "mobile" in satellite.routes,
+        **describe_definition(satellite),
+    }
+
+
+def describe_definition(satellite) -> dict:
+    """The parts of a Satellite's entry that only change when its files do -
+    not its live state or status. Their hash is the catalog revision."""
+    return {
+        # a name from the shared icon set every client can draw - see
+        # SatelliteManifest.icon_name
+        "icon_name": satellite.manifest.icon_name,
+        # Satellite capabilities it provides to others - see docs/ui-contract.md
+        "provides": satellite.manifest.provides,
+        # its declarative interface (ui.json): contract and revision only; the
+        # document itself is GET /api/satellites/<name>/ui
+        "ui": satellite.ui.describe() if satellite.ui else None,
+    }
+
+
+def catalog_revision(engine) -> str:
+    """One hash over what every loaded Satellite *is* - names, versions,
+    pages, icons, capabilities, UI revisions and whether it's enabled - but
+    not what it's doing right now. A client that sees it unchanged knows
+    every definition it cached is still current."""
+    entries = []
+    for satellite in engine.registry.all():
+        entries.append({
+            "name": satellite.manifest.name,
+            "version": satellite.manifest.version,
+            "type": satellite.type,
+            "enabled": satellite.enabled,
+            "icon": satellite.manifest.icon,
+            "section_of": satellite.manifest.section_of,
+            "page": satellite.page,
+            "routes": sorted(satellite.routes),
+            **describe_definition(satellite),
+        })
+    return ui_contract.revision(entries)
+
+
+def describe_capabilities(engine) -> dict:
+    """{capability: [providers]} across every loaded Satellite, in discovery
+    order. A disabled provider is listed (so a client can say why something
+    is unavailable) but marked, and clients use the first enabled one."""
+    registry = {}
+    for satellite in engine.registry.all():
+        for name, entry in satellite.manifest.provides.items():
+            registry.setdefault(name, []).append({
+                "satellite": satellite.manifest.name,
+                "version": entry["version"],
+                "operations": entry["operations"],
+                "enabled": satellite.enabled,
+            })
+    return registry
+
+
+def describe_catalog(engine) -> dict:
+    return {
+        "contract": ui_contract.contract_info(),
+        "revision": catalog_revision(engine),
+        "capabilities": describe_capabilities(engine),
+        # Satellite folders found on disk by rediscovery but not loaded yet -
+        # loading new code needs a restart (see StarCore.rediscover)
+        "pending": list(engine.pending_satellites),
     }
 
 
@@ -59,6 +123,12 @@ def satellite_status(engine, satellite) -> str:
 
 def describe_satellites(engine) -> list:
     return [describe_satellite(engine, satellite) for satellite in engine.registry.all()]
+
+
+def describe_satellite_list(engine) -> dict:
+    """GET /api/satellites - every Satellite, plus the catalog revision so a
+    client knows when to revalidate what it cached (see describe_catalog)."""
+    return {"satellites": describe_satellites(engine), "catalog_revision": catalog_revision(engine)}
 
 
 def describe_commands(engine, source=None) -> list:

@@ -290,6 +290,10 @@ try {
             <h2>Loaded satellites</h2>
             <span id="satellite-count" class="badge badge-unknown">&mdash;</span>
             <p>Every satellite discovered by the Core, with the commands it contributes and the state it publishes.</p>
+            <div class="rediscover">
+                <button id="rediscover-button" class="sc-button" type="button" title="Re-read every Satellite's interface and capabilities from disk, and look for new Satellite folders. No code is loaded.">Rediscover</button>
+                <p id="rediscover-result" class="muted" hidden></p>
+            </div>
         </div>
         <div id="satellites" class="cards">
             <p class="muted">Loading satellites&hellip;</p>

@@ -20,7 +20,7 @@ import {useServers} from '../src/servers/ServersContext';
 import {getCachedSatellites, setCachedSatellites} from '../src/satellites/cache';
 const {__mocks} = jest.requireMock('../src/satellites/api') as {__mocks: {list: jest.Mock}};
 
-const navigation = {navigate: jest.fn()} as any;
+const navigation = {navigate: jest.fn(), addListener: jest.fn(() => () => {})} as any;
 const route = {} as any;
 
 const satelliteA = {
@@ -96,6 +96,34 @@ describe('SatellitesListScreen', () => {
     act(() => tree.root.findByProps({disabled: false}).props.onPress());
 
     expect(navigation.navigate).toHaveBeenCalledWith('SatelliteDetail', {name: 'status'});
+  });
+
+  it('opens a Satellite that only ships a ui.json in the generic renderer, with its own icon', async () => {
+    const notes = {
+      ...satelliteB, name: 'Notes', mobile_ui: false, icon_name: 'file-text',
+      ui: {contract: 'starcore.ui/1.0', revision: 'abc123', error: null},
+    };
+    __mocks.list.mockResolvedValue([notes]);
+    let tree!: ReturnType<typeof renderer.create>;
+    await act(async () => {
+      tree = renderer.create(<SatellitesListScreen navigation={navigation} route={route} />);
+    });
+
+    expect(texts(tree)).not.toContain('No mobile interface yet');
+    expect(tree.root.findAll((node: any) => node.props.name === 'file-text').length).toBeGreaterThan(0);
+    act(() => tree.root.findByProps({disabled: false}).props.onPress());
+    expect(navigation.navigate).toHaveBeenCalledWith('SatelliteUi', {name: 'Notes', revision: 'abc123'});
+  });
+
+  it('does not open a ui.json the Engine refused', async () => {
+    const broken = {...satelliteB, name: 'Broken', mobile_ui: false, ui: {contract: null, revision: null, error: 'ui.json is invalid'}};
+    __mocks.list.mockResolvedValue([broken]);
+    let tree!: ReturnType<typeof renderer.create>;
+    await act(async () => {
+      tree = renderer.create(<SatellitesListScreen navigation={navigation} route={route} />);
+    });
+
+    expect(texts(tree)).toContain('No mobile interface yet');
   });
 
   it('shows an error when the server cannot be reached and nothing is cached', async () => {

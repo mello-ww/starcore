@@ -178,6 +178,7 @@ version, build and commit, and can copy them for a bug report.
 - [Roadmap](docs/roadmap.md) (also the current state, known limitations and latest security review)
 - [Satellites](docs/satellites.md)
 - [Terminology](docs/terminology.md)
+- [UI contract](docs/ui-contract.md) (how Satellites describe their interfaces for every client)
 - [StarCore for Android](mobile/README.md)
 
 <p align="center"><sub>The README's graphics are generated from Mission Control's own tokens
