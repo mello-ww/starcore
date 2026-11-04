@@ -115,3 +115,8 @@ mobile/.metro-health-check*
 mobile/*.log
 mobile/.vscode/
 mobile/.idea/
+
+# Graphify knowledge-graph output - generated locally, large, and never part of the
+# repository (see CLAUDE.md, "Working rules").
+graphify-out/
+.graphify*

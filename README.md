@@ -181,5 +181,10 @@ version, build and commit, and can copy them for a bug report.
 - [UI contract](docs/ui-contract.md) (how Satellites describe their interfaces for every client)
 - [StarCore for Android](mobile/README.md)
 
+## License
+
+StarCore is free software, released under the
+[GNU General Public License v3.0](LICENSE) (GPL-3.0).
+
 <p align="center"><sub>The README's graphics are generated from Mission Control's own tokens
 and icons by <a href="docs/assets/readme/generate.py"><code>docs/assets/readme/generate.py</code></a>.</sub></p>
