@@ -2,6 +2,7 @@ import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {DeveloperModeButton} from '../developer/DeveloperModeButton';
 import {tokens} from '../theme';
+import {TopBarSlot} from './TopBarSlot';
 
 /** A tab's own heading: a spaced eyebrow above a large title, as on Home. A tab passes
  * `developerToggle` to put the Developer Mode switch at its top right. */
@@ -22,6 +23,7 @@ export function ScreenTitle({
         <Text style={[tokens.type.eyebrow, styles.eyebrow]}>{eyebrow.toUpperCase()}</Text>
         {developerToggle ? (
           <View style={styles.toggle}>
+            <TopBarSlot />
             <DeveloperModeButton />
           </View>
         ) : null}
@@ -37,5 +39,5 @@ const styles = StyleSheet.create({
   top: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 20},
   eyebrow: {flex: 1},
   // the 44pt touch target overlaps the spacing around the eyebrow instead of pushing the title down
-  toggle: {marginVertical: -12},
+  toggle: {flexDirection: 'row', alignItems: 'center', gap: tokens.space.sm, marginVertical: -12},
 });

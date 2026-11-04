@@ -6,6 +6,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
 import {AccentCustomColor} from '../components/AccentCustomColor';
 import {DeveloperModeButton} from '../developer/DeveloperModeButton';
+import {TopBarSlot} from '../components/TopBarSlot';
 import {useDeveloperMode} from '../developer/DeveloperModeContext';
 import {SatellitesApi} from '../satellites/api';
 import {STATUS_LABELS, satelliteIcon, statusDotColor as dotColor} from '../satellites/icons';
@@ -148,6 +149,7 @@ export function HomeScreen() {
               {greeting(name)}
             </Text>
           </View>
+          <TopBarSlot />
           <Pressable
             onPress={() => setPicking(value => !value)}
             accessibilityRole="button"

@@ -1,6 +1,7 @@
 import {BottomTabBar, createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import React from 'react';
+import React, {useState} from 'react';
+import {StyleSheet, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {SETTINGS_ICON} from '../components/SettingsButton';
 import {useDeveloperMode} from '../developer/DeveloperModeContext';
@@ -24,6 +25,8 @@ import {StatusHomeScreen} from '../status/StatusHomeScreen';
 import {MusicProvider} from '../music/MusicProvider';
 import {FullPlayer} from '../music/player/FullPlayer';
 import {MiniPlayer} from '../music/player/MiniPlayer';
+import {MusicDisc, MusicFlight} from '../music/player/MusicDisc';
+import {TopBarSlot, TopBarSlotProvider} from '../components/TopBarSlot';
 import {AlbumScreen} from '../music/screens/AlbumScreen';
 import {ArtistScreen} from '../music/screens/ArtistScreen';
 import {DownloadsScreen} from '../music/screens/DownloadsScreen';
@@ -92,6 +95,8 @@ const stackScreenOptions = {
   headerTitleStyle: {fontFamily: tokens.type.title.fontFamily, fontWeight: '700' as const},
   headerShadowVisible: false,
   contentStyle: {backgroundColor: tokens.palette.bg},
+  // the same top-right slot every screen title has (Music's disc while something plays)
+  headerRight: () => <TopBarSlot />,
 };
 
 /** "Satellites" tab's own stack: the list, then whichever Satellite the
@@ -192,13 +197,18 @@ export function MainTabs() {
   // Console and Config are developer tools: their tabs exist only in Developer Mode (their
   // routes stay as protected as ever - see DeveloperModeContext)
   const {enabled: developer} = useDeveloperMode();
+  // the mini-player floats over the screens just above the tab bar, so it needs the bar's height
+  const [tabBarHeight, setTabBarHeight] = useState(0);
   return (
     <MusicProvider>
+      <TopBarSlotProvider component={MusicDisc}>
+      <View style={styles.fill}>
       <Tab.Navigator
       tabBar={props => (
         <>
-          <MiniPlayer />
-          <BottomTabBar {...props} />
+          <View onLayout={event => setTabBarHeight(event.nativeEvent.layout.height)}>
+            <BottomTabBar {...props} />
+          </View>
           <FullPlayer />
         </>
       )}
@@ -214,6 +224,16 @@ export function MainTabs() {
       {developer && <Tab.Screen name="Config" component={ConfigScreen} options={{tabBarIcon: tabIcon('Config')}} />}
       <Tab.Screen name="Settings" component={SettingsStack} options={{tabBarIcon: tabIcon('Settings')}} />
       </Tab.Navigator>
+      {/* drawn over the screens rather than inside the tab bar's area, so what is underneath
+          shows around its rounded edges */}
+      <View pointerEvents="box-none" style={[styles.floating, {bottom: tabBarHeight}]}>
+        <MiniPlayer />
+      </View>
+      <MusicFlight />
+      </View>
+      </TopBarSlotProvider>
     </MusicProvider>
   );
 }
+
+const styles = StyleSheet.create({fill: {flex: 1}, floating: {position: 'absolute', left: 0, right: 0}});
