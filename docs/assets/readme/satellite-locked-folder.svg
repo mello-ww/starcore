@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" role="img" aria-labelledby="t">
+<title id="t">Locked Folder</title>
+<rect x="0.5" y="0.5" width="47" height="47" rx="12" fill="#212228" stroke="#222329"/><g transform="translate(12.0 12.0) scale(1.0000)" fill="none" stroke="#e6e7eb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="1.5"/>
+  <path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>
+  <circle cx="12" cy="15" r="1.4"/></g>
+</svg>
