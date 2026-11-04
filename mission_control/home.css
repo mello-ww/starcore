@@ -259,6 +259,42 @@ body {
     gap: 8px;
 }
 
+/* a slot a Satellite may put one control into (Music's now-playing disc) */
+.topbar-extras {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.topbar-extras:empty {
+    display: none;
+}
+
+/* a control in the slot lines up with the buttons beside it: same height, no inherited margins */
+.topbar-extras > * {
+    flex: none;
+    align-self: center;
+    margin: 0;
+}
+
+/* the engine's state and the last update read as one quiet group, apart from the buttons */
+.topbar-right #core-state {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 12px;
+    border-radius: 999px;
+    line-height: 1;
+}
+
+.topbar-right #updated {
+    margin: 0 12px 0 2px;
+    color: var(--sc-text-3);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
 .accent-picker {
     position: relative;
 }
