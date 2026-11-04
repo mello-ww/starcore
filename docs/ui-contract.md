@@ -328,6 +328,7 @@ says so in place, and a document that `requires` it is not opened.
 | Capability | Version | Operations | Shared block |
 |---|---|---|---|
 | `files.browse` | 1 | `list`: `GET ?path=` → `{path, parent, entries: [{name, type: dir\|file, size, modified}]}`; at the roots (`path` empty) each entry's name is itself an absolute path | `file-browser` |
+| `audio.library` | 1 (specified, not yet in the vocabulary) | `search`, `track`, `resolve`, `artwork`, optional `lyrics` - see [Audio playback](media-audio.md) | played by the `media.audio` client capability |
 
 File Explorer provides `files.browse`. Mission Control's folder picker for `"path"`-typed
 settings also uses it, so no generic code names File Explorer any more.
@@ -467,7 +468,7 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 |---|---|---|
 | Blocks | the 16 above, including `chart` and `table`; the `dashboard` template | more, minor by minor: `image`, `map`, `tabs`; templates `list-detail`, `settings`, `media-gallery`, `media-library` |
 | Satellite capabilities | `files.browse` | `media.gallery` (Photos), `audio.library` and `audio.stream` (Music), `vault` (Locked Folder) |
-| Client capabilities | none claimed | `media.audio-playback`, `secure.screen`, `device.biometrics`, `device.background-tasks` - each a native module written once in the app, behind a shared block |
+| Client capabilities | none claimed | `media.audio` (specified in [Audio playback](media-audio.md); replaces the reserved `media.audio-playback`), `secure.screen`, `device.biometrics`, `device.background-tasks` - each a native module written once in the app, behind a shared block |
 | Home | `widgets` in each document, drawn by both clients; Android keeps the Status card only for servers older than Status's `ui.json` | the fallback card removed once older servers are gone |
 | Sections | `section_of`, but Photo still names the Locked Folder | the host discovers its sections from the catalog |
 | Icons | `icon_name` from the shared set; an Android fallback list for older servers | the fallback list removed once older servers are gone |
@@ -498,8 +499,9 @@ until then.
 7. **Capabilities, one at a time, extracted from the existing code:**
    1. `media.gallery` from Photos' grid and viewer;
    2. `vault` with `secure.screen` and `device.biometrics` from the Locked Folder;
-   3. `audio.library` and `media.audio-playback` from Music's player, queue and downloads,
-      last because it is the largest.
+   3. `audio.library` and `media.audio` from Music's player, queue and downloads. Specified
+      first in [Audio playback](media-audio.md), with its own milestones, because the
+      player is the largest piece of Satellite-specific client code.
 
    Each becomes a shared block or module that any Satellite can use, and removes one name check
    from the clients.

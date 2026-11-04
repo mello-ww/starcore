@@ -34,7 +34,8 @@ Start with `docs/architecture.md`, `docs/ui-contract.md`, `docs/satellites.md` a
 ## Current state
 
 Status runs on the declarative UI contract 1.1 on both clients. Music has its cross-platform
-redesign and a retractable floating player, but keeps its own client code. Photos and File
+redesign and a retractable floating player, but keeps its own client code. Its player is being
+generalised into a shared audio host (`docs/media-audio.md`). Photos and File
 Explorer still need architectural work before moving to the contract.
 
 ## Checks

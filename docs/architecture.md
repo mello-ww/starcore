@@ -32,6 +32,9 @@ later) - a separate application that speaks to the Engine's existing public API 
 Mission Control does, over the same `/api/...` endpoints and the same session system, rather than
 a second backend of its own. See `mobile/README.md`.
 
+Audio playback is moving to one host per client (`media.audio`), which plays content any
+Satellite provides through `audio.library`. See [docs/media-audio.md](media-audio.md).
+
 ## Design
 
 The Engine remains generic while functionality is added through Satellites.

@@ -179,6 +179,7 @@ version, build and commit, and can copy them for a bug report.
 - [Satellites](docs/satellites.md)
 - [Terminology](docs/terminology.md)
 - [UI contract](docs/ui-contract.md) (how Satellites describe their interfaces for every client)
+- [Audio playback](docs/media-audio.md) (the shared `media.audio` host and `audio.library` capability)
 - [StarCore for Android](mobile/README.md)
 
 ## License

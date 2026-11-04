@@ -314,6 +314,11 @@ album, artist and song lists are drawn in chunks as they scroll. See
 
 ## Mobile
 
+Music's players on both clients are the reference for the shared audio host specified in
+[docs/media-audio.md](../media-audio.md); Music will provide `audio.library` from its existing
+routes.
+
+
 StarCore Mobile opens Music on its own screens (Home, Search, Library, album, artist,
 playlist, full-screen player with queue, lyrics, info and devices, equaliser, downloads,
 settings) with a mini-player above the tab bar. Playback uses `react-native-video` (already a

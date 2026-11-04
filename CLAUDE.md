@@ -48,6 +48,7 @@ Codex.
 - **Music** has its cross-platform redesign: StarCore tokens, pill controls and a
   retractable floating player whose top-bar disc shows the playing cover. It still uses its
   own `page.js` and native screens, not `ui.json`.
+  Next: the shared audio host specified in `docs/media-audio.md`.
 - **Photos and File Explorer** still use Satellite-specific client code and need architectural
   work (shared capabilities such as a media gallery) before they move to the contract.
 
