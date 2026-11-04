@@ -88,7 +88,8 @@ New-Item -ItemType Directory -Force $dist | Out-Null
 $out = Join-Path $dist "StarCore-$version.apk"
 Copy-Item $built $out -Force
 $hash = (Get-FileHash $out -Algorithm SHA256).Hash.ToLower()
-"$hash  StarCore-$version.apk" | Set-Content -Encoding ascii "$out.sha256"
+# LF and no BOM, so `sha256sum -c` reads it on Linux and macOS too
+[IO.File]::WriteAllText("$out.sha256", "$hash  StarCore-$version.apk`n", (New-Object System.Text.UTF8Encoding $false))
 
 Write-Host ""
 Write-Host "APK:     $out"

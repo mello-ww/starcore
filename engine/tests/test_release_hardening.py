@@ -203,6 +203,14 @@ class BuildInfoTest(unittest.TestCase):
                                     "commit": None, "dirty": None, "date": None})
         self.assertEqual(line, "StarCore 0.1.0 (stable)")
 
+    def test_startup_output_names_the_version(self):
+        from unittest import mock
+        with mock.patch("builtins.print") as printed:
+            engine = start_engine(mission_control=False)
+        stop_engine(engine)
+        lines = [" ".join(str(arg) for arg in call.args) for call in printed.call_args_list]
+        self.assertTrue(any(line.startswith(build_info.describe()) for line in lines), lines[:5])
+
     def test_status_carries_the_build(self):
         engine = start_engine(mission_control=True)
         try:

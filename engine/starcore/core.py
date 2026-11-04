@@ -114,7 +114,8 @@ class StarCore:
         self.restart_requested = False
 
     def start(self):
-        print("Starting StarCore...\n")
+        print("Starting StarCore...")
+        print(build_info.describe() + "\n")
 
         print("Loading configuration...")
         print("Configuration loaded.\n")
