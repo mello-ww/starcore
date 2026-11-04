@@ -213,7 +213,9 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] Native Music and Photos, declarative screens for other satellites
 - [x] Shared renderer for UI contract documents; icons from `icon_name`
 - [ ] Rediscover and cache controls in the app
-- [ ] Move Status, then Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/ui-contract.md`, "Migration")
+- [x] Move Status onto shared blocks, at parity - UI contract 1.1 (`docs/satellites/status.md`, "Status's migration")
+- [ ] Retire Status's previous page and screen once 1.1 is validated
+- [ ] Move Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/ui-contract.md`, "Migration")
 - [ ] Light theme
 - [ ] Icons instead of text glyphs for the remaining Music controls
 - [ ] Audio playback validated on a real device

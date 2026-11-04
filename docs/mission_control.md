@@ -37,11 +37,12 @@ Pages are addressable: `#/overview`, `#/satellites`, `#/console`, `#/configurati
 
 Mission Control polls the API every 5 seconds. If the Core becomes unreachable it keeps the last known values and shows an error message.
 
-Home also carries a **Status** summary - overall health, CPU, memory, satellites online and the
-most important warnings - when the Status Satellite is loaded and enabled. It comes from the
-state Status publishes, which already arrives with that 5-second `/api/satellites` poll, so it
-adds no request of its own; clicking it opens the Status page (`#/satellite/Status`), whose
-sections are addressable too (`#/satellite/Status/history`). See `docs/satellites/status.md`.
+Home also carries each enabled Satellite's **widgets** - the summaries a Satellite declares in
+its `ui.json` (UI contract 1.1, see [UI contract](ui-contract.md)), drawn by the shared renderer.
+Status's is overall health, CPU, memory, satellites online and the most important warnings. A
+widget without a source binds to the state its Satellite publishes, which already arrives with
+that 5-second `/api/satellites` poll, so it adds no request of its own; clicking it opens the
+page it names (`#/satellite/Status/overview`). Home names no Satellite.
 
 ## Stopping and restarting StarCore
 
@@ -111,6 +112,11 @@ Satellite with a `ui.json` gets a page drawn by Mission Control's shared rendere
 its blocks, live data from its routes, and actions that call them. The renderer knows the
 [UI contract](ui-contract.md), never a Satellite. A new revision of the document (after an
 update or a rediscovery) remounts the page.
+
+A Satellite that ships both a `ui.json` and a `page.js` gets the shared interface; its
+`page.js` is the fallback if the document is refused. In Developer Mode, the button beside the
+Satellite's title switches between the two (remembered per browser), so a Satellite moving to
+`ui.json` can be compared with its previous page before that page is retired.
 
 The Satellites page has a **Rediscover** button: StarCore re-reads every Satellite's
 `ui.json` and manifest metadata from disk, without loading any code, and says what changed -

@@ -61,8 +61,8 @@ describe('UI contract (shared fixtures)', () => {
 
   it('formats values and decides visibility', () => {
     const {cases, visible} = load('formats.json');
-    for (const {value, format, unit, expected} of cases) {
-      expect([value, format, contract.formatValue(value, format, unit)]).toEqual([value, format, expected]);
+    for (const {value, format, unit, options, expected} of cases) {
+      expect([value, format, contract.formatValue(value, format, unit, options)]).toEqual([value, format, expected]);
     }
     for (const {value, expected} of visible) {
       expect(contract.isVisible(value)).toBe(expected);

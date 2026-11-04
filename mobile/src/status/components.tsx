@@ -16,22 +16,8 @@ export function SectionCard({title, children, testID}: {title: string; children:
   );
 }
 
-/** A usage bar. The fill carries severity - neutral, then warning, then danger - never the
- * accent, which with the default red would make a normal bar look critical. */
-export function Meter({value, level, label}: {value: number | null | undefined; level?: HealthState | null; label: string}) {
-  const known = typeof value === 'number' && Number.isFinite(value);
-  const fill = level === 'critical' ? palette.danger : level === 'warning' ? palette.warn : palette.textIcon;
-  return (
-    <View
-      style={styles.track}
-      accessible
-      accessibilityRole="progressbar"
-      accessibilityLabel={label}
-      accessibilityValue={known ? {min: 0, max: 100, now: Math.round(value)} : {text: 'Unavailable'}}>
-      {known && <View style={[styles.fill, {width: `${Math.max(0, Math.min(100, value))}%`, backgroundColor: fill}]} />}
-    </View>
-  );
-}
+/** A usage bar - the app's shared meter (components/charts.tsx). */
+export {Meter} from '../components/charts';
 
 /** A KPI: label, value, a line of context and optionally a meter. */
 export function Tile({label, value, caption, children}: {label: string; value: string; caption?: string; children?: ReactNode}) {
@@ -115,8 +101,6 @@ export function WarningList({warnings}: {warnings: StatusWarning[]}) {
 
 const styles = StyleSheet.create({
   card: {padding: space.lg, borderRadius: radii.card, backgroundColor: palette.card, gap: space.md},
-  track: {height: 6, borderRadius: 3, backgroundColor: palette.controlStrong, overflow: 'hidden'},
-  fill: {height: '100%', borderRadius: 3},
   tile: {
     flexGrow: 1,
     flexBasis: '45%',

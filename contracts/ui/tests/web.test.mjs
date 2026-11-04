@@ -47,8 +47,8 @@ test("route safety", () => {
 
 test("formats and visibility", () => {
     const { cases, visible } = load("formats.json");
-    for (const { value, format, unit, expected } of cases) {
-        assert.equal(contract.formatValue(value, format, unit), expected, `${JSON.stringify(value)} ${format}`);
+    for (const { value, format, unit, options, expected } of cases) {
+        assert.equal(contract.formatValue(value, format, unit, options), expected, `${JSON.stringify(value)} ${format}`);
     }
     for (const { value, expected } of visible) {
         assert.equal(contract.isVisible(value), expected, JSON.stringify(value));

@@ -1,4 +1,4 @@
-// Mission Control's renderer for StarCore UI contract 1.0 (docs/ui-contract.md).
+// Mission Control's renderer for StarCore UI contract 1.1 (docs/ui-contract.md).
 //
 // Mounted exactly like a Satellite's own mission_control/page.js - same
 // mount(context) and cleanup - for any Satellite that ships a ui.json
@@ -8,6 +8,7 @@
 // contains is ever evaluated; every action is an ordinary request to the
 // Satellite's own routes, which keep their own authentication and checks.
 
+import { createChart, meter, sparkline } from "./charts.js";
 import {
     BLOCK_TYPES, checkDocument, findProvider, formatValue, isSafeRoute, isVisible,
     missingRequirements, resolve, resolveTemplate, toneOf,
@@ -15,6 +16,7 @@ import {
 import { icon } from "./icons.js";
 
 const STYLESHEET = "/ui/ui.css";
+const TONE_LEVEL = { warn: "warning", danger: "critical" };
 
 function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -61,12 +63,60 @@ export function sectionFor(page, params) {
     return query ? `${page}?${query}` : page;
 }
 
+/** A dot and a word, never colour alone. */
+function stateDot(tone) {
+    const dot = el("i", `ui-dot ui-dot-${toneOf(tone)}`);
+    dot.setAttribute("aria-hidden", "true");
+    return dot;
+}
+
+/** A severity meter: its fill is neutral until the tone says otherwise. */
+function toneMeter(value, max, tone, label) {
+    const percent = typeof value === "number" && typeof max === "number" && max > 0 ? (value / max) * 100 : null;
+    const node = meter(percent, { warn: Infinity, critical: Infinity, label });
+    const level = TONE_LEVEL[toneOf(tone)];
+    if (level && percent !== null) {
+        node.classList.add(level);
+    }
+    return node;
+}
+
+/** The value of a chart point: [time, value, peak?] or a plain number. */
+function pointValue(point) {
+    return Array.isArray(point) ? point[1] : point;
+}
+
+/** How a chart's axis rounds, from the format its values are shown in. */
+function chartScale(format) {
+    return { percent: "percent", bytes: "bytes", byterate: "bytes", bitrate: "bits" }[format] || "plain";
+}
+
+/** Blocks a dashboard lays out side by side: tiles, charts, and cards
+ * without a table (judged by what was drawn - a hidden table doesn't count). */
+function groupOf(block, node) {
+    if (block.type === "field") {
+        return "fields";
+    }
+    if (block.type === "metric") {
+        return "tiles";
+    }
+    if (block.type === "chart" && block.kind !== "bars") {
+        return "charts";
+    }
+    if (block.type === "card" && !node.querySelector(".ui-table-wrap")) {
+        return "columns";
+    }
+    return null;
+}
+
 export function mount(context) {
     loadStylesheet();
     const root = el("div", "ui-root");
     context.element.appendChild(root);
     const satelliteName = context.satellite.name;
     const satelliteBase = `/api/satellites/${encodeURIComponent(satelliteName)}`;
+    // a host without Developer Mode shows everything
+    const developer = context.developer || { enabled: true, subscribe: () => () => {} };
 
     const state = {
         document: null,
@@ -74,29 +124,44 @@ export function mount(context) {
         catalog: null,
         page: null,
         params: {},
+        pageState: {},
         data: null,
         dataError: null,
+        loading: false,
+        lastGood: 0,
+        sources: {},
+        header: null,
         forms: {},
         notice: null,
-        timer: null,
+        timers: new Map(),
         noticeTimer: null,
         disposed: false,
-        loadToken: 0,
+        tokens: new Map(),
+        charts: new Map(),
+        openTables: new WeakSet(),
     };
 
     // ---------- navigation ----------
+
+    function navigationItems() {
+        return (state.document.navigation || []).filter((item) => !item.developer || developer.enabled);
+    }
 
     function navigate(page, params = {}) {
         location.hash = `#/satellite/${encodeURIComponent(satelliteName)}/${sectionFor(page, params)}`;
     }
 
     function goBack() {
-        const entry = state.document.entry;
         if (history.length > 1) {
             history.back();
         } else {
-            navigate(entry);
+            navigate(state.document.entry);
         }
+    }
+
+    function isAvailable(page) {
+        const item = (state.document.navigation || []).find((entry) => entry.page === page);
+        return !(item && item.developer && !developer.enabled);
     }
 
     function showSection(section) {
@@ -104,7 +169,10 @@ export function mount(context) {
             return;
         }
         const { page, params } = parseSection(section);
-        const target = page && Object.hasOwn(state.document.pages, page) ? page : state.document.entry;
+        let target = page && Object.hasOwn(state.document.pages, page) ? page : state.document.entry;
+        if (!isAvailable(target)) {
+            target = state.document.entry;
+        }
         const required = state.document.pages[target].params || [];
         if (required.some((name) => !(name in params))) {
             navigate(state.document.entry);
@@ -113,10 +181,21 @@ export function mount(context) {
         if (target !== state.page || JSON.stringify(params) !== JSON.stringify(state.params)) {
             state.page = target;
             state.params = params;
+            state.pageState = { ...(pageDefinition().state || {}) };
             state.data = null;
             state.dataError = null;
+            state.lastGood = 0;
+            state.sources = {};
             state.forms = {};
-            loadData();
+            for (const [name, timer] of state.timers) {
+                if (name !== "header") {
+                    clearTimeout(timer);
+                    state.timers.delete(name);
+                }
+            }
+            state.charts.forEach((chart) => chart.destroy());
+            state.charts.clear();
+            loadPage();
         }
     }
 
@@ -126,51 +205,148 @@ export function mount(context) {
         return state.document.pages[state.page];
     }
 
-    function scheduleRefresh() {
-        clearTimeout(state.timer);
-        const source = pageDefinition().source;
-        if (source && source.refresh) {
-            state.timer = setTimeout(() => loadData({ background: true }), Math.max(2, source.refresh) * 1000);
-        }
-    }
-
     function userIsEditing() {
         const active = document.activeElement;
         return Boolean(active && root.contains(active) && ["INPUT", "SELECT", "TEXTAREA"].includes(active.tagName)
             && active.type !== "checkbox");
     }
 
+    /** One source on its own timer: "page" (the page's own), "header", or a named one. */
+    function schedule(name, source, run) {
+        clearTimeout(state.timers.get(name));
+        if (source && source.refresh) {
+            state.timers.set(name, setTimeout(run, Math.max(2, source.refresh) * 1000));
+        }
+    }
+
+    async function fetchSource(name, source) {
+        const token = (state.tokens.get(name) || 0) + 1;
+        state.tokens.set(name, token);
+        const route = resolveTemplate(source.route, { params: state.params, state: state.pageState });
+        if (!isSafeRoute(route)) {
+            throw new Error("This page points outside its Satellite and was not loaded.");
+        }
+        const data = await requestJson(`${satelliteBase}/${route}`);
+        if (token !== state.tokens.get(name) || state.disposed) {
+            return undefined;  // a newer request for this source is under way
+        }
+        return data && typeof data === "object" ? data : {};
+    }
+
+    function loadPage() {
+        loadData();
+        for (const name of Object.keys(pageDefinition().sources || {})) {
+            loadNamed(name);
+        }
+    }
+
     async function loadData({ background = false } = {}) {
-        const token = ++state.loadToken;
+        const page = state.page;
         const source = pageDefinition().source;
         if (!source) {
             state.data = {};
             render();
             return;
         }
-        if (background && userIsEditing()) {
-            scheduleRefresh();  // never pull a form or slider out from under the user
+        const again = () => loadData({ background: true });
+        if (background && (userIsEditing() || document.hidden)) {
+            schedule("page", source, again);  // never pull a form out from under the user, nor poll a hidden tab
             return;
         }
-        const route = resolveTemplate(source.route, { params: state.params });
+        state.loading = true;
+        markLoading();
         try {
-            if (!isSafeRoute(route)) {
-                throw new Error("This page points outside its Satellite and was not loaded.");
-            }
-            const data = await requestJson(`${satelliteBase}/${route}`);
-            if (token !== state.loadToken || state.disposed) {
+            const data = await fetchSource("page", source);
+            if (data === undefined || page !== state.page) {
                 return;
             }
-            state.data = data && typeof data === "object" ? data : {};
+            state.data = data;
             state.dataError = null;
+            state.lastGood = Date.now();
         } catch (error) {
-            if (token !== state.loadToken || state.disposed) {
+            if (state.disposed || page !== state.page) {
                 return;
             }
-            state.dataError = error.message;
+            state.dataError = error.message || "StarCore did not answer";
         }
+        state.loading = false;
         render();
-        scheduleRefresh();
+        schedule("page", source, again);
+    }
+
+    async function loadNamed(name) {
+        const page = state.page;
+        const source = (pageDefinition().sources || {})[name];
+        if (!source) {
+            return;
+        }
+        const again = () => loadNamed(name);
+        if (document.hidden) {
+            schedule(name, source, again);
+            return;
+        }
+        try {
+            const data = await fetchSource(name, source);
+            if (data !== undefined && page === state.page) {
+                state.sources = { ...state.sources, [name]: data };
+                render();
+            }
+        } catch {
+            // a named source is supplementary: its blocks show what they have, the page stays
+        }
+        if (page === state.page && !state.disposed) {
+            schedule(name, source, again);
+        }
+    }
+
+    async function loadHeader() {
+        const header = state.document.header;
+        if (!header || !header.source) {
+            state.header = {};
+            return;
+        }
+        const again = () => loadHeader();
+        if (!document.hidden) {
+            try {
+                const data = await fetchSource("header", header.source);
+                if (data !== undefined) {
+                    state.header = data;
+                    render();
+                }
+            } catch {
+                // the page's own notice says when StarCore isn't answering
+            }
+        }
+        if (!state.disposed) {
+            schedule("header", header.source, again);
+        }
+    }
+
+    function onVisibility() {
+        if (!document.hidden && !state.disposed && state.document && state.page) {
+            loadData({ background: true });
+            for (const name of Object.keys(pageDefinition().sources || {})) {
+                loadNamed(name);
+            }
+            loadHeader();
+        }
+    }
+
+    function setPageState(key, value) {
+        if (state.pageState[key] === value) {
+            return;
+        }
+        state.pageState = { ...state.pageState, [key]: value };
+        render();  // the choice shows at once; the data follows
+        loadData();
+        for (const name of Object.keys(pageDefinition().sources || {})) {
+            loadNamed(name);
+        }
+    }
+
+    // refetching keeps the frame: what is shown stays, dimmed, until the new data arrives
+    function markLoading() {
+        root.classList.toggle("ui-refreshing", Boolean(state.loading && state.data));
     }
 
     // ---------- actions ----------
@@ -232,7 +408,8 @@ export function mount(context) {
     // ---------- blocks ----------
 
     function scopeFor(data) {
-        return { data, page: state.data, params: state.params, form: undefined };
+        return { data, page: state.data, params: state.params, state: state.pageState, sources: state.sources,
+            form: undefined };
     }
 
     function text(value, scope) {
@@ -240,11 +417,58 @@ export function mount(context) {
         return resolved === null || resolved === undefined ? "" : String(resolved);
     }
 
+    // consecutive fields form one group, which a wide card lays out as a grid of facts
     function renderBlocks(blocks, scope, container) {
+        let fields = null;
         for (const block of blocks || []) {
             const node = renderBlock(block, scope);
-            if (node) {
+            if (!node) {
+                continue;
+            }
+            if (block.type === "field") {
+                if (!fields) {
+                    fields = el("div", "ui-fields");
+                    container.appendChild(fields);
+                }
+                fields.appendChild(node);
+            } else {
+                fields = null;
                 container.appendChild(node);
+            }
+        }
+    }
+
+    /** A page's own blocks: on a dashboard, runs of tiles, charts and plain
+     * cards sit side by side where the page is wide enough. */
+    function renderPageBlocks(blocks, scope, container, template) {
+        if (template !== "dashboard") {
+            renderBlocks(blocks, scope, container);
+            return;
+        }
+        let group = null;
+        let holder = null;
+        for (const block of blocks || []) {
+            const node = renderBlock(block, scope);
+            if (!node) {
+                continue;
+            }
+            const kind = block && typeof block === "object" ? groupOf(block, node) : null;
+            if (!kind) {
+                group = null;
+                container.appendChild(node);
+                continue;
+            }
+            if (kind !== group) {
+                group = kind;
+                holder = el("div", `ui-${kind}`);
+                container.appendChild(holder);
+            }
+            holder.appendChild(node);
+        }
+        // a chart or card on its own takes the whole width
+        for (const lone of container.querySelectorAll(":scope > .ui-charts, :scope > .ui-columns")) {
+            if (lone.children.length === 1) {
+                lone.replaceWith(lone.firstElementChild);
             }
         }
     }
@@ -253,7 +477,7 @@ export function mount(context) {
         if (!block || typeof block !== "object") {
             return null;
         }
-        if (block.developer && !context.developer.enabled) {
+        if (block.developer && !developer.enabled) {
             return null;
         }
         if ("visible" in block && !isVisible(resolve(block.visible, scope))) {
@@ -271,32 +495,24 @@ export function mount(context) {
     const BLOCKS = {
         heading: (block, scope) => el("h3", "ui-heading", text(block.text, scope)),
 
-        text: (block, scope) => el("p", `ui-text ui-text-${block.style || "body"}`, text(block.text, scope)),
+        text: (block, scope) => (block.style === "eyebrow"
+            ? el("p", "eyebrow ui-eyebrow", text(block.text, scope))
+            : el("p", `ui-text ui-text-${block.style || "body"}`, text(block.text, scope))),
 
         field: (block, scope) => {
             const row = el("div", "ui-field");
             row.appendChild(el("span", "ui-field-label", text(block.label, scope)));
             const value = el("span", `ui-field-value ui-tone-${toneOf(resolve(block.tone, scope))}`,
                 formatValue(resolve(block.value, scope), block.format, block.unit));
+            const detail = block.detail !== undefined ? text(block.detail, scope) : "";
+            if (detail) {
+                value.appendChild(el("small", "ui-field-detail", detail));
+            }
             row.appendChild(value);
             return row;
         },
 
-        metric: (block, scope) => {
-            const value = resolve(block.value, scope);
-            const tile = el("div", `ui-metric ui-tone-${toneOf(resolve(block.tone, scope))}`);
-            tile.appendChild(el("span", "ui-metric-label", text(block.label, scope)));
-            tile.appendChild(el("span", "ui-metric-value", formatValue(value, block.format, block.unit)));
-            const max = resolve(block.max, scope);
-            if (typeof max === "number" && max > 0 && typeof value === "number") {
-                const bar = el("span", "ui-metric-bar");
-                const fill = el("span", "ui-metric-fill");
-                fill.style.width = `${Math.max(0, Math.min(100, (value / max) * 100))}%`;
-                bar.appendChild(fill);
-                tile.appendChild(bar);
-            }
-            return tile;
-        },
+        metric: (block, scope) => renderMetric(block, scope),
 
         card: (block, scope) => {
             const card = el("section", "ui-card");
@@ -324,6 +540,9 @@ export function mount(context) {
                     row.type = "button";
                     row.addEventListener("click", () => runAction(block.action, itemScope));
                 }
+                if (block.item.tone !== undefined) {
+                    row.appendChild(stateDot(resolve(block.item.tone, itemScope)));
+                }
                 const glyph = icon(resolve(block.item.icon, itemScope));
                 if (glyph) {
                     const holder = el("span", "ui-list-icon");
@@ -333,8 +552,10 @@ export function mount(context) {
                 const main = el("span", "ui-list-main");
                 main.appendChild(el("span", "ui-list-title", text(block.item.title, itemScope)));
                 if (block.item.subtitle !== undefined) {
-                    main.appendChild(el("span", "ui-list-subtitle",
-                        formatValue(resolve(block.item.subtitle, itemScope), formats.subtitle)));
+                    const subtitle = resolve(block.item.subtitle, itemScope);
+                    if (subtitle !== null && subtitle !== undefined && subtitle !== "") {
+                        main.appendChild(el("span", "ui-list-subtitle", formatValue(subtitle, formats.subtitle)));
+                    }
                 }
                 row.appendChild(main);
                 if (block.item.value !== undefined) {
@@ -455,7 +676,290 @@ export function mount(context) {
         },
 
         "file-browser": (block, scope) => renderFileBrowser(block, scope),
+
+        chart: (block, scope) => (block.kind === "bars" ? renderBars(block, scope) : renderChart(block, scope)),
+
+        table: (block, scope) => renderTable(block, scope),
+
+        choice: (block, scope) => {
+            const wrapper = el("div", "ui-choice");
+            const group = el("div", "ui-segmented");
+            group.setAttribute("role", "radiogroup");
+            const label = block.label !== undefined ? text(block.label, scope) : "";
+            if (label) {
+                group.setAttribute("aria-label", label);
+            }
+            const current = state.pageState[block.key];
+            for (const option of block.options || []) {
+                const selected = option.value === current;
+                const button = el("button", `ui-segment${selected ? " active" : ""}`, text(option.label, scope));
+                button.type = "button";
+                button.setAttribute("role", "radio");
+                button.setAttribute("aria-checked", String(selected));
+                button.tabIndex = selected ? 0 : -1;
+                button.addEventListener("click", () => setPageState(block.key, option.value));
+                button.addEventListener("keydown", (event) => {
+                    const options = block.options || [];
+                    const move = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+                    if (move) {
+                        event.preventDefault();
+                        const index = options.findIndex((entry) => entry.value === current);
+                        const next = options[(index + move + options.length) % options.length];
+                        setPageState(block.key, next.value);
+                        requestAnimationFrame(() => {
+                            const focused = root.querySelector(".ui-segment.active");
+                            if (focused) {
+                                focused.focus();
+                            }
+                        });
+                    }
+                });
+                group.appendChild(button);
+            }
+            wrapper.appendChild(group);
+            return wrapper;
+        },
+
+        status: (block, scope) => {
+            const tone = toneOf(resolve(block.tone, scope));
+            const pill = el("div", `ui-status ui-status-${tone}`);
+            pill.append(stateDot(tone), el("span", null, text(block.label, scope)));
+            const detail = block.detail !== undefined ? text(block.detail, scope) : "";
+            if (detail) {
+                pill.appendChild(el("small", null, detail));
+            }
+            return pill;
+        },
+
+        code: (block, scope) => {
+            const value = resolve(block.value, scope);
+            const content = typeof value === "string" ? value : JSON.stringify(value, null, 2) ?? "";
+            const box = el("details", "ui-code");
+            box.appendChild(el("summary", null, block.label !== undefined ? text(block.label, scope) : "Details"));
+            box.appendChild(el("pre", null, content));
+            if (block.copy) {
+                const copy = el("button", "sc-button ui-button", "Copy");
+                copy.type = "button";
+                copy.addEventListener("click", async () => {
+                    try {
+                        await navigator.clipboard.writeText(content);
+                        copy.textContent = "Copied";
+                    } catch {
+                        copy.textContent = "Select the text to copy it";
+                    }
+                    setTimeout(() => {
+                        copy.textContent = "Copy";
+                    }, 2000);
+                });
+                box.appendChild(copy);
+            }
+            return box;
+        },
     };
+
+    function renderMetric(block, scope) {
+        const value = resolve(block.value, scope);
+        const tone = toneOf(resolve(block.tone, scope));
+        const max = resolve(block.max, scope);
+        const label = text(block.label, scope);
+        const formatted = formatValue(value, block.format, block.unit);
+        const detail = block.detail !== undefined ? text(block.detail, scope) : "";
+        const tile = el(block.action ? "button" : "div", `ui-metric ui-tone-${tone}`);
+        if (block.action) {
+            tile.type = "button";
+            tile.addEventListener("click", () => runAction(block.action, scope));
+        }
+        tile.appendChild(el("span", "ui-metric-label", label));
+        tile.appendChild(el("span", "ui-metric-value", formatted));
+        if (detail) {
+            tile.appendChild(el("span", "ui-metric-detail", detail));
+        }
+        if (typeof max === "number" && max > 0 && typeof value === "number") {
+            tile.appendChild(toneMeter(value, max, tone, label));
+        }
+        if (block.trend !== undefined) {
+            const points = resolve(block.trend, scope);
+            if (Array.isArray(points)) {
+                tile.appendChild(sparkline(points.map(pointValue)));
+            }
+        }
+        tile.setAttribute("aria-label", `${label}: ${formatted}${detail ? `, ${detail}` : ""}`);
+        return tile;
+    }
+
+    function chartModel(block, scope) {
+        const series = (block.series || []).map((line, index) => {
+            const points = resolve(line.points, scope);
+            return {
+                key: `s${index}`,
+                label: line.label !== undefined ? text(line.label, scope) : "",
+                points: Array.isArray(points) ? points.filter((point) => Array.isArray(point) && typeof point[1] === "number") : [],
+            };
+        });
+        const times = series.flatMap((line) => line.points.map((point) => point[0]));
+        const now = Date.now() / 1000;
+        const to = Number(resolve(block.to, scope)) || (times.length ? Math.max(...times) : now);
+        const from = Number(resolve(block.from, scope)) || (times.length ? Math.min(...times) : to - 3600);
+        const span = Math.max(1, to - from);
+        const resolution = Number(resolve(block.resolution, scope)) || Math.max(1, span / Math.max(1, times.length));
+        const max = resolve(block.max, scope);
+        const format = (value) => formatValue(value, block.format, block.unit);
+        const scale = chartScale(block.format);
+        const empty = block.empty !== undefined ? text(block.empty, scope) : "";
+        return {
+            title: block.title !== undefined ? text(block.title, scope) : "",
+            from,
+            to,
+            resolution,
+            scale,
+            max: typeof max === "number" && max > 0 ? max : null,
+            format,
+            tickFormat: scale === "percent" ? (value) => `${Math.round(value)}%` : format,
+            tick: (time) => formatValue(time, span <= 2 * 86400 ? "time" : "date"),
+            moment: (time) => formatValue(time, span <= 86400 ? "time" : "datetime"),
+            empty: empty || "Nothing recorded yet",
+            series,
+        };
+    }
+
+    function renderChart(block, scope) {
+        const model = chartModel(block, scope);
+        let chart = state.charts.get(block);
+        if (!chart) {
+            chart = createChart({ label: model.title || "Chart" });
+            state.charts.set(block, chart);
+        }
+        const panel = el("div", "ui-chart");
+        panel.appendChild(chart.element);
+        // drawn once it is in the document, so it knows its width
+        requestAnimationFrame(() => chart.render(model));
+        chart.render(model);
+        panel.appendChild(chartValues(block, model));
+        return panel;
+    }
+
+    /** Every value behind a chart, as a table - the chart's accessible twin. */
+    function chartValues(block, model) {
+        const box = el("div", "ui-chart-values");
+        const toggle = el("button", "ui-chart-toggle", state.openTables.has(block) ? "Hide values" : "Show values");
+        toggle.type = "button";
+        toggle.setAttribute("aria-expanded", String(state.openTables.has(block)));
+        toggle.addEventListener("click", () => {
+            if (state.openTables.has(block)) {
+                state.openTables.delete(block);
+            } else {
+                state.openTables.add(block);
+            }
+            render();
+        });
+        box.appendChild(toggle);
+        if (!state.openTables.has(block)) {
+            return box;
+        }
+        const times = new Map();
+        model.series.forEach((line, index) => {
+            for (const [time, value, peak] of line.points) {
+                if (!times.has(time)) {
+                    times.set(time, { time });
+                }
+                times.get(time)[`s${index}`] = typeof peak === "number" && peak > value
+                    ? `${model.format(value)} (peak ${model.format(peak)})` : model.format(value);
+            }
+        });
+        const rows = [...times.values()].sort((a, b) => b.time - a.time)
+            .map((row) => ({ ...row, time: model.moment(row.time) }));
+        const columns = [{ key: "time", label: "Time" },
+            ...model.series.map((line, index) => ({ key: `s${index}`, label: line.label || "Value", end: true }))];
+        box.appendChild(tableOf(columns, rows, model.empty, true));
+        return box;
+    }
+
+    function renderBars(block, scope) {
+        const series = (block.series || [])[0] || {};
+        const points = resolve(series.points, scope);
+        const values = Array.isArray(points) ? points.map(pointValue).filter((value) => typeof value === "number") : [];
+        const max = Number(resolve(block.max, scope)) || Math.max(1, ...values);
+        const label = series.label !== undefined ? text(series.label, scope) : "";
+        const figure = el("figure", "ui-bars-figure");
+        if (block.title !== undefined) {
+            figure.appendChild(el("figcaption", "eyebrow ui-eyebrow", text(block.title, scope)));
+        }
+        const bars = el("div", "ui-bars");
+        bars.setAttribute("role", "img");
+        bars.setAttribute("aria-label", `${text(block.title, scope) || label}: ${values.map((value) => formatValue(value, block.format, block.unit)).join(", ")}`);
+        values.forEach((value, index) => {
+            const column = el("div", "ui-bar");
+            column.title = `${label ? `${label} ` : ""}${index + 1}: ${formatValue(value, block.format, block.unit)}`;
+            const fill = el("span", "ui-bar-fill");
+            fill.style.height = `${Math.max(2, Math.min(100, (value / max) * 100))}%`;
+            column.appendChild(fill);
+            bars.appendChild(column);
+        });
+        figure.appendChild(bars);
+        return figure;
+    }
+
+    function renderTable(block, scope) {
+        const rows = Array.isArray(block.rows) ? block.rows : resolve(block.rows, scope);
+        const empty = block.empty !== undefined ? text(block.empty, scope) : "Nothing to show.";
+        const columns = (block.columns || []).map((column, index) => ({ ...column, key: `c${index}`, end: column.align === "end" }));
+        const shaped = (Array.isArray(rows) ? rows : []).map((row) => {
+            const rowScope = { ...scope, data: row };
+            const cells = {};
+            for (const column of columns) {
+                const value = resolve(column.value, rowScope);
+                const shown = formatValue(value, column.format, column.unit === undefined ? undefined : text(column.unit, rowScope));
+                const max = resolve(column.max, rowScope);
+                if (column.tone !== undefined && column.max === undefined) {
+                    const cell = el("span", "ui-cell-state");
+                    cell.append(stateDot(resolve(column.tone, rowScope)), el("span", null, shown));
+                    cells[column.key] = cell;
+                } else if (typeof max === "number" && typeof value === "number") {
+                    const cell = el("span", "ui-cell-usage");
+                    cell.append(toneMeter(value, max, resolve(column.tone, rowScope), `${text(column.label, rowScope)}`),
+                        el("span", null, shown));
+                    cells[column.key] = cell;
+                } else {
+                    cells[column.key] = shown;
+                }
+            }
+            return cells;
+        });
+        return tableOf(columns.map((column) => ({ key: column.key, label: column.label, end: column.end })), shaped, empty);
+    }
+
+    function tableOf(columns, rows, emptyText, scroll = false) {
+        if (!rows.length) {
+            return el("p", "ui-text ui-text-caption", emptyText || "Nothing to show.");
+        }
+        const wrapper = el("div", `ui-table-wrap${scroll ? " ui-table-scroll" : ""}`);
+        const grid = el("table", "ui-table");
+        const head = el("tr");
+        for (const column of columns) {
+            const cell = el("th", column.end ? "ui-end" : null, column.label);
+            cell.scope = "col";
+            head.appendChild(cell);
+        }
+        grid.appendChild(el("thead")).appendChild(head);
+        const body = el("tbody");
+        for (const row of rows) {
+            const line = el("tr");
+            for (const column of columns) {
+                const value = row[column.key];
+                const cell = el("td", column.end ? "ui-end" : null);
+                if (value instanceof Node) {
+                    cell.appendChild(value);
+                } else {
+                    cell.textContent = value === null || value === undefined ? "—" : String(value);
+                }
+                line.appendChild(cell);
+            }
+            body.appendChild(line);
+        }
+        grid.appendChild(body);
+        wrapper.appendChild(grid);
+        return wrapper;
+    }
 
     function renderFormField(field, values, scope) {
         const label = el("label", field.kind === "toggle" ? "ui-toggle" : "ui-input-field");
@@ -590,16 +1094,33 @@ export function mount(context) {
         }
     }
 
+    function renderHeader() {
+        const header = state.document.header;
+        if (!header || !state.header) {
+            return null;
+        }
+        const scope = { data: state.header, page: state.header, params: {}, state: {}, sources: {} };
+        const band = el("header", "ui-header");
+        const main = el("div", "ui-header-main");
+        const side = el("div", "ui-header-side");
+        for (const block of header.blocks || []) {
+            const node = renderBlock(block, scope);
+            if (node) {
+                (block.type === "status" ? side : main).appendChild(node);
+            }
+        }
+        band.append(main, side);
+        return band;
+    }
+
     function renderNavigation() {
-        const items = state.document.navigation || [];
+        const items = navigationItems();
         if (items.length < 2) {
             return null;
         }
         const nav = el("nav", "ui-tabs");
-        nav.setAttribute("aria-label", `${satelliteName} pages`);
-        const current = items.some((item) => item.page === state.page)
-            ? state.page
-            : null;
+        nav.setAttribute("aria-label", `${state.document.title || satelliteName} pages`);
+        const current = items.some((item) => item.page === state.page) ? state.page : null;
         for (const item of items) {
             const tab = el("button", `ui-tab${item.page === current ? " active" : ""}`);
             tab.type = "button";
@@ -617,21 +1138,51 @@ export function mount(context) {
         return nav;
     }
 
+    function renderSkeleton(template) {
+        const grid = el("div", template === "dashboard" ? "ui-tiles" : "ui-page");
+        for (let index = 0; index < (template === "dashboard" ? 6 : 3); index += 1) {
+            grid.appendChild(el("div", "ui-skeleton"));
+        }
+        return grid;
+    }
+
+    function renderFailure() {
+        const box = el("section", "ui-card ui-failure");
+        box.appendChild(el("p", "eyebrow", `${state.document.title || satelliteName} is unavailable`));
+        box.appendChild(el("p", "ui-text ui-text-caption", state.dataError));
+        const retry = el("button", "sc-button ui-button", "Try again");
+        retry.type = "button";
+        retry.addEventListener("click", () => {
+            state.dataError = null;
+            render();
+            loadData();
+        });
+        box.appendChild(retry);
+        return box;
+    }
+
     function render() {
-        if (state.disposed || !state.document) {
+        if (state.disposed || !state.document || !state.page) {
             return;
         }
         const page = pageDefinition();
         const scope = scopeFor(state.data || {});
+        const template = page.template || "stack";
         root.replaceChildren();
+        root.classList.toggle("ui-wide", template === "dashboard");
 
-        const nav = renderNavigation();
-        if (nav) {
-            root.appendChild(nav);
-        }
-        const isTopLevel = (state.document.navigation || []).some((item) => item.page === state.page)
+        const isTopLevel = navigationItems().some((item) => item.page === state.page)
             || state.page === state.document.entry;
-        if (!isTopLevel) {
+        if (isTopLevel) {
+            const header = renderHeader();
+            if (header) {
+                root.appendChild(header);
+            }
+            const nav = renderNavigation();
+            if (nav) {
+                root.appendChild(nav);
+            }
+        } else {
             // a detail page: the tabs don't name it, so it gets a title and a way back
             const head = el("div", "ui-page-head");
             const back = el("button", "sc-icon-button sc-icon-button-quiet ui-back", "‹ Back");
@@ -645,19 +1196,25 @@ export function mount(context) {
         }
         renderNotice();
 
-        if (state.dataError) {
-            root.appendChild(el("p", "banner error ui-notice", state.dataError));
-            if (!state.data) {
-                return;
-            }
-        }
-        if (!state.data) {
-            root.appendChild(el("p", "ui-text ui-text-caption", "Loading…"));
+        if (state.dataError && state.data) {
+            // readings that are no longer current stay visible, dimmed, under the notice
+            const seconds = Math.max(1, Math.round((Date.now() - state.lastGood) / 1000));
+            const notice = el("p", "ui-stale", `StarCore is not answering (${state.dataError}). `
+                + `Showing what it said ${formatValue(seconds, "duration")} ago.`);
+            notice.setAttribute("role", "status");
+            root.appendChild(notice);
+        } else if (state.dataError) {
+            root.appendChild(renderFailure());
             return;
         }
-        const body = el("div", "ui-page");
-        renderBlocks(page.blocks, scope, body);
+        if (!state.data) {
+            root.appendChild(renderSkeleton(template));
+            return;
+        }
+        const body = el("div", `ui-page${state.dataError ? " ui-page-stale" : ""}`);
+        renderPageBlocks(page.blocks, scope, body, template);
         root.appendChild(body);
+        markLoading();
     }
 
     function fail(message) {
@@ -688,6 +1245,7 @@ export function mount(context) {
                     : `This interface needs a Satellite that provides ${item.name}.`)).join(" "));
                 return;
             }
+            loadHeader();
             showSection(context.section);
         } catch (error) {
             if (!state.disposed) {
@@ -696,13 +1254,23 @@ export function mount(context) {
         }
     }
 
-    const unsubscribe = context.developer.subscribe(() => render());
+    // a developer-only page disappears with Developer Mode: never leave it open
+    const unsubscribe = developer.subscribe(() => {
+        if (state.document && state.page && !isAvailable(state.page)) {
+            navigate(state.document.entry);
+            return;
+        }
+        render();
+    });
+    document.addEventListener("visibilitychange", onVisibility);
     start();
 
     const cleanup = () => {
         state.disposed = true;
-        clearTimeout(state.timer);
+        state.timers.forEach((timer) => clearTimeout(timer));
         clearTimeout(state.noticeTimer);
+        state.charts.forEach((chart) => chart.destroy());
+        document.removeEventListener("visibilitychange", onVisibility);
         unsubscribe();
         root.remove();
         noticeSlot.remove();
@@ -710,4 +1278,105 @@ export function mount(context) {
     cleanup.showSection = showSection;
     cleanup.revision = () => state.revision;
     return cleanup;
+}
+
+/**
+ * One widget from a document's `widgets` (UI contract 1.1), for Home: a
+ * compact card of the blocks a summary needs - status, metrics, fields,
+ * text and lists - drawn from `data` (the Satellite's published state, or
+ * the widget's own source). It opens the Satellite, and never acts on it.
+ */
+export function renderWidget(widget, data, { developer = false, title, onOpen } = {}) {
+    loadStylesheet();
+    const scope = { data, page: data, params: {}, state: {}, sources: {} };
+    const words = (value) => {
+        const resolved = resolve(value, scope);
+        return resolved === null || resolved === undefined ? "" : String(resolved);
+    };
+    const card = el("article", "ui-widget");
+    card.tabIndex = 0;
+    card.setAttribute("role", "link");
+    const head = el("div", "ui-widget-head");
+    const glyph = icon(widget.icon, 16);
+    if (glyph) {
+        head.appendChild(glyph);
+    }
+    const name = widget.title !== undefined ? words(widget.title) : title || "";
+    head.appendChild(el("h2", "sc-eyebrow ui-widget-title", name));
+    head.appendChild(el("span", "ui-widget-open", "Open"));
+    card.appendChild(head);
+    card.setAttribute("aria-label", `${name}: open`);
+
+    const body = el("div", "ui-widget-body");
+    let metrics = null;
+    for (const block of widget.blocks || []) {
+        if (!block || typeof block !== "object" || (block.developer && !developer)
+            || ("visible" in block && !isVisible(resolve(block.visible, scope)))) {
+            continue;
+        }
+        if (block.type !== "metric") {
+            metrics = null;
+        }
+        if (block.type === "status") {
+            const tone = toneOf(resolve(block.tone, scope));
+            const state = el("p", "ui-widget-state");
+            state.append(stateDot(tone), el("span", null, words(block.label)));
+            const detail = block.detail !== undefined ? words(block.detail) : "";
+            if (detail) {
+                state.appendChild(el("small", null, detail));
+            }
+            body.appendChild(state);
+        } else if (block.type === "metric") {
+            if (!metrics) {
+                metrics = el("dl", "ui-widget-metrics");
+                body.appendChild(metrics);
+            }
+            const value = resolve(block.value, scope);
+            const max = resolve(block.max, scope);
+            const tone = toneOf(resolve(block.tone, scope));
+            const item = el("div");
+            item.append(el("dt", null, words(block.label)), el("dd", `ui-tone-${tone}`, formatValue(value, block.format, block.unit)));
+            if (typeof max === "number" && max > 0 && typeof value === "number") {
+                item.appendChild(toneMeter(value, max, tone, words(block.label)));
+            } else if (block.detail !== undefined) {
+                item.appendChild(el("span", "ui-widget-note", words(block.detail)));
+            }
+            metrics.appendChild(item);
+        } else if (block.type === "list") {
+            const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
+            const list = el("ul", "ui-widget-list");
+            for (const entry of Array.isArray(items) ? items.slice(0, 3) : []) {
+                const itemScope = { ...scope, data: entry };
+                const row = el("li");
+                if (block.item && block.item.tone !== undefined) {
+                    row.appendChild(stateDot(resolve(block.item.tone, itemScope)));
+                }
+                const text = resolve(block.item && block.item.title, itemScope);
+                row.appendChild(el("span", null, text === null || text === undefined ? "" : String(text)));
+                list.appendChild(row);
+            }
+            if (list.children.length) {
+                body.appendChild(list);
+            }
+        } else if (block.type === "field") {
+            const row = el("p", "ui-widget-field");
+            row.append(el("span", null, words(block.label)),
+                el("strong", null, formatValue(resolve(block.value, scope), block.format, block.unit)));
+            body.appendChild(row);
+        } else if (block.type === "text" || block.type === "heading") {
+            body.appendChild(el("p", "ui-text ui-text-caption", words(block.text)));
+        }
+        // anything else belongs on the Satellite's own pages, not in a summary
+    }
+    card.appendChild(body);
+    const open = () => onOpen && onOpen(widget.action && widget.action.navigate
+        ? sectionFor(widget.action.navigate, resolve(widget.action.params || {}, scope)) : null);
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            open();
+        }
+    });
+    return card;
 }

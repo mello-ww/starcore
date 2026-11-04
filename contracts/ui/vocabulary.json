@@ -1,27 +1,46 @@
 {
   "contract": "starcore.ui",
-  "version": "1.0",
-  "description": "The closed vocabulary of StarCore UI contract v1.0 - see docs/ui-contract.md. The Engine (engine/starcore/ui_contract.py), Mission Control (mission_control/ui/contract.js) and the Android app (mobile/src/satellites/ui/contract.ts) each test that they implement exactly this list.",
+  "version": "1.1",
+  "description": "The closed vocabulary of StarCore UI contract v1.1 - see docs/ui-contract.md. The Engine (engine/starcore/ui_contract.py), Mission Control (mission_control/ui/contract.js) and the Android app (mobile/src/satellites/ui/contract.ts) each test that they implement exactly this list. 1.1 only adds to 1.0: every 1.0 document is a valid 1.1 document.",
   "blocks": {
     "heading": {"required": ["text"], "optional": []},
     "text": {"required": ["text"], "optional": ["style"]},
-    "field": {"required": ["label", "value"], "optional": ["format", "unit", "tone"]},
-    "metric": {"required": ["label", "value"], "optional": ["format", "unit", "max", "tone"]},
+    "field": {"required": ["label", "value"], "optional": ["format", "unit", "tone", "detail"]},
+    "metric": {"required": ["label", "value"], "optional": ["format", "unit", "max", "tone", "detail", "trend", "action"]},
     "card": {"required": ["blocks"], "optional": ["title"]},
     "list": {"required": ["items", "item"], "optional": ["empty", "action"]},
     "button": {"required": ["label", "action"], "optional": ["style"]},
     "toggle": {"required": ["label", "value", "action"], "optional": ["description"]},
     "slider": {"required": ["label", "value", "min", "max", "action"], "optional": ["step", "format", "unit"]},
     "form": {"required": ["fields", "submit"], "optional": []},
-    "file-browser": {"required": ["capability"], "optional": ["select", "action", "label"]}
+    "file-browser": {"required": ["capability"], "optional": ["select", "action", "label"]},
+    "chart": {"required": ["series"], "optional": ["title", "kind", "format", "unit", "max", "from", "to", "resolution", "empty"]},
+    "table": {"required": ["rows", "columns"], "optional": ["empty"]},
+    "choice": {"required": ["key", "options"], "optional": ["label"]},
+    "status": {"required": ["label"], "optional": ["tone", "detail"]},
+    "code": {"required": ["value"], "optional": ["label", "copy"]}
+  },
+  "since": {
+    "_note": "The minor each block, key or format arrived in. A document that declares an older minor may not use them.",
+    "1.1": {
+      "blocks": ["chart", "table", "choice", "status", "code"],
+      "keys": ["field.detail", "metric.detail", "metric.trend", "metric.action", "list.item.tone", "text.style.eyebrow",
+               "page.state", "page.sources", "page.template", "navigation.developer", "document.header", "document.widgets"],
+      "formats": ["bitrate", "byterate", "date", "time", "datetime", "relative"],
+      "bindings": ["$state.", "$sources."]
+    }
   },
   "common_block_keys": ["type", "id", "visible", "required", "developer"],
-  "text_styles": ["body", "caption", "mono"],
+  "text_styles": ["body", "caption", "mono", "eyebrow"],
   "button_styles": ["primary", "secondary", "danger"],
   "tones": ["neutral", "ok", "warn", "danger"],
-  "formats": ["text", "number", "integer", "percent", "bytes", "duration"],
+  "formats": ["text", "number", "integer", "percent", "bytes", "duration",
+              "bitrate", "byterate", "date", "time", "datetime", "relative"],
   "form_field_kinds": ["text", "number", "select", "toggle"],
   "file_browser_select": ["none", "directory", "file"],
+  "chart_kinds": ["columns", "bars"],
+  "column_align": ["start", "end"],
+  "page_templates": ["stack", "dashboard"],
   "action_then": ["refresh", "back"],
   "methods": ["GET", "POST"],
   "icons": [
@@ -38,7 +57,7 @@
     }
   },
   "client_capabilities": {
-    "_note": "Device features a client may offer a document beyond rendering blocks. Reserved names only in 1.0: no 1.0 block uses one, so neither client claims any yet, and a document that requires one is shown as needing a newer app.",
+    "_note": "Device features a client may offer a document beyond rendering blocks. Reserved names only: no 1.x block uses one yet, so neither client claims any, and a document that requires one is shown as needing a newer app.",
     "reserved": ["device.biometrics", "device.background-tasks", "media.audio-playback", "secure.screen"]
   },
   "limits": {
@@ -46,6 +65,11 @@
     "pages": 32,
     "blocks_per_page": 200,
     "nesting_depth": 4,
-    "min_refresh_seconds": 2
+    "min_refresh_seconds": 2,
+    "sources_per_page": 4,
+    "widgets": 4,
+    "chart_series": 4,
+    "table_columns": 10,
+    "choice_options": 8
   }
 }

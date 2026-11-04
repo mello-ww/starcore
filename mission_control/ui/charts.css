@@ -1,0 +1,230 @@
+/* Mission Control's shared charts, meters and sparklines (ui/charts.js). */
+
+.sc-meter {
+    position: relative;
+    flex: none;
+    height: 6px;
+    margin-top: auto;
+    overflow: hidden;
+    border-radius: 3px;
+    background: var(--sc-control-strong);
+}
+
+/* a meter's fill carries severity, so it stays neutral until a threshold:
+   with the red accent preset, an accent fill would look like danger */
+.sc-meter-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--sc-text-icon);
+    transition: width 400ms ease;
+}
+
+.sc-meter.warning .sc-meter-fill {
+    background: var(--sc-warn);
+}
+
+.sc-meter.critical .sc-meter-fill {
+    background: var(--sc-danger);
+}
+
+.sc-spark {
+    display: block;
+    margin-top: 8px;
+    overflow: visible;
+}
+
+.sc-spark-line {
+    fill: none;
+    stroke: var(--sc-chart-2);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sc-spark-dot {
+    fill: var(--sc-accent);
+    stroke: var(--sc-card);
+    stroke-width: 2;
+}
+
+.sc-chart {
+    margin: 0;
+}
+
+.sc-chart-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px 16px;
+    margin-bottom: 10px;
+}
+
+.sc-chart-title {
+    color: var(--sc-text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.sc-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    color: var(--sc-text-2);
+    font-size: 12px;
+}
+
+.sc-chart-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sc-chart-legend-item strong,
+.sc-chart-tooltip strong {
+    color: var(--sc-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.sc-chart-key {
+    flex: none;
+    display: inline-block;
+    width: 14px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--sc-accent);
+}
+
+.sc-chart-key.sc-chart-second {
+    background: var(--sc-chart-2);
+}
+
+.sc-chart-plot {
+    position: relative;
+}
+
+.sc-chart-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.sc-chart-grid {
+    stroke: var(--line-bright, #2e2f36);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+}
+
+.sc-chart-axis {
+    fill: var(--sc-text-3);
+    font: 11px var(--sc-font-sans);
+    font-variant-numeric: tabular-nums;
+}
+
+.sc-chart-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sc-chart-line.sc-chart-accent {
+    stroke: var(--sc-accent);
+}
+
+.sc-chart-line.sc-chart-second {
+    stroke: var(--sc-chart-2);
+}
+
+.sc-chart-area {
+    fill: var(--sc-accent);
+    opacity: 0.1;
+}
+
+.sc-chart-point.sc-chart-accent,
+.sc-chart-marker.sc-chart-accent {
+    fill: var(--sc-accent);
+}
+
+.sc-chart-point.sc-chart-second,
+.sc-chart-marker.sc-chart-second {
+    fill: var(--sc-chart-2);
+}
+
+.sc-chart-marker {
+    stroke: var(--sc-card);
+    stroke-width: 2;
+}
+
+.sc-chart-crosshair {
+    stroke: var(--sc-text-3);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+}
+
+.sc-chart-overlay {
+    fill: transparent;
+    cursor: crosshair;
+    outline: none;
+}
+
+.sc-chart-overlay:focus-visible {
+    stroke: var(--sc-accent);
+    stroke-width: 1;
+}
+
+.sc-chart-empty {
+    fill: var(--sc-text-3);
+    font: 13px var(--sc-font-sans);
+}
+
+.sc-chart-tooltip {
+    position: absolute;
+    top: 0;
+    z-index: 2;
+    min-width: 160px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--sc-control-strong);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.sc-chart-tooltip[hidden] {
+    display: none;
+}
+
+.sc-chart-tooltip-time {
+    margin: 0 0 6px;
+    color: var(--sc-text-2);
+}
+
+.sc-chart-tooltip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 3px 0 0;
+}
+
+.sc-chart-tooltip-row strong {
+    font-size: 13px;
+}
+
+.sc-chart-tooltip-row span {
+    color: var(--sc-text-2);
+}
+
+.sc-chart-tooltip-row small {
+    margin-left: auto;
+    padding-left: 8px;
+    color: var(--sc-text-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sc-meter-fill {
+        transition: none;
+    }
+}

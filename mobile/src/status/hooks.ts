@@ -1,5 +1,4 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {AppState} from 'react-native';
 import type {StatusApi} from './api';
 import type {HistoryPeriod, SeriesName, StatusHistory, StatusSnapshot} from './types';
 
@@ -7,18 +6,7 @@ import type {HistoryPeriod, SeriesName, StatusHistory, StatusSnapshot} from './t
 export const DEFAULT_INTERVAL_SECONDS = 5;
 const MIN_INTERVAL_SECONDS = 2;
 
-/** Whether the app is in the foreground - polling stops when it isn't. */
-export function useAppActive(): boolean {
-  const [active, setActive] = useState(() => {
-    const state = AppState.currentState as unknown;
-    return typeof state !== 'string' || state === 'active';
-  });
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', state => setActive(state === 'active'));
-    return () => subscription?.remove?.();
-  }, []);
-  return active;
-}
+export {useAppActive} from '../hooks/useAppActive';
 
 export interface MetricsState {
   data: StatusSnapshot | null;

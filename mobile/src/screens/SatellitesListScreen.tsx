@@ -9,6 +9,7 @@ import {getCachedSatellites, setCachedSatellites} from '../satellites/cache';
 import {STATUS_LABELS, satelliteIcon, statusDotColor} from '../satellites/icons';
 import type {SatelliteSummary} from '../satellites/types';
 import {ScreenTitle} from '../components/ScreenTitle';
+import {DEDICATED_SCREENS} from './HomeScreen';
 import {Surface} from '../components/Surface';
 import {tokens, useAccent, useTopInset} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
@@ -83,9 +84,12 @@ export function SatellitesListScreen({navigation}: Props) {
           </View>
         }
         renderItem={({item}) => {
-          // a ui.json the Engine validated (UI contract 1.0) - drawn by the
-          // generic SatelliteUiScreen, so a new Satellite needs no app change
+          // a ui.json the Engine validated (UI contract 1.x) - drawn by the
+          // generic SatelliteUiScreen, so a new Satellite needs no app change.
+          // It comes first: a dedicated screen is what a Satellite without one
+          // uses (Photo, Music), or the fallback for a server older than its ui.json.
           const declarative = Boolean(item.ui?.revision);
+          const dedicated = declarative ? undefined : DEDICATED_SCREENS[item.name];
           const openable = item.mobile_ui || declarative;
           return (
           <Pressable
@@ -94,22 +98,11 @@ export function SatellitesListScreen({navigation}: Props) {
             accessibilityLabel={openable ? `Open ${item.name}` : `${item.name}, no mobile interface yet`}
             style={({pressed}) => pressed && styles.pressed}
             onPress={() =>
-              // "Photo" gets its own dedicated screens (grid, folders,
-              // search, a full-screen viewer) instead of the generic
-              // DeclarativeScreen every other Satellite renders through -
-              // see PhotoHomeScreen's docstring. Still gated on
-              // item.mobile_ui like everything else: Photo only reaches
-              // here at all because it now answers a "mobile" route too
-              // (see satellites/native/photo/api.py).
-              item.name === 'Photo'
-                ? navigation.navigate('PhotoHome')
-                : item.name === 'Music'
-                  ? navigation.navigate('MusicHome')
-                  : item.name === 'Status'
-                    ? navigation.navigate('StatusHome')
-                    : declarative
-                      ? navigation.navigate('SatelliteUi', {name: item.name, revision: item.ui?.revision})
-                      : navigation.navigate('SatelliteDetail', {name: item.name})
+              dedicated
+                ? navigation.navigate(dedicated)
+                : declarative
+                  ? navigation.navigate('SatelliteUi', {name: item.name, revision: item.ui?.revision})
+                  : navigation.navigate('SatelliteDetail', {name: item.name})
             }>
             <Surface style={styles.card}>
               <View style={styles.row}>

@@ -1,11 +1,12 @@
 import React, {useEffect, useState} from 'react';
-import {Alert, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
+import {Alert, Clipboard, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import {Bars, ChartScale, ColumnChart, Meter, Sparkline} from '../../components/charts';
 import {PrimaryButton} from '../../components/PrimaryButton';
 import {Slider} from '../../components/Slider';
 import {StarSwitch} from '../../components/StarSwitch';
 import {Surface} from '../../components/Surface';
-import {tokens, useAccent} from '../../theme';
+import {TOUCH_TARGET, tokens, useAccent} from '../../theme';
 import {
   BLOCK_TYPES, findProvider, formatValue, ICONS, isSafeRoute, isVisible, resolve, toneOf,
   type Providers, type Scope, type UiAction, type UiBlock,
@@ -14,7 +15,7 @@ import {
 const {palette, space, type, radii} = tokens;
 
 /**
- * This app's components for UI contract 1.0 blocks (docs/ui-contract.md).
+ * This app's components for UI contract 1.1 blocks (docs/ui-contract.md).
  * Each block is drawn with the app's own components and tokens; what it
  * shows comes from bindings into live data, and what it does is an action
  * the screen runs against the Satellite's own routes. No block knows which
@@ -32,11 +33,31 @@ export interface BlockContext {
   forms: Record<string, Record<string, any>>;
   /** A slider or text field is being used - background refresh holds off. */
   setEditing: (editing: boolean) => void;
+  /** 1.1: the page's own values (a choice's selection), and how a choice changes one. */
+  pageState?: Record<string, any>;
+  setPageState?: (key: string, value: any) => void;
+  /** New data for the page is on its way: what is shown stays, dimmed. */
+  refreshing?: boolean;
+  /** The header: a field reads as one line of context ("Updated 12s ago · Sampling every 5 s"). */
+  inline?: boolean;
 }
 
 const asText = (value: unknown) => (value === null || value === undefined ? '' : String(value));
 
 const TONE_COLORS: Record<string, string> = {neutral: palette.text, ok: palette.text, warn: palette.warn, danger: palette.danger};
+const DOT_COLORS: Record<string, string> = {neutral: palette.text3, ok: palette.textIcon, warn: palette.warn, danger: palette.danger};
+const METER_LEVELS: Record<string, 'warning' | 'critical' | null> = {neutral: null, ok: null, warn: 'warning', danger: 'critical'};
+
+/** Whether a block is drawn at all - Developer Mode and `visible`. */
+function isShown(block: UiBlock, scope: Scope, context: BlockContext): boolean {
+  if (!block || typeof block !== 'object') {
+    return false;
+  }
+  if (block.developer && !context.developer) {
+    return false;
+  }
+  return !('visible' in block) || isVisible(resolve(block.visible, scope));
+}
 
 export function UiBlocks({blocks, scope, context}: {blocks: UiBlock[] | undefined; scope: Scope; context: BlockContext}) {
   return (
@@ -48,14 +69,104 @@ export function UiBlocks({blocks, scope, context}: {blocks: UiBlock[] | undefine
   );
 }
 
+/** A page's own blocks. On a dashboard, a run of metrics is a grid of tiles;
+ * everything else stacks, as a phone is one column wide. */
+export function UiPageBlocks({
+  blocks, scope, context, template,
+}: {blocks: UiBlock[] | undefined; scope: Scope; context: BlockContext; template?: string}) {
+  if (template !== 'dashboard') {
+    return <UiBlocks blocks={blocks} scope={scope} context={context} />;
+  }
+  const groups: Array<{tiles: boolean; items: Array<{block: UiBlock; key: string}>}> = [];
+  (blocks ?? []).forEach((block, index) => {
+    if (!isShown(block, scope, context)) {
+      return;
+    }
+    const tiles = block.type === 'metric';
+    const last = groups[groups.length - 1];
+    const key = block.id ?? `${block.type}-${index}`;
+    if (tiles && last?.tiles) {
+      last.items.push({block, key});
+    } else {
+      groups.push({tiles, items: [{block, key}]});
+    }
+  });
+  return (
+    <>
+      {groups.map(group =>
+        group.tiles ? (
+          <View key={group.items[0].key} style={styles.tiles}>
+            {group.items.map(({block, key}) => (
+              <MetricBlock key={key} block={block} scope={scope} context={context} tile />
+            ))}
+          </View>
+        ) : (
+          <UiBlockView key={group.items[0].key} block={group.items[0].block} scope={scope} context={context} />
+        ),
+      )}
+    </>
+  );
+}
+
+/** A widget's blocks (Home): a run of metrics shares one compact row. */
+export function UiWidgetBlocks({blocks, scope, context}: {blocks: UiBlock[] | undefined; scope: Scope; context: BlockContext}) {
+  const shown = (blocks ?? []).map((block, index) => ({block, key: block?.id ?? `${block?.type}-${index}`}))
+    .filter(({block}) => isShown(block, scope, context));
+  const groups: Array<Array<{block: UiBlock; key: string}>> = [];
+  for (const item of shown) {
+    const last = groups[groups.length - 1];
+    if (item.block.type === 'metric' && last?.[0].block.type === 'metric') {
+      last.push(item);
+    } else {
+      groups.push([item]);
+    }
+  }
+  return (
+    <>
+      {groups.map(group =>
+        group[0].block.type === 'metric' ? (
+          <View key={group[0].key} style={styles.compactRow}>
+            {group.map(({block, key}) => (
+              <MetricBlock key={key} block={block} scope={scope} context={context} compact />
+            ))}
+          </View>
+        ) : group[0].block.type === 'list' ? (
+          <WidgetList key={group[0].key} block={group[0].block} scope={scope} />
+        ) : (
+          <UiBlockView key={group[0].key} block={group[0].block} scope={scope} context={context} />
+        ),
+      )}
+    </>
+  );
+}
+
+/** A widget's list: a line per row, two at most, then how many more. */
+function WidgetList({block, scope}: {block: UiBlock; scope: Scope}) {
+  const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
+  if (!Array.isArray(items) || items.length === 0) {
+    return null;
+  }
+  const shown = items.slice(0, 2);
+  return (
+    <View style={styles.widgetList}>
+      {shown.map((item: any, index: number) => {
+        const itemScope = {...scope, data: item};
+        return (
+          <View key={index} style={styles.widgetRow}>
+            {block.item?.tone !== undefined && <Dot tone={resolve(block.item.tone, itemScope)} size={6} />}
+            <Text style={[type.caption, styles.widgetText]} numberOfLines={1}>
+              {asText(resolve(block.item?.title, itemScope))}
+            </Text>
+          </View>
+        );
+      })}
+      {items.length > shown.length && <Text style={[type.caption, styles.more]}>{`+${items.length - shown.length} more`}</Text>}
+    </View>
+  );
+}
+
 function UiBlockView({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
-  if (!block || typeof block !== 'object') {
-    return null;
-  }
-  if (block.developer && !context.developer) {
-    return null;
-  }
-  if ('visible' in block && !isVisible(resolve(block.visible, scope))) {
+  if (!isShown(block, scope, context)) {
     return null;
   }
   if (!BLOCK_TYPES.has(block.type)) {
@@ -66,22 +177,18 @@ function UiBlockView({block, scope, context}: {block: UiBlock; scope: Scope; con
     case 'heading':
       return <Text style={type.title}>{asText(resolve(block.text, scope))}</Text>;
     case 'text':
+      if (block.style === 'eyebrow') {
+        return <Text style={[type.eyebrow, styles.eyebrow]}>{asText(resolve(block.text, scope)).toUpperCase()}</Text>;
+      }
       return (
         <Text style={block.style === 'caption' ? type.caption : block.style === 'mono' ? styles.mono : styles.body}>
           {asText(resolve(block.text, scope))}
         </Text>
       );
     case 'field':
-      return (
-        <View style={styles.field}>
-          <Text style={styles.label}>{asText(resolve(block.label, scope))}</Text>
-          <Text style={[styles.value, {color: TONE_COLORS[toneOf(resolve(block.tone, scope))]}]} selectable>
-            {formatValue(resolve(block.value, scope), block.format, block.unit)}
-          </Text>
-        </View>
-      );
+      return context.inline ? <InlineField block={block} scope={scope} /> : <FieldBlock block={block} scope={scope} />;
     case 'metric':
-      return <MetricBlock block={block} scope={scope} />;
+      return <MetricBlock block={block} scope={scope} context={context} />;
     case 'card':
       return (
         <Surface style={styles.card}>
@@ -101,30 +208,104 @@ function UiBlockView({block, scope, context}: {block: UiBlock; scope: Scope; con
       return <FormBlock block={block} scope={scope} context={context} />;
     case 'file-browser':
       return <FileBrowserBlock block={block} scope={scope} context={context} />;
+    case 'chart':
+      return block.kind === 'bars' ? <BarsBlock block={block} scope={scope} /> : <ChartBlock block={block} scope={scope} context={context} />;
+    case 'table':
+      return <TableBlock block={block} scope={scope} />;
+    case 'choice':
+      return <ChoiceBlock block={block} scope={scope} context={context} />;
+    case 'status':
+      return <StatusBlock block={block} scope={scope} />;
+    case 'code':
+      return <CodeBlock block={block} scope={scope} />;
     default:
       return null;
   }
 }
 
-function MetricBlock({block, scope}: {block: UiBlock; scope: Scope}) {
+function Dot({tone, size = 8}: {tone: unknown; size?: number}) {
+  return <View style={{width: size, height: size, borderRadius: size / 2, backgroundColor: DOT_COLORS[toneOf(tone)]}} />;
+}
+
+function InlineField({block, scope}: {block: UiBlock; scope: Scope}) {
+  const detail = block.detail !== undefined ? asText(resolve(block.detail, scope)) : '';
+  const value = formatValue(resolve(block.value, scope), block.format, block.unit);
+  return <Text style={type.caption}>{`${asText(resolve(block.label, scope))} ${value}${detail ? ` · ${detail}` : ''}`}</Text>;
+}
+
+function FieldBlock({block, scope}: {block: UiBlock; scope: Scope}) {
+  const detail = block.detail !== undefined ? asText(resolve(block.detail, scope)) : '';
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{asText(resolve(block.label, scope))}</Text>
+      <View style={styles.fieldValue}>
+        <Text style={[styles.value, {color: TONE_COLORS[toneOf(resolve(block.tone, scope))]}]} selectable>
+          {formatValue(resolve(block.value, scope), block.format, block.unit)}
+        </Text>
+        {detail ? <Text style={styles.detail}>{detail}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+function pointValue(point: unknown): number | null {
+  const value = Array.isArray(point) ? point[1] : point;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function MetricBlock({
+  block, scope, context, tile, compact,
+}: {block: UiBlock; scope: Scope; context: BlockContext; tile?: boolean; compact?: boolean}) {
   const value = resolve(block.value, scope);
   const max = resolve(block.max, scope);
   const tone = toneOf(resolve(block.tone, scope));
   const {color: accent} = useAccent();
-  const ratio = typeof max === 'number' && max > 0 && typeof value === 'number' ? Math.max(0, Math.min(1, value / max)) : null;
-  return (
-    <View style={styles.metric}>
-      <View style={styles.field}>
-        <Text style={styles.label}>{asText(resolve(block.label, scope))}</Text>
-        <Text style={[styles.metricValue, {color: TONE_COLORS[tone]}]}>{formatValue(value, block.format, block.unit)}</Text>
-      </View>
-      {ratio !== null && (
-        <View style={styles.bar}>
-          <View
-            style={[styles.barFill, {width: `${ratio * 100}%`, backgroundColor: tone === 'neutral' || tone === 'ok' ? accent : TONE_COLORS[tone]}]}
-          />
+  const label = asText(resolve(block.label, scope));
+  const shown = formatValue(value, block.format, block.unit);
+  const detail = block.detail !== undefined ? asText(resolve(block.detail, scope)) : '';
+  const percent = typeof max === 'number' && max > 0 && typeof value === 'number' ? (value / max) * 100 : null;
+  const trend = block.trend !== undefined ? resolve(block.trend, scope) : null;
+  const values = Array.isArray(trend) ? trend.map(pointValue).filter((item): item is number => item !== null) : [];
+  const content = (
+    <>
+      {tile || compact ? (
+        <>
+          <Text style={[type.eyebrow, styles.tileLabel]}>{label.toUpperCase()}</Text>
+          <Text style={[compact ? styles.compactValue : styles.tileValue, {color: TONE_COLORS[tone]}]} numberOfLines={1} adjustsFontSizeToFit>
+            {shown}
+          </Text>
+        </>
+      ) : (
+        <View style={styles.field}>
+          <Text style={styles.label}>{label}</Text>
+          <Text style={[styles.metricValue, {color: TONE_COLORS[tone]}]}>{shown}</Text>
         </View>
       )}
+      {detail ? (
+        <Text style={type.caption} numberOfLines={2}>
+          {detail}
+        </Text>
+      ) : null}
+      {percent !== null && <Meter value={percent} level={METER_LEVELS[tone]} label={label} />}
+      {values.length > 1 && <Sparkline values={values} accent={accent} />}
+    </>
+  );
+  const style = tile ? styles.tile : compact ? styles.compact : styles.metric;
+  const description = `${label}: ${shown}${detail ? `, ${detail}` : ''}`;
+  if (block.action) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={description}
+        onPress={() => context.runAction(block.action, scope)}
+        style={({pressed}) => [style, pressed && styles.pressed]}>
+        {content}
+      </Pressable>
+    );
+  }
+  return (
+    <View style={style} accessible accessibilityLabel={description}>
+      {content}
     </View>
   );
 }
@@ -141,12 +322,14 @@ function ListBlock({block, scope, context}: {block: UiBlock; scope: Scope; conte
         const itemScope = {...scope, data: item};
         const iconName = resolve(block.item?.icon, itemScope);
         const title = asText(resolve(block.item?.title, itemScope));
+        const subtitle = block.item?.subtitle !== undefined ? resolve(block.item.subtitle, itemScope) : undefined;
         return (
           <Row
             key={item?.id ?? index}
             icon={typeof iconName === 'string' && ICONS.has(iconName) ? iconName : undefined}
+            tone={block.item?.tone !== undefined ? resolve(block.item.tone, itemScope) : undefined}
             title={title}
-            subtitle={block.item?.subtitle !== undefined ? formatValue(resolve(block.item.subtitle, itemScope), formats.subtitle) : undefined}
+            subtitle={subtitle !== undefined && subtitle !== null && subtitle !== '' ? formatValue(subtitle, formats.subtitle) : undefined}
             value={block.item?.value !== undefined ? formatValue(resolve(block.item.value, itemScope), formats.value) : undefined}
             onPress={block.action ? () => context.runAction(block.action, itemScope) : undefined}
           />
@@ -156,27 +339,34 @@ function ListBlock({block, scope, context}: {block: UiBlock; scope: Scope; conte
   );
 }
 
-function Row({icon, title, subtitle, value, onPress}: {icon?: string; title: string; subtitle?: string; value?: string; onPress?: () => void}) {
+function Row({
+  icon, tone, title, subtitle, value, onPress,
+}: {icon?: string; tone?: unknown; title: string; subtitle?: string; value?: string; onPress?: () => void}) {
   const {color: accent} = useAccent();
   const content = (
     <>
+      {tone !== undefined && <Dot tone={tone} />}
       {icon && <Icon name={icon} size={18} color={accent} />}
       <View style={styles.rowMain}>
-        <Text style={styles.rowTitle} numberOfLines={1}>
+        <Text style={styles.rowTitle} numberOfLines={tone !== undefined ? 2 : 1}>
           {title}
         </Text>
         {subtitle !== undefined && (
-          <Text style={type.caption} numberOfLines={1}>
+          <Text style={type.caption} numberOfLines={tone !== undefined ? 3 : 1}>
             {subtitle}
           </Text>
         )}
       </View>
-      {value !== undefined && <Text style={type.caption}>{value}</Text>}
+      {value !== undefined && <Text style={[type.caption, tone !== undefined && {color: DOT_COLORS[toneOf(tone)]}]}>{value}</Text>}
       {onPress && <Icon name="chevron-right" size={18} color={palette.text3} />}
     </>
   );
   if (!onPress) {
-    return <View style={styles.row}>{content}</View>;
+    return (
+      <View style={styles.row} accessible={tone !== undefined} accessibilityLabel={[title, subtitle, value].filter(Boolean).join('. ')}>
+        {content}
+      </View>
+    );
   }
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={({pressed}) => [styles.row, pressed && styles.pressed]}>
@@ -442,6 +632,208 @@ function FileBrowserBlock({block, scope, context}: {block: UiBlock; scope: Scope
   );
 }
 
+/** How a chart's axis rounds, from the format its values are shown in. */
+function chartScale(format: unknown): ChartScale {
+  return format === 'percent' ? 'percent' : format === 'bitrate' ? 'bits' : format === 'bytes' || format === 'byterate' ? 'bytes' : 'plain';
+}
+
+function ChartBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const {color: accent} = useAccent();
+  const colors = [accent, palette.chart2, palette.text3, palette.textIcon];
+  const series = (Array.isArray(block.series) ? block.series : []).map((line: any, index: number) => {
+    const points = resolve(line?.points, scope);
+    return {
+      key: `s${index}`,
+      label: asText(resolve(line?.label, scope)),
+      color: colors[index % colors.length],
+      points: Array.isArray(points) ? points.filter((point: any) => Array.isArray(point) && typeof point[1] === 'number') : [],
+    };
+  });
+  const times = series.flatMap(line => line.points.map((point: number[]) => point[0]));
+  const now = Date.now() / 1000;
+  const to = Number(resolve(block.to, scope)) || (times.length ? Math.max(...times) : now);
+  const from = Number(resolve(block.from, scope)) || (times.length ? Math.min(...times) : to - 3600);
+  const span = Math.max(1, to - from);
+  const resolution = Number(resolve(block.resolution, scope)) || Math.max(1, span / Math.max(1, times.length));
+  const max = resolve(block.max, scope);
+  const empty = block.empty !== undefined ? asText(resolve(block.empty, scope)) : '';
+  return (
+    <Surface style={styles.card}>
+      <ColumnChart
+        title={asText(resolve(block.title, scope))}
+        series={series}
+        from={from}
+        to={to}
+        resolution={resolution}
+        scale={chartScale(block.format)}
+        max={typeof max === 'number' && max > 0 ? max : null}
+        format={value => formatValue(value, block.format, block.unit)}
+        timeLabel={time => (span <= 2 * 86400 ? formatValue(time, 'time') : formatValue(time, 'date').replace(/ \d{4}$/, ''))}
+        dimmed={context.refreshing}
+        empty={empty || 'Nothing recorded yet'}
+      />
+    </Surface>
+  );
+}
+
+function BarsBlock({block, scope}: {block: UiBlock; scope: Scope}) {
+  const {color: accent} = useAccent();
+  const line = Array.isArray(block.series) ? block.series[0] : null;
+  const points = resolve(line?.points, scope);
+  const values = Array.isArray(points) ? points.map(pointValue).filter((value): value is number => value !== null) : [];
+  const title = asText(resolve(block.title, scope));
+  const max = Number(resolve(block.max, scope)) || Math.max(1, ...values);
+  return (
+    <View style={styles.bars}>
+      {title ? <Text style={[type.eyebrow, styles.eyebrow]}>{title.toUpperCase()}</Text> : null}
+      <Bars
+        values={values}
+        color={accent}
+        max={max}
+        label={`${title}: ${values.map(value => formatValue(value, block.format, block.unit)).join(', ')}`}
+      />
+    </View>
+  );
+}
+
+/** A table on a phone: each row a small card - its first column as the
+ * title, the others as labelled values beneath. */
+function TableBlock({block, scope}: {block: UiBlock; scope: Scope}) {
+  const rows = Array.isArray(block.rows) ? block.rows : resolve(block.rows, scope);
+  const columns: any[] = Array.isArray(block.columns) ? block.columns : [];
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return <Text style={type.caption}>{block.empty !== undefined ? asText(resolve(block.empty, scope)) : 'Nothing to show.'}</Text>;
+  }
+  const [first, ...rest] = columns;
+  return (
+    <View style={styles.list}>
+      {rows.map((row: any, index: number) => {
+        const rowScope = {...scope, data: row};
+        return (
+          <View key={index} style={styles.tableRow} accessible testID="ui-table-row">
+            {first && <Cell column={first} scope={rowScope} title />}
+            <View style={styles.tableFacts}>
+              {rest.map((column, at) => (
+                <View key={at} style={styles.tableFact}>
+                  <Text style={styles.tableLabel}>{asText(column.label).toUpperCase()}</Text>
+                  <Cell column={column} scope={rowScope} />
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function Cell({column, scope, title}: {column: any; scope: Scope; title?: boolean}) {
+  const value = resolve(column.value, scope);
+  const unit = column.unit !== undefined ? asText(resolve(column.unit, scope)) : undefined;
+  const shown = formatValue(value, column.format, unit);
+  const tone = column.tone !== undefined ? resolve(column.tone, scope) : undefined;
+  const max = resolve(column.max, scope);
+  const text = <Text style={title ? styles.rowTitle : styles.cellText}>{shown}</Text>;
+  if (typeof max === 'number' && max > 0 && typeof value === 'number') {
+    return (
+      <View style={styles.cellUsage}>
+        <View style={styles.cellMeter}>
+          <Meter value={(value / max) * 100} level={METER_LEVELS[toneOf(tone)]} label={asText(column.label)} />
+        </View>
+        {text}
+      </View>
+    );
+  }
+  if (tone !== undefined) {
+    return (
+      <View style={styles.cellState}>
+        <Dot tone={tone} />
+        {text}
+      </View>
+    );
+  }
+  return text;
+}
+
+function ChoiceBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const {color: accent, onColor} = useAccent();
+  const current = context.pageState?.[block.key];
+  const label = block.label !== undefined ? asText(resolve(block.label, scope)) : '';
+  return (
+    <View style={styles.segments} accessibilityRole="radiogroup" accessibilityLabel={label || undefined}>
+      {(Array.isArray(block.options) ? block.options : []).map((option: any) => {
+        const selected = option.value === current;
+        const text = asText(resolve(option.label, scope));
+        return (
+          <Pressable
+            key={String(option.value)}
+            onPress={() => context.setPageState?.(block.key, option.value)}
+            accessibilityRole="radio"
+            accessibilityState={{selected}}
+            accessibilityLabel={text}
+            testID={`ui-choice-${String(option.value)}`}
+            style={[styles.segment, selected && {backgroundColor: accent}]}>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.segmentLabel, selected && {color: onColor, fontWeight: '700'}]}>
+              {text}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function StatusBlock({block, scope}: {block: UiBlock; scope: Scope}) {
+  const tone = resolve(block.tone, scope);
+  const label = asText(resolve(block.label, scope));
+  const detail = block.detail !== undefined ? asText(resolve(block.detail, scope)) : '';
+  return (
+    <View style={styles.pill} accessible accessibilityLabel={`${label}${detail ? `, ${detail}` : ''}`}>
+      <Dot tone={tone} />
+      <Text style={type.label}>{label}</Text>
+      {detail ? <Text style={type.caption}>{detail}</Text> : null}
+    </View>
+  );
+}
+
+function CodeBlock({block, scope}: {block: UiBlock; scope: Scope}) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const value = resolve(block.value, scope);
+  const content = typeof value === 'string' ? value : JSON.stringify(value, null, 2) ?? '';
+  const label = block.label !== undefined ? asText(resolve(block.label, scope)) : 'Details';
+  return (
+    <View style={styles.form}>
+      <Pressable
+        onPress={() => setOpen(current => !current)}
+        accessibilityRole="button"
+        accessibilityState={{expanded: open}}
+        style={({pressed}) => [styles.codeToggle, pressed && styles.pressed]}>
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} color={palette.text2} />
+        <Text style={type.caption}>{label}</Text>
+      </Pressable>
+      {open && (
+        <>
+          <Text style={[styles.mono, styles.code]} selectable>
+            {content}
+          </Text>
+          {block.copy && (
+            <PrimaryButton
+              title={copied ? 'Copied' : 'Copy'}
+              variant="secondary"
+              onPress={() => {
+                Clipboard.setString(content);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+            />
+          )}
+        </>
+      )}
+    </View>
+  );
+}
+
 /** Asks before an action that says to - resolves false when cancelled. */
 export function confirmAction(message: string, label = 'Continue'): Promise<boolean> {
   return new Promise(done => {
@@ -457,11 +849,31 @@ const styles = StyleSheet.create({
   mono: {fontFamily: 'monospace', fontSize: 12, color: palette.text2},
   label: {...type.caption, color: palette.text2},
   value: {...type.label, fontWeight: '600', flexShrink: 1, textAlign: 'right'},
+  fieldValue: {flexShrink: 1, alignItems: 'flex-end', gap: 2},
+  detail: {...type.caption, color: palette.text3, textAlign: 'right'},
+  eyebrow: {marginTop: space.xs},
   metricValue: {...type.title, fontSize: 20},
   field: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: space.md},
   metric: {gap: space.sm},
-  bar: {height: 6, borderRadius: 3, backgroundColor: palette.controlStrong, overflow: 'hidden'},
-  barFill: {height: 6, borderRadius: 3},
+  tiles: {flexDirection: 'row', flexWrap: 'wrap', gap: space.md},
+  tile: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    minWidth: 140,
+    padding: space.lg,
+    borderRadius: radii.card,
+    backgroundColor: palette.card,
+    gap: space.xs,
+  },
+  tileLabel: {fontSize: 10, letterSpacing: 1.6},
+  compactRow: {flexDirection: 'row', gap: space.lg},
+  compact: {flex: 1, gap: space.xs},
+  compactValue: {...type.title, fontSize: 20},
+  widgetList: {gap: space.sm},
+  widgetRow: {flexDirection: 'row', alignItems: 'center', gap: space.sm},
+  widgetText: {flex: 1},
+  more: {color: palette.text3},
+  tileValue: {...type.title, fontSize: 24, lineHeight: 30},
   card: {gap: space.md},
   list: {gap: 2},
   row: {
@@ -504,4 +916,28 @@ const styles = StyleSheet.create({
   optionLabel: {...type.caption, color: palette.text, fontWeight: '600'},
   error: {color: palette.danger, fontSize: 13},
   unsupported: {...type.caption, padding: space.md, borderRadius: radii.control, backgroundColor: palette.control},
+  bars: {gap: space.sm},
+  tableRow: {padding: space.md, borderRadius: radii.control, backgroundColor: palette.control, gap: space.sm},
+  tableFacts: {flexDirection: 'row', flexWrap: 'wrap', columnGap: space.lg, rowGap: space.sm},
+  tableFact: {minWidth: 88, gap: 2},
+  tableLabel: {fontSize: 10, letterSpacing: 1.2, fontWeight: '600', color: palette.text3},
+  cellText: {...type.caption, color: palette.text},
+  cellState: {flexDirection: 'row', alignItems: 'center', gap: space.sm},
+  cellUsage: {flexDirection: 'row', alignItems: 'center', gap: space.sm, minWidth: 140},
+  cellMeter: {flex: 1},
+  segments: {flexDirection: 'row', backgroundColor: palette.card, borderRadius: radii.control, padding: 3, gap: 3},
+  segment: {flex: 1, minHeight: TOUCH_TARGET, paddingHorizontal: 2, borderRadius: radii.control - 3, alignItems: 'center', justifyContent: 'center'},
+  segmentLabel: {...type.caption, color: palette.text2},
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    alignSelf: 'flex-start',
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs + 2,
+    borderRadius: 999,
+    backgroundColor: palette.control,
+  },
+  codeToggle: {flexDirection: 'row', alignItems: 'center', gap: space.xs, minHeight: TOUCH_TARGET},
+  code: {padding: space.md, borderRadius: radii.control, backgroundColor: palette.field},
 });

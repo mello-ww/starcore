@@ -19,6 +19,7 @@ import tempfile
 import time
 import unittest
 
+from starcore import ui_contract
 from starcore.api.response import Request
 from starcore.auth import AuthStore
 from starcore.cli import runner, spec
@@ -31,7 +32,7 @@ REPO = Path(__file__).resolve().parents[2]
 STATUS_DIR = REPO / "satellites" / "native" / "status"
 register_package("satellites.native.status", STATUS_DIR)
 
-from satellites.native.status import health, history, linux, metrics, monitor  # noqa: E402
+from satellites.native.status import health, history, linux, metrics, monitor, view  # noqa: E402
 
 
 # ---------- fixtures ----------
@@ -532,8 +533,11 @@ class StatusEngineTest(unittest.TestCase):
 
     def test_the_summary_is_flat_and_drawn_from_the_snapshot(self):
         summary = self.satellite.state(self.engine)
+        # what Alpha clients read, then what the Home widget in ui.json binds to
         self.assertEqual(set(summary), {"health", "cpu_percent", "memory_percent", "satellites_online",
-                                        "satellites_total", "warnings", "warning_count", "platform", "python"})
+                                        "satellites_total", "warnings", "warning_count", "platform", "python",
+                                        "health_label", "health_tone", "health_detail", "cpu_tone", "memory_tone",
+                                        "satellites", "warning_items"})
         self.assertTrue(all(isinstance(value, (str, int, float, list, type(None))) for value in summary.values()))
         self.assertEqual(summary["satellites_total"], len(self.engine.registry.all()))
 
@@ -552,7 +556,7 @@ class StatusEngineTest(unittest.TestCase):
 
     def test_every_route_needs_a_session(self):
         token = self.engine.auth.bootstrap("admin", "a very good password")
-        for route in ("metrics", "history", "diagnostics", "mobile"):
+        for route in ("metrics", "history", "diagnostics", "view", "view/diagnostics", "mobile"):
             with self.subTest(route=route):
                 self.assertEqual(self.request(f"/api/satellites/status/{route}")[0], 401)
                 self.assertEqual(self.request(f"/api/satellites/status/{route}", token=token)[0], 200)
@@ -581,11 +585,64 @@ class StatusEngineTest(unittest.TestCase):
                 self.assertEqual(self.request(f"/api/satellites/status/history?{query}")[0], 400)
         self.assertEqual(self.request("/api/satellites/status/metrics", method="POST")[0], 405)
 
+    def test_the_view_shapes_the_same_snapshot_for_display(self):
+        status, payload = self.request("/api/satellites/status/view")
+        self.assertEqual(status, 200)
+        for key in ("eyebrow", "health", "warnings", "overview", "hardware", "network", "services", "history_notes"):
+            self.assertIn(key, payload)
+        snapshot = self.monitor.snapshot()
+        self.assertEqual(payload["sampled_at"], snapshot["sampled_at"])  # no second measurement
+        self.assertEqual(payload["overview"]["cpu"]["percent"], snapshot["cpu"]["percent"])
+        self.assertIn(payload["health"]["tone"], ("ok", "warn", "danger"))
+        for tone_key in (payload["overview"]["cpu"]["tone"], payload["overview"]["memory"]["tone"]):
+            self.assertIn(tone_key, ("neutral", "warn", "danger"))
+        self.assertEqual(len(payload["hardware"]["storage"]["partitions"]), len(snapshot["storage"]["partitions"]))
+        self.assertEqual(len(payload["services"]["satellites"]), snapshot["services"]["total"])
+
+        status, payload = self.request("/api/satellites/status/view/diagnostics")
+        self.assertEqual(status, 200)
+        self.assertEqual([row["tier"] for row in payload["tiers"]], ["10s", "1m", "10m", "1h"])
+        self.assertIn("sampler", payload["raw"])
+        self.assertNotIn(str(self.directory), json.dumps(payload))
+        self.assertEqual(self.request("/api/satellites/status/view/elsewhere")[0], 404)
+        self.assertEqual(self.request("/api/satellites/status/view", method="POST")[0], 405)
+
+    def test_the_view_says_why_a_reading_is_missing(self):
+        snapshot = {**self.monitor.snapshot(), "memory": None, "network": None,
+                    "unsupported": {"memory": "no memory here", "network": "no network here",
+                                    "cpu.load": "no load average"}}
+        shaped = view.describe(snapshot)
+        self.assertEqual(shaped["overview"]["memory"]["detail"], "no memory here")
+        self.assertFalse(shaped["network"]["available"])
+        self.assertEqual(shaped["network"]["unavailable"], "no network here")
+        self.assertIn({"title": "Load average", "reason": "no load average"}, shaped["history_notes"]["unsupported"])
+
+    def test_the_status_interface_document_is_valid(self):
+        definition = ui_contract.load_definition(STATUS_DIR, "Status")
+        self.assertIsNotNone(definition)
+        self.assertIsNone(definition.error)
+        document = definition.document
+        self.assertEqual(document["contract"], "starcore.ui/1.1")
+        routes = set(self.satellite.routes)
+        def walk(value):
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    if key == "route":
+                        self.assertIn(item.split("?")[0].split("/")[0], routes, item)
+                    walk(item)
+            elif isinstance(value, list):
+                for item in value:
+                    walk(item)
+        walk(document)
+
     def test_the_listing_carries_the_home_summary(self):
         status, payload = self.request("/api/satellites")
         entry = next(item for item in payload["satellites"] if item["name"] == "Status")
         self.assertIn("health", entry["state"])
         self.assertIn("cpu_percent", entry["state"])
+        # what the Home widget in ui.json binds to
+        for key in ("health_label", "health_tone", "cpu_tone", "memory_tone", "satellites", "warning_items"):
+            self.assertIn(key, entry["state"])
         self.assertEqual(entry["page"], {"module": "page.js", "stylesheet": "page.css"})
 
     def test_the_mobile_screen_shows_real_readings(self):
@@ -645,13 +702,16 @@ class StatusEngineTest(unittest.TestCase):
 
 class StatusPageTest(unittest.TestCase):
     def test_home_reads_the_summary_from_the_listing_it_already_polls(self):
+        # Home draws every Satellite's ui.json widgets from the listing it already
+        # polls: Status's widget has no source of its own, and Home names no Satellite
         app = (REPO / "mission_control" / "app.js").read_text(encoding="utf-8")
         page = (REPO / "mission_control" / "index.html").read_text(encoding="utf-8")
-        self.assertIn("renderHomeHealth();", app)
+        self.assertIn("renderHomeWidgets();", app)
         self.assertNotIn("/api/satellites/status/metrics", app)  # no second poll from Home
-        for element in ("home-health", "home-health-cpu", "home-health-memory", "home-health-satellites",
-                        "home-health-warnings"):
-            self.assertIn(f'id="{element}"', page)
+        self.assertIn('id="home-widgets"', page)
+        document = json.loads((STATUS_DIR / "ui.json").read_text(encoding="utf-8"))
+        widget = document["widgets"][0]
+        self.assertNotIn("source", widget)
 
     def test_tokens_stay_in_sync(self):
         css = (REPO / "mission_control" / "tokens.css").read_text(encoding="utf-8")
@@ -673,7 +733,8 @@ assert(f.megahertz(4493) === "4.49 GHz", "MHz " + f.megahertz(4493));
 assert(f.duration(90061) === "1d 1h" && f.duration(59) === "59s", "duration");
 assert(f.span(86400) === "24 hours" && f.span(604800) === "7 days" && f.span(10) === "10 s", "span");
 globalThis.document = undefined;
-const charts = await import("{folder}/charts.js");
+// the page's charts are Mission Control's shared ones (its charts.js re-exports them)
+const charts = await import("{(REPO / "mission_control" / "ui" / "charts.js").as_uri()}");
 assert(charts.niceMaximum(73, "percent") === 100, "percent max");
 assert(charts.niceMaximum(3_000_000, "bytes") === 5 * 1024 * 1024, "bytes max " + charts.niceMaximum(3_000_000, "bytes"));
 assert(charts.niceMaximum(60_000, "bits") === 500_000 / 8, "bits max " + charts.niceMaximum(60_000, "bits"));

@@ -1,4 +1,4 @@
-/* Mission Control's components for StarCore UI contract 1.0 (ui/renderer.js).
+/* Mission Control's components for StarCore UI contract 1.1 (ui/renderer.js).
    Built only from the shared tokens in tokens.css, so a declarative Satellite
    page looks like every other page - on Android the same blocks are drawn
    from the same tokens (mobile/src/theme/tokens.ts). */
@@ -8,6 +8,13 @@
     flex-direction: column;
     gap: var(--sc-space-4);
     max-width: 880px;
+    /* the layout follows the page's own width, whatever the sidebar takes */
+    container-type: inline-size;
+}
+
+/* a dashboard uses the whole page */
+.ui-root.ui-wide {
+    max-width: none;
 }
 
 .ui-page {
@@ -94,6 +101,37 @@
     display: flex;
     flex-direction: column;
     gap: var(--sc-space-3);
+    container-type: inline-size;
+}
+
+.ui-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-3);
+}
+
+/* in a card with room for two, a run of fields reads as a grid of facts: label above value */
+@container (min-width: 340px) {
+    .ui-fields {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 14px 20px;
+    }
+
+    .ui-fields .ui-field {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .ui-fields .ui-field-label {
+        color: var(--sc-text-3);
+        font-size: 12px;
+    }
+
+    .ui-fields .ui-field-value {
+        text-align: left;
+    }
 }
 
 .ui-heading {
@@ -158,24 +196,32 @@
     font-variant-numeric: tabular-nums;
 }
 
-.ui-metric-bar {
+.ui-metric-detail {
     grid-column: 1 / -1;
-    height: 6px;
-    border-radius: 999px;
-    background: var(--sc-control-strong);
     overflow: hidden;
+    color: var(--sc-text-2);
+    font: 400 13px/1.4 var(--sc-font-sans);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.ui-metric-fill {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    background: var(--sc-text-icon);
+/* the meter's fill carries severity (ui/charts.css): neutral until the tone says otherwise */
+.ui-metric .sc-meter,
+.ui-metric .sc-spark {
+    grid-column: 1 / -1;
+    margin-top: 2px;
 }
 
-.ui-tone-ok .ui-metric-fill { background: var(--sc-text-icon); }
-.ui-tone-warn .ui-metric-fill { background: var(--sc-warn); }
-.ui-tone-danger .ui-metric-fill { background: var(--sc-danger); }
+button.ui-metric {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
 .ui-field-value.ui-tone-warn,
 .ui-tone-warn .ui-metric-value { color: var(--sc-warn); }
 .ui-field-value.ui-tone-danger,
@@ -457,4 +503,594 @@ button.ui-list-row:hover {
     background: #3a1c1f;
     color: var(--sc-danger);
     white-space: normal;
+}
+
+/* ---------- 1.1: header, dashboard, charts, tables, choices ---------- */
+
+.ui-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--sc-space-4);
+}
+
+.ui-header-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.ui-header-main .eyebrow {
+    margin: 0;
+}
+
+.ui-header-main .ui-heading {
+    margin: 2px 0 0;
+    font-size: 24px;
+    letter-spacing: -0.01em;
+}
+
+/* a field in the header reads as one line: "Updated 12s ago · Sampling every 5 s" */
+.ui-header-main .ui-field {
+    justify-content: flex-start;
+    gap: 6px;
+}
+
+.ui-header-main .ui-field-label,
+.ui-header-main .ui-field-value {
+    color: var(--sc-text-2);
+    font: 400 13px/1.4 var(--sc-font-sans);
+    text-align: left;
+}
+
+.ui-header-main .ui-field-detail {
+    display: inline;
+    margin: 0;
+    color: var(--sc-text-2);
+    font-size: 13px;
+}
+
+.ui-header-main .ui-field-detail::before {
+    content: " · ";
+}
+
+.ui-header-side {
+    display: flex;
+    gap: var(--sc-space-2);
+}
+
+.ui-eyebrow {
+    margin: 0;
+}
+
+.ui-card-body > .ui-eyebrow {
+    margin-top: var(--sc-space-2);
+}
+
+.ui-field-detail {
+    display: block;
+    margin-top: 2px;
+    color: var(--sc-text-3);
+    font: 400 12px/1.4 var(--sc-font-sans);
+}
+
+.ui-dot {
+    flex: none;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sc-text-3);
+}
+
+.ui-dot-ok {
+    background: var(--sc-text-icon);
+}
+
+.ui-dot-warn {
+    background: var(--sc-warn);
+}
+
+.ui-dot-danger {
+    background: var(--sc-danger);
+}
+
+.ui-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: var(--sc-radius-control);
+    background: var(--sc-card);
+    font: 700 15px/1 var(--sc-font-display);
+}
+
+.ui-status small {
+    color: var(--sc-text-2);
+    font: 500 12px/1 var(--sc-font-sans);
+}
+
+.ui-card .ui-status {
+    align-self: flex-start;
+    background: var(--sc-control);
+}
+
+/* tiles: a dashboard's run of metrics */
+.ui-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    gap: 12px;
+}
+
+.ui-tiles > .ui-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 140px;
+    padding: 16px 18px;
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+}
+
+.ui-tiles > button.ui-metric {
+    transition: background 120ms ease;
+}
+
+.ui-tiles > button.ui-metric:hover {
+    background: #26272e;
+}
+
+.ui-tiles > .ui-metric:focus-visible {
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 2px;
+}
+
+.ui-tiles .ui-metric-label {
+    color: var(--sc-text-3);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+}
+
+.ui-tiles .ui-metric-value {
+    margin-top: 4px;
+    font: 600 28px/1.1 var(--sc-font-sans);
+    letter-spacing: -0.02em;
+}
+
+.ui-tiles .sc-meter {
+    margin-top: auto;
+}
+
+.ui-tiles .sc-spark {
+    margin-top: 8px;
+}
+
+.ui-charts,
+.ui-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sc-space-4);
+    align-items: start;
+}
+
+.ui-chart {
+    min-width: 0;
+}
+
+.ui-page > .ui-chart,
+.ui-charts > .ui-chart {
+    padding: 20px 22px;
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+}
+
+.ui-chart-values {
+    margin-top: 6px;
+}
+
+.ui-chart-toggle {
+    min-height: 32px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--sc-text-2);
+    font: 500 12px/1 var(--sc-font-sans);
+    cursor: pointer;
+}
+
+.ui-chart-toggle:hover {
+    color: var(--sc-text);
+}
+
+.ui-chart-toggle:focus-visible {
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 2px;
+}
+
+.ui-refreshing .ui-chart {
+    opacity: 0.55;
+    transition: opacity 200ms ease;
+}
+
+.ui-bars-figure {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-2);
+    margin: 0;
+}
+
+.ui-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 72px;
+}
+
+.ui-bar {
+    display: flex;
+    flex: 1;
+    align-items: flex-end;
+    max-width: 24px;
+    height: 100%;
+    border-radius: 4px 4px 0 0;
+    background: var(--sc-control);
+}
+
+.ui-bar-fill {
+    display: block;
+    width: 100%;
+    border-radius: 4px 4px 0 0;
+    background: var(--sc-accent);
+    transition: height 400ms ease;
+}
+
+.ui-table-wrap {
+    overflow-x: auto;
+}
+
+.ui-table-scroll {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.ui-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.ui-table th {
+    padding: 0 12px 10px;
+    border-bottom: 1px solid var(--line-bright, #2e2f36);
+    color: var(--sc-text-3);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.ui-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--sc-line);
+    color: var(--sc-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.ui-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.ui-table th:first-child,
+.ui-table td:first-child {
+    padding-left: 0;
+}
+
+.ui-table .ui-end {
+    text-align: right;
+}
+
+.ui-cell-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ui-cell-usage {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 150px;
+}
+
+.ui-cell-usage .sc-meter {
+    flex: 1;
+    margin: 0;
+}
+
+.ui-list-row > .ui-dot {
+    margin-left: 2px;
+}
+
+/* a row with a state: its value is the state's word (Warning, Critical) */
+.ui-list-row > .ui-dot ~ .ui-list-value {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.ui-segmented {
+    display: inline-flex;
+    gap: 4px;
+    max-width: 100%;
+    padding: 3px;
+    overflow-x: auto;
+    border-radius: 12px;
+    background: var(--sc-card);
+    scrollbar-width: none;
+}
+
+.ui-segment {
+    flex: none;
+    min-height: 38px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--sc-text-2);
+    font: 600 13px/1 var(--sc-font-sans);
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.ui-segment:hover {
+    color: var(--sc-text);
+}
+
+.ui-segment.active {
+    background: var(--sc-accent);
+    color: var(--sc-on-accent);
+}
+
+.ui-segment:focus-visible {
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 2px;
+}
+
+.ui-code summary {
+    color: var(--sc-text-2);
+    cursor: pointer;
+}
+
+.ui-code pre {
+    max-height: 360px;
+    margin: 12px 0;
+    padding: 12px;
+    overflow: auto;
+    border-radius: 10px;
+    background: var(--sc-field);
+    color: var(--sc-text-2);
+    font: 12px/1.5 var(--sc-font-mono);
+}
+
+.ui-skeleton {
+    min-height: 140px;
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+    animation: ui-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ui-pulse {
+    50% {
+        opacity: 0.55;
+    }
+}
+
+.ui-stale {
+    margin: 0;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: rgba(240, 180, 60, 0.1);
+    color: var(--sc-warn);
+    font-size: 13px;
+}
+
+.ui-page-stale {
+    opacity: 0.6;
+}
+
+.ui-failure .ui-button {
+    margin-top: 4px;
+}
+
+@container (max-width: 860px) {
+    .ui-charts,
+    .ui-columns {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@container (max-width: 560px) {
+    .ui-tiles {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .ui-tiles > .ui-metric {
+        min-height: 124px;
+        padding: 14px;
+    }
+
+    .ui-tiles .ui-metric-value {
+        font-size: 22px;
+    }
+
+    .ui-header-main .ui-heading {
+        font-size: 20px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-skeleton {
+        animation: none;
+    }
+
+    .ui-bar-fill,
+    .ui-refreshing .ui-chart {
+        transition: none;
+    }
+}
+
+/* ---------- 1.1: Home widgets (renderWidget) ---------- */
+
+.ui-widget {
+    display: grid;
+    grid-template-columns: minmax(180px, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: 16px 40px;
+    padding: 20px 24px;
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+
+.ui-widget:hover {
+    background: #26272e;
+}
+
+.ui-widget:focus-visible {
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 2px;
+}
+
+.ui-widget-head {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--sc-text-icon);
+}
+
+.ui-widget-title {
+    flex: 1;
+    margin: 0;
+}
+
+.ui-widget-open {
+    color: var(--sc-text-2);
+    font: 500 13px/1 var(--sc-font-sans);
+}
+
+.ui-widget:hover .ui-widget-open {
+    color: var(--sc-text);
+}
+
+.ui-widget-body {
+    display: contents;
+}
+
+.ui-widget-state {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    color: var(--sc-text);
+    font: 600 22px/1.2 var(--sc-font-display);
+}
+
+.ui-widget-state small {
+    color: var(--sc-text-2);
+    font: 500 13px/1 var(--sc-font-sans);
+}
+
+.ui-widget-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 24px;
+    margin: 0;
+}
+
+.ui-widget-metrics dt {
+    color: var(--sc-text-3);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+
+.ui-widget-metrics dd {
+    margin: 6px 0 8px;
+    color: var(--sc-text);
+    font: 600 22px/1 var(--sc-font-display);
+}
+
+.ui-widget-metrics dd.ui-tone-warn {
+    color: var(--sc-warn);
+}
+
+.ui-widget-metrics dd.ui-tone-danger {
+    color: var(--sc-danger);
+}
+
+.ui-widget-metrics .sc-meter {
+    height: 4px;
+}
+
+.ui-widget-note {
+    color: var(--sc-text-2);
+    font-size: 13px;
+}
+
+.ui-widget-list {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ui-widget-list li {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--sc-control);
+    color: var(--sc-text-2);
+    font-size: 13px;
+}
+
+.ui-widget-list .ui-dot {
+    width: 6px;
+    height: 6px;
+}
+
+.ui-widget-field {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    color: var(--sc-text-2);
+    font-size: 13px;
+}
+
+.ui-widget-field strong {
+    color: var(--sc-text);
+}
+
+@media (max-width: 720px) {
+    .ui-widget {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+    }
 }

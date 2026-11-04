@@ -1,5 +1,5 @@
 {
-  "_about": "Value formatting - docs/ui-contract.md, 'Formats'. {value, format, unit?} -> expected display text.",
+  "_about": "Value formatting - docs/ui-contract.md, 'Formats'. {value, format, unit?, options?} -> expected display text. options.utc formats times in UTC instead of the device's time zone, and options.now (epoch seconds) is the moment 'relative' is measured from - both exist so every implementation can be tested with the same expectations.",
   "cases": [
     {"value": null, "format": "text", "expected": "—"},
     {"value": "hello", "format": "text", "expected": "hello"},
@@ -25,7 +25,26 @@
     {"value": 3720, "format": "duration", "expected": "1h 2m"},
     {"value": 90000, "format": "duration", "expected": "1d 1h"},
     {"value": 5, "format": "no-such-format", "expected": "5"},
-    {"value": 9, "expected": "9"}
+    {"value": 9, "expected": "9"},
+    {"value": 1880, "format": "bitrate", "expected": "15 kb/s"},
+    {"value": 100, "format": "bitrate", "expected": "800 b/s"},
+    {"value": 125000, "format": "bitrate", "expected": "1 Mb/s"},
+    {"value": 1562500, "format": "bitrate", "expected": "12.5 Mb/s"},
+    {"value": 0, "format": "bitrate", "expected": "0 b/s"},
+    {"value": 1536, "format": "byterate", "expected": "1.5 KB/s"},
+    {"value": 0, "format": "byterate", "expected": "0 B/s"},
+    {"value": 1793812518, "format": "time", "options": {"utc": true, "now": 1793812518}, "expected": "17:15"},
+    {"value": 1793751318, "format": "time", "options": {"utc": true, "now": 1793812518}, "expected": "00:15"},
+    {"value": 1793812518, "format": "date", "options": {"utc": true, "now": 1793812518}, "expected": "4 Nov 2026"},
+    {"value": 1793812518, "format": "datetime", "options": {"utc": true, "now": 1793812518}, "expected": "4 Nov 2026, 17:15"},
+    {"value": 1793812513, "format": "relative", "options": {"utc": true, "now": 1793812518}, "expected": "just now"},
+    {"value": 1793812476, "format": "relative", "options": {"utc": true, "now": 1793812518}, "expected": "42s ago"},
+    {"value": 1793812218, "format": "relative", "options": {"utc": true, "now": 1793812518}, "expected": "5 min ago"},
+    {"value": 1793805318, "format": "relative", "options": {"utc": true, "now": 1793812518}, "expected": "2 h ago"},
+    {"value": 1793639718, "format": "relative", "options": {"utc": true, "now": 1793812518}, "expected": "2 d ago"},
+    {"value": 1793812638, "format": "relative", "options": {"utc": true, "now": 1793812518}, "expected": "in 2 min"},
+    {"value": "soon", "format": "datetime", "options": {"utc": true, "now": 1793812518}, "expected": "soon"},
+    {"value": null, "format": "relative", "options": {"utc": true, "now": 1793812518}, "expected": "—"}
   ],
   "visible": [
     {"value": null, "expected": false},

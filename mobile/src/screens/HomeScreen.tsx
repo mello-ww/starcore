@@ -6,9 +6,12 @@ import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
 import {AccentCustomColor} from '../components/AccentCustomColor';
 import {DeveloperModeButton} from '../developer/DeveloperModeButton';
+import {useDeveloperMode} from '../developer/DeveloperModeContext';
 import {SatellitesApi} from '../satellites/api';
 import {STATUS_LABELS, satelliteIcon, statusDotColor as dotColor} from '../satellites/icons';
 import type {SatelliteSummary} from '../satellites/types';
+import {UiApi} from '../satellites/ui/api';
+import {SatelliteWidgets} from '../satellites/ui/Widgets';
 import {useServers} from '../servers/ServersContext';
 import {StatusWidget} from '../status/StatusWidget';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
@@ -36,8 +39,17 @@ export function formatUptime(seconds: number): string {
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
-/** Satellites with a native screen of their own instead of the generic declarative one. */
-const DEDICATED_SCREENS: Record<string, string> = {Photo: 'PhotoHome', Music: 'MusicHome', Status: 'StatusHome'};
+/**
+ * Satellites with a native screen of their own. A Satellite's ui.json comes
+ * first (the shared SatelliteUiScreen): these are for Satellites without one
+ * yet (Photo, Music), and for a server older than a Satellite's ui.json
+ * (Status before UI contract 1.1).
+ */
+export const DEDICATED_SCREENS: Record<string, 'PhotoHome' | 'MusicHome' | 'StatusHome'> = {
+  Photo: 'PhotoHome',
+  Music: 'MusicHome',
+  Status: 'StatusHome',
+};
 
 export function alertsFor(satellites: SatelliteSummary[]) {
   return satellites
@@ -59,6 +71,8 @@ export function HomeScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const api = useMemo(() => new SatellitesApi(client), [client]);
+  const uiApi = useMemo(() => new UiApi(client, activeServer?.id ?? 'default'), [client, activeServer?.id]);
+  const {enabled: developer} = useDeveloperMode();
 
   const [status, setStatus] = useState<EngineStatus | null>(null);
   const [satellites, setSatellites] = useState<SatelliteSummary[] | null>(null);
@@ -97,18 +111,20 @@ export function HomeScreen() {
     setRefreshing(false);
   };
 
-  const open = (satellite: SatelliteSummary) => {
-    const declarative = !DEDICATED_SCREENS[satellite.name] && Boolean(satellite.ui?.revision);
-    const screen = DEDICATED_SCREENS[satellite.name] ?? (declarative ? 'SatelliteUi' : 'SatelliteDetail');
+  const open = (satellite: SatelliteSummary, page?: string, pageParams?: Record<string, any>) => {
+    const declarative = Boolean(satellite.ui?.revision);
+    const screen: string = declarative ? 'SatelliteUi' : DEDICATED_SCREENS[satellite.name] ?? 'SatelliteDetail';
     const params =
       screen === 'SatelliteUi'
-        ? {name: satellite.name, revision: satellite.ui?.revision}
+        ? {name: satellite.name, revision: satellite.ui?.revision, page, params: pageParams}
         : screen === 'SatelliteDetail'
           ? {name: satellite.name}
           : undefined;
     navigation.navigate('Satellites', {screen, params, initial: false});
   };
-  const statusSatellite = satellites?.find(satellite => satellite.name === 'Status');
+  // a server older than Status's ui.json (UI contract 1.1) has no widget for it:
+  // its dedicated card stays, so a newer app on an older server loses nothing
+  const legacyStatus = satellites?.find(satellite => satellite.name === 'Status' && !satellite.ui?.revision);
 
   const online = satellites?.filter(satellite => satellite.status === 'running').length ?? 0;
   // a satellite shown inside another (the Locked Folder, in Photos) gets no card of its own;
@@ -210,7 +226,9 @@ export function HomeScreen() {
           )}
         </View>
 
-        {!error && statusSatellite && <StatusWidget satellite={statusSatellite} onOpen={() => open(statusSatellite)} />}
+        {/* every Satellite's ui.json widgets - Home names none of them */}
+        {!error && satellites && <SatelliteWidgets satellites={satellites} api={uiApi} developer={developer} onOpen={open} />}
+        {!error && legacyStatus && <StatusWidget satellite={legacyStatus} onOpen={() => open(legacyStatus)} />}
 
         <View style={styles.sectionHead}>
           <Text style={type.eyebrow}>SATELLITES</Text>

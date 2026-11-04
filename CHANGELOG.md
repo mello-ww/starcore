@@ -26,12 +26,38 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   check the same vocabulary and fixtures. `test_client_modularity.py` fails when generic
   client code names a Satellite.
 - **Showcase** example Satellite (`examples/satellites/native/showcase/`), using every block.
+- **UI contract 1.1** - only additions, so every 1.0 document still works:
+  - blocks `chart` (time series, or bars), `table`, `choice` (a segmented control over page
+    state), `status` (a dot and a word) and `code` (JSON, with Copy);
+  - `detail` on fields and metrics, `trend` (a sparkline) and `action` on metrics, `tone` on
+    list items, the `eyebrow` text style;
+  - page `state`, named `sources` and the `dashboard` template; a document `header`;
+    developer-only navigation;
+  - `widgets`, summaries a client shows on Home;
+  - formats `bitrate`, `byterate`, `time`, `date`, `datetime` and `relative`, and the same
+    formatting in the Engine (`format_value`) for Satellites that build text;
+  - a 1.0 document that uses a 1.1 feature is refused, so it always declares what it needs.
+- **Status is drawn by the shared renderers.** Its interface is now `ui.json` (with a `view`
+  route that shapes its snapshot for display) on Mission Control and Android, at parity with
+  its previous screens - see "Status's migration" in `docs/satellites/status.md`. Its previous
+  page and screen remain for one release: in Developer Mode on the web, and for servers older
+  than this one on Android.
+- **Home widgets.** Home on both clients draws every Satellite's widgets; neither names Status
+  any more (the Android app keeps its Status card for older servers).
+- Mission Control's charts, meters and sparklines, and the app's column chart, meter, bars and
+  sparkline, are shared components now (`mission_control/ui/charts.js`,
+  `mobile/src/components/charts.tsx`).
 
 ### Changed
 
 - Mission Control's files and Satellite assets are served `no-cache` with an ETag (revalidated)
   instead of `no-store`.
 - The Android Satellites list refreshes when you return to it.
+- A Satellite with both a `ui.json` and a `page.js` gets the shared interface on the web; its
+  `page.js` is the fallback, and Developer Mode can switch between them.
+- The shared renderers pause while a browser tab is hidden or the app is in the background,
+  keep the last data (dimmed, with its age) when a refresh fails, and offer a retry when the
+  first one does.
 
 ## 0.1.0-alpha.1 - unreleased
 

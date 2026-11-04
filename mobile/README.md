@@ -103,16 +103,19 @@ through StarCore Connect only runs while the app is in the foreground.
 
 ### Status
 
-`src/status/` is the Status satellite's native screen (Overview, Hardware,
-Network, Services, History), opened from the Satellites tab or from Home's
-Status card. One poller (`hooks.ts`) reads `/api/satellites/status/metrics`
-at the server's own sampling interval, and only while the screen is focused
-and the app is in the foreground; when a request fails, the last reading
-stays on screen under an offline banner. History charts are columns built
-from Views (the app has no SVG library), laid on a fixed time grid so gaps
-stay gaps. Home's Status card reads the summary the satellite publishes in
-the satellite list Home already loads, so it costs no request of its own.
-See `docs/satellites/status.md`.
+Status's interface is its `ui.json` (UI contract 1.1), drawn by the shared
+`SatelliteUiScreen`: a dashboard with charts, tables, a period choice and a
+header, refreshed only while the screen is focused and the app is in the
+foreground; when a request fails, the last reading stays on screen under an
+offline banner. Charts are columns built from Views (the app has no SVG
+library), laid on a fixed time grid so gaps stay gaps
+(`src/components/charts.tsx`, shared by every Satellite). Home draws each
+Satellite's `ui.json` widgets (`src/satellites/ui/Widgets.tsx`) from the
+satellite list it already loads, so Status's costs no request of its own.
+
+`src/status/` is Status's previous native screen and Home card. The app uses
+them only with a server older than Status's `ui.json`, and they are removed
+once that release is validated. See `docs/satellites/status.md`.
 
 ## Connecting to a server
 

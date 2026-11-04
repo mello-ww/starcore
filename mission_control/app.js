@@ -138,10 +138,29 @@ function hasUiDocument(satellite) {
     return Boolean(satellite.ui && satellite.ui.revision);
 }
 
+// A Satellite's ui.json is drawn by the shared renderer (ui/renderer.js). Its own
+// page.js is used when it has no valid ui.json - or, in Developer Mode, when its
+// "own page" is chosen: a Satellite migrating to ui.json keeps its page.js for
+// comparison until it retires it.
+const OWN_PAGE_KEY = "starcore.ownPage";
+
+function ownPagePreferred() {
+    try {
+        return new Set(JSON.parse(localStorage.getItem(OWN_PAGE_KEY) || "[]"));
+    } catch {
+        return new Set();
+    }
+}
+
+function usesOwnPage(satellite) {
+    return Boolean(satellite.page)
+        && (!hasUiDocument(satellite) || (developerMode && ownPagePreferred().has(satellite.name)));
+}
+
 // what a mounted page was built from: a page.js, or one revision of a ui.json -
 // a new revision (after an update or a rediscovery) remounts the page
 function pageRevision(satellite) {
-    return satellite.page ? "page.js" : hasUiDocument(satellite) ? satellite.ui.revision : null;
+    return usesOwnPage(satellite) ? "page.js" : hasUiDocument(satellite) ? satellite.ui.revision : null;
 }
 
 // the first enabled Satellite providing a capability, from GET /api/satellites -
@@ -559,55 +578,62 @@ function renderHomeSatellites() {
     box.replaceChildren(list);
 }
 
-/* ---------- home: the Status summary ---------- */
+/* ---------- home: widgets ---------- */
 
-const HEALTH_LABELS = { ok: "Healthy", warning: "Warning", critical: "Critical" };
-const HEALTH_DOTS = { ok: "on", warning: "warn", critical: "off" };
+// Each Satellite's ui.json may declare widgets (UI contract 1.1). A widget
+// without a source binds to the state the Satellite publishes with
+// /api/satellites - the answer the regular poll already has - so Home makes
+// no request of its own for it; documents are fetched once per revision.
+const widgetDocuments = new Map();  // satellite name -> {revision, widgets}
+let widgetRenderer = null;
 
-function healthPercent(value) {
-    if (typeof value !== "number") {
-        return "—";
+async function loadWidgetDocument(satellite) {
+    const known = widgetDocuments.get(satellite.name);
+    if (known && known.revision === satellite.ui.revision) {
+        return known.widgets;
     }
-    return `${value < 10 || (value >= 90 && value < 100) ? value.toFixed(1) : Math.round(value)}%`;
+    try {
+        const payload = await getJson(satelliteUrl(satellite.name, "/ui"));
+        const widgets = (payload && payload.document && Array.isArray(payload.document.widgets))
+            ? payload.document.widgets : [];
+        widgetDocuments.set(satellite.name, { revision: satellite.ui.revision, widgets });
+        return widgets;
+    } catch {
+        return [];
+    }
 }
 
-function setHealthBar(id, value, warnAt, criticalAt) {
-    const bar = document.getElementById(id);
-    const known = typeof value === "number";
-    bar.style.width = known ? `${Math.max(0, Math.min(100, value))}%` : "0";
-    bar.className = known && value >= criticalAt ? "critical" : known && value >= warnAt ? "warn" : "";
-}
-
-// the Status satellite publishes a small summary as its state, so this reuses the
-// /api/satellites answer the regular poll already has - no request of its own
-function renderHomeHealth() {
-    const status = satellites.find((satellite) => satellite.name === "Status");
-    const section = document.getElementById("home-health-section");
-    section.hidden = !status || !status.enabled;
-    if (section.hidden) {
+async function renderHomeWidgets() {
+    const container = document.getElementById("home-widgets");
+    const candidates = satellites.filter((satellite) => satellite.enabled && hasUiDocument(satellite));
+    const found = await Promise.all(candidates.map(async (satellite) => ({
+        satellite, widgets: await loadWidgetDocument(satellite),
+    })));
+    if (!found.some((entry) => entry.widgets.length)) {
+        container.replaceChildren();
         return;
     }
-    const state = status.state || {};
-    const health = HEALTH_LABELS[state.health] ? state.health : null;
-    document.getElementById("home-health-dot").className = `home-dot ${health ? HEALTH_DOTS[health] : ""}`;
-    const count = Number(state.warning_count) || 0;
-    setText("home-health-label", health
-        ? `${HEALTH_LABELS[health]}${count ? ` · ${count} warning${count === 1 ? "" : "s"}` : ""}`
-        : "No readings yet");
-    setText("home-health-cpu", healthPercent(state.cpu_percent));
-    setText("home-health-memory", healthPercent(state.memory_percent));
-    setHealthBar("home-health-cpu-bar", state.cpu_percent, 90, 98);
-    setHealthBar("home-health-memory-bar", state.memory_percent, 90, 97);
-    setText("home-health-satellites", typeof state.satellites_total === "number"
-        ? `${state.satellites_online}/${state.satellites_total}` : "—");
-
-    const list = document.getElementById("home-health-warnings");
-    list.replaceChildren(...(Array.isArray(state.warnings) ? state.warnings : []).slice(0, 3).map((title) => {
-        const item = element("li");
-        item.appendChild(element("i", "home-dot"));
-        item.appendChild(element("span", null, String(title)));
-        return item;
-    }));
+    widgetRenderer = widgetRenderer || await import("/ui/renderer.js");
+    const cards = [];
+    for (const { satellite, widgets } of found) {
+        for (const widget of widgets) {
+            if (widget.source) {
+                continue;  // a widget with its own source belongs to a client that polls it; Home stays on the listing
+            }
+            const state = satellite.state || {};
+            if (!Object.keys(state).length) {
+                continue;  // nothing published yet - a disabled Satellite publishes nothing
+            }
+            cards.push(widgetRenderer.renderWidget(widget, state, {
+                developer: developerContext.enabled,
+                title: satellite.name,
+                onOpen: (section) => {
+                    location.hash = section ? `${satelliteHash(satellite)}/${section}` : satelliteHash(satellite);
+                },
+            }));
+        }
+    }
+    container.replaceChildren(...cards);
 }
 
 function openIcon() {
@@ -1033,13 +1059,14 @@ async function mountSatellitePage(satellite) {
     mounted = { name: satellite.name, section: route.section, revision, cleanup: null };
     container.replaceChildren();
 
-    if (satellite.page && satellite.page.stylesheet) {
+    const ownPage = usesOwnPage(satellite);
+    if (ownPage && satellite.page.stylesheet) {
         loadStylesheet(satelliteUrl(satellite.name, `/assets/${satellite.page.stylesheet}`));
     }
 
-    // a Satellite's own page.js, or else the shared renderer for its ui.json -
+    // the shared renderer for its ui.json, or else a Satellite's own page.js -
     // both mounted through the same context, so neither is special-cased below
-    const moduleUrl = satellite.page
+    const moduleUrl = ownPage
         ? satelliteUrl(satellite.name, `/assets/${satellite.page.module}`)
         : "/ui/renderer.js";
 
@@ -1181,7 +1208,7 @@ async function refresh() {
 
         renderCore(status);
         renderHomeSatellites();
-        renderHomeHealth();
+        renderHomeWidgets();
         renderSatelliteList();
         renderSatelliteNav();
         if (route.name === "satellite") {
@@ -1595,7 +1622,46 @@ function buildConfigButton(satellite, extraClass) {
 
 // shown in the topbar whenever the current route is a configurable satellite's
 // page, in addition to the same button already on its card in the list
+// Developer Mode only: a Satellite with both a ui.json and a page.js can be shown either way
+function updateSatelliteOwnPageButton() {
+    const button = document.getElementById("satellite-classic-button");
+    const satellite = route.name === "satellite" ? findSatellite(route.satellite) : null;
+    if (!satellite || !satellite.page || !hasUiDocument(satellite)) {
+        button.hidden = true;
+        button.onclick = null;
+        return;
+    }
+    const chosen = ownPagePreferred().has(satellite.name);
+    button.hidden = false;
+    button.setAttribute("aria-pressed", String(chosen));
+    button.title = chosen ? "Show the shared interface (ui.json)" : "Show the Satellite's own page (page.js)";
+    button.setAttribute("aria-label", button.title);
+    button.onclick = () => {
+        const names = ownPagePreferred();
+        if (names.has(satellite.name)) {
+            names.delete(satellite.name);
+        } else {
+            names.add(satellite.name);
+        }
+        try {
+            localStorage.setItem(OWN_PAGE_KEY, JSON.stringify([...names]));
+        } catch {
+            // without storage the choice lasts until the page is reloaded
+        }
+        updateSatelliteOwnPageButton();
+        renderSatellitePage();
+    };
+}
+
+developerContext.subscribe(() => {
+    updateSatelliteOwnPageButton();
+    if (route.name === "satellite") {
+        renderSatellitePage();
+    }
+});
+
 function updateSatelliteConfigButton() {
+    updateSatelliteOwnPageButton();
     const button = document.getElementById("satellite-config-button");
     const satellite = route.name === "satellite" ? findSatellite(route.satellite) : null;
 
@@ -2081,11 +2147,6 @@ document.getElementById("console-form").addEventListener("submit", (event) => {
 });
 
 document.getElementById("console-clear").addEventListener("click", resetConsole);
-// the whole Status summary opens the Status page; its "Open Status" link is the keyboard route
-document.getElementById("home-health").addEventListener("click", () => {
-    const status = findSatellite("Status");
-    location.hash = status ? satelliteHash(status) : "#/satellite/Status";
-});
 document.getElementById("configuration-form").addEventListener("submit", handleConfigurationSubmit);
 document.getElementById("about-copy").addEventListener("click", handleCopyBuildInfo);
 document.getElementById("satellite-config-form").addEventListener("submit", handleSatelliteConfigSubmit);

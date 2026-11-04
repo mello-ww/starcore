@@ -1,0 +1,297 @@
+{
+  "_about": "Status's interface for every client - UI contract 1.1 (docs/ui-contract.md). It binds to the Satellite's own routes: view and view/diagnostics (the snapshot shaped for display, see view.py) and history (the recorded series). Nothing here is Status-specific on the clients.",
+  "contract": "starcore.ui/1.1",
+  "title": "Status",
+  "entry": "overview",
+  "header": {
+    "source": {"route": "view", "refresh": 5},
+    "blocks": [
+      {"type": "text", "style": "eyebrow", "text": "$.eyebrow"},
+      {"type": "heading", "text": "System status"},
+      {"type": "field", "label": "Updated", "value": "$.sampled_at", "format": "relative", "detail": "$.sampling_text"},
+      {"type": "status", "label": "$.health.label", "tone": "$.health.tone", "detail": "$.health.detail"}
+    ]
+  },
+  "widgets": [
+    {
+      "id": "health",
+      "title": "Status",
+      "icon": "activity",
+      "action": {"navigate": "overview"},
+      "blocks": [
+        {"type": "status", "label": "$.health_label", "tone": "$.health_tone", "detail": "$.health_detail"},
+        {"type": "metric", "label": "CPU", "value": "$.cpu_percent", "format": "percent", "max": 100, "tone": "$.cpu_tone"},
+        {"type": "metric", "label": "RAM", "value": "$.memory_percent", "format": "percent", "max": 100, "tone": "$.memory_tone"},
+        {"type": "metric", "label": "Satellites", "value": "$.satellites"},
+        {"type": "list", "visible": "$.warning_items", "items": "$.warning_items", "item": {"title": "$.title", "tone": "$.tone"}}
+      ]
+    }
+  ],
+  "navigation": [
+    {"page": "overview", "label": "Overview", "icon": "activity"},
+    {"page": "hardware", "label": "Hardware", "icon": "cpu"},
+    {"page": "network", "label": "Network", "icon": "zap"},
+    {"page": "services", "label": "Services", "icon": "layers"},
+    {"page": "history", "label": "History", "icon": "clock"},
+    {"page": "diagnostics", "label": "Diagnostics", "icon": "info", "developer": true}
+  ],
+  "pages": {
+    "overview": {
+      "template": "dashboard",
+      "source": {"route": "view", "refresh": 5},
+      "sources": {"trend": {"route": "history?period=1h&series=cpu%2Cmemory%2Cnet_rx%2Cnet_tx&points=120", "refresh": 30}},
+      "blocks": [
+        {"type": "card", "title": "Warnings", "blocks": [
+          {"type": "list", "items": "$.warnings", "empty": "No warnings. Every reading is within its normal range.",
+           "item": {"title": "$.title", "subtitle": "$.detail", "value": "$.level", "tone": "$.tone"}}
+        ]},
+        {"type": "metric", "label": "CPU", "value": "$.overview.cpu.percent", "format": "percent", "max": 100,
+         "tone": "$.overview.cpu.tone", "detail": "$.overview.cpu.detail", "trend": "$sources.trend.series.cpu.points",
+         "action": {"navigate": "hardware"}},
+        {"type": "metric", "label": "Memory", "value": "$.overview.memory.percent", "format": "percent", "max": 100,
+         "tone": "$.overview.memory.tone", "detail": "$.overview.memory.detail", "trend": "$sources.trend.series.memory.points",
+         "action": {"navigate": "hardware"}},
+        {"type": "metric", "label": "Storage", "value": "$.overview.storage.percent", "format": "percent", "max": 100,
+         "tone": "$.overview.storage.tone", "detail": "$.overview.storage.detail", "action": {"navigate": "hardware"}},
+        {"type": "metric", "label": "Network", "value": "$.overview.network.rx_bps", "format": "bitrate",
+         "detail": "$.overview.network.detail", "trend": "$sources.trend.series.net_rx.points",
+         "action": {"navigate": "network"}},
+        {"type": "metric", "label": "Satellites", "value": "$.overview.satellites.value",
+         "detail": "$.overview.satellites.detail", "action": {"navigate": "services"}},
+        {"type": "metric", "label": "Uptime", "value": "$.overview.uptime.seconds", "format": "duration",
+         "detail": "$.overview.uptime.detail"},
+        {"type": "chart", "title": "CPU · last hour", "format": "percent", "max": 100,
+         "from": "$sources.trend.from", "to": "$sources.trend.to", "resolution": "$sources.trend.resolution",
+         "empty": "$.overview.history_note", "series": [{"label": "CPU", "points": "$sources.trend.series.cpu.points"}]},
+        {"type": "chart", "title": "Memory · last hour", "format": "percent", "max": 100,
+         "from": "$sources.trend.from", "to": "$sources.trend.to", "resolution": "$sources.trend.resolution",
+         "empty": "$.overview.history_note", "series": [{"label": "Memory", "points": "$sources.trend.series.memory.points"}]}
+      ]
+    },
+    "hardware": {
+      "template": "dashboard",
+      "source": {"route": "view", "refresh": 5},
+      "blocks": [
+        {"type": "card", "title": "Processor", "blocks": [
+          {"type": "heading", "text": "$.hardware.cpu.model"},
+          {"type": "field", "label": "Usage", "value": "$.hardware.cpu.percent", "format": "percent"},
+          {"type": "field", "label": "Threads / cores", "value": "$.hardware.cpu.cores"},
+          {"type": "field", "label": "Frequency", "value": "$.hardware.cpu.frequency", "detail": "$.hardware.cpu.frequency_detail"},
+          {"type": "field", "label": "Load average", "value": "$.hardware.cpu.load", "detail": "$.hardware.cpu.load_detail"},
+          {"type": "field", "label": "Temperature", "value": "$.hardware.cpu.temperature", "format": "number", "unit": "°C",
+           "detail": "$.hardware.cpu.temperature_detail"},
+          {"type": "chart", "kind": "bars", "title": "Per thread", "visible": "$.hardware.cpu.per_core", "format": "percent",
+           "max": 100, "series": [{"label": "Thread", "points": "$.hardware.cpu.per_core"}]},
+          {"type": "table", "visible": "$.hardware.cpu.sensors", "rows": "$.hardware.cpu.sensors", "columns": [
+            {"label": "Sensor", "value": "$.label"},
+            {"label": "Temperature", "value": "$.celsius", "format": "number", "unit": "°C", "align": "end"}
+          ]}
+        ]},
+        {"type": "card", "title": "Memory", "blocks": [
+          {"type": "text", "visible": "$.hardware.memory.unavailable", "style": "caption", "text": "$.hardware.memory.unavailable"},
+          {"type": "heading", "visible": "$.hardware.memory.available", "text": "$.hardware.memory.title"},
+          {"type": "metric", "visible": "$.hardware.memory.available", "label": "In use", "value": "$.hardware.memory.percent",
+           "format": "percent", "max": 100, "tone": "$.hardware.memory.tone"},
+          {"type": "field", "visible": "$.hardware.memory.available", "label": "Available", "value": "$.hardware.memory.free",
+           "format": "bytes"},
+          {"type": "field", "visible": "$.hardware.memory.available", "label": "Swap", "value": "$.hardware.memory.swap",
+           "detail": "$.hardware.memory.swap_detail"},
+          {"type": "metric", "visible": "$.hardware.memory.has_swap", "label": "Swap in use", "value": "$.hardware.memory.swap_percent",
+           "format": "percent", "max": 100, "tone": "$.hardware.memory.swap_tone"}
+        ]},
+        {"type": "card", "title": "Storage", "blocks": [
+          {"type": "text", "visible": "$.hardware.storage.stale", "style": "caption", "text": "$.hardware.storage.stale"},
+          {"type": "table", "rows": "$.hardware.storage.partitions", "empty": "No drives could be read.", "columns": [
+            {"label": "Drive", "value": "$.drive"},
+            {"label": "Kind", "value": "$.kind"},
+            {"label": "File system", "value": "$.fs"},
+            {"label": "Used", "value": "$.percent", "format": "percent", "max": 100, "tone": "$.tone"},
+            {"label": "Size", "value": "$.total", "format": "bytes", "align": "end"},
+            {"label": "Free", "value": "$.free", "format": "bytes", "align": "end"}
+          ]},
+          {"type": "text", "style": "eyebrow", "text": "Disk activity"},
+          {"type": "table", "rows": "$.hardware.storage.disks", "empty": "$.hardware.storage.disks_empty", "columns": [
+            {"label": "Disk", "value": "$.name"},
+            {"label": "Volumes", "value": "$.volumes"},
+            {"label": "Read", "value": "$.read_bps", "format": "byterate", "align": "end"},
+            {"label": "Write", "value": "$.write_bps", "format": "byterate", "align": "end"},
+            {"label": "Busy", "value": "$.busy", "format": "percent", "align": "end"}
+          ]}
+        ]},
+        {"type": "card", "title": "System", "blocks": [
+          {"type": "field", "label": "Operating system", "value": "$.hardware.system.os"},
+          {"type": "field", "label": "Kernel", "value": "$.hardware.system.kernel"},
+          {"type": "field", "label": "Architecture", "value": "$.hardware.system.architecture"},
+          {"type": "field", "label": "Hardware", "value": "$.hardware.system.hardware"},
+          {"type": "field", "label": "Host name", "value": "$.hardware.system.hostname"},
+          {"type": "field", "label": "Booted", "value": "$.hardware.system.boot_time", "format": "datetime",
+           "detail": "$.hardware.system.uptime"}
+        ]}
+      ]
+    },
+    "network": {
+      "template": "dashboard",
+      "source": {"route": "view", "refresh": 5},
+      "sources": {"trend": {"route": "history?period=1h&series=net_rx%2Cnet_tx&points=120", "refresh": 30}},
+      "blocks": [
+        {"type": "card", "visible": "$.network.unavailable", "title": "Network", "blocks": [
+          {"type": "text", "style": "caption", "text": "$.network.unavailable"}
+        ]},
+        {"type": "metric", "visible": "$.network.available", "label": "Download", "value": "$.network.rx_bps", "format": "bitrate",
+         "detail": "all physical adapters", "trend": "$sources.trend.series.net_rx.points"},
+        {"type": "metric", "visible": "$.network.available", "label": "Upload", "value": "$.network.tx_bps", "format": "bitrate",
+         "detail": "all physical adapters", "trend": "$sources.trend.series.net_tx.points"},
+        {"type": "metric", "visible": "$.network.available", "label": "Interfaces", "value": "$.network.connected",
+         "detail": "connected"},
+        {"type": "card", "visible": "$.network.available", "title": "Interfaces", "blocks": [
+          {"type": "table", "rows": "$.network.interfaces", "empty": "No network interfaces were found.", "columns": [
+            {"label": "Interface", "value": "$.name"},
+            {"label": "Kind", "value": "$.kind"},
+            {"label": "State", "value": "$.state", "tone": "$.tone"},
+            {"label": "Link", "value": "$.link", "align": "end"},
+            {"label": "Download", "value": "$.rx_bps", "format": "bitrate", "align": "end"},
+            {"label": "Upload", "value": "$.tx_bps", "format": "bitrate", "align": "end"},
+            {"label": "Received", "value": "$.rx_bytes", "format": "bytes", "align": "end"},
+            {"label": "Sent", "value": "$.tx_bytes", "format": "bytes", "align": "end"},
+            {"label": "Errors / drops", "value": "$.errors", "align": "end"}
+          ]},
+          {"type": "text", "style": "caption",
+           "text": "Totals count since the adapter came up. Addresses are deliberately not collected."}
+        ]},
+        {"type": "chart", "visible": "$.network.available", "title": "Throughput · last hour", "format": "bitrate",
+         "from": "$sources.trend.from", "to": "$sources.trend.to", "resolution": "$sources.trend.resolution",
+         "empty": "$.overview.history_note", "series": [
+           {"label": "Download", "points": "$sources.trend.series.net_rx.points"},
+           {"label": "Upload", "points": "$sources.trend.series.net_tx.points"}
+         ]}
+      ]
+    },
+    "services": {
+      "template": "dashboard",
+      "source": {"route": "view", "refresh": 5},
+      "blocks": [
+        {"type": "card", "title": "Engine", "blocks": [
+          {"type": "heading", "text": "$.services.engine.title"},
+          {"type": "field", "label": "Uptime", "value": "$.services.engine.uptime", "format": "duration"},
+          {"type": "field", "label": "Mission Control", "value": "$.services.engine.mission_control"},
+          {"type": "field", "label": "Satellite services", "value": "$.services.engine.satellite_services"},
+          {"type": "field", "label": "Commands", "value": "$.services.engine.commands", "format": "integer"}
+        ]},
+        {"type": "card", "title": "Checks", "blocks": [
+          {"type": "table", "rows": "$.services.checks", "empty": "No checks were reported.", "columns": [
+            {"label": "Check", "value": "$.check"},
+            {"label": "State", "value": "$.state", "tone": "$.tone"},
+            {"label": "Detail", "value": "$.detail"}
+          ]}
+        ]},
+        {"type": "card", "title": "$.services.satellites_title", "blocks": [
+          {"type": "table", "rows": "$.services.satellites", "empty": "No Satellites are loaded.", "columns": [
+            {"label": "Satellite", "value": "$.name"},
+            {"label": "Status", "value": "$.status", "tone": "$.tone"},
+            {"label": "Background service", "value": "$.service"},
+            {"label": "Version", "value": "$.version"},
+            {"label": "Commands", "value": "$.commands"},
+            {"label": "Last error", "value": "$.error"}
+          ]}
+        ]},
+        {"type": "card", "title": "Dependencies", "blocks": [
+          {"type": "table", "rows": "$.services.dependencies", "empty": "No satellite depends on another.", "columns": [
+            {"label": "Satellite", "value": "$.satellite"},
+            {"label": "Needs", "value": "$.needs"},
+            {"label": "How", "value": "$.how"}
+          ]},
+          {"type": "text", "style": "eyebrow", "text": "Optional components"},
+          {"type": "table", "rows": "$.services.components", "columns": [
+            {"label": "Component", "value": "$.name"},
+            {"label": "State", "value": "$.state", "tone": "$.tone"},
+            {"label": "Used for", "value": "$.used"}
+          ]}
+        ]}
+      ]
+    },
+    "history": {
+      "template": "dashboard",
+      "state": {"period": "24h"},
+      "source": {"route": "history?period={$state.period}&points=360", "refresh": 60},
+      "sources": {"view": {"route": "view", "refresh": 30}},
+      "blocks": [
+        {"type": "choice", "key": "period", "label": "Time range", "options": [
+          {"value": "1h", "label": "1 hour"}, {"value": "24h", "label": "24 hours"},
+          {"value": "7d", "label": "7 days"}, {"value": "30d", "label": "30 days"}
+        ]},
+        {"type": "field", "label": "One point every", "value": "$.resolution", "format": "duration",
+         "detail": "averages - select a point for its peak"},
+        {"type": "chart", "title": "CPU", "format": "percent", "max": 100, "empty": "$sources.view.history_notes.empty",
+         "from": "$.from", "to": "$.to", "resolution": "$.resolution",
+         "series": [{"label": "CPU", "points": "$.series.cpu.points"}]},
+        {"type": "chart", "title": "Memory", "format": "percent", "max": 100, "empty": "$sources.view.history_notes.empty",
+         "from": "$.from", "to": "$.to", "resolution": "$.resolution",
+         "series": [{"label": "Memory", "points": "$.series.memory.points"}]},
+        {"type": "chart", "visible": "$.series.net_rx.points", "title": "Network", "format": "bitrate",
+         "from": "$.from", "to": "$.to", "resolution": "$.resolution",
+         "series": [{"label": "Download", "points": "$.series.net_rx.points"}, {"label": "Upload", "points": "$.series.net_tx.points"}]},
+        {"type": "chart", "visible": "$.series.disk_read.points", "title": "Disk throughput", "format": "byterate",
+         "from": "$.from", "to": "$.to", "resolution": "$.resolution",
+         "series": [{"label": "Read", "points": "$.series.disk_read.points"}, {"label": "Write", "points": "$.series.disk_write.points"}]},
+        {"type": "chart", "visible": "$.series.storage.points", "title": "Fullest drive", "format": "percent", "max": 100,
+         "from": "$.from", "to": "$.to", "resolution": "$.resolution",
+         "series": [{"label": "Used", "points": "$.series.storage.points"}]},
+        {"type": "chart", "visible": "$.series.swap.points", "title": "Swap", "format": "percent", "max": 100,
+         "from": "$.from", "to": "$.to", "resolution": "$.resolution",
+         "series": [{"label": "Swap", "points": "$.series.swap.points"}]},
+        {"type": "chart", "visible": "$.series.load.points", "title": "Load average", "format": "number",
+         "from": "$.from", "to": "$.to", "resolution": "$.resolution",
+         "series": [{"label": "1 minute", "points": "$.series.load.points"}]},
+        {"type": "chart", "visible": "$.series.temperature.points", "title": "CPU temperature", "format": "number", "unit": "°C",
+         "from": "$.from", "to": "$.to", "resolution": "$.resolution",
+         "series": [{"label": "Hottest CPU sensor", "points": "$.series.temperature.points"}]},
+        {"type": "card", "visible": "$sources.view.history_notes.unsupported", "title": "Not recorded on this machine", "blocks": [
+          {"type": "list", "items": "$sources.view.history_notes.unsupported", "item": {"title": "$.title", "subtitle": "$.reason"}}
+        ]}
+      ]
+    },
+    "diagnostics": {
+      "template": "dashboard",
+      "source": {"route": "view/diagnostics", "refresh": 15},
+      "blocks": [
+        {"type": "text", "style": "caption",
+         "text": "Shown in Developer Mode. These details never include addresses, tokens or file contents."},
+        {"type": "card", "title": "Sampler", "blocks": [
+          {"type": "field", "label": "State", "value": "$.sampler.state"},
+          {"type": "field", "label": "Interval", "value": "$.sampler.interval", "format": "duration"},
+          {"type": "field", "label": "Samples taken", "value": "$.sampler.samples", "format": "integer"},
+          {"type": "field", "label": "Collection time", "value": "$.sampler.collect", "detail": "$.sampler.collect_detail"},
+          {"type": "field", "label": "Errors", "value": "$.sampler.errors", "format": "integer", "detail": "$.sampler.last_error"},
+          {"type": "field", "label": "Started", "value": "$.sampler.started_at", "format": "datetime"}
+        ]},
+        {"type": "card", "title": "StarCore process", "blocks": [
+          {"type": "field", "label": "CPU", "value": "$.process.cpu", "format": "percent", "detail": "of the whole machine"},
+          {"type": "field", "label": "Memory", "value": "$.process.memory", "format": "bytes"},
+          {"type": "field", "label": "Python", "value": "$.process.python"},
+          {"type": "field", "label": "Platform", "value": "$.process.platform"}
+        ]},
+        {"type": "card", "title": "History file", "blocks": [
+          {"type": "field", "label": "Size", "value": "$.store.bytes", "format": "bytes"},
+          {"type": "field", "label": "State", "value": "$.store.state"},
+          {"type": "text", "style": "eyebrow", "text": "Tiers"},
+          {"type": "table", "rows": "$.tiers", "columns": [
+            {"label": "Tier", "value": "$.tier"},
+            {"label": "Point every", "value": "$.bucket", "format": "duration", "align": "end"},
+            {"label": "Kept for", "value": "$.kept", "format": "duration", "align": "end"},
+            {"label": "Points stored", "value": "$.rows", "format": "integer", "align": "end"}
+          ]}
+        ]},
+        {"type": "card", "title": "Not available on this machine", "blocks": [
+          {"type": "text", "visible": "$.all_supported", "style": "caption", "text": "$.all_supported"},
+          {"type": "table", "visible": "$.unsupported", "rows": "$.unsupported", "columns": [
+            {"label": "Reading", "value": "$.reading"},
+            {"label": "Why", "value": "$.reason"}
+          ]}
+        ]},
+        {"type": "card", "title": "Raw", "blocks": [
+          {"type": "code", "label": "Raw diagnostics (JSON)", "value": "$.raw", "copy": true}
+        ]}
+      ]
+    }
+  }
+}

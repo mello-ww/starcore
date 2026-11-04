@@ -144,6 +144,12 @@ describe('HomeScreen Status card', () => {
     expect(__navigation.navigate).toHaveBeenCalledWith('Satellites', {screen: 'StatusHome', params: undefined, initial: false});
   });
 
+  it('leaves Status to its ui.json widget once the server ships one', async () => {
+    __mocks.list.mockReset().mockResolvedValue([music, {...status, ui: {contract: 'starcore.ui/1.1', revision: 'r1', error: null}}]);
+    const tree = await render();
+    expect(tree.root.findAllByProps({testID: 'home-status-widget'}, {deep: false})).toHaveLength(0);
+  });
+
   it('shows no Status card when the server has no Status satellite', async () => {
     __mocks.list.mockReset().mockResolvedValue([music]);
     const tree = await render();

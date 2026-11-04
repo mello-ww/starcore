@@ -1,5 +1,5 @@
 /**
- * StarCore UI contract 1.0 - this app's side of the shared rules: bindings,
+ * StarCore UI contract 1.1 - this app's side of the shared rules: bindings,
  * route templates, route safety, formats and compatibility. Pure functions,
  * tested against the same fixtures (contracts/ui/) as the Engine and
  * Mission Control - see docs/ui-contract.md. Nothing here ever evaluates
@@ -8,12 +8,18 @@
 
 export const CONTRACT_NAME = 'starcore.ui';
 export const MAJOR = 1;
-export const MINOR = 0;
+export const MINOR = 1;
 
 export const BLOCK_TYPES = new Set([
   'heading', 'text', 'field', 'metric', 'card', 'list', 'button', 'toggle', 'slider', 'form', 'file-browser',
+  // 1.1
+  'chart', 'table', 'choice', 'status', 'code',
 ]);
-export const FORMATS = new Set(['text', 'number', 'integer', 'percent', 'bytes', 'duration']);
+export const FORMATS = new Set([
+  'text', 'number', 'integer', 'percent', 'bytes', 'duration',
+  // 1.1
+  'bitrate', 'byterate', 'date', 'time', 'datetime', 'relative',
+]);
 export const TONES = new Set(['neutral', 'ok', 'warn', 'danger']);
 /** The shared icon set - every name is a Feather glyph this app can draw. */
 export const ICONS = new Set([
@@ -55,11 +61,33 @@ export interface UiBlock {
   [key: string]: any;
 }
 
+export interface UiSource {
+  route: string;
+  refresh?: number;
+}
+
 export interface UiPage {
   title?: Json;
   params?: string[];
-  source?: {route: string; refresh?: number};
+  source?: UiSource;
+  /** 1.1: more sources, bound as $sources.<name> */
+  sources?: Record<string, UiSource>;
+  /** 1.1: page-local values (a choice's selection), bound as $state.<key> */
+  state?: Record<string, Json>;
+  /** 1.1: 'stack' (the default) or 'dashboard' */
+  template?: string;
   blocks: UiBlock[];
+}
+
+/** 1.1: a summary any client may show outside the Satellite's pages (Home).
+ * Without a source, its data is the state the Satellite publishes. */
+export interface UiWidget {
+  id: string;
+  title?: Json;
+  icon?: string;
+  source?: UiSource;
+  blocks: UiBlock[];
+  action?: UiAction;
 }
 
 export interface UiDocument {
@@ -67,7 +95,10 @@ export interface UiDocument {
   title?: string;
   requires?: {client?: string[]; capabilities?: string[]};
   entry: string;
-  navigation?: Array<{page: string; label: string; icon?: string}>;
+  navigation?: Array<{page: string; label: string; icon?: string; developer?: boolean}>;
+  /** 1.1: a band above the navigation on top-level pages */
+  header?: {source?: UiSource; blocks: UiBlock[]};
+  widgets?: UiWidget[];
   pages: Record<string, UiPage>;
 }
 
@@ -86,6 +117,8 @@ export interface Scope {
   params?: Record<string, any>;
   value?: any;
   form?: Record<string, any>;
+  state?: Record<string, any>;
+  sources?: Record<string, any>;
 }
 
 export function parseContract(value: unknown): {major: number; minor: number} | null {
@@ -151,7 +184,9 @@ function lookup(root: any, path: string[]): any {
   return value === undefined ? null : value;
 }
 
-const ROOTS: Array<[string, keyof Scope]> = [['$.', 'data'], ['$page.', 'page'], ['$params.', 'params'], ['$form.', 'form']];
+const ROOTS: Array<[string, keyof Scope]> = [
+  ['$.', 'data'], ['$page.', 'page'], ['$params.', 'params'], ['$form.', 'form'], ['$state.', 'state'], ['$sources.', 'sources'],
+];
 
 function resolveString(expression: string, scope: Scope): any {
   if (!expression.startsWith('$')) {
@@ -251,8 +286,47 @@ function duration(seconds: number): string {
   return `${total}s`;
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
+const BIT_UNITS = ['b/s', 'kb/s', 'Mb/s', 'Gb/s', 'Tb/s'];
+
+function moment(seconds: number, format: string, utc: boolean): string {
+  const date = new Date(seconds * 1000);
+  const hours = utc ? date.getUTCHours() : date.getHours();
+  const minutes = utc ? date.getUTCMinutes() : date.getMinutes();
+  const clock = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  const day = `${utc ? date.getUTCDate() : date.getDate()} ${MONTHS[utc ? date.getUTCMonth() : date.getMonth()]} ${
+    utc ? date.getUTCFullYear() : date.getFullYear()
+  }`;
+  return format === 'time' ? clock : format === 'date' ? day : `${day}, ${clock}`;
+}
+
+function relative(seconds: number, now: number): string {
+  const difference = now - seconds;
+  const size = Math.abs(difference);
+  if (size < 10) {
+    return 'just now';
+  }
+  const amount =
+    size < 60
+      ? `${Math.floor(size)}s`
+      : size < 3600
+        ? `${Math.floor(size / 60)} min`
+        : size < 86400
+          ? `${Math.floor(size / 3600)} h`
+          : `${Math.floor(size / 86400)} d`;
+  return difference > 0 ? `${amount} ago` : `in ${amount}`;
+}
+
+export interface FormatOptions {
+  /** Times in UTC instead of the device's time zone - for the tests. */
+  utc?: boolean;
+  /** The moment `relative` measures from (epoch seconds) - for the tests. */
+  now?: number;
+}
+
 /** A value as display text - see "Formats" in docs/ui-contract.md. */
-export function formatValue(value: unknown, format: string = 'text', unit?: string): string {
+export function formatValue(value: unknown, format: string = 'text', unit?: string, options: FormatOptions = {}): string {
   let text: string;
   if (value === null || value === undefined) {
     return '—';
@@ -267,9 +341,17 @@ export function formatValue(value: unknown, format: string = 'text', unit?: stri
   } else if (format === 'percent') {
     return `${trimNumber(value, 1)}%`;
   } else if (format === 'bytes') {
-    return scaled(value, ['B', 'KB', 'MB', 'GB', 'TB'], 1024);
+    return scaled(value, BYTE_UNITS, 1024);
+  } else if (format === 'byterate') {
+    return `${scaled(value, BYTE_UNITS, 1024)}/s`;
+  } else if (format === 'bitrate') {
+    return scaled(Math.max(value, 0) * 8, BIT_UNITS, 1000);
   } else if (format === 'duration') {
     return duration(value);
+  } else if (format === 'time' || format === 'date' || format === 'datetime') {
+    return moment(value, format, Boolean(options.utc));
+  } else if (format === 'relative') {
+    return relative(value, typeof options.now === 'number' ? options.now : Date.now() / 1000);
   } else {
     text = trimNumber(value, 2);
   }

@@ -5,7 +5,9 @@
     "page": {"title": "Overview", "total": 12},
     "params": {"id": "item 7"},
     "value": 55,
-    "form": {"title": "New note"}
+    "form": {"title": "New note"},
+    "state": {"period": "24h"},
+    "sources": {"trend": {"points": [[1, 2, 3]]}}
   },
   "resolve": [
     {"expr": "plain text", "expected": "plain text"},
@@ -26,13 +28,17 @@
     {"expr": "$$literal", "expected": "$literal"},
     {"expr": "$unknown.root", "expected": null},
     {"expr": {"enabled": "$value", "label": "$.name", "fixed": 1}, "expected": {"enabled": 55, "label": "Alpha", "fixed": 1}},
-    {"expr": ["$.count", "x"], "expected": [3, "x"]}
+    {"expr": ["$.count", "x"], "expected": [3, "x"]},
+    {"expr": "$state.period", "expected": "24h"},
+    {"expr": "$sources.trend.points.0.1", "expected": 2},
+    {"expr": "$sources.missing.x", "expected": null}
   ],
   "templates": [
     {"template": "items", "expected": "items"},
     {"template": "items/{$params.id}", "expected": "items/item%207"},
     {"template": "items/{$.rows.0.id}/rename", "expected": "items/a/rename"},
     {"template": "entries?path={$.missing}", "expected": "entries?path="},
-    {"template": "search?q={$form.title}&n={$.count}", "expected": "search?q=New%20note&n=3"}
+    {"template": "search?q={$form.title}&n={$.count}", "expected": "search?q=New%20note&n=3"},
+    {"template": "history?period={$state.period}&points=60", "expected": "history?period=24h&points=60"}
   ]
 }

@@ -5,18 +5,35 @@ import {ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Te
 import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
 import {useDeveloperMode} from '../developer/DeveloperModeContext';
+import {useAppActive} from '../hooks/useAppActive';
 import {useServers} from '../servers/ServersContext';
 import {UiApi} from '../satellites/ui/api';
 import {
-  ICONS, missingRequirements, resolve, resolveTemplate, type Providers, type Scope, type UiAction, type UiDocument,
+  ICONS, formatValue, missingRequirements, resolve, resolveTemplate,
+  type Providers, type Scope, type UiAction, type UiDocument, type UiSource,
 } from '../satellites/ui/contract';
-import {BlockContext, confirmAction, UiBlocks} from '../satellites/ui/UiBlocks';
-import {tokens, useAccent} from '../theme';
+import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
+import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
 
-const {palette, space, type} = tokens;
+const {palette, radii, space, type} = tokens;
 
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'SatelliteUi'>;
+
+/** Calls `load` now and every `source.refresh` seconds while `active`. */
+function usePolling(source: UiSource | undefined, active: boolean, load: () => void, paused: () => boolean) {
+  useEffect(() => {
+    if (!active || !source?.refresh) {
+      return;
+    }
+    const timer = setInterval(() => {
+      if (!paused()) {
+        load();
+      }
+    }, Math.max(2, source.refresh) * 1000);
+    return () => clearInterval(timer);
+  }, [active, source, load, paused]);
+}
 
 /**
  * Any Satellite's declarative interface (its ui.json - see
@@ -26,15 +43,18 @@ type Props = NativeStackScreenProps<SatellitesStackParamList, 'SatelliteUi'>;
  *
  * Top-level pages (the document's navigation) are tabs within one screen;
  * a detail page is pushed as another instance of this screen, so Android's
- * back gesture works as everywhere else.
+ * back gesture works as everywhere else. Live pages refresh only while the
+ * screen is focused and the app is in the foreground.
  */
 export function SatelliteUiScreen({route, navigation}: Props) {
   const {name, page: requestedPage, params = {}, revision} = route.params;
   const {client} = useAuth();
   const {activeServer} = useServers();
   const {enabled: developer} = useDeveloperMode();
-  const {color: accent} = useAccent();
+  const {color: accent, onColor} = useAccent();
   const focused = useIsFocused();
+  const appActive = useAppActive();
+  const live = focused && appActive;
   const api = useMemo(() => new UiApi(client, activeServer?.id ?? 'default'), [client, activeServer?.id]);
 
   const [document, setDocument] = useState<UiDocument | null>(null);
@@ -43,15 +63,35 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const [fatal, setFatal] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [sources, setSources] = useState<Record<string, any>>({});
+  const [header, setHeader] = useState<any>(null);
+  // a choice's selections, for the page they were made on; the page's own defaults otherwise
+  const [choices, setChoices] = useState<{page: string | undefined; values: Record<string, any>}>({page: undefined, values: {}});
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState<{text: string; error: boolean} | null>(null);
+  const [now, setNow] = useState(Date.now());
   const forms = useRef<Record<string, Record<string, any>>>({}).current;
   const editing = useRef(false);
   const loadToken = useRef(0);
+  const sourceTokens = useRef<Record<string, number>>({});
 
-  const pageId = document && requestedPage && document.pages[requestedPage] ? requestedPage : document?.entry;
+  const navigationItems = useMemo(
+    () => (document?.navigation ?? []).filter(item => !item.developer || developer),
+    [document, developer],
+  );
+  const hidden = (target: string | undefined) =>
+    Boolean(target && (document?.navigation ?? []).some(item => item.page === target && item.developer && !developer));
+  const pageId =
+    document && requestedPage && document.pages[requestedPage] && !hidden(requestedPage) ? requestedPage : document?.entry;
   const page = document && pageId ? document.pages[pageId] : null;
-  const topLevel = !!document && (pageId === document.entry || (document.navigation ?? []).some(item => item.page === pageId));
+  const topLevel = !!document && (pageId === document.entry || navigationItems.some(item => item.page === pageId));
+  const paramsKey = JSON.stringify(params);
+  const pageState = useMemo(
+    () => ({...(page?.state ?? {}), ...(choices.page === pageId ? choices.values : {})}),
+    [page, pageId, choices],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -82,6 +122,14 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     };
   }, [api, name, revision]);
 
+  // a new page starts afresh
+  useEffect(() => {
+    setSources({});
+    setData(null);
+    setDataError(null);
+    setUpdatedAt(null);
+  }, [page, paramsKey]);
+
   const showToast = useCallback((text: string | null, error = false) => {
     setToast(text ? {text, error} : null);
   }, []);
@@ -94,6 +142,18 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // keeps "updated 12s ago" and the offline notice honest between refreshes
+  useEffect(() => {
+    if (!live) {
+      return;
+    }
+    const timer = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, [live]);
+
+  const stateKey = JSON.stringify(pageState);
+  const bindings = useMemo(() => ({params, state: pageState}), [paramsKey, stateKey]);
+
   const loadData = useCallback(async () => {
     if (!page) {
       return;
@@ -103,46 +163,97 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       setData({});
       return;
     }
+    setLoading(true);
     try {
-      const body = await api.read(name, resolveTemplate(page.source.route, {params}));
+      const body = await api.read(name, resolveTemplate(page.source.route, bindings));
       if (token === loadToken.current) {
         setData(body && typeof body === 'object' ? body : {});
         setDataError(null);
+        setUpdatedAt(Date.now());
       }
     } catch (err: any) {
       if (token === loadToken.current) {
         setDataError(err?.message || 'Could not load this page.');
       }
+    } finally {
+      if (token === loadToken.current) {
+        setLoading(false);
+      }
     }
-    // params is a fresh object each render; its contents are what matter
-  }, [api, name, page, JSON.stringify(params)]);
+  }, [api, name, page, bindings]);
 
-  // on open, and again on coming back to this page - something on the page
-  // it opened (a detail page, say) may have changed what this one shows
-  const wasFocused = useRef(focused);
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-  useEffect(() => {
-    if (focused && !wasFocused.current) {
-      loadData();
-    }
-    wasFocused.current = focused;
-  }, [focused, loadData]);
+  const loadSource = useCallback(
+    async (sourceName: string) => {
+      const source = page?.sources?.[sourceName];
+      if (!source) {
+        return;
+      }
+      const token = (sourceTokens.current[sourceName] ?? 0) + 1;
+      sourceTokens.current[sourceName] = token;
+      try {
+        const body = await api.read(name, resolveTemplate(source.route, bindings));
+        if (sourceTokens.current[sourceName] === token) {
+          setSources(current => ({...current, [sourceName]: body}));
+        }
+      } catch {
+        // a named source is supplementary: its blocks show what they have, the page stays
+      }
+    },
+    [api, name, page, bindings],
+  );
 
-  // live pages refresh on their own while visible - never under a finger
-  useEffect(() => {
-    const seconds = page?.source?.refresh;
-    if (!focused || !seconds) {
+  const loadHeader = useCallback(async () => {
+    const source = document?.header?.source;
+    if (!source) {
       return;
     }
-    const timer = setInterval(() => {
-      if (!editing.current) {
-        loadData();
-      }
-    }, Math.max(2, seconds) * 1000);
-    return () => clearInterval(timer);
-  }, [focused, page, loadData]);
+    try {
+      const body = await api.read(name, resolveTemplate(source.route, {}));
+      setHeader(body && typeof body === 'object' ? body : {});
+    } catch {
+      // the page's own notice says when StarCore isn't answering
+    }
+  }, [api, name, document]);
+
+  const loadAll = useCallback(() => {
+    loadData();
+    for (const sourceName of Object.keys(page?.sources ?? {})) {
+      loadSource(sourceName);
+    }
+  }, [loadData, loadSource, page]);
+
+  // on open, on a new page or choice, and again on coming back - to this
+  // screen (a detail page may have changed what it shows) or to the app
+  useEffect(() => {
+    if (live) {
+      loadAll();
+    }
+  }, [live, loadAll]);
+  useEffect(() => {
+    if (live && topLevel) {
+      loadHeader();
+    }
+  }, [live, topLevel, loadHeader]);
+
+  // live pages refresh on their own while visible - never under a finger
+  const busy = useCallback(() => editing.current, []);
+  usePolling(page?.source, live, loadData, busy);
+  usePolling(document?.header?.source, live && topLevel, loadHeader, busy);
+  useEffect(() => {
+    if (!live) {
+      return;
+    }
+    const timers = Object.entries(page?.sources ?? {})
+      .filter(([, source]) => source?.refresh)
+      .map(([sourceName, source]) =>
+        setInterval(() => {
+          if (!editing.current) {
+            loadSource(sourceName);
+          }
+        }, Math.max(2, source.refresh as number) * 1000),
+      );
+    return () => timers.forEach(timer => clearInterval(timer));
+  }, [live, page, loadSource]);
 
   useEffect(() => {
     const title = page?.title !== undefined && !topLevel ? resolve(page.title, {data: data ?? {}, params}) : null;
@@ -172,18 +283,18 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       if (!action) {
         return false;
       }
-      const bindings: Scope = {...scope, value};
+      const scoped: Scope = {...scope, value};
       if (action.navigate) {
-        go(action.navigate, resolve(action.params ?? {}, bindings));
+        go(action.navigate, resolve(action.params ?? {}, scoped));
         return true;
       }
-      if (action.confirm && !(await confirmAction(String(resolve(action.confirm, bindings))))) {
+      if (action.confirm && !(await confirmAction(String(resolve(action.confirm, scoped))))) {
         return false;
       }
       let result: any;
       try {
-        const body = action.body !== undefined ? resolve(action.body, bindings) : scope.form ?? {};
-        result = await api.act(name, resolveTemplate(action.route ?? '', bindings), action.method ?? 'POST', body);
+        const body = action.body !== undefined ? resolve(action.body, scoped) : scope.form ?? {};
+        result = await api.act(name, resolveTemplate(action.route ?? '', scoped), action.method ?? 'POST', body);
       } catch (err: any) {
         showToast(err?.message || 'That action failed.', true);
         loadData(); // show what's actually true now
@@ -194,7 +305,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       if (then === 'back') {
         navigation.goBack();
       } else if (then && typeof then === 'object' && then.navigate) {
-        go(then.navigate, resolve(then.params ?? {}, {...bindings, data: result ?? {}}));
+        go(then.navigate, resolve(then.params ?? {}, {...scoped, data: result ?? {}}));
       } else if (then === 'refresh') {
         loadData();
       }
@@ -212,11 +323,18 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     setEditing: value => {
       editing.current = value;
     },
+    pageState,
+    setPageState: (key, value) =>
+      setChoices(current => {
+        const values = current.page === pageId ? current.values : {};
+        return values[key] === value ? current : {page: pageId, values: {...values, [key]: value}};
+      }),
+    refreshing: loading && data !== null,
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await Promise.all([loadData(), loadHeader(), ...Object.keys(page?.sources ?? {}).map(loadSource)]);
     setRefreshing(false);
   };
 
@@ -236,14 +354,31 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     );
   }
 
-  const scope: Scope = {data: data ?? {}, page: data ?? {}, params};
-  const tabs = topLevel ? document.navigation ?? [] : [];
+  const scope: Scope = {data: data ?? {}, page: data ?? {}, params, state: pageState, sources};
+  const tabs = topLevel ? navigationItems : [];
+  const headerBlocks = topLevel && document.header && header ? document.header.blocks : null;
+  const stale = Boolean(data !== null && dataError);
+  const ago = updatedAt ? formatValue(Math.round(updatedAt / 1000), 'relative', undefined, {now: now / 1000}) : null;
+  const template = page.template ?? 'stack';
   return (
     <View style={styles.screen}>
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accent} />}>
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={accent}
+            colors={[accent]}
+            progressBackgroundColor={palette.card}
+          />
+        }>
+        {headerBlocks && (
+          <View style={styles.header} testID="ui-header">
+            <UiBlocks blocks={headerBlocks} scope={{data: header, page: header, params: {}}} context={{...context, inline: true}} />
+          </View>
+        )}
         {tabs.length > 1 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
             {tabs.map(item => {
@@ -254,23 +389,47 @@ export function SatelliteUiScreen({route, navigation}: Props) {
                   accessibilityRole="tab"
                   accessibilityState={{selected: active}}
                   onPress={() => go(item.page)}
+                  testID={`ui-tab-${item.page}`}
                   style={[styles.tab, active && {backgroundColor: accent}]}>
                   {item.icon && ICONS.has(item.icon) && (
-                    <Icon name={item.icon} size={15} color={active ? palette.onAccent : palette.text2} />
+                    <Icon name={item.icon} size={15} color={active ? onColor : palette.text2} />
                   )}
-                  <Text style={[styles.tabLabel, active && {color: palette.onAccent}]}>{item.label}</Text>
+                  <Text style={[styles.tabLabel, active && {color: onColor}]}>{item.label}</Text>
                 </Pressable>
               );
             })}
           </ScrollView>
         )}
-        {offline && <Text style={styles.offline}>Showing the last saved layout - StarCore is unreachable.</Text>}
-        {dataError && <Text style={styles.error}>{dataError}</Text>}
-        {data === null && !dataError ? (
-          <ActivityIndicator color={accent} />
-        ) : data !== null ? (
-          <UiBlocks key={`${pageId}:${JSON.stringify(params)}`} blocks={page.blocks} scope={scope} context={context} />
-        ) : null}
+        {offline && <Text style={styles.offlineLayout}>Showing the last saved layout - StarCore is unreachable.</Text>}
+        {stale && (
+          <View style={styles.offline} accessibilityRole="alert" testID="ui-stale">
+            <Text style={[type.label, styles.offlineTitle]}>Offline</Text>
+            <Text style={type.caption}>{`Showing what StarCore said${ago ? ` ${ago}` : ' earlier'}. ${dataError}`}</Text>
+          </View>
+        )}
+        {data === null && dataError ? (
+          <View style={styles.failure} testID="ui-failure">
+            <Text style={type.title}>{`${document.title || name} is unavailable`}</Text>
+            <Text style={type.body}>{dataError}</Text>
+            <Pressable
+              onPress={loadAll}
+              accessibilityRole="button"
+              testID="ui-retry"
+              style={({pressed}) => [styles.retry, pressed && styles.pressed]}>
+              <Text style={type.label}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : data === null ? (
+          <View style={styles.loading} testID="ui-loading">
+            {[0, 1, 2].map(index => (
+              <View key={index} style={styles.skeleton} />
+            ))}
+          </View>
+        ) : (
+          <View style={[styles.page, stale && styles.stalePage]}>
+            <UiPageBlocks key={`${pageId}:${paramsKey}`} blocks={page.blocks} scope={scope} context={context} template={template} />
+          </View>
+        )}
       </ScrollView>
       {toast && (
         <View pointerEvents="none" style={[styles.toast, toast.error && styles.toastError]} accessibilityLiveRegion="polite">
@@ -286,6 +445,7 @@ const styles = StyleSheet.create({
   content: {padding: space.lg, gap: space.md, paddingBottom: space.xxl * 2},
   center: {flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.md, backgroundColor: palette.bg, padding: space.xl},
   fatal: {...type.body, textAlign: 'center'},
+  header: {gap: space.sm, paddingBottom: space.xs},
   tabs: {gap: space.sm, paddingBottom: space.xs},
   tab: {
     flexDirection: 'row',
@@ -297,8 +457,31 @@ const styles = StyleSheet.create({
     backgroundColor: palette.control,
   },
   tabLabel: {...type.caption, color: palette.text2, fontWeight: '600'},
-  offline: {...type.caption, color: palette.text3},
-  error: {color: palette.danger, fontSize: 13},
+  offlineLayout: {...type.caption, color: palette.text3},
+  offline: {
+    padding: space.md,
+    borderRadius: radii.control,
+    backgroundColor: palette.control,
+    borderLeftWidth: 3,
+    borderLeftColor: palette.warn,
+    gap: 2,
+  },
+  offlineTitle: {color: palette.warn},
+  page: {gap: space.md},
+  stalePage: {opacity: 0.6},
+  loading: {gap: space.md},
+  skeleton: {height: 120, borderRadius: radii.card, backgroundColor: palette.card},
+  failure: {padding: space.xl, borderRadius: radii.card, backgroundColor: palette.card, gap: space.sm},
+  retry: {
+    alignSelf: 'flex-start',
+    marginTop: space.sm,
+    minHeight: TOUCH_TARGET,
+    justifyContent: 'center',
+    paddingHorizontal: space.xl,
+    borderRadius: radii.control,
+    backgroundColor: palette.controlStrong,
+  },
+  pressed: {opacity: 0.8},
   toast: {
     position: 'absolute',
     left: space.lg,

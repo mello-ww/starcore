@@ -5,8 +5,9 @@ Satellite describes its interface as data, using reusable blocks; Mission Contro
 Android app each render that description with their own platform components. A new Satellite
 therefore needs no client update, unless it introduces a genuinely new native capability.
 
-This page is the specification of **UI contract 1.0** (`starcore.ui/1.0`). It covers what is
-implemented today and what is still the target. The closed vocabulary itself is
+This page is the specification of **UI contract 1.1** (`starcore.ui/1.1`). 1.1 only adds to
+1.0: every 1.0 document is a valid 1.1 document, and keeps working on clients that know only
+1.0. It covers what is implemented today and what is still the target. The closed vocabulary itself is
 machine-readable in [`contracts/ui/vocabulary.json`](../contracts/ui/vocabulary.json).
 
 - [Three ways a Satellite gets an interface](#three-ways-a-satellite-gets-an-interface)
@@ -16,6 +17,7 @@ machine-readable in [`contracts/ui/vocabulary.json`](../contracts/ui/vocabulary.
 - [Bindings](#bindings)
 - [Actions](#actions)
 - [Formats](#formats)
+- [Dashboards, headers and widgets](#dashboards-headers-and-widgets)
 - [Shared blocks and Satellite capabilities](#shared-blocks-and-satellite-capabilities)
 - [Discovery, caching and rediscovery](#discovery-caching-and-rediscovery)
 - [Versions and negotiation](#versions-and-negotiation)
@@ -28,15 +30,19 @@ machine-readable in [`contracts/ui/vocabulary.json`](../contracts/ui/vocabulary.
 
 | Mechanism | File | Web | Android | Status |
 |---|---|---|---|---|
-| **UI document** | `ui.json` | shared renderer (`mission_control/ui/renderer.js`) | shared renderer (`SatelliteUiScreen`) | contract 1.0 - the default for new Satellites |
+| **UI document** | `ui.json` | shared renderer (`mission_control/ui/renderer.js`) | shared renderer (`SatelliteUiScreen`) | contract 1.1 - the default for new Satellites |
 | **Mission Control page** | `mission_control/page.js` | the Satellite's own ES module | - | kept: a trusted, first-party extension for the web |
 | **Mobile screen (v0)** | a `mobile` route | - | `DeclarativeScreen`, four item types | kept for compatibility; superseded by `ui.json` |
 
-A Satellite with `page.js` keeps it on the web even if it also ships `ui.json`; the document
-is then used by the Android app. Music, Photo and Status keep their dedicated, hand-written
-screens on both clients until the shared blocks reach parity with them (see
-[Migration](#migration)). Those implementations are the behavioural reference for the
-capabilities still to come, not code to be thrown away.
+A validated `ui.json` comes first on both clients. A Satellite that also ships `page.js` keeps
+it as the web's fallback, used when its document is missing or refused, and in Developer
+Mode Mission Control can show either: the button beside the Satellite's title switches
+between the shared interface and the Satellite's own page, so a migration can be compared
+side by side before the old page is retired. Status is the first Satellite to make that
+move (1.1). Music and Photo keep their dedicated, hand-written screens on both clients until
+the shared blocks reach parity with them (see [Migration](#migration)). Those
+implementations are the behavioural reference for the capabilities still to come, not code
+to be thrown away.
 
 ## Two kinds of capability
 
@@ -95,7 +101,9 @@ comes from the Satellite's ordinary routes, through bindings.
 | `title` | Optional display name; clients fall back to the Satellite's name. |
 | `requires` | Optional. `client`: client capabilities the whole interface needs; `capabilities`: Satellite capabilities it needs. A client that can't meet them shows why instead of the interface. |
 | `entry` | The page that opens first. It can't require params. |
-| `navigation` | Optional top-level pages: tabs on both clients. Each names a `page`, a `label` and an optional `icon` from the shared set. |
+| `navigation` | Optional top-level pages: tabs on both clients. Each names a `page`, a `label`, an optional `icon` from the shared set and, from 1.1, `developer: true` for a page shown only in Developer Mode. |
+| `header` | 1.1, optional: blocks shown above the navigation on every top-level page, with a `source` of their own - see [Dashboards, headers and widgets](#dashboards-headers-and-widgets). |
+| `widgets` | 1.1, optional: up to 4 summaries a client may show outside the Satellite (Home). |
 | `pages` | Page id (lower case, digits, `-`, `_`) to page. |
 
 A **page** has `blocks` and optionally:
@@ -104,7 +112,18 @@ A **page** has `blocks` and optionally:
 - `params`: the names it must be opened with;
 - `source`: `{route, refresh}`, the Satellite route (a template, see [Actions](#actions))
   whose JSON response is the page's data, refetched every `refresh` seconds (at least 2) while
-  the page is visible.
+  the page is visible;
+- `sources` (1.1): up to 4 more, `{name: {route, refresh}}`, each loaded and refreshed on its
+  own and bound as `$sources.<name>`. They are supplementary: one that fails leaves its blocks
+  empty and the page standing;
+- `state` (1.1): the page's own values, `{key: default}` - what a `choice` selects - bound as
+  `$state.<key>`. Route templates may use them, so a choice can change what the page loads;
+- `template` (1.1): `stack` (the default) or `dashboard`.
+
+While a page is visible, its sources refresh on their own; a hidden browser tab or an app in
+the background polls nothing. When a refresh fails, the page keeps what it last showed,
+dimmed, under a notice saying since when; when the first one fails, it says so with a way
+to try again.
 
 Pages listed in `navigation` (and the entry page) are top-level. Any other page is a detail
 page, which clients open on top with a way back. On Android, that is a pushed screen.
@@ -126,6 +145,36 @@ Keys starting with `_` are comments and are ignored.
 | `slider` | `label`, `value`, `min`, `max`, `action` | `step`, `format`, `unit` | a range; the action runs once, on release, with `$value` |
 | `form` | `fields`, `submit` | | inputs (`text`, `number`, `select`, `toggle`) and a submit action that gets them as `$form` |
 | `file-browser` | `capability` | `select`: `none`, `directory`, `file`; `action`; `label` | the shared file browser - see [Shared blocks](#shared-blocks-and-satellite-capabilities) |
+| `chart` (1.1) | `series` | `title`, `kind`: `columns` (default) or `bars`, `format`, `unit`, `max`, `from`, `to`, `resolution`, `empty` | a time series - see below |
+| `table` (1.1) | `rows`, `columns` | `empty` | rows from an array, one cell per column - see below |
+| `choice` (1.1) | `key`, `options` | `label` | a segmented control that sets the page state `key`; `options` are `[{value, label}]`, at most 8 |
+| `status` (1.1) | `label` | `tone`, `detail` | a state as a dot and a word, never colour alone ("Healthy", "2 warnings") |
+| `code` (1.1) | `value` | `label`, `copy` | text or JSON, folded under `label`, with a Copy button when `copy` is true |
+
+1.1 also adds:
+
+- to `field` and `metric`: `detail`, a line under the value;
+- to `metric`: `trend` (points, drawn as a sparkline) and `action` (the metric opens something:
+  a dashboard tile you can press);
+- to a `list`'s `item`: `tone`, drawn as a state dot;
+- the text style `eyebrow`, a small upper-case label.
+
+A `metric`'s bar carries severity, not identity: it is neutral until its `tone` is `warn` or
+`danger`, so a bar never looks critical just because the accent is red.
+
+A **chart**'s `series` is a list of up to 4 `{label, points}`. `points` binds to an array of
+`[time, value]` or `[time, value, peak]` (epoch seconds), the shape a history route returns.
+`from`, `to` and `resolution` (seconds per point) place them on a time axis: a stretch with no
+points is drawn as a gap, never bridged. `format` and `unit` format the values, `max` fixes the
+top of the axis (otherwise one is rounded up from the values, in the format's own steps), and
+`empty` is what an empty chart says. Every chart offers its values as a table too. A `bars`
+chart draws one series of plain numbers (`[12, 40, 7]`) against `max`, such as per-core usage.
+
+A **table**'s `columns` are up to 10 `{label, value, format, unit, align, tone, max}`, where
+`value`, `tone` and `max` bind inside each row (`$.` is the row). `align` is `start` or `end`.
+A column with a `tone` shows a state dot beside its value; one with a `max` shows a bar. Mission
+Control draws a table; the Android app draws each row as a small card - the first column as
+its title, the others as labelled values - because a phone is one column wide.
 
 Every block may also have:
 
@@ -155,6 +204,8 @@ Any text, value or action body can be a binding instead of a literal:
 | `$params.id` | a page param |
 | `$value` | a control's new value (toggle, slider, file browser) |
 | `$form.key` | a form field, inside its submit action |
+| `$state.key` | 1.1: the page's own state (see `state` above) |
+| `$sources.name.a` | 1.1: `a` in a named source's data |
 | `$$text` | the literal string `$text` |
 
 Numeric segments index arrays: `$.rows.0.id`. A missing value resolves to `null`, which
@@ -202,9 +253,57 @@ A response may carry `{"message": "..."}`, shown as a short notice; an error res
 | `percent` | 0 to 100 | `7.34` → "7.3%" |
 | `bytes` | bytes, powers of 1024 | `1536` → "1.5 KB" |
 | `duration` | seconds | `303` → "5m 3s"; `90000` → "1d 1h" |
+| `bitrate` (1.1) | bytes per second, shown in bits | `1880` → "15 kb/s"; `1562500` → "12.5 Mb/s" |
+| `byterate` (1.1) | bytes per second | `1536` → "1.5 KB/s" |
+| `time` (1.1) | epoch seconds, in the device's time zone | "17:15" |
+| `date` (1.1) | epoch seconds | "4 Nov 2026" |
+| `datetime` (1.1) | epoch seconds | "4 Nov 2026, 17:15" |
+| `relative` (1.1) | epoch seconds | "just now", "42s ago", "5 min ago", "2 h ago", "2 d ago", "in 2 min" |
 
 `unit` is appended after a space: `21.5` with `"unit": "°C"` → "21.5 °C". A non-numeric value
-under a numeric format falls back to `text`.
+under a numeric format falls back to `text`. Dates and times are written the same way on every
+client, whatever its language settings, so the fixtures can test them.
+
+The Engine formats exactly like the clients (`format_value` in `engine/starcore/ui_contract.py`,
+checked against the same fixtures), so a Satellite can build a line out of several values -
+"8 GB of 16 GB" - that reads like the values the clients format themselves.
+
+## Dashboards, headers and widgets
+
+These are the 1.1 additions that let a Satellite like Status describe a whole monitoring
+interface without client code of its own.
+
+**`template: "dashboard"`** lays a page out for reading at a glance. On Mission Control, a run
+of `metric` blocks becomes a grid of tiles, a run of charts sits two to a row and so do plain
+cards (one holding a table takes the full width); runs of `field` blocks inside a card
+become a grid of facts. The page uses the full width. On Android, metrics become two-column
+tiles and everything else stacks. It is a layout hint, not a layout language: a document still
+cannot place, size or colour anything.
+
+**`header`** is a band above the navigation on every top-level page: `{source, blocks}`. Its
+source is loaded once for all the pages and refreshed on its own. Mission Control puts its
+`status` blocks on the right; both clients show a `field` there as one line of context.
+
+**`widgets`** are summaries any client may show outside the Satellite's own pages, such as
+Home:
+
+```json
+"widgets": [{
+  "id": "health", "title": "Status", "icon": "activity",
+  "action": {"navigate": "overview"},
+  "blocks": [
+    {"type": "status", "label": "$.health_label", "tone": "$.health_tone"},
+    {"type": "metric", "label": "CPU", "value": "$.cpu_percent", "format": "percent", "max": 100}
+  ]
+}]
+```
+
+A widget without a `source` binds to the state the Satellite already publishes (its `state.py`,
+returned with every `GET /api/satellites`), so a client draws it from the listing it already
+has, with no request of its own. One with a `source` is loaded by the client that shows it.
+A widget's only action is to open one of the Satellite's pages. Widgets suit short summaries
+(status, metrics, fields, text, a few list rows). Home shows each enabled Satellite's widgets
+in place of the per-Satellite cards it used to hardcode.
 
 ## Shared blocks and Satellite capabilities
 
@@ -298,11 +397,19 @@ The contract is `starcore.ui/<major>.<minor>`:
   says `"required": true`, in which case it shows "needs a newer app" in its place.
 - The Engine checks strictly for its own minor: an unknown block or key is a typo, refused
   with a reason. A newer minor is checked leniently.
+- A document must declare the minor it uses: a `starcore.ui/1.0` document that uses a 1.1 block,
+  key, format or binding is refused ("needs starcore.ui/1.1"), so a client that knows only 1.0
+  is never handed one it would draw half of. `vocabulary.json` lists what arrived in each minor
+  (`since`).
 
 `GET /api/catalog` reports what the Engine supports (`contract.version`, `majors`, and the
 capability protocol versions). Clients check a document's `requires` against their own client
-capabilities and the catalog's providers. No 1.0 block uses a client capability, so neither
+capabilities and the catalog's providers. No 1.x block uses a client capability, so neither
 client claims any yet; the reserved names are in `vocabulary.json`.
+
+An app released with 1.0 (the Alpha) that meets a 1.1 document draws its 1.0 blocks and skips
+the rest. Status keeps that case simple: the Alpha app opens Status's own dedicated screen,
+which reads the routes it always did.
 
 ## Trust and validation
 
@@ -313,8 +420,10 @@ client claims any yet; the reserved names are in `vocabulary.json`.
   counter refuses an increment while disabled, whatever the client shows.
 - The Engine validates every document at load and rediscovery: structure, vocabulary,
   bindings, route templates, limits (256 KB, 32 pages, 200 blocks per page, nesting depth 4,
-  refresh of at least 2 s). A refused document is reported in the Satellite's `ui.error` and
-  never served.
+  refresh of at least 2 s; from 1.1, 4 sources per page, 4 widgets, 4 series per chart, 10
+  columns per table, 8 options per choice). A `$state` or `$sources` binding must name what
+  its page declares. A refused document is reported in the Satellite's `ui.error` and never
+  served.
 - Clients check again, because a client can't assume every server validated what it sends:
   - they render only known blocks;
   - they call only safe, relative routes;
@@ -337,7 +446,12 @@ Both renderers implement the same rules, and these tests keep them in step:
 
 All three read `contracts/ui/vocabulary.json` and the fixtures in `contracts/ui/fixtures/`
 (bindings, route templates, route safety, formats, valid and invalid documents). A change to
-the contract starts there.
+the contract starts there. Formats with times take `options` (`utc`, `now`) in the fixtures,
+so every implementation is tested against the same moment in the same time zone.
+
+Status's document is tested on every side too: the Engine checks it validates and that every
+route it names exists (`engine/tests/test_status.py`), and the app renders it with its
+`view` data (`mobile/__tests__/statusUiDocument.test.tsx`).
 
 `engine/tests/test_client_modularity.py` fails when generic client code names a Satellite.
 The couplings that predate 1.0 are listed with their counts, and that list may only shrink.
@@ -349,16 +463,16 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 
 ## Current implementation and target
 
-| | Now (contract 1.0) | Target |
+| | Now (contract 1.1) | Target |
 |---|---|---|
-| Blocks | the 11 above | more, minor by minor: `chart`, `table`, `image`, `map`, `tabs`; page **templates** (`dashboard`, `list-detail`, `settings`, `media-gallery`, `media-library`) built from blocks |
+| Blocks | the 16 above, including `chart` and `table`; the `dashboard` template | more, minor by minor: `image`, `map`, `tabs`; templates `list-detail`, `settings`, `media-gallery`, `media-library` |
 | Satellite capabilities | `files.browse` | `media.gallery` (Photos), `audio.library` and `audio.stream` (Music), `vault` (Locked Folder) |
 | Client capabilities | none claimed | `media.audio-playback`, `secure.screen`, `device.biometrics`, `device.background-tasks` - each a native module written once in the app, behind a shared block |
-| Home | Mission Control and Android each hardcode the Status summary | `widgets` in the document, so any Satellite can put a summary on Home |
+| Home | `widgets` in each document, drawn by both clients; Android keeps the Status card only for servers older than Status's `ui.json` | the fallback card removed once older servers are gone |
 | Sections | `section_of`, but Photo still names the Locked Folder | the host discovers its sections from the catalog |
 | Icons | `icon_name` from the shared set; an Android fallback list for older servers | the fallback list removed once older servers are gone |
 | Rediscovery | Mission Control button and API | also on Android; and a CLI command |
-| Formats | 6 | dates and relative times ("5 min ago") |
+| Formats | 12, including rates, dates and relative times | |
 
 ## Migration
 
@@ -371,12 +485,16 @@ until then.
    `catalog_revision`, `/api/catalog`, rediscovery, revalidating static files.
 3. **Done:** contract 1.0 and both renderers, proven by Showcase.
 4. **Partly done:** remove cheap couplings.
-   - Done: icons come from `icon_name`; the folder picker uses `files.browse`.
-   - Next: Home widgets instead of the Status summary; sections discovered instead of Photo
-     naming the Locked Folder.
+   - Done: icons come from `icon_name`; the folder picker uses `files.browse`; Home draws
+     widgets instead of naming Status.
+   - Next: sections discovered instead of Photo naming the Locked Folder.
 5. Rediscovery and cache controls on Android.
-6. **Status first:** `chart` blocks and a `dashboard` template, until the shared Status page
-   matches `StatusHomeScreen` and the Status `page.js`. Then retire them.
+6. **Done (1.1): Status first.** `chart`, `table`, `choice`, `status`, `code`, the
+   `dashboard` template, page state and sources, the header and widgets. Status's `ui.json`
+   now draws its interface on both clients. Its `page.js` and `StatusHomeScreen` stay for one
+   release: the web's fallback and Developer Mode comparison, and the app's screen for older
+   servers. Then they are retired (see "Status's migration" in
+   [docs/satellites/status.md](satellites/status.md)).
 7. **Capabilities, one at a time, extracted from the existing code:**
    1. `media.gallery` from Photos' grid and viewer;
    2. `vault` with `secure.screen` and `device.biometrics` from the Locked Folder;

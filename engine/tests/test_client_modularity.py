@@ -24,14 +24,11 @@ SATELLITE_SPECIFIC = ("mobile/src/music/", "mobile/src/photo/", "mobile/src/stat
 # generic code that still names a Satellite: (file, current count) - lower a
 # count, or drop the line, when a coupling goes; never raise one or add a line
 KNOWN_COUPLINGS = {
-    # Home's Status summary reads Status's own state keys (until home widgets)
-    "mission_control/app.js": 2,
     # icons for servers older than 1.0, whose Satellites can't declare icon_name
     "mobile/src/satellites/icons.ts": 6,
-    # Home: dedicated screens for Photo, Music and Status, and the Status card
+    # the dedicated Photo and Music screens, and Status's screen and Home card for
+    # servers older than its ui.json (the Satellites list reads the same table)
     "mobile/src/screens/HomeScreen.tsx": 4,
-    # the Satellites list opens the dedicated Photo, Music and Status screens
-    "mobile/src/screens/SatellitesListScreen.tsx": 3,
 }
 
 # Satellite code naming another Satellite: (file, current count)

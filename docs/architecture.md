@@ -66,7 +66,7 @@ flowchart LR
     Android -- "actions and data" --> Routes
 ```
 
-**Today**, this runs alongside what came before it. Status, Photo, Music and the Locked Folder keep their dedicated, hand-written screens on both clients (and their Mission Control `page.js`) until the shared blocks reach parity with them. Those screens are the reference the shared components are extracted from, not code to discard. A handful of name-based couplings from before the contract remain, each listed in a test that only lets the list shrink. See "Current implementation and target" and "Migration" in [UI contract](ui-contract.md).
+**Today**, this runs alongside what came before it. Status is the first existing Satellite drawn entirely from its `ui.json` (UI contract 1.1), on both clients and on Home. Photo, Music and the Locked Folder keep their dedicated, hand-written screens on both clients (and their Mission Control `page.js`) until the shared blocks reach parity with them. Those screens are the reference the shared components are extracted from, not code to discard. A handful of name-based couplings from before the contract remain, each listed in a test that only lets the list shrink. See "Current implementation and target" and "Migration" in [UI contract](ui-contract.md).
 
 
 

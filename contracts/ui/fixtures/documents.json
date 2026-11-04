@@ -10,7 +10,7 @@
       "_why": "A Satellite written for 1.4 still loads on an Engine and clients that know 1.0: blocks they don't know are skipped.",
       "document": {"contract": "starcore.ui/1.4", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "heading", "text": "Hi"},
-        {"type": "chart", "series": "$.history"}
+        {"type": "map", "pins": "$.places"}
       ]}}}
     },
     {
@@ -67,7 +67,8 @@
           }
         }
       }
-    }
+    },
+    {"name": "every-1.1-feature", "document": {"contract": "starcore.ui/1.1", "title": "System", "entry": "overview", "header": {"source": {"route": "view", "refresh": 5}, "blocks": [{"type": "text", "style": "eyebrow", "text": "$.node"}, {"type": "heading", "text": "System"}, {"type": "status", "label": "$.health.label", "tone": "$.health.tone", "detail": "$.health.detail"}]}, "widgets": [{"id": "summary", "title": "Summary", "icon": "activity", "blocks": [{"type": "metric", "label": "CPU", "value": "$.cpu", "format": "percent", "max": 100}], "action": {"navigate": "overview"}}], "navigation": [{"page": "overview", "label": "Overview", "icon": "activity"}, {"page": "diag", "label": "Diagnostics", "developer": true}], "pages": {"overview": {"template": "dashboard", "source": {"route": "view", "refresh": 5}, "sources": {"trend": {"route": "history?period=1h", "refresh": 30}}, "blocks": [{"type": "metric", "label": "CPU", "value": "$.cpu", "format": "percent", "max": 100, "tone": "$.cpu_tone", "detail": "$.cpu_detail", "trend": "$sources.trend.series.cpu.points", "action": {"navigate": "diag"}}, {"type": "field", "label": "Booted", "value": "$.boot", "format": "datetime", "detail": "$.uptime"}, {"type": "chart", "title": "CPU", "series": [{"label": "CPU", "points": "$sources.trend.series.cpu.points"}], "format": "percent", "max": 100, "from": "$sources.trend.from", "to": "$sources.trend.to", "resolution": "$sources.trend.resolution", "empty": "No samples yet"}, {"type": "chart", "kind": "bars", "series": [{"label": "Per thread", "points": "$.per_core"}], "format": "percent", "max": 100}, {"type": "table", "rows": "$.drives", "empty": "No drives", "columns": [{"label": "Drive", "value": "$.mount"}, {"label": "Used", "value": "$.percent", "format": "percent", "max": 100, "align": "end", "tone": "$.tone"}]}, {"type": "list", "items": "$.warnings", "item": {"title": "$.title", "subtitle": "$.detail", "value": "$.level", "tone": "$.tone"}, "empty": "No warnings."}]}, "diag": {"state": {"period": "24h"}, "source": {"route": "history?period={$state.period}"}, "blocks": [{"type": "choice", "key": "period", "label": "Range", "options": [{"value": "1h", "label": "1 hour"}, {"value": "24h", "label": "24 hours"}]}, {"type": "text", "text": "$state.period", "style": "mono"}, {"type": "code", "value": "$", "label": "Raw", "copy": true}]}}}}
   ],
   "invalid": [
     {"name": "not-an-object", "document": [], "error": "must be an object", "client": true},
@@ -78,7 +79,7 @@
     {"name": "entry-missing", "document": {"contract": "starcore.ui/1.0", "entry": "nope", "pages": {"home": {"blocks": []}}}, "error": "entry", "client": true},
     {"name": "entry-needs-params", "document": {"contract": "starcore.ui/1.0", "entry": "row", "pages": {"row": {"params": ["id"], "blocks": []}}}, "error": "entry"},
     {"name": "bad-page-id", "document": {"contract": "starcore.ui/1.0", "entry": "Home Page", "pages": {"Home Page": {"blocks": []}}}, "error": "page id"},
-    {"name": "unknown-block-same-minor", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "chart"}]}}}, "error": "unknown block type"},
+    {"name": "unknown-block-same-minor", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "map"}]}}}, "error": "unknown block type"},
     {"name": "missing-required-key", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "slider", "label": "x", "value": 1, "min": 0, "action": {"route": "a"}}]}}}, "error": "max"},
     {"name": "unknown-key", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "heading", "text": "x", "colour": "red"}]}}}, "error": "colour"},
     {"name": "absolute-route", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "Stop", "action": {"route": "/api/shutdown"}}]}}}, "error": "route"},
@@ -95,6 +96,24 @@
     ]}}}, "error": "nested"},
     {"name": "bad-format", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "field", "label": "x", "value": 1, "format": "currency"}]}}}, "error": "format"},
     {"name": "unknown-capability-block", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "file-browser", "capability": "media.gallery"}]}}}, "error": "capability"},
-    {"name": "select-without-options", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "form", "fields": [{"key": "a", "label": "A", "kind": "select"}], "submit": {"label": "Go", "action": {"route": "a"}}}]}}}, "error": "options"}
+    {"name": "select-without-options", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "form", "fields": [{"key": "a", "label": "A", "kind": "select"}], "submit": {"label": "Go", "action": {"route": "a"}}}]}}}, "error": "options"},
+    {"name": "1.1-block-in-1.0-document", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "chart", "series": [{"label": "s0", "points": "$.p"}]}]}}}, "error": "1.1"},
+    {"name": "1.1-format-in-1.0-document", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "field", "label": "x", "value": 1, "format": "bitrate"}]}}}, "error": "1.1"},
+    {"name": "1.1-page-key-in-1.0-document", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"template": "dashboard", "blocks": []}}}, "error": "1.1"},
+    {"name": "chart-series-not-a-list", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [{"type": "chart", "series": "$.history"}]}}}, "error": "series"},
+    {"name": "chart-too-many-series", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [{"type": "chart", "series": [{"label": "s0", "points": "$.p"}, {"label": "s1", "points": "$.p"}, {"label": "s2", "points": "$.p"}, {"label": "s3", "points": "$.p"}, {"label": "s4", "points": "$.p"}]}]}}}, "error": "series"},
+    {"name": "chart-series-without-points", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [{"type": "chart", "series": [{"label": "x"}]}]}}}, "error": "points"},
+    {"name": "chart-unknown-kind", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [{"type": "chart", "kind": "pie", "series": [{"label": "s0", "points": "$.p"}]}]}}}, "error": "kind"},
+    {"name": "table-column-without-label", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [{"type": "table", "rows": "$.rows", "columns": [{"value": "$.a"}]}]}}}, "error": "label"},
+    {"name": "table-bad-align", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [{"type": "table", "rows": "$.rows", "columns": [{"label": "A", "value": "$.a", "align": "middle"}]}]}}}, "error": "align"},
+    {"name": "choice-key-not-in-state", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [{"type": "choice", "key": "period", "options": [{"value": "1h", "label": "1h"}]}]}}}, "error": "state"},
+    {"name": "choice-without-options", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"state": {"period": "1h"}, "blocks": [{"type": "choice", "key": "period", "options": []}]}}}, "error": "options"},
+    {"name": "state-binding-not-declared", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"source": {"route": "history?period={$state.period}"}, "blocks": []}}}, "error": "state"},
+    {"name": "source-binding-not-declared", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [{"type": "text", "text": "$sources.trend.x"}]}}}, "error": "sources"},
+    {"name": "unsafe-extra-source", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"sources": {"trend": {"route": "../photo/items"}}, "blocks": []}}}, "error": "route"},
+    {"name": "unknown-template", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"template": "magazine", "blocks": []}}}, "error": "template"},
+    {"name": "widget-navigates-to-unknown-page", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": []}}, "widgets": [{"id": "w", "blocks": [], "action": {"navigate": "ghost"}}]}, "error": "ghost"},
+    {"name": "widget-without-blocks", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": []}}, "widgets": [{"id": "w"}]}, "error": "blocks"},
+    {"name": "header-unsafe-source", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": []}}, "header": {"source": {"route": "/api/status"}, "blocks": []}}, "error": "route"}
   ]
 }

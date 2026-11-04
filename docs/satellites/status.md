@@ -7,9 +7,13 @@ all fed by the same snapshot:
 | Where | What |
 | --- | --- |
 | Mission Control → Status | Overview, Hardware, Network, Services, History and Diagnostics |
-| Mission Control → Home | a Status summary: health, CPU, memory, satellites online, top warnings |
-| Android app → Satellites → Status | the same sections, native |
+| Mission Control and the Android app → Home | Status's widget: health, CPU, memory, satellites online, top warnings |
+| Android app → Satellites → Status | the same sections |
 | CLI | `status`, `status hardware`, `status network`, `status services`, `status history` |
+
+Its interface is described once, in `ui.json` (UI contract 1.1, see
+[docs/ui-contract.md](../ui-contract.md)), and drawn by both clients' shared renderers: Status
+is the first existing Satellite migrated off client code of its own. See "Interface" below.
 
 Every value is a real reading. Anything a machine can't provide is shown as unavailable
 with the reason - never estimated, never invented.
@@ -27,9 +31,11 @@ satellites/native/status/
     monitor.py    the sampler thread, the cached snapshot, on-demand readings
     satellite.py  start/stop hooks: the sampler is Status's background service
     state.py      the Home summary, published with every satellite listing
-    api.py        metrics, history, diagnostics, mobile
+    view.py       the snapshot shaped for display: what ui.json binds to
+    api.py        metrics, history, diagnostics, view, mobile
+    ui.json       the interface, for every client (UI contract 1.1)
     commands/status.py           the CLI namespace
-    mission_control/page.js      the page (charts.js, format.js, page.css)
+    mission_control/page.js      the previous web page, kept for one release (see "Interface")
 ```
 
 Standard library only - no psutil or other package. While Status's service runs (it starts
@@ -38,12 +44,11 @@ every `sample_interval` seconds, keeps it in memory, and folds it into the histo
 Everything else reads that snapshot instead of measuring again, so more open views never
 mean more sampling:
 
-- the Status page polls `metrics` at the sampler's interval while it is open and its
-  browser tab is visible;
-- Home shows the summary Status publishes as its satellite state, which arrives with the
-  `/api/satellites` listing Home already polls - no request of its own;
-- the Android app polls `metrics` only while a Status screen is focused and the app is in
-  the foreground;
+- the Status pages read `view` every 5 seconds (the default sample interval), and history
+  less often, only while they are open - in a visible browser tab, or on a focused screen
+  with the app in the foreground;
+- Home shows Status's widget from the summary Status publishes as its satellite state, which
+  arrives with the `/api/satellites` listing Home already polls - no request of its own;
 - CLI commands read the latest snapshot. With no sampler running (the one-shot CLI with
   StarCore stopped, or satellite services turned off), a reading is taken on the spot -
   at most once a second - and nothing is written.
@@ -141,7 +146,7 @@ seconds. With a 2-second interval and Mission Control open on the Status page, S
 whole process stayed at 0.3 % of the machine's CPU and 45 MiB of memory. The Diagnostics
 section shows the live collection time. Linux readings are file reads from `/proc` and `/sys`.
 
-## Mission Control
+## Interface
 
 - **Overview**: warnings, then tiles for CPU, memory, the fullest drive, network, satellites
   and uptime (each with a meter or a last-hour trend), and last-hour CPU and memory charts.
@@ -151,19 +156,81 @@ section shows the live collection time. Linux readings are file reads from `/pro
   errors and drops), last-hour throughput.
 - **Services**: the engine, pass/fail checks, every satellite with its status and last error,
   dependencies between satellites, optional components (Pillow, cryptography, FFmpeg).
-- **History**: a 1h / 24h / 7d / 30d range above every chart; a crosshair shows every series
-  at that moment, with its peak; the arrow keys step through points; "Show as table" lists the
-  same values. Charts the machine can't record are listed with the reason.
+- **History**: a 1h / 24h / 7d / 30d range above every chart. On the web a crosshair shows
+  every series at that moment, with its peak, and the arrow keys step through points; on
+  Android a finger does. Every chart's "Show values" lists the same values. Charts the machine
+  can't record are listed with the reason.
 - **Diagnostics**: the sampler, StarCore's own process, the history file and its tiers, every
   unavailable reading with its reason, and the raw JSON. Shown in Developer Mode only (the
   route itself is signed-in only either way - see docs/satellites.md, "Developer Mode").
 
 Meters carry severity: neutral below the warning threshold, then the warning colour, then the
 danger colour - never the accent, which would look like danger with the red preset. Chart lines
-use the accent; a second series uses `--sc-chart-2` without a fill. Units: capacities in binary
-units (GiB), disk throughput in MiB/s, network throughput in bits per second to match link
-speeds. When StarCore stops answering, the last readings stay on screen, dimmed, with how old
-they are.
+use the accent; a second series uses `--sc-chart-2` without a fill. Units follow the UI
+contract's formats: sizes in powers of 1024 (shown as KB, MB, GB), disk throughput in bytes per
+second, network throughput in bits per second to match link speeds. When StarCore stops
+answering, the last readings stay on screen, dimmed, with how old they are.
+
+### How the interface is built
+
+`ui.json` describes the pages, the header (health and when it was updated), the navigation
+(Diagnostics is a Developer Mode page) and the Home widget. It uses UI contract 1.1's
+dashboard template, charts, tables, the period choice and status blocks, and binds to three
+routes: `view` (every tab but History), `view/diagnostics`, and `history`, which charts bind
+to directly. `view.py` is the one Status-specific step: UI documents have no expression
+language, so it decides what a tile shows (the fullest drive), the tone of each reading (from
+the same thresholds health.py warns at), and builds lines of text with the contract's own
+`format_value`. It measures nothing: every value comes from the cached snapshot.
+
+The Home widget binds to the summary in `state.py`, which now also carries the widget's
+display keys (`health_label`, `health_tone`, `cpu_tone`, `memory_tone`, `satellites`,
+`warning_items`) beside the keys the Alpha app reads.
+
+### Status's migration
+
+Status's previous interfaces stay for one release, so the shared one can be checked against
+them:
+
+- **Mission Control** uses `ui.json`. `mission_control/page.js` is the fallback if the document
+  is ever refused, and in Developer Mode the button beside the Satellite's title switches
+  between the two. Its charts, meters and sparklines are now Mission Control's shared ones
+  (`mission_control/ui/charts.js`), which its `charts.js` re-exports.
+- **The Android app** opens Status in the shared `SatelliteUiScreen`. `StatusHomeScreen` and
+  Home's dedicated Status card are what the app uses with a server older than this
+  `ui.json`, so a newer app on an Alpha server loses nothing. Its column chart and meter are
+  now the app's shared ones (`mobile/src/components/charts.tsx`).
+- **The Alpha app** (0.1.0-alpha.1) keeps opening its own Status screen, which reads the
+  `metrics` and `history` routes, unchanged.
+
+Feature by feature:
+
+| | Previous web page | Previous Android screen | Shared interface |
+| --- | --- | --- | --- |
+| Header: node, health, warning count, last update, sampling | yes | yes | yes, both clients |
+| Overview: warnings, 6 tiles, last-hour CPU and memory | yes (tiles with sparklines) | yes (no sparklines) | yes, sparklines on both |
+| Tiles open their section | yes | no | yes, both |
+| Hardware: processor, per-thread bars, memory, swap, drives, disk activity, system | yes | yes | yes |
+| Network: rates, interfaces, last-hour throughput | yes | yes | yes |
+| Services: engine, checks, satellites, dependencies, components | yes | yes | yes |
+| History: 4 ranges, 8 charts, unsupported list, values as a table | yes | yes (no table) | yes, table on both |
+| Diagnostics (Developer Mode) with raw JSON and Copy | yes | no | yes, both |
+| Refresh: polling while visible, pull to refresh | yes / - | yes / yes | yes / yes |
+| Offline: last readings kept, dimmed, with their age; retry when nothing loaded | yes | yes | yes |
+| Home summary | dedicated card | dedicated card | the Satellite's widget, both |
+
+Differences that remain, by design or for later:
+
+- Sizes read "GB" where the previous screens said "GiB" (the same powers of 1024): the UI
+  contract has one `bytes` format for every Satellite.
+- Percentages keep one decimal ("74.5%") where the previous screens rounded above 10%.
+- Navigation is the shared tab style (pills with icons) rather than Status's own segmented
+  bar, on both clients.
+- On the web, Hardware's per-thread bars are a `bars` chart; the previous page's bars were
+  the same shape.
+
+Once this release is validated, `page.js` and its stylesheet, `StatusHomeScreen` and its
+sections, and the dedicated Home cards are removed, together with their entries in
+`engine/tests/test_client_modularity.py`.
 
 ## API
 
@@ -175,7 +242,9 @@ route).
 | `metrics` | the latest snapshot: `node`, `interval`, `sampling`, `sampled_at`, `health`, `cpu`, `memory`, `storage`, `network`, `system`, `process`, `services`, `unsupported`, `collect_ms` |
 | `history?period=1h\|24h\|7d\|30d&series=cpu,memory&points=N` | `{period, resolution, from, to, sampling, interval, series: {name: {unit, points: [[time, average, peak], ...]}}}`; `points` (10-2000) divides the whole period into at most N fixed, clock-aligned slots (`resolution` says how long each is), however much of the period has samples |
 | `diagnostics` | sampler statistics, the history file's size and rows per tier, StarCore's process, unavailable readings |
-| `mobile` | the generic declarative screen, for clients without a native one |
+| `view` | the latest snapshot shaped for display (`header` keys, `overview`, `hardware`, `network`, `services`, `history_notes`) - what `ui.json` binds to; see `view.py` |
+| `view/diagnostics` | `diagnostics` shaped for display, with the raw answer under `raw` |
+| `mobile` | the generic declarative screen of UI contract v0, for older clients |
 
 A reading that isn't available is `null`; the reason is under `unsupported`. Invalid query
 parameters answer `400`.

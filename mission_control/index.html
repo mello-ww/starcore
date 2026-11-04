@@ -180,6 +180,12 @@ try {
                     <path d="M12.6 2.6v3h-3"/>
                 </svg>
             </button>
+            <button id="satellite-classic-button" class="icon-button" type="button" title="Show the Satellite's own page" aria-pressed="false" hidden data-developer>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="2.5" y="2.5" width="11" height="11" rx="2"/>
+                    <path d="M2.5 6h11M6 6v7.5"/>
+                </svg>
+            </button>
             <button id="satellite-toggle-button" class="icon-button" type="button" title="Enable / disable" hidden>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
                     <path d="M8 2.6v5.2"/>
@@ -247,22 +253,9 @@ try {
             </dl>
         </section>
 
-        <!-- the Status satellite's summary, from the satellite listing Home already polls -->
-        <section class="home-section" id="home-health-section" aria-labelledby="home-health-title" hidden>
-            <div class="home-section-head">
-                <h2 class="sc-eyebrow" id="home-health-title">Status</h2>
-                <a class="home-link" href="#/satellite/Status">Open Status</a>
-            </div>
-            <article class="home-health" id="home-health" aria-live="polite">
-                <p class="home-health-state"><i class="home-dot" id="home-health-dot"></i><span id="home-health-label">No readings yet</span></p>
-                <dl class="home-health-metrics">
-                    <div><dt>CPU</dt><dd id="home-health-cpu">&mdash;</dd><span class="home-health-bar" aria-hidden="true"><i id="home-health-cpu-bar"></i></span></div>
-                    <div><dt>Memory</dt><dd id="home-health-memory">&mdash;</dd><span class="home-health-bar" aria-hidden="true"><i id="home-health-memory-bar"></i></span></div>
-                    <div><dt>Satellites</dt><dd id="home-health-satellites">&mdash;</dd><span class="home-health-note">online</span></div>
-                </dl>
-                <ul class="home-health-warnings" id="home-health-warnings"></ul>
-            </article>
-        </section>
+        <!-- every Satellite's widgets (its ui.json "widgets", UI contract 1.1) - drawn by
+             ui/renderer.js from the listing Home already polls; Home names no Satellite -->
+        <div class="home-widgets" id="home-widgets" aria-live="polite"></div>
 
         <section class="home-section" aria-labelledby="home-satellites-title">
             <div class="home-section-head">

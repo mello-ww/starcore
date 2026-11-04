@@ -75,7 +75,8 @@ class VocabularyTest(unittest.TestCase):
                            ("form_field_kinds", ui_contract.FORM_FIELD_KINDS),
                            ("file_browser_select", ui_contract.FILE_BROWSER_SELECT),
                            ("action_then", ui_contract.ACTION_THEN), ("methods", ui_contract.METHODS),
-                           ("icons", ui_contract.ICONS)):
+                           ("icons", ui_contract.ICONS), ("chart_kinds", ui_contract.CHART_KINDS),
+                           ("column_align", ui_contract.COLUMN_ALIGN), ("page_templates", ui_contract.PAGE_TEMPLATES)):
             self.assertEqual(set(self.vocabulary[key]), value, key)
 
     def test_capabilities_and_limits(self):
@@ -84,6 +85,23 @@ class VocabularyTest(unittest.TestCase):
         for name, spec in self.vocabulary["satellite_capabilities"].items():
             self.assertEqual(set(spec["operations"]), ui_contract.SATELLITE_CAPABILITIES[name]["operations"])
         self.assertEqual(self.vocabulary["limits"], ui_contract.LIMITS)
+
+
+class FormatTest(unittest.TestCase):
+    """format_value gives exactly what both clients give (formats.json)."""
+
+    def test_formats(self):
+        for case in fixture("formats.json")["cases"]:
+            options = case.get("options", {})
+            with self.subTest(case):
+                self.assertEqual(ui_contract.format_value(case["value"], case.get("format", "text"), case.get("unit"),
+                                                          now=options.get("now"), utc=options.get("utc", False)),
+                                 case["expected"])
+
+    def test_every_1_1_addition_is_in_the_vocabulary(self):
+        since = ui_contract.SINCE_1_1
+        self.assertLessEqual(set(since["blocks"]), set(ui_contract.BLOCKS))
+        self.assertLessEqual(set(since["formats"]), ui_contract.FORMATS)
 
 
 class DocumentFixturesTest(unittest.TestCase):
@@ -198,7 +216,7 @@ class UiApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
 
     def test_a_satellite_without_a_document_answers_404(self):
-        status, payload, _ = request(self.engine, "/api/satellites/Status/ui")
+        status, payload, _ = request(self.engine, "/api/satellites/Music/ui")
         self.assertEqual(status, 404)
         self.assertIn("no UI document", payload["error"])
 

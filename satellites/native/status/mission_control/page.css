@@ -296,59 +296,8 @@ button.status-kpi:hover {
     }
 }
 
-/* ---------- meters and sparklines ---------- */
-
-.status-meter {
-    position: relative;
-    flex: none;
-    height: 6px;
-    margin-top: auto;
-    overflow: hidden;
-    border-radius: 3px;
-    background: var(--sc-control-strong);
-}
-
-.status-panel .status-meter {
+.status-panel .sc-meter {
     margin: 12px 0 4px;
-}
-
-/* a meter's fill carries severity, so it stays neutral until a threshold:
-   with the red accent preset, an accent fill would look like danger */
-.status-meter-fill {
-    display: block;
-    width: 0;
-    height: 100%;
-    border-radius: 3px;
-    background: var(--sc-text-icon);
-    transition: width 400ms ease;
-}
-
-.status-meter.warning .status-meter-fill {
-    background: var(--sc-warn);
-}
-
-.status-meter.critical .status-meter-fill {
-    background: var(--sc-danger);
-}
-
-.status-spark {
-    display: block;
-    margin-top: 8px;
-    overflow: visible;
-}
-
-.status-spark-line {
-    fill: none;
-    stroke: var(--sc-chart-2);
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.status-spark-dot {
-    fill: var(--sc-accent);
-    stroke: var(--sc-card);
-    stroke-width: 2;
 }
 
 /* ---------- panels ---------- */
@@ -432,7 +381,7 @@ button.status-kpi:hover {
     min-width: 150px;
 }
 
-.status-usage .status-meter {
+.status-usage .sc-meter {
     flex: 1;
     margin: 0;
 }
@@ -531,180 +480,6 @@ button.status-kpi:hover {
     grid-template-columns: minmax(0, 1fr);
 }
 
-.status-chart {
-    margin: 0;
-}
-
-.status-chart-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 6px 16px;
-    margin-bottom: 10px;
-}
-
-.status-chart-title {
-    color: var(--sc-text);
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.status-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 16px;
-    color: var(--sc-text-2);
-    font-size: 12px;
-}
-
-.status-legend-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.status-legend-item strong,
-.status-tooltip strong {
-    color: var(--sc-text);
-    font-variant-numeric: tabular-nums;
-}
-
-.status-key {
-    flex: none;
-    display: inline-block;
-    width: 14px;
-    height: 2px;
-    border-radius: 1px;
-    background: var(--sc-accent);
-}
-
-.status-key.status-second {
-    background: var(--sc-chart-2);
-}
-
-.status-chart-plot {
-    position: relative;
-}
-
-.status-chart-svg {
-    display: block;
-    width: 100%;
-    height: auto;
-    overflow: visible;
-}
-
-.status-grid {
-    stroke: var(--line-bright, #2e2f36);
-    stroke-width: 1;
-    shape-rendering: crispEdges;
-}
-
-.status-axis {
-    fill: var(--sc-text-3);
-    font: 11px var(--sc-font-sans);
-    font-variant-numeric: tabular-nums;
-}
-
-.status-line {
-    fill: none;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.status-line.status-accent {
-    stroke: var(--sc-accent);
-}
-
-.status-line.status-second {
-    stroke: var(--sc-chart-2);
-}
-
-.status-area {
-    fill: var(--sc-accent);
-    opacity: 0.1;
-}
-
-.status-point.status-accent,
-.status-marker.status-accent {
-    fill: var(--sc-accent);
-}
-
-.status-point.status-second,
-.status-marker.status-second {
-    fill: var(--sc-chart-2);
-}
-
-.status-marker {
-    stroke: var(--sc-card);
-    stroke-width: 2;
-}
-
-.status-crosshair {
-    stroke: var(--sc-text-3);
-    stroke-width: 1;
-    shape-rendering: crispEdges;
-}
-
-.status-overlay {
-    fill: transparent;
-    cursor: crosshair;
-    outline: none;
-}
-
-.status-overlay:focus-visible {
-    stroke: var(--sc-accent);
-    stroke-width: 1;
-}
-
-.status-chart-empty {
-    fill: var(--sc-text-3);
-    font: 13px var(--sc-font-sans);
-}
-
-.status-tooltip {
-    position: absolute;
-    top: 0;
-    z-index: 2;
-    min-width: 160px;
-    padding: 10px 12px;
-    border-radius: 10px;
-    background: var(--sc-control-strong);
-    font-size: 12px;
-    pointer-events: none;
-}
-
-.status-tooltip[hidden] {
-    display: none;
-}
-
-.status-tooltip-time {
-    margin: 0 0 6px;
-    color: var(--sc-text-2);
-}
-
-.status-tooltip-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 3px 0 0;
-}
-
-.status-tooltip-row strong {
-    font-size: 13px;
-}
-
-.status-tooltip-row span {
-    color: var(--sc-text-2);
-}
-
-.status-tooltip-row small {
-    margin-left: auto;
-    padding-left: 8px;
-    color: var(--sc-text-3);
-}
-
 /* ---------- diagnostics ---------- */
 
 .status-raw summary {
@@ -773,7 +548,6 @@ button.status-kpi:hover {
         animation: none;
     }
 
-    .status-meter-fill,
     .status-core-bar,
     .status-section,
     .status-charts {

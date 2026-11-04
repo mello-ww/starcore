@@ -1,4 +1,4 @@
-// StarCore UI contract 1.0 - Mission Control's side of the shared rules:
+// StarCore UI contract 1.1 - Mission Control's side of the shared rules:
 // bindings, route templates, route safety, formats and compatibility.
 // Pure functions, no DOM, so contracts/ui/tests/web.test.mjs can check them
 // against the same fixtures the Engine and the Android app use.
@@ -6,13 +6,19 @@
 
 export const CONTRACT_NAME = "starcore.ui";
 export const MAJOR = 1;
-export const MINOR = 0;
+export const MINOR = 1;
 
 export const BLOCK_TYPES = new Set([
     "heading", "text", "field", "metric", "card", "list", "button",
     "toggle", "slider", "form", "file-browser",
+    // 1.1
+    "chart", "table", "choice", "status", "code",
 ]);
-export const FORMATS = new Set(["text", "number", "integer", "percent", "bytes", "duration"]);
+export const FORMATS = new Set([
+    "text", "number", "integer", "percent", "bytes", "duration",
+    // 1.1
+    "bitrate", "byterate", "date", "time", "datetime", "relative",
+]);
 export const TONES = new Set(["neutral", "ok", "warn", "danger"]);
 export const ICONS = new Set([
     "activity", "box", "camera", "check", "circle", "clock", "cpu", "file", "file-text",
@@ -106,7 +112,9 @@ function resolveString(expression, context) {
     if (expression === "$value") {
         return context.value === undefined ? null : context.value;
     }
-    const roots = { "$.": "data", "$page.": "page", "$params.": "params", "$form.": "form" };
+    const roots = {
+        "$.": "data", "$page.": "page", "$params.": "params", "$form.": "form", "$state.": "state", "$sources.": "sources",
+    };
     for (const [prefix, key] of Object.entries(roots)) {
         if (expression.startsWith(prefix)) {
             return lookup(context[key], expression.slice(prefix.length).split("."));
@@ -116,7 +124,8 @@ function resolveString(expression, context) {
 }
 
 /** A binding (or any literal, nested object or array) resolved against
- * {data, page, params, value, form}. Plain lookups only - no expressions. */
+ * {data, page, params, value, form, state, sources}. Plain lookups only -
+ * no expressions. */
 export function resolve(expression, context) {
     if (typeof expression === "string") {
         return resolveString(expression, context);
@@ -197,8 +206,37 @@ function duration(seconds) {
     return `${total}s`;
 }
 
-/** A value as display text - see "Formats" in docs/ui-contract.md. */
-export function formatValue(value, format = "text", unit) {
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function moment(seconds, format, utc) {
+    const date = new Date(seconds * 1000);
+    const hours = utc ? date.getUTCHours() : date.getHours();
+    const minutes = utc ? date.getUTCMinutes() : date.getMinutes();
+    const clock = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    const day = `${utc ? date.getUTCDate() : date.getDate()} ${MONTHS[utc ? date.getUTCMonth() : date.getMonth()]} `
+        + `${utc ? date.getUTCFullYear() : date.getFullYear()}`;
+    return format === "time" ? clock : format === "date" ? day : `${day}, ${clock}`;
+}
+
+function relative(seconds, now) {
+    const difference = now - seconds;
+    const size = Math.abs(difference);
+    if (size < 10) {
+        return "just now";
+    }
+    const amount = size < 60 ? `${Math.floor(size)}s`
+        : size < 3600 ? `${Math.floor(size / 60)} min`
+            : size < 86400 ? `${Math.floor(size / 3600)} h`
+                : `${Math.floor(size / 86400)} d`;
+    return difference > 0 ? `${amount} ago` : `in ${amount}`;
+}
+
+const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"];
+const BIT_UNITS = ["b/s", "kb/s", "Mb/s", "Gb/s", "Tb/s"];
+
+/** A value as display text - see "Formats" in docs/ui-contract.md.
+ * `options.utc` and `options.now` (epoch seconds) exist for the tests. */
+export function formatValue(value, format = "text", unit, options = {}) {
     const numeric = typeof value === "number" && Number.isFinite(value);
     let text;
     if (value === null || value === undefined) {
@@ -214,9 +252,17 @@ export function formatValue(value, format = "text", unit) {
     } else if (format === "percent") {
         return `${trimNumber(value, 1)}%`;
     } else if (format === "bytes") {
-        return scaled(value, ["B", "KB", "MB", "GB", "TB"], 1024);
+        return scaled(value, BYTE_UNITS, 1024);
+    } else if (format === "byterate") {
+        return `${scaled(value, BYTE_UNITS, 1024)}/s`;
+    } else if (format === "bitrate") {
+        return scaled(Math.max(value, 0) * 8, BIT_UNITS, 1000);
     } else if (format === "duration") {
         return duration(value);
+    } else if (format === "time" || format === "date" || format === "datetime") {
+        return moment(value, format, Boolean(options.utc));
+    } else if (format === "relative") {
+        return relative(value, typeof options.now === "number" ? options.now : Date.now() / 1000);
     } else {
         text = trimNumber(value, 2);
     }

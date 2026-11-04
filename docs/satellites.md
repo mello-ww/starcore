@@ -205,11 +205,12 @@ function, if any, is called when the user navigates away. An optional
 `mission_control/` is served read-only from `/api/satellites/<name>/assets/`.
 
 A `page.js` is a trusted, first-party extension for the web only: it runs with the full
-rights of the signed-in page, and the Android app can't use it. Music, Photo, Status, the
-Locked Folder and File Explorer use one today. A new Satellite should describe its
-interface with `ui.json` instead (see "Describing an interface" above), and use `page.js`
-only for what the shared blocks can't express yet. If a Satellite ships both, Mission Control
-uses `page.js` and the Android app uses `ui.json`.
+rights of the signed-in page, and the Android app can't use it. Music, Photo, the Locked
+Folder and File Explorer use one today. A new Satellite should describe its interface with
+`ui.json` instead (see "Describing an interface" above), and use `page.js` only for what the
+shared blocks can't express yet. If a Satellite ships both, both clients use `ui.json`; its
+`page.js` is Mission Control's fallback, and Developer Mode can switch to it. Status, the
+first Satellite to move, works that way for one release.
 
 A Satellite without a page still gets one: Mission Control renders whatever it publishes
 through `state.py` as generic labelled values. A Satellite that provides none of these is
@@ -413,8 +414,10 @@ Both categories share the same lifecycle and extension model. The only differenc
 
 - **Status** (`satellites/native/status/`, `docs/satellites/status.md`) - a background service
   (its metric sampler) feeding one cached snapshot to its routes, its published state (the Home
-  summary), its CLI namespace and a Mission Control page with charts; a bounded SQLite history
-  in StarCore's data directory; platform readings behind one backend interface.
+  widget's data), its CLI namespace and an interface described in `ui.json` - a dashboard with
+  charts, tables, a period choice, a header and a Home widget (UI contract 1.1) - over a `view`
+  route that shapes the snapshot for display; a bounded SQLite history in StarCore's data
+  directory; platform readings behind one backend interface.
 - **Photo** (`satellites/native/photo/`, `docs/satellites/photo.md`) - state, routes, a Mission Control
   page, a background service (its phone-sync listener) and Satellite configuration, all
   together.
@@ -435,7 +438,7 @@ Both categories share the same lifecycle and extension model. The only differenc
   generic "path"-typed configuration fields (see "Exposing configuration" above) browse
   through, as the provider of the `files.browse` capability backed by this same `entries` route.
 - **Showcase** (`examples/satellites/native/showcase/`) - an interface described entirely in
-  `ui.json` (every block of UI contract 1.0, navigation, detail pages, a form, sliders and the
+  `ui.json` (the blocks of UI contract 1.0, navigation, detail pages, a form, sliders and the
   shared file browser) over a few in-memory routes, with no client code of its own. It lives
   outside `satellites/` so it is never loaded on a real install; copy it into
   `satellites/native/` to try it.
