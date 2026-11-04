@@ -42,6 +42,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   its previous screens - see "Status's migration" in `docs/satellites/status.md`. Its previous
   page and screen remain for one release: in Developer Mode on the web, and for servers older
   than this one on Android.
+- **`audio.library` capability (v1).** Music provides it from its existing routes, so any client
+  or Satellite can find an audio library through `GET /api/catalog` without naming Music. A
+  capability may now have optional operations, and an operation its version doesn't define is
+  refused. The reserved client capability `media.audio-playback` is now `media.audio`. See
+  `docs/media-audio.md`.
 - **Home widgets.** Home on both clients draws every Satellite's widgets; neither names Status
   any more (the Android app keeps its Status card for older servers).
 - Mission Control's charts, meters and sparklines, and the app's column chart, meter, bars and

@@ -70,11 +70,12 @@ PAGE_TEMPLATES = set(VOCABULARY["page_templates"])
 SINCE_1_1 = VOCABULARY["since"]["1.1"]
 BLOCKS_1_1 = set(SINCE_1_1["blocks"])
 FORMATS_1_1 = set(SINCE_1_1["formats"])
-# Satellite capabilities a shared block can be bound to, with the protocol
-# versions and operations this Engine knows. A Satellite may also declare a
-# capability that isn't listed (the registry reports it as declared), but
-# only these have a shared block on the clients.
-SATELLITE_CAPABILITIES = {name: {"versions": set(spec["versions"]), "operations": set(spec["operations"])}
+# Satellite capabilities with a protocol this Engine knows: their versions, the
+# operations every provider must offer and those it may. A Satellite may also
+# declare a capability that isn't listed (the registry reports it as declared).
+# Clients draw a shared block only for the capabilities they list themselves.
+SATELLITE_CAPABILITIES = {name: {"versions": set(spec["versions"]), "operations": set(spec["operations"]),
+                                 "optional": set(spec.get("optional_operations", {}))}
                           for name, spec in VOCABULARY["satellite_capabilities"].items()}
 # the shared block bound to each capability
 CAPABILITY_BLOCKS = {"file-browser": "files.browse"}
@@ -754,6 +755,9 @@ def normalise_provides(provides) -> tuple:
             missing = known["operations"] - set(operations)
             if missing:
                 found.append(f"provides.{name} is missing operations {sorted(missing)}")
+            unknown = set(operations) - known["operations"] - known["optional"]
+            if unknown:
+                found.append(f"provides.{name} has operations version {version} doesn't define: {sorted(unknown)}")
         if found:
             problems.extend(found)
         else:

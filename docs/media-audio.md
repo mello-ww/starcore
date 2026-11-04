@@ -1,7 +1,7 @@
 # Audio playback: `media.audio` and `audio.library`
 
-Status: **specification** (milestone 1 of Music's modularity work). Nothing here is implemented
-under these names yet. Music's current web player (`satellites/native/music/mission_control/
+Status: **specification**, with its contract groundwork in place: `audio.library` v1 is in
+`contracts/ui/vocabulary.json` and Music provides it. No client plays through it yet. Music's current web player (`satellites/native/music/mission_control/
 player/`, `audio/`) and Android player (`mobile/src/music/`, `android/.../music/`) are the
 behavioural reference: each section says which file it describes. See
 [UI contract](ui-contract.md), "Two kinds of capability", for the general model.
@@ -19,9 +19,10 @@ A client never names the Satellite that provides audio. It plays tracks it got f
 `audio.library` provider, resolved through the catalog, and any Satellite (a future StarCore AI,
 say) can start playback or offer a track picker without depending on Music.
 
-`media.audio` replaces the reserved, never-implemented client capability name
-`media.audio-playback` in `contracts/ui/vocabulary.json`. Nothing claims the old name, so
-renaming it breaks no document.
+`media.audio` replaced the reserved, never-implemented client capability name
+`media.audio-playback` in `contracts/ui/vocabulary.json`. Nothing read or claimed the old
+name (not the Engine, either client or the released Alpha app), so the rename broke no
+document.
 
 ## `audio.library` - the Satellite side
 
@@ -142,7 +143,7 @@ The milestones are in order; each is shippable on its own.
 
 ### 1. This specification - done
 
-### 2. Contract groundwork (small)
+### 2. Contract groundwork - done
 
 - Add `audio.library` v1 to `satellite_capabilities` in `contracts/ui/vocabulary.json`.
 - Rename the reserved `media.audio-playback` to `media.audio`.

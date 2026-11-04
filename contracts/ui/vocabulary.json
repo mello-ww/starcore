@@ -54,11 +54,24 @@
       "operations": {
         "list": "GET ?path=<absolute path, or empty for the roots> -> {path, parent, entries: [{name, type: dir|file, size, modified}]}; at the roots an entry's name is itself an absolute path"
       }
+    },
+    "audio.library": {
+      "versions": [1],
+      "operations": {
+        "search": "GET ?q=&limit= -> {tracks: [Track], albums?, artists?, playlists?}",
+        "track": "GET /<id> -> {track: Track}",
+        "resolve": "GET /<id>?quality=&format= -> {track, plan, stream, gain}; stream is a path relative to the provider, answering Range requests",
+        "artwork": "GET /<album>?size= -> an image"
+      },
+      "optional_operations": {
+        "lyrics": "GET /<id>?language= -> synced lines or plain text"
+      },
+      "_note": "Track: {id, title, artist, album, album_id, duration, has_artwork, quality: {label, lossless, hires}}; providers may add keys. See docs/media-audio.md."
     }
   },
   "client_capabilities": {
     "_note": "Device features a client may offer a document beyond rendering blocks. Reserved names only: no 1.x block uses one yet, so neither client claims any, and a document that requires one is shown as needing a newer app.",
-    "reserved": ["device.biometrics", "device.background-tasks", "media.audio-playback", "secure.screen"]
+    "reserved": ["device.biometrics", "device.background-tasks", "media.audio", "secure.screen"]
   },
   "limits": {
     "document_bytes": 262144,

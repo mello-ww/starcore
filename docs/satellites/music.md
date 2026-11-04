@@ -316,7 +316,7 @@ album, artist and song lists are drawn in chunks as they scroll. See
 
 Music's players on both clients are the reference for the shared audio host specified in
 [docs/media-audio.md](../media-audio.md); Music will provide `audio.library` from its existing
-routes.
+routes (declared in `satellite.toml`: `search`, `tracks`, `playback`, `artwork`, `lyrics`).
 
 
 StarCore Mobile opens Music on its own screens (Home, Search, Library, album, artist,

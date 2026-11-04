@@ -14,6 +14,12 @@
       ]}}}
     },
     {
+      "name": "requires-audio",
+      "_why": "A document may require the media.audio client capability and an audio.library provider; a client that can't meet them says why instead of opening it.",
+      "document": {"contract": "starcore.ui/1.0", "requires": {"client": ["media.audio"], "capabilities": ["audio.library"]},
+                   "entry": "home", "pages": {"home": {"blocks": []}}}
+    },
+    {
       "name": "every-block",
       "document": {
         "contract": "starcore.ui/1.0",

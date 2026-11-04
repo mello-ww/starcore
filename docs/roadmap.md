@@ -216,7 +216,8 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] Move Status onto shared blocks, at parity - UI contract 1.1 (`docs/satellites/status.md`, "Status's migration")
 - [ ] Retire Status's previous page and screen once 1.1 is validated
 - [x] Specify `media.audio` and `audio.library` from Music's player (`docs/media-audio.md`)
-- [ ] Audio: contract groundwork, then the Android and web AudioHosts (`docs/media-audio.md`, "Migration plan")
+- [x] Audio contract groundwork: `audio.library` v1 in the vocabulary, provided by Music; `media.audio` reserved
+- [ ] Audio: the Android and web AudioHosts (`docs/media-audio.md`, "Migration plan")
 - [ ] Move Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/ui-contract.md`, "Migration")
 - [ ] Light theme
 - [ ] Icons instead of text glyphs for the remaining Music controls

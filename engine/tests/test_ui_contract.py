@@ -167,6 +167,34 @@ class ProvidesTest(unittest.TestCase):
             self.assertEqual(provides, {}, broken)
             self.assertTrue(problems, broken)
 
+    AUDIO = {"search": "search", "track": "tracks", "resolve": "playback", "artwork": "artwork"}
+
+    def test_audio_library_needs_its_four_operations_and_may_offer_lyrics(self):
+        for operations in (self.AUDIO, {**self.AUDIO, "lyrics": "lyrics"}):
+            provides, problems = ui_contract.normalise_provides(
+                {"audio.library": {"version": 1, "operations": operations}})
+            self.assertEqual(problems, [])
+            self.assertEqual(provides["audio.library"]["operations"], operations)
+
+    def test_a_broken_audio_library_is_left_out(self):
+        without_resolve = {key: value for key, value in self.AUDIO.items() if key != "resolve"}
+        for operations in (without_resolve,                           # a required operation missing
+                           {**self.AUDIO, "download": "download"},     # one version 1 doesn't define
+                           {**self.AUDIO, "lyrics": "../lyrics"},      # an optional one, malformed
+                           {**self.AUDIO, "artwork": 3}):              # a route that isn't a string
+            provides, problems = ui_contract.normalise_provides(
+                {"audio.library": {"version": 1, "operations": operations}})
+            self.assertEqual(provides, {}, operations)
+            self.assertTrue(problems, operations)
+        provides, problems = ui_contract.normalise_provides({"audio.library": {"version": 2, "operations": self.AUDIO}})
+        self.assertEqual(provides, {})
+        self.assertIn("version 2", problems[0])
+
+    def test_the_media_audio_client_capability_replaces_the_old_reserved_name(self):
+        reserved = ui_contract.VOCABULARY["client_capabilities"]["reserved"]
+        self.assertIn("media.audio", reserved)
+        self.assertNotIn("media.audio-playback", reserved)
+
 
 class ShippedManifestsTest(unittest.TestCase):
     def test_every_icon_name_is_in_the_shared_set(self):
@@ -174,6 +202,24 @@ class ShippedManifestsTest(unittest.TestCase):
         for path in [*REPO.glob("satellites/*/*/satellite.toml"), SHOWCASE / "satellite.toml"]:
             manifest = tomllib.loads(path.read_text(encoding="utf-8"))
             self.assertIn(manifest.get("icon_name"), ui_contract.ICONS, path)
+
+    def test_every_declared_operation_is_one_of_the_providers_routes(self):
+        """A shipped Satellite's [provides] maps each operation to a route its api.py
+        really serves (the Engine only checks the shape: it never imports code to load
+        a manifest)."""
+        import importlib
+        import tomllib
+        for path in REPO.glob("satellites/*/*/satellite.toml"):
+            manifest = tomllib.loads(path.read_text(encoding="utf-8"))
+            provides, problems = ui_contract.normalise_provides(manifest.get("provides"))
+            self.assertEqual(problems, [], path)
+            if not provides:
+                continue
+            module = importlib.import_module(f"satellites.{path.parent.parent.name}.{path.parent.name}.api")
+            routes = module.routes()
+            for name, entry in provides.items():
+                for operation, route in entry["operations"].items():
+                    self.assertIn(route, routes, f"{path.parent.name}: {name}.{operation}")
 
 
 class UiApiTest(unittest.TestCase):
@@ -232,6 +278,12 @@ class UiApiTest(unittest.TestCase):
         providers = payload["capabilities"]["files.browse"]
         self.assertEqual(providers[0]["satellite"], "FileExplorer")
         self.assertEqual(providers[0]["operations"], {"list": "entries"})
+        self.assertEqual(payload["contract"]["capabilities"]["audio.library"], [1])
+        audio = payload["capabilities"]["audio.library"]
+        self.assertEqual([provider["satellite"] for provider in audio], ["Music"])
+        self.assertEqual(audio[0]["version"], 1)
+        self.assertEqual(audio[0]["operations"], {"search": "search", "track": "tracks", "resolve": "playback",
+                                                  "artwork": "artwork", "lyrics": "lyrics"})
         status, _, _ = request(self.engine, "/api/catalog", headers={"If-None-Match": headers["ETag"]})
         self.assertEqual(status, 304)
 
@@ -373,6 +425,21 @@ class RediscoverTest(unittest.TestCase):
         self.assertFalse(any(name.endswith(".newcomer") or ".newcomer." in name for name in sys.modules))
         _, catalog, _ = request(self.engine, "/api/catalog")
         self.assertEqual(catalog["pending"][0]["name"], "Newcomer")
+
+    def test_any_satellite_can_provide_audio_library(self):
+        """The registry knows capabilities, not Satellites: another Satellite declaring
+        audio.library is listed beside Music, in discovery order."""
+        manifest = self.copy / "satellite.toml"
+        manifest.write_text(manifest.read_text(encoding="utf-8") + (
+            '\n[provides."audio.library"]\nversion = 1\n'
+            'operations = { search = "summary", track = "summary", resolve = "summary", artwork = "summary" }\n'),
+            encoding="utf-8")
+        payload = self.rediscover()
+        self.assertIn("Showcase", payload["updated"])
+        _, catalog, _ = request(self.engine, "/api/catalog")
+        providers = {provider["satellite"]: provider for provider in catalog["capabilities"]["audio.library"]}
+        self.assertIn("Showcase", providers)
+        self.assertNotIn("lyrics", providers["Showcase"]["operations"])
 
     def test_a_version_change_asks_for_a_reload(self):
         manifest = self.copy / "satellite.toml"

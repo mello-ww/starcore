@@ -5,3 +5,10 @@ description = "Local music library satellite."
 icon = "icon.svg"
 # from the shared icon set every client can draw (contracts/ui/vocabulary.json)
 icon_name = "music"
+
+# a Satellite capability: any client or Satellite can search and play this
+# library's tracks through it without naming Music (docs/media-audio.md).
+# Each operation is one of Music's existing routes.
+[provides."audio.library"]
+version = 1
+operations = { search = "search", track = "tracks", resolve = "playback", artwork = "artwork", lyrics = "lyrics" }
