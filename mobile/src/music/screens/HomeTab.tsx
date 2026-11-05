@@ -2,12 +2,12 @@ import React, {useState} from 'react';
 import {ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
-import type {HomeSection, Track} from '../types';
+import type {HomeSection, Track} from '../../media/types';
 import {useMusicNavigation} from '../ui/navigation';
 import {Shelf, type ShelfItem} from '../ui/Shelf';
 import {TrackActions} from '../ui/TrackActions';
-import {TrackRow} from '../ui/TrackRow';
-import {trackCount} from '../ui/format';
+import {TrackRow} from '../../media/ui/TrackRow';
+import {trackCount} from '../../media/format';
 import {useLoad} from '../ui/useLoad';
 import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 

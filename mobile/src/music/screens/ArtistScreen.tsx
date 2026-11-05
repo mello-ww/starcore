@@ -4,11 +4,11 @@ import {ActivityIndicator, ScrollView, StyleSheet, Text, View} from 'react-nativ
 import type {SatellitesStackParamList} from '../../navigation/MainTabs';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
-import type {Album, Track} from '../types';
+import type {Album, Track} from '../../media/types';
 import {useMusicNavigation} from '../ui/navigation';
 import {Shelf, type ShelfItem} from '../ui/Shelf';
 import {TrackActions} from '../ui/TrackActions';
-import {TrackRow} from '../ui/TrackRow';
+import {TrackRow} from '../../media/ui/TrackRow';
 import {useLoad} from '../ui/useLoad';
 import {CollectionHeader} from './CollectionHeader';
 import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';

@@ -4,10 +4,10 @@ import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextI
 import type {SatellitesStackParamList} from '../../navigation/MainTabs';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
-import type {Track} from '../types';
-import {longDuration} from '../ui/format';
+import type {Track} from '../../media/types';
+import {longDuration} from '../../media/format';
 import {TrackActions} from '../ui/TrackActions';
-import {TrackRow} from '../ui/TrackRow';
+import {TrackRow} from '../../media/ui/TrackRow';
 import {useLoad} from '../ui/useLoad';
 import {CollectionHeader} from './CollectionHeader';
 import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';

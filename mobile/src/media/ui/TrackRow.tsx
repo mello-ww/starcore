@@ -1,10 +1,10 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {colors, spacing, TOUCH_TARGET, touchTarget, typography, useAccentStyles} from '../../theme';
-import {useCurrentTrackId, useMusic} from '../MusicProvider';
+import {useCurrentTrackId, useAudioHost} from '../AudioHost';
 import type {Track} from '../types';
 import {Artwork} from './Artwork';
-import {duration} from './format';
+import {duration} from '../format';
 
 interface Props {
   track: Track;
@@ -17,7 +17,7 @@ interface Props {
 
 export function TrackRow({track, onPress, onMore, showArtwork = true, number, subtitle}: Props) {
   const accentStyle = useAccentStyles();
-  const {liked, downloads} = useMusic();
+  const {liked, downloads} = useAudioHost();
   const playingId = useCurrentTrackId();
   const active = playingId === track.id;
   const unavailable = !!track.missing;

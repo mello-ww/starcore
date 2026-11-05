@@ -53,6 +53,25 @@ playback: favourites, playlists, history, stats, recommendations, scanning. They
 provider's own routes and in its own interface. They are added to the protocol only when a
 second provider or consumer needs them (a new version beside v1, as the contract requires).
 
+### `audio.session` - the playback session beside a library
+
+What a host does around playback, beyond the library itself, uses a second capability from
+the **same** Satellite. It is not yet in the shared vocabulary, so the Engine registers it as
+declared and doesn't check it. A host uses each operation only when the provider declares it;
+without one, that feature is simply absent.
+
+| Operation | Used for | Music's route |
+|---|---|---|
+| `queue` | the server copy of the queue, and resolving tracks for a Connect transfer | `queue` |
+| `history` | reporting plays | `history` |
+| `radio` | continuing when the queue ends ("autoplay") | `radio` |
+| `preferences` | streaming quality, effects, speed, downloads | `preferences` |
+| `favorites` | the like button | `favorites` |
+| `stream` | a stream when the resolve step can't plan one | `stream` |
+| `connect` | StarCore Connect (`connect/register`, `state`, `events`, `command`, `transfer`, `devices`) | `connect` |
+
+It is a candidate for the shared vocabulary once a second provider needs part of it.
+
 ## `media.audio` - the client side (the AudioHost)
 
 Each client has one AudioHost, mounted by the shell rather than by a Satellite's page, so
@@ -155,7 +174,30 @@ Accepted when:
   operation.
 - The engine tests pass, and no Music route changes.
 
-### 3. Android AudioHost
+### 3. Android AudioHost - done
+
+What it is now:
+- `mobile/src/media/` holds the host: `AudioHost.tsx` (the player, downloads, Connect and
+  the native output), `library.ts` (provider resolution and requests), the controller and
+  queue, and the player UI under `media/ui/`.
+- `MainTabs.tsx` mounts it. Music's screens and its additions to the player (the track menu,
+  links to its album and artist screens, and the provider to assume on a server older than
+  the capability) come in through one composition root, `mobile/src/satellites/builtins.tsx`.
+- Music's screens still reach Music's own routes (`music/api.ts`). They are Music's code.
+- `builtins.tsx` is temporary. It exists so Music's native screens keep working while they
+  have no `ui.json`. Each entry goes once Music's declarative interface replaces that screen,
+  and the file goes with the last one; its line in `KNOWN_IMPORTS`
+  (`engine/tests/test_client_modularity.py`) is lowered at each step.
+
+Follow-ups found while building it:
+- **Formalize `audio.session`:** add it to the shared vocabulary with a version and its
+  required and optional operations, checked by the Engine like `audio.library`, before the
+  web host relies on it.
+- **Lock-screen position after a pause:** after pausing from the lock screen, Android's
+  media controls showed the position as 0:00 (seen on the emulator). The output component
+  (react-native-video's `<Video>` and its props) was moved unchanged, so this looks like
+  existing behaviour rather than a regression of this milestone. To investigate.
+
 
 - Move the player controller, `dock.ts`, `MiniPlayer`, `FullPlayer`, `MusicDisc`/`MusicFlight`
   and the effects and downloads bridges behind a generic host in `mobile/src/media/`.

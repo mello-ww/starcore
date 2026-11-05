@@ -3,8 +3,8 @@ import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {StarSwitch} from '../../components/StarSwitch';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
-import {audioEffects} from '../native';
-import type {Equalizer} from '../types';
+import {audioEffects} from '../../media/native';
+import type {Equalizer} from '../../media/types';
 import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 export const BANDS = ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k'];

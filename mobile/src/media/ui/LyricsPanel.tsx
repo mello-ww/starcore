@@ -2,14 +2,14 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {activeLine, activeWords, lyricsTime} from '../lyrics';
-import {useMusic, usePlayerState} from '../MusicProvider';
+import {useAudioHost, usePlayerState} from '../AudioHost';
 import type {Lyrics} from '../types';
 
 const LINE_HEIGHT = 44;
 
 export function LyricsPanel({trackId}: {trackId: string}) {
   const accentStyle = useAccentStyles();
-  const {api, player, preferences} = useMusic();
+  const {library: api, player, preferences} = useAudioHost();
   const state = usePlayerState();
   const [lyrics, setLyrics] = useState<Lyrics | null>(null);
   const [message, setMessage] = useState<string | null>('Loading lyrics…');

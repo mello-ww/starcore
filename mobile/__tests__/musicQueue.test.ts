@@ -1,4 +1,4 @@
-import * as Q from '../src/music/queue';
+import * as Q from '../src/media/queue';
 import {makeTracks} from './musicFakes';
 
 const seeded = () => {

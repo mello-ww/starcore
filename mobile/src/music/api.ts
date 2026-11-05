@@ -18,7 +18,7 @@ import type {
   QueueState,
   SearchResult,
   Track,
-} from './types';
+} from '../media/types';
 
 export const MUSIC_BASE = '/api/satellites/music';
 
@@ -232,25 +232,4 @@ export class MusicApi {
       'Lost the connection to StarCore Connect.',
     );
   }
-}
-
-export function musicUrl(baseUrl: string, path: string): string {
-  return `${baseUrl}${MUSIC_BASE}/${path}`;
-}
-
-export function authHeaders(token: string | null): Record<string, string> | undefined {
-  return token ? {Authorization: `Bearer ${token}`} : undefined;
-}
-
-export function artworkSource(baseUrl: string, token: string | null, albumId: string | null | undefined, size = 300) {
-  if (!albumId) {
-    return null;
-  }
-  return {uri: musicUrl(baseUrl, `artwork/${enc(albumId)}?size=${size}`), headers: authHeaders(token)};
-}
-
-export function streamPath(trackId: string, quality: Quality, format: string): string {
-  return quality === 'original'
-    ? `stream/${enc(trackId)}?quality=original`
-    : `stream/${enc(trackId)}?quality=${quality}&format=${format}`;
 }

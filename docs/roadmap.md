@@ -217,7 +217,11 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [ ] Retire Status's previous page and screen once 1.1 is validated
 - [x] Specify `media.audio` and `audio.library` from Music's player (`docs/media-audio.md`)
 - [x] Audio contract groundwork: `audio.library` v1 in the vocabulary, provided by Music; `media.audio` reserved
-- [ ] Audio: the Android and web AudioHosts (`docs/media-audio.md`, "Migration plan")
+- [x] Audio: the Android AudioHost (`mobile/src/media/`), playing from the catalog's `audio.library` provider
+- [ ] Audio: version `audio.session` in the shared vocabulary before the web host relies on it
+- [ ] Audio: the lock-screen position reads 0:00 after pausing on Android (investigate)
+- [ ] Audio: the web AudioHost (`docs/media-audio.md`, "Migration plan")
+- [ ] Remove `mobile/src/satellites/builtins.tsx` once Music's declarative interface replaces its native screens
 - [ ] Move Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/ui-contract.md`, "Migration")
 - [ ] Light theme
 - [ ] Icons instead of text glyphs for the remaining Music controls

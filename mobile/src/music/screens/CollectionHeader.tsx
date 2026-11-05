@@ -1,7 +1,7 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
-import {Artwork, Mosaic} from '../ui/Artwork';
+import {Artwork, Mosaic} from '../../media/ui/Artwork';
 
 interface Props {
   title: string;

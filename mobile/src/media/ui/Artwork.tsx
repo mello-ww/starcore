@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {Image, StyleSheet, Text, View} from 'react-native';
 import {colors, radius} from '../../theme';
-import {useArtworkUri} from '../MusicProvider';
+import {useArtworkUri} from '../AudioHost';
 
 export function Artwork({albumId, size, round, label}: {albumId?: string | null; size: number; round?: boolean; label?: string}) {
   const source = useArtworkUri(albumId, size > 160 ? 600 : 300);

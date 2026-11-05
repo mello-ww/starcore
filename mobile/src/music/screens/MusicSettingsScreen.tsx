@@ -7,7 +7,7 @@ import {useDeveloperMode} from '../../developer/DeveloperModeContext';
 import {Surface} from '../../components/Surface';
 import {tokens, TOUCH_TARGET, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
-import type {MusicPreferences} from '../types';
+import type {MusicPreferences} from '../../media/types';
 import {useMusicNavigation} from '../ui/navigation';
 import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 

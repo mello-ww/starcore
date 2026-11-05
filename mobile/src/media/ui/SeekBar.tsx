@@ -1,7 +1,7 @@
 import React, {useMemo, useRef, useState} from 'react';
 import {LayoutChangeEvent, PanResponder, StyleSheet, Text, View} from 'react-native';
 import {colors, spacing, typography} from '../../theme';
-import {duration as format} from '../ui/format';
+import {duration as format} from '../format';
 
 export function SeekBar({position, duration, onSeek}: {position: number; duration: number; onSeek: (seconds: number) => void}) {
   const [width, setWidth] = useState(1);

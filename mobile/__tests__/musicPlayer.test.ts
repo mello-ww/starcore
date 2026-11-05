@@ -1,9 +1,12 @@
-import {PlayerController} from '../src/music/player';
-import {fakeEffects, makeTracks, manualTimers, preferences} from './musicFakes';
+import {PlayerController} from '../src/media/player';
+import {fakeEffects, makeTracks, manualTimers, preferences, testLibrary} from './musicFakes';
 
 function setup(overrides: Partial<ConstructorParameters<typeof PlayerController>[0]> = {}) {
   const timers = manualTimers();
+  const library = testLibrary();
   const api = {
+    path: library.path,
+    streamPath: library.streamPath.bind(library),
     playback: jest.fn(async (id: string, quality: string) => ({
       track: {} as any,
       plan: {delivery: quality === 'original' ? 'original' : 'transcode', format: 'flac', codec: 'flac', bitrate: null, lossless: true, reason: null},

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {setPlayerCollapsed} from '../src/music/player/dock';
+import {setPlayerCollapsed} from '../src/media/ui/dock';
 
 describe('the mini-player dock', () => {
   it('remembers whether the player is put away', async () => {

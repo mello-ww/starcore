@@ -22,21 +22,13 @@ import {PhotoHomeScreen} from '../photo/PhotoHomeScreen';
 import {PhotoTrashTab} from '../photo/PhotoTrashTab';
 import {PhotoViewerScreen} from '../photo/PhotoViewerScreen';
 import {StatusHomeScreen} from '../status/StatusHomeScreen';
-import {MusicProvider} from '../music/MusicProvider';
-import {FullPlayer} from '../music/player/FullPlayer';
-import {MiniPlayer} from '../music/player/MiniPlayer';
-import {MusicDisc, MusicFlight} from '../music/player/MusicDisc';
+import {AudioHost} from '../media/AudioHost';
+import {AudioDisc, AudioFlight} from '../media/ui/AudioDisc';
+import {FullPlayer} from '../media/ui/FullPlayer';
+import {MiniPlayer} from '../media/ui/MiniPlayer';
+import {BUILTIN_AUDIO, BUILTIN_SCREENS, type BuiltinScreenParams} from '../satellites/builtins';
 import {TopBarSlot, TopBarSlotProvider} from '../components/TopBarSlot';
 import {FloatingPlayerInsetProvider} from '../components/FloatingPlayerInset';
-import {AlbumScreen} from '../music/screens/AlbumScreen';
-import {ArtistScreen} from '../music/screens/ArtistScreen';
-import {DownloadsScreen} from '../music/screens/DownloadsScreen';
-import {EqualizerScreen} from '../music/screens/EqualizerScreen';
-import {MusicHomeScreen} from '../music/screens/MusicHomeScreen';
-import {MusicSettingsScreen} from '../music/screens/MusicSettingsScreen';
-import {PlaylistScreen} from '../music/screens/PlaylistScreen';
-import {TrackListScreen} from '../music/screens/TrackListScreen';
-import type {TrackListKind} from '../music/ui/navigation';
 
 export type MainTabParamList = {
   Overview: undefined;
@@ -67,18 +59,9 @@ export type SatellitesStackParamList = {
    * PhotoAlbumsTab's own "Recycle bin" card. */
   PhotoTrash: undefined;
   PhotoViewer: {media: {id: string; mediaType: 'photo' | 'video'; duration: number | null}[]; startIndex: number};
-  /** "Music" is special-cased the same way - see src/music/MusicProvider.tsx. */
-  MusicHome: undefined;
-  MusicAlbum: {id: string};
-  MusicArtist: {id: string};
-  MusicPlaylist: {id: string};
-  MusicTracks: {kind: TrackListKind; id: string; title: string};
-  MusicSettings: undefined;
-  MusicEqualizer: undefined;
-  MusicDownloads: undefined;
   /** "Status" gets its own native screen too - see src/status/StatusHomeScreen.tsx. */
   StatusHome: undefined;
-};
+} & BuiltinScreenParams;
 
 export type SettingsStackParamList = {
   SettingsHome: undefined;
@@ -96,7 +79,7 @@ const stackScreenOptions = {
   headerTitleStyle: {fontFamily: tokens.type.title.fontFamily, fontWeight: '700' as const},
   headerShadowVisible: false,
   contentStyle: {backgroundColor: tokens.palette.bg},
-  // the same top-right slot every screen title has (Music's disc while something plays)
+  // the same top-right slot every screen title has (the playing cover's disc)
   headerRight: () => <TopBarSlot />,
 };
 
@@ -122,14 +105,10 @@ function SatellitesStack() {
         component={PhotoViewerScreen}
         options={{headerShown: false, presentation: 'fullScreenModal'}}
       />
-      <SatellitesStackNav.Screen name="MusicHome" component={MusicHomeScreen} options={{title: ''}} />
-      <SatellitesStackNav.Screen name="MusicAlbum" component={AlbumScreen} options={{title: 'Album'}} />
-      <SatellitesStackNav.Screen name="MusicArtist" component={ArtistScreen} options={{title: 'Artist'}} />
-      <SatellitesStackNav.Screen name="MusicPlaylist" component={PlaylistScreen} options={{title: 'Playlist'}} />
-      <SatellitesStackNav.Screen name="MusicTracks" component={TrackListScreen} />
-      <SatellitesStackNav.Screen name="MusicSettings" component={MusicSettingsScreen} options={{title: ''}} />
-      <SatellitesStackNav.Screen name="MusicEqualizer" component={EqualizerScreen} options={{title: 'Equalizer'}} />
-      <SatellitesStackNav.Screen name="MusicDownloads" component={DownloadsScreen} options={{title: 'Downloads'}} />
+      {BUILTIN_SCREENS.map(screen => (
+        <SatellitesStackNav.Screen key={screen.name} name={screen.name} component={screen.component}
+          options={screen.title !== undefined ? {title: screen.title} : undefined} />
+      ))}
       <SatellitesStackNav.Screen name="StatusHome" component={StatusHomeScreen} options={{title: ''}} />
     </SatellitesStackNav.Navigator>
   );
@@ -188,10 +167,10 @@ function tabIcon(name: keyof MainTabParamList) {
 /**
  * Bottom tabs - exactly the five destinations in "New mobile bottom
  * navigation" in the task brief. Individual Satellites are never their own
- * tab; they live inside the Satellites tab's own stack. Music's mini-player
- * rides on top of the tab bar so it stays visible on every tab, and its one
- * audio player (MusicProvider) lives above all of them, so changing tabs or
- * screens never stops playback.
+ * tab; they live inside the Satellites tab's own stack. The shared audio
+ * player (AudioHost, docs/media-audio.md) lives above all of them, so changing
+ * tabs or screens never stops playback, and its mini-player floats over every
+ * tab, above the tab bar.
  */
 export function MainTabs() {
   const {color: accent} = useAccent();
@@ -203,8 +182,8 @@ export function MainTabs() {
   // and the screens leave its measured height (0 while it is hidden) at the end of their scrolling
   const [playerHeight, setPlayerHeight] = useState(0);
   return (
-    <MusicProvider>
-      <TopBarSlotProvider component={MusicDisc}>
+    <AudioHost fallbackProvider={BUILTIN_AUDIO.fallbackProvider} extensions={BUILTIN_AUDIO.extensions}>
+      <TopBarSlotProvider component={AudioDisc}>
       <FloatingPlayerInsetProvider value={playerHeight > 0 ? playerHeight + tokens.space.sm : 0}>
       <View style={styles.fill}>
       <Tab.Navigator
@@ -236,11 +215,11 @@ export function MainTabs() {
         onLayout={event => setPlayerHeight(Math.round(event.nativeEvent.layout.height))}>
         <MiniPlayer />
       </View>
-      <MusicFlight />
+      <AudioFlight />
       </View>
       </FloatingPlayerInsetProvider>
       </TopBarSlotProvider>
-    </MusicProvider>
+    </AudioHost>
   );
 }
 

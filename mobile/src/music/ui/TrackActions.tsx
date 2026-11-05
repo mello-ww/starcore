@@ -4,7 +4,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ModalSafeArea} from '../../components/ModalSafeArea';
 import {colors, radius, spacing, TOUCH_TARGET, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
-import type {Playlist, Track} from '../types';
+import type {Playlist, Track} from '../../media/types';
 import {useMusicNavigation} from './navigation';
 
 /** The long-press sheet for one or more tracks. */

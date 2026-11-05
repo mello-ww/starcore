@@ -47,6 +47,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   capability may now have optional operations, and an operation its version doesn't define is
   refused. The reserved client capability `media.audio-playback` is now `media.audio`. See
   `docs/media-audio.md`.
+- **Android: one shared audio player.** The player, its queue, effects, downloads, Connect and
+  the floating player UI moved to `mobile/src/media/` (the AudioHost). It plays from the
+  catalog's `audio.library` provider, with Music's routes as the fallback on older servers.
+  Music also declares `audio.session`, its queue, history, radio, preferences, likes and
+  Connect. Nothing about playback changes for listeners.
 - **Home widgets.** Home on both clients draws every Satellite's widgets; neither names Status
   any more (the Android app keeps its Status card for older servers).
 - Mission Control's charts, meters and sparklines, and the app's column chart, meter, bars and

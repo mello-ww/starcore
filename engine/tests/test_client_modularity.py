@@ -31,6 +31,18 @@ KNOWN_COUPLINGS = {
     "mobile/src/screens/HomeScreen.tsx": 4,
 }
 
+# generic mobile code that imports a Satellite-specific folder: (file, {folder: count}).
+# The composition root is where native Satellite code is wired in; the Photo and Status
+# screens are still registered by the navigation. Lower a count when one goes.
+KNOWN_IMPORTS = {
+    "mobile/src/satellites/builtins.tsx": {"mobile/src/music/": 10},
+    "mobile/src/navigation/MainTabs.tsx": {"mobile/src/photo/": 5, "mobile/src/status/": 1},
+    # Photo's background sync, started with the app
+    "mobile/src/App.tsx": {"mobile/src/photo/": 1},
+    # Status's Home card, for servers older than its ui.json
+    "mobile/src/screens/HomeScreen.tsx": {"mobile/src/status/": 1},
+}
+
 # Satellite code naming another Satellite: (file, current count)
 KNOWN_CROSS_SATELLITE = {
     # Photo hosts the Locked Folder's page as a tab (until sections are discovered)
@@ -76,6 +88,25 @@ def generic_client_files() -> list:
     return sorted(files)
 
 
+IMPORT = re.compile(r"""\bfrom\s+['"](\.[^'"]*)['"]|\brequire\(\s*['"](\.[^'"]*)['"]|\bimport\(\s*['"](\.[^'"]*)['"]""")
+
+
+def satellite_imports(path: Path) -> dict:
+    """{Satellite folder: how many imports} for a file's relative imports that land in a
+    Satellite-specific folder (src/music/, src/photo/...)."""
+    counts = {}
+    for match in IMPORT.finditer(path.read_text(encoding="utf-8")):
+        target = (path.parent / next(group for group in match.groups() if group)).resolve()
+        try:
+            relative = target.relative_to(REPO).as_posix() + "/"
+        except ValueError:
+            continue
+        folder = next((prefix for prefix in SATELLITE_SPECIFIC if relative.startswith(prefix)), None)
+        if folder:
+            counts[folder] = counts.get(folder, 0) + 1
+    return counts
+
+
 class ClientModularityTest(unittest.TestCase):
     def test_generic_client_code_names_no_satellite_beyond_the_known_couplings(self):
         names = satellite_names()
@@ -91,6 +122,29 @@ class ClientModularityTest(unittest.TestCase):
                 problems.append(f"{relative} now names a Satellite only {len(found)} times - "
                                 f"lower its KNOWN_COUPLINGS entry to {len(found)} so it can't creep back")
         self.assertEqual(problems, [])
+
+    def test_generic_mobile_code_imports_no_satellite_folder_beyond_the_known_ones(self):
+        problems = []
+        for path in generic_client_files():
+            relative = path.relative_to(REPO).as_posix()
+            if not relative.startswith("mobile/"):
+                continue
+            found = satellite_imports(path)
+            allowed = KNOWN_IMPORTS.get(relative, {})
+            if found != allowed:
+                problems.append(f"{relative} imports Satellite folders {found} (listed: {allowed})")
+        self.assertEqual(problems, [])
+
+    def test_the_audio_host_and_shared_layout_import_no_satellite_folder(self):
+        """The shared player and the shell around it stay Satellite-agnostic (docs/media-audio.md)."""
+        files = [*REPO.glob("mobile/src/media/**/*.ts"), *REPO.glob("mobile/src/media/**/*.tsx"),
+                 *REPO.glob("mobile/src/components/*.tsx"), REPO / "mobile/src/navigation/MainTabs.tsx"]
+        self.assertTrue(any("media" in path.parts for path in files))
+        for path in files:
+            found = satellite_imports(path)
+            self.assertNotIn("mobile/src/music/", found, path.relative_to(REPO).as_posix())
+            if "media" in path.parts or "components" in path.parts:
+                self.assertEqual(found, {}, path.relative_to(REPO).as_posix())
 
     def test_satellites_name_no_other_satellite_beyond_the_known_couplings(self):
         names = satellite_names()

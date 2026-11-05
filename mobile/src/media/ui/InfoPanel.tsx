@@ -1,8 +1,8 @@
 import React from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
-import {useMusic, usePlayerState} from '../MusicProvider';
-import {bytes} from '../ui/format';
+import {useAudioHost, usePlayerState} from '../AudioHost';
+import {bytes} from '../format';
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 const SLEEP = [15, 30, 45, 60];
@@ -22,7 +22,7 @@ function Line({label, value}: {label: string; value: string | number | null | un
 /** Quality, delivery, credits and file details, plus speed and the sleep timer. */
 export function InfoPanel() {
   const accentStyle = useAccentStyles();
-  const {player} = useMusic();
+  const {player} = useAudioHost();
   const state = usePlayerState();
   const track = state.track;
   if (!track) {

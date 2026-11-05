@@ -1,5 +1,4 @@
-import type {MusicApi} from './api';
-import {authHeaders, musicUrl, streamPath} from './api';
+import {authHeaders, type AudioLibraryClient} from './library';
 import type {DownloadManager} from './downloads';
 import type {AudioEffects, NetworkType} from './native';
 import * as Q from './queue';
@@ -33,7 +32,10 @@ export interface PlayerState {
 }
 
 export interface PlayerDeps {
-  api: Pick<MusicApi, 'playback' | 'recordPlay' | 'saveQueue' | 'publishState' | 'radio' | 'command'>;
+  /** The audio.library provider's client (see library.ts). */
+  api: Pick<AudioLibraryClient, 'path' | 'streamPath' | 'playback' | 'recordPlay' | 'saveQueue' | 'publishState' | 'radio' | 'command'>
+    & Partial<Pick<AudioLibraryClient, 'ready'>>;
+  /** The server's origin; stream URLs are this plus the provider's path. */
   baseUrl: string;
   token: () => string | null;
   deviceId: () => string | null;
@@ -153,7 +155,15 @@ export class PlayerController {
     }
     this.set({track, playing: play, error: null, buffering: true, position: this.pendingSeek ?? 0,
       duration: track.duration ?? 0});
-    const source = await this.resolveSource(track, false);
+    let source: Source;
+    try {
+      source = await this.resolveSource(track, false);
+    } catch (failure: any) {
+      if (Q.current(this.state.queue)?.id === track.id) {
+        this.set({playing: false, buffering: false, error: failure?.message ?? 'Could not play this track.'});
+      }
+      return;
+    }
     if (Q.current(this.state.queue)?.id !== track.id) {
       return;
     }
@@ -179,9 +189,11 @@ export class PlayerController {
       this.applyGain(this.trackGain(track));
       return {uri: local, local: true, quality: 'original'};
     }
+    // a queue restored at launch asks before the catalog has named the provider
+    await this.deps.api.ready;
     const quality = forceOriginal ? 'original' : await this.quality();
     const format = this.deps.preferences()?.transcode_format ?? 'opus';
-    let path = streamPath(track.id, quality, format);
+    let path = this.deps.api.streamPath(track.id, quality, format);
     try {
       const info = await this.deps.api.playback(track.id, quality);
       this.set({plan: info.plan});
@@ -191,7 +203,10 @@ export class PlayerController {
       this.set({plan: null});
       this.applyGain(this.trackGain(track));
     }
-    return {uri: musicUrl(this.deps.baseUrl, path), headers: authHeaders(this.deps.token()), local: false, quality};
+    if (!path || !this.deps.api.path) {
+      throw new Error('There is no audio library to play from.');
+    }
+    return {uri: `${this.deps.baseUrl}${this.deps.api.path}/${path}`, headers: authHeaders(this.deps.token()), local: false, quality};
   }
 
   private trackGain(track: Track): number {

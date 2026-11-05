@@ -85,10 +85,13 @@ picking up a newer 6.x release.
 
 ### Music playback
 
-StarCore Music (`src/music/`) plays through that same `react-native-video`
-rather than adding `react-native-track-player`: one hidden `<Video>` lives in
-`MusicProvider` (mounted around the tab navigator, inside the per-server
-`AuthProvider`), with `playInBackground` and `showNotificationControls`, so
+Audio plays through the shared AudioHost (`src/media/`, see
+`docs/media-audio.md`), which plays from whichever Satellite the capability
+catalog lists as the `audio.library` provider (Music today; its native screens
+stay in `src/music/` and are wired in by `src/satellites/builtins.tsx`). It
+uses that same `react-native-video` rather than adding
+`react-native-track-player`: one hidden `<Video>` lives in the `AudioHost`
+(mounted around the tab navigator, inside the per-server `AuthProvider`), with `playInBackground` and `showNotificationControls`, so
 playback runs in react-native-video's media3 `VideoPlaybackService` - a
 `mediaPlayback` foreground service with notification, lock-screen and
 headset play/pause, audio focus and becoming-noisy handling. The app's own

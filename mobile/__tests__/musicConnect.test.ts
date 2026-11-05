@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {ConnectClient} from '../src/music/connect';
-import {activeLine, activeWords, lyricsTime} from '../src/music/lyrics';
-import {deviceId, musicKeys} from '../src/music/storage';
-import type {LyricLine} from '../src/music/types';
+import {ConnectClient} from '../src/media/connect';
+import {activeLine, activeWords, lyricsTime} from '../src/media/lyrics';
+import {deviceId, musicKeys} from '../src/media/storage';
+import type {LyricLine} from '../src/media/types';
 
 function handlers() {
   return {onCommand: jest.fn(), onRemoteState: jest.fn(), onDevicesChanged: jest.fn()};

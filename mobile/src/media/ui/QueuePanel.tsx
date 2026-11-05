@@ -1,13 +1,13 @@
 import React from 'react';
 import {FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
-import {useMusic, usePlayerState} from '../MusicProvider';
+import {useAudioHost, usePlayerState} from '../AudioHost';
 import {upcoming} from '../queue';
-import {TrackRow} from '../ui/TrackRow';
+import {TrackRow} from './TrackRow';
 
 export function QueuePanel() {
   const accentStyle = useAccentStyles();
-  const {player} = useMusic();
+  const {player} = useAudioHost();
   const state = usePlayerState();
   const next = upcoming(state.queue);
   return (

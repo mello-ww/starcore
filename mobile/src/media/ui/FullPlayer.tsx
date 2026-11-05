@@ -3,10 +3,8 @@ import {ActivityIndicator, Modal, PanResponder, Pressable, StyleSheet, Text, Vie
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ModalSafeArea} from '../../components/ModalSafeArea';
 import {colors, spacing, touchTarget, typography, useAccent, useAccentStyles} from '../../theme';
-import {useMusic, usePlayerState} from '../MusicProvider';
-import {Artwork} from '../ui/Artwork';
-import {useMusicNavigation} from '../ui/navigation';
-import {TrackActions} from '../ui/TrackActions';
+import {useAudioHost, usePlayerState} from '../AudioHost';
+import {Artwork} from './Artwork';
 import {DevicesPanel} from './DevicesPanel';
 import {InfoPanel} from './InfoPanel';
 import {LyricsPanel} from './LyricsPanel';
@@ -17,7 +15,7 @@ type Panel = 'artwork' | 'lyrics' | 'queue' | 'devices' | 'info';
 
 /** The full-screen player. Android Back and a downward swipe both close it before anything else. */
 export function FullPlayer() {
-  const {fullPlayer, setFullPlayer} = useMusic();
+  const {fullPlayer, setFullPlayer} = useAudioHost();
   const state = usePlayerState();
   if (!state.track) {
     return null;
@@ -32,14 +30,22 @@ export function FullPlayer() {
   );
 }
 
+const noLinks = (): {album?: (id: string) => void; artist?: (id: string) => void} => ({});
+
 function PlayerBody() {
   const accentStyle = useAccentStyles();
   const {color: accent, onColor} = useAccent();
   // an active toggle: a soft accent pill behind the accent glyph
   const tint = {backgroundColor: `${accent}29`};
-  const {player, setFullPlayer, liked, setLiked} = useMusic();
+  const {player, setFullPlayer, liked, setLiked, library, connect, extensions} = useAudioHost();
   const state = usePlayerState();
-  const go = useMusicNavigation();
+  // the provider's own links and track menu, when its native code supplies them
+  const useLinks = extensions.useTrackLinks ?? noLinks;
+  const go = useLinks();
+  const TrackMenu = extensions.TrackMenu;
+  const panels = (['lyrics', 'queue', 'devices', 'info'] as Panel[]).filter(
+    name => (name !== 'lyrics' || library.offers('lyrics')) && (name !== 'devices' || connect),
+  );
   const insets = useSafeAreaInsets();
   const [panel, setPanel] = useState<Panel>('artwork');
   const [actions, setActions] = useState(false);
@@ -71,7 +77,11 @@ function PlayerBody() {
         <View style={styles.top} {...responder.panHandlers}>
           <Pressable onPress={close} style={styles.touch} accessibilityRole="button" accessibilityLabel="Close the player"><Text style={styles.chevron}>⌄</Text></Pressable>
           <Text numberOfLines={1} style={typography.label}>{remote ? `Playing on ${remote.name}` : state.context ?? 'Now playing'}</Text>
-          <Pressable onPress={() => setActions(true)} style={styles.touch} accessibilityRole="button" accessibilityLabel="Track options"><Text style={styles.chevron}>⋮</Text></Pressable>
+          {TrackMenu ? (
+            <Pressable onPress={() => setActions(true)} style={styles.touch} accessibilityRole="button" accessibilityLabel="Track options"><Text style={styles.chevron}>⋮</Text></Pressable>
+          ) : (
+            <View style={styles.touch} />
+          )}
         </View>
 
         <View style={styles.middle} {...(panel === 'artwork' ? responder.panHandlers : {})}>
@@ -88,10 +98,10 @@ function PlayerBody() {
 
         <View style={styles.titleRow}>
           <View style={styles.titles}>
-            <Pressable onPress={open(() => go.album(track.album_id))}>
+            <Pressable onPress={go.album ? open(() => go.album!(track.album_id)) : undefined}>
               <Text numberOfLines={1} style={typography.title}>{track.title}</Text>
             </Pressable>
-            <Pressable onPress={open(() => go.artist(track.artist_id))}>
+            <Pressable onPress={go.artist ? open(() => go.artist!(track.artist_id)) : undefined}>
               <Text numberOfLines={1} style={typography.body}>{track.artist ?? track.album_artist}</Text>
             </Pressable>
             <Text style={typography.label}>
@@ -128,7 +138,7 @@ function PlayerBody() {
         </View>
 
         <View style={styles.tabs}>
-          {(['lyrics', 'queue', 'devices', 'info'] as Panel[]).map(name => (
+          {panels.map(name => (
             <Pressable key={name} onPress={() => setPanel(panel === name ? 'artwork' : name)} style={styles.tabTouch} accessibilityRole="tab"
               accessibilityState={{selected: panel === name}}>
               <View style={[styles.tabPill, panel === name && {backgroundColor: accent}]}>
@@ -138,7 +148,7 @@ function PlayerBody() {
           ))}
         </View>
       </View>
-      {actions && <TrackActions tracks={[track]} onClose={() => setActions(false)} />}
+      {actions && TrackMenu && <TrackMenu tracks={[track]} onClose={() => setActions(false)} />}
     </>
   );
 }

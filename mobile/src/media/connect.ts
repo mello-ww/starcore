@@ -1,4 +1,4 @@
-import type {MusicApi} from './api';
+import type {AudioLibraryClient} from './library';
 import type {ConnectEvent} from './types';
 
 export interface ConnectHandlers {
@@ -22,7 +22,7 @@ export class ConnectClient {
   registered = false;
 
   constructor(
-    private api: MusicApi,
+    private api: Pick<AudioLibraryClient, 'registerDevice' | 'events'>,
     readonly deviceId: string,
     private name: string,
     private handlers: ConnectHandlers,

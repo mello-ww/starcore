@@ -30,7 +30,8 @@ Codex.
   must keep working.
 - **Parity.** Web and Android offer the same functionality, each with its platform's behaviour.
 - **Reusable layout.** Overlays, navigation and scrolling use shared mechanisms, not per-screen
-  offsets. On Android: `TopBarSlot` (header control beside Developer Mode),
+  offsets. On Android: the `AudioHost` in `mobile/src/media/` (the shared player),
+  `TopBarSlot` (header control beside Developer Mode),
   `FloatingPlayerInset` / `FloatingPlayerSpacer` (scroll space for the floating player),
   `PillTabs`. On the web: the `#topbar-extras` slot in Mission Control's top bar.
 - **Visual identity.** Tokens live in `mission_control/tokens.css` and
@@ -47,8 +48,10 @@ Codex.
   web page and Android screen remain as fallbacks until retired (`docs/satellites/status.md`).
 - **Music** has its cross-platform redesign: StarCore tokens, pill controls and a
   retractable floating player whose top-bar disc shows the playing cover. It still uses its
-  own `page.js` and native screens, not `ui.json`.
-  Next: the shared audio host specified in `docs/media-audio.md`.
+  own `page.js` and native screens, not `ui.json`. On Android its player is now the shared
+  AudioHost (`mobile/src/media/`), fed by the `audio.library` capability. The web host is
+  next (`docs/media-audio.md`). Native Satellite screens are wired in only by
+  `mobile/src/satellites/builtins.tsx`.
 - **Photos and File Explorer** still use Satellite-specific client code and need architectural
   work (shared capabilities such as a media gallery) before they move to the contract.
 

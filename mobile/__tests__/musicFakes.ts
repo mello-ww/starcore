@@ -1,4 +1,5 @@
-import type {MusicPreferences, Track} from '../src/music/types';
+import {AudioLibraryClient, type AudioProvider} from '../src/media/library';
+import type {MusicPreferences, Track} from '../src/media/types';
 
 export function makeTrack(index: number, prefix = 'a'): Track {
   const id = `${prefix.charCodeAt(0).toString(16)}${String(index).padStart(14, '0')}`;
@@ -88,4 +89,17 @@ export function manualTimers() {
     },
     pending,
   };
+}
+
+/** An audio.library provider as the catalog would describe one, with a session. */
+export const testProvider: AudioProvider = {
+  satellite: 'music',
+  operations: {search: 'search', track: 'tracks', resolve: 'playback', artwork: 'artwork', lyrics: 'lyrics'},
+  session: {queue: 'queue', history: 'history', radio: 'radio', preferences: 'preferences', favorites: 'favorites',
+            stream: 'stream', connect: 'connect'},
+};
+
+/** A provider client that makes no requests: for the URL-building parts of the host. */
+export function testLibrary(provider: AudioProvider = testProvider) {
+  return new AudioLibraryClient({} as any, provider);
 }

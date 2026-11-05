@@ -2,11 +2,11 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
-import type {SearchResult, Track} from '../types';
+import type {SearchResult, Track} from '../../media/types';
 import {useMusicNavigation} from '../ui/navigation';
 import {Shelf} from '../ui/Shelf';
 import {TrackActions} from '../ui/TrackActions';
-import {TrackRow} from '../ui/TrackRow';
+import {TrackRow} from '../../media/ui/TrackRow';
 import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 const QUALITIES = [

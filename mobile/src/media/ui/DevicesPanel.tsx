@@ -1,13 +1,13 @@
 import React, {useEffect, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
-import {useMusic, usePlayerState} from '../MusicProvider';
+import {useAudioHost, usePlayerState} from '../AudioHost';
 import type {ConnectDevice} from '../types';
 
 /** StarCore Connect: move playback between this phone and the listener's other devices. */
 export function DevicesPanel() {
   const accentStyle = useAccentStyles();
-  const {api, player, deviceId} = useMusic();
+  const {library: api, player, deviceId} = useAudioHost();
   const state = usePlayerState();
   const [devices, setDevices] = useState<ConnectDevice[] | null>(null);
   const [error, setError] = useState<string | null>(null);

@@ -2,8 +2,8 @@ import React, {useEffect, useReducer} from 'react';
 import {Alert, FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
-import {bytes} from '../ui/format';
-import {TrackRow} from '../ui/TrackRow';
+import {bytes} from '../../media/format';
+import {TrackRow} from '../../media/ui/TrackRow';
 import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
 export function DownloadsScreen() {

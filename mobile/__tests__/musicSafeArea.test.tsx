@@ -3,7 +3,7 @@ import React from 'react';
 import {Modal, StyleSheet} from 'react-native';
 import renderer, {act} from 'react-test-renderer';
 import {MusicProvider, useMusic} from '../src/music/MusicProvider';
-import {FullPlayer} from '../src/music/player/FullPlayer';
+import {FullPlayer} from '../src/media/ui/FullPlayer';
 import {TrackActions} from '../src/music/ui/TrackActions';
 import {TOUCH_TARGET} from '../src/theme';
 import {makeTracks, preferences} from './musicFakes';

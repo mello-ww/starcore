@@ -2,8 +2,8 @@ import {useIsFocused} from '@react-navigation/native';
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View} from 'react-native';
 import {colors, tokens, useAccent} from '../../theme';
-import {usePlayerState} from '../MusicProvider';
-import {Artwork} from '../ui/Artwork';
+import {usePlayerState} from '../AudioHost';
+import {Artwork} from './Artwork';
 import {anchors, Rect, setPlayerCollapsed, usePlayerCollapsed} from './dock';
 
 const SIZE = 36;
@@ -32,7 +32,7 @@ function useSpin(playing: boolean) {
 
 /** The playing cover as a spinning disc, in the header's top-bar slot (see TopBarSlot).
  * Tapping it brings the mini-player up or puts it away. */
-export function MusicDisc() {
+export function AudioDisc() {
   const {color: accent} = useAccent();
   const state = usePlayerState();
   const collapsed = usePlayerCollapsed();
@@ -97,7 +97,7 @@ function useFlying() {
 /** The cover's flight between the disc and the mini-player: down and larger as the bar rises,
  * back up and spinning as it sinks. Drawn once, above the navigation; it measures where both
  * ends are, and skips the flight when either is unknown or motion is reduced. */
-export function MusicFlight() {
+export function AudioFlight() {
   const state = usePlayerState();
   const collapsed = usePlayerCollapsed();
   const origin = useRef<View>(null);

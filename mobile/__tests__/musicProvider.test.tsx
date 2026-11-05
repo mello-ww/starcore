@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import {MusicProvider, useMusic, usePlayerState} from '../src/music/MusicProvider';
-import {musicKeys} from '../src/music/storage';
+import {musicKeys} from '../src/media/storage';
 import {SatellitesListScreen} from '../src/screens/SatellitesListScreen';
 import {makeTracks, preferences} from './musicFakes';
 

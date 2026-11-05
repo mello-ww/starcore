@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {DownloadManager, type DownloadSettings} from '../src/music/downloads';
-import type {DownloadNative} from '../src/music/native';
-import {musicKeys} from '../src/music/storage';
-import {makeTracks} from './musicFakes';
+import {DownloadManager, type DownloadSettings} from '../src/media/downloads';
+import type {DownloadNative} from '../src/media/native';
+import {musicKeys} from '../src/media/storage';
+import {makeTracks, testLibrary} from './musicFakes';
 
 function fakeNative() {
   const files = new Map<string, number>();
@@ -34,6 +34,7 @@ function manager(serverId: string, native: DownloadNative | null, network = 'wif
   return new DownloadManager(
     serverId,
     'https://music.test',
+    () => testLibrary(),
     () => 'secret-token',
     native,
     async () => network as any,

@@ -1,7 +1,7 @@
 import React from 'react';
 import {FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
 import {spacing, typography, useAccentStyles} from '../../theme';
-import {Artwork, Mosaic} from './Artwork';
+import {Artwork, Mosaic} from '../../media/ui/Artwork';
 
 export interface ShelfItem {
   key: string;

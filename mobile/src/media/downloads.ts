@@ -1,4 +1,4 @@
-import {musicUrl, streamPath} from './api';
+import type {AudioLibraryClient} from './library';
 import type {DownloadNative, NetworkType} from './native';
 import {serverFolder} from './native';
 import {musicKeys, readJson, writeJson} from './storage';
@@ -47,6 +47,7 @@ export class DownloadManager {
   constructor(
     private serverId: string,
     private baseUrl: string,
+    private library: () => Pick<AudioLibraryClient, 'path' | 'streamPath' | 'artworkPath' | 'playback'> | null,
     private token: () => string | null,
     private native: DownloadNative | null,
     private network: () => Promise<NetworkType>,
@@ -186,7 +187,7 @@ export class DownloadManager {
     try {
       const result = await this.native!.download(
         job.id,
-        musicUrl(this.baseUrl, streamPath(job.track.id, settings.quality, settings.format)),
+        await this.streamUrl(job.track.id, settings.quality, settings.format),
         token ? {Authorization: `Bearer ${token}`} : {},
         relative,
       );
@@ -272,7 +273,7 @@ export class DownloadManager {
     try {
       const result = await this.native.download(
         `art-${albumId}`,
-        musicUrl(this.baseUrl, `artwork/${albumId}?size=600`),
+        this.artworkUrl(albumId),
         token ? {Authorization: `Bearer ${token}`} : {},
         relative,
       );
@@ -280,5 +281,25 @@ export class DownloadManager {
     } catch {
       return null;
     }
+  }
+
+  /** The provider's stream for a download: its session's stream route, else the stream its
+   * resolve step plans. */
+  private async streamUrl(trackId: string, quality: Quality, format: string): Promise<string> {
+    const library = this.library();
+    if (!library?.path) {
+      throw new Error('There is no audio library to download from.');
+    }
+    const path = library.streamPath(trackId, quality, format) ?? (await library.playback(trackId, quality)).stream;
+    return `${this.baseUrl}${library.path}/${path}`;
+  }
+
+  private artworkUrl(albumId: string): string {
+    const library = this.library();
+    const path = library?.artworkPath(albumId, 600);
+    if (!library?.path || !path) {
+      throw new Error('This audio library has no artwork.');
+    }
+    return `${this.baseUrl}${library.path}/${path}`;
   }
 }
