@@ -371,6 +371,18 @@ export function mount(context) {
             navigate(action.navigate, resolve(action.params || {}, bindings));
             return true;
         }
+        if (action.play) {
+            // 1.2: played by the shell's audio host, from whichever Satellite provides audio.library
+            try {
+                const host = await import("/media/host.js");
+                const found = await host.playSearch(String(resolve(action.play.search, bindings) ?? ""));
+                setNotice(found ? null : "Nothing to play was found.", found ? "info" : "error");
+                return found > 0;
+            } catch (error) {
+                setNotice(error.message, "error");
+                return false;
+            }
+        }
         if (action.confirm && !window.confirm(String(resolve(action.confirm, bindings)))) {
             return false;
         }

@@ -15,7 +15,8 @@ import {
 import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
-import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
+import {FloatingPlayerSpacer, useFloatingPlayerInset} from '../components/FloatingPlayerInset';
+import {useOptionalAudioHost} from '../media/AudioHost';
 
 const {palette, radii, space, type} = tokens;
 
@@ -57,6 +58,10 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const appActive = useAppActive();
   const live = focused && appActive;
   const api = useMemo(() => new UiApi(client, activeServer?.id ?? 'default'), [client, activeServer?.id]);
+  // the app's shared audio host: what a document's play action plays through (media.audio)
+  const audio = useOptionalAudioHost();
+  // notices sit above the floating player while it shows, not behind it
+  const playerInset = useFloatingPlayerInset();
 
   const [document, setDocument] = useState<UiDocument | null>(null);
   const [offline, setOffline] = useState(false);
@@ -289,6 +294,20 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         go(action.navigate, resolve(action.params ?? {}, scoped));
         return true;
       }
+      if (action.play) {
+        // 1.2: played by the app's audio host, from whichever Satellite provides audio.library
+        try {
+          if (!audio) {
+            throw new Error('Audio playback is not available here.');
+          }
+          const found = await audio.playSearch(String(resolve(action.play.search, scoped) ?? ''));
+          showToast(found ? null : 'Nothing to play was found.', !found);
+          return found > 0;
+        } catch (err: any) {
+          showToast(err?.message || 'Could not play that.', true);
+          return false;
+        }
+      }
       if (action.confirm && !(await confirmAction(String(resolve(action.confirm, scoped))))) {
         return false;
       }
@@ -312,7 +331,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       }
       return true;
     },
-    [api, name, go, loadData, navigation, showToast],
+    [api, name, go, loadData, navigation, showToast, audio],
   );
 
   const context: BlockContext = {
@@ -434,7 +453,10 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         <FloatingPlayerSpacer />
       </ScrollView>
       {toast && (
-        <View pointerEvents="none" style={[styles.toast, toast.error && styles.toastError]} accessibilityLiveRegion="polite">
+        <View
+          pointerEvents="none"
+          style={[styles.toast, {bottom: space.xl + playerInset}, toast.error && styles.toastError]}
+          accessibilityLiveRegion="polite">
           <Text style={[styles.toastText, toast.error && {color: palette.danger}]}>{toast.text}</Text>
         </View>
       )}

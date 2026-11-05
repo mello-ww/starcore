@@ -175,3 +175,44 @@ describe('a session with only its required queue', () => {
     tree.unmount();
   });
 });
+
+describe('playSearch (the play action of the UI contract)', () => {
+  it('plays what an unknown provider finds for a search, through its own operations', async () => {
+    const found = makeTracks(2);
+    const http = {
+      get: jest.fn(async (path: string) => {
+        if (path === '/api/catalog') {
+          return {status: 200, body: {capabilities: {'audio.library': [radio]}}};
+        }
+        if (path.startsWith('/api/satellites/Radio/find?q=tide')) {
+          return {status: 200, body: {tracks: found}};
+        }
+        if (path.startsWith('/api/satellites/Radio/find')) {
+          return {status: 200, body: {tracks: []}};
+        }
+        const tune = /^\/api\/satellites\/Radio\/tune\/([^?]+)/.exec(path);
+        return tune ? {status: 200, body: {track: {}, plan: null, stream: `listen/${tune[1]}`, gain: {db: 0}}} : {status: 404, body: {}};
+      }),
+      post: jest.fn(async () => ({status: 404, body: {}})),
+    };
+    (useAuth as jest.Mock).mockReturnValue({client: http, state: {status: 'signed-in', session: {token: 'token-a'}}});
+    (useServers as jest.Mock).mockReturnValue({activeServer: {id: 'server-a', baseUrl: 'https://server-a.test'}});
+    let tree!: ReturnType<typeof renderer.create>;
+    await act(async () => {
+      tree = renderer.create(<AudioHost><Probe /></AudioHost>);
+    });
+    let count = -1;
+    await act(async () => {
+      count = await captured!.playSearch('tide');
+    });
+    expect(count).toBe(2);
+    expect(captured!.player.state.track?.id).toBe(found[0].id);
+    expect(tree.root.findByProps({testID: 'music-video'}).props.source.uri).toBe(`https://server-a.test/api/satellites/Radio/listen/${found[0].id}`);
+    await act(async () => {
+      count = await captured!.playSearch('nothing');
+    });
+    expect(count).toBe(0);
+    expect(captured!.player.state.track?.id).toBe(found[0].id);
+    tree.unmount();
+  });
+});

@@ -33,7 +33,7 @@ import time
 
 CONTRACT_NAME = "starcore.ui"
 MAJOR = 1
-MINOR = 1
+MINOR = 2
 UI_FILENAME = "ui.json"
 
 VOCABULARY_PATH = Path(__file__).resolve().parents[2] / "contracts" / "ui" / "vocabulary.json"
@@ -184,10 +184,10 @@ class _Validator:
         self.state_keys = set()
         self.source_names = set()
 
-    def since(self, where: str, what: str):
-        """`what` arrived in 1.1: refused in a document that declares 1.0."""
-        if self.minor < 1:
-            self.error(where, f"{what} needs {CONTRACT_NAME}/1.1 or later (the document declares 1.{self.minor})")
+    def since(self, where: str, what: str, minor: int = 1):
+        """`what` arrived in 1.`minor`: refused in a document that declares an older minor."""
+        if self.minor < minor:
+            self.error(where, f"{what} needs {CONTRACT_NAME}/1.{minor} or later (the document declares 1.{self.minor})")
 
     def error(self, where: str, message: str):
         self.errors.append(f"{where}: {message}" if where else message)
@@ -631,6 +631,9 @@ class _Validator:
             self.unknown_keys(where, action, {"navigate", "params"})
             self.check_navigate(where, action)
             return
+        if "play" in action:
+            self.check_play(where, action)
+            return
         self.unknown_keys(where, action, {"route", "method", "body", "confirm", "then"})
         self.check_route(f"{where}.route", action.get("route"))
         if "method" in action and action["method"] not in METHODS:
@@ -650,6 +653,22 @@ class _Validator:
             self.check_navigate(f"{where}.then", then)
         elif then not in ACTION_THEN:
             self.error(f"{where}.then", "must be 'refresh', 'back' or {navigate, params}")
+
+    def check_play(self, where: str, action: dict):
+        """{play: {search}} (1.2): the client searches the audio.library provider for `search`
+        (text or a binding) and plays what it finds through its media.audio host. It reaches no
+        route of its own, so it can't reach anything the provider doesn't already offer."""
+        self.since(f"{where}.play", "the play action", 2)
+        self.unknown_keys(where, action, {"play"})
+        play = action["play"]
+        if not isinstance(play, dict) or "search" not in play:
+            self.error(f"{where}.play", "must be {search: text or binding}")
+            return
+        self.unknown_keys(f"{where}.play", play, {"search"})
+        if not isinstance(play["search"], str) or not play["search"].strip():
+            self.error(f"{where}.play.search", "must be a non-empty text or binding")
+            return
+        self.check_values(f"{where}.play.search", play["search"])
 
     def check_navigate(self, where: str, action: dict):
         target = action.get("navigate")

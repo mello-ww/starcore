@@ -37,6 +37,9 @@ export interface AudioHostValue {
   fullPlayer: boolean;
   setFullPlayer: (open: boolean) => void;
   resolveTracks: (ids: string[]) => Promise<Track[]>;
+  /** Plays what the provider finds for a search (the UI contract's play action); resolves
+   * with how many tracks it found. */
+  playSearch: (text: string) => Promise<number>;
   extensions: AudioHostExtensions;
 }
 
@@ -267,6 +270,22 @@ export function AudioHost({
     [library],
   );
 
+  const playSearch = useCallback(
+    async (text: string) => {
+      await library.ready;
+      if (!library.provider) {
+        throw new Error('There is no audio library to play from.');
+      }
+      const found = await library.search(text);
+      const tracks = (found.tracks ?? []).filter(track => track && track.id);
+      if (tracks.length) {
+        await player.playTracks(tracks, 0, `search:${text}`);
+      }
+      return tracks.length;
+    },
+    [library, player],
+  );
+
   const value: AudioHostValue = {
     library,
     provider,
@@ -284,6 +303,7 @@ export function AudioHost({
     fullPlayer,
     setFullPlayer,
     resolveTracks,
+    playSearch,
     extensions,
   };
 
@@ -370,6 +390,11 @@ export function useAudioHost(): AudioHostValue {
     throw new Error('useAudioHost() must be used inside an AudioHost');
   }
   return value;
+}
+
+/** The host, or null outside one (a screen rendered on its own, as in tests). */
+export function useOptionalAudioHost(): AudioHostValue | null {
+  return useContext(AudioHostContext);
 }
 
 export function usePlayerState(player?: PlayerController): PlayerState {

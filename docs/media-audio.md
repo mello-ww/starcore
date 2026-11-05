@@ -253,11 +253,23 @@ Accepted when:
   (`starcore.music.playerCollapsed`) behave as before.
 - The shell names no Satellite, and Music's page works with the host.
 
-### 5. A second consumer
+### 5. A second consumer - done
 
-A test Satellite (an example under `examples/`) plays a track from `audio.library` without
-naming Music. Only then is a `track-picker` block designed, as the counterpart of
-`file-browser`.
+A Satellite can play from `audio.library` without naming or importing its provider, on both
+clients, with no client code of its own:
+- Its `ui.json` (contract 1.2) carries the UI contract's `play` action on any button or list
+  row: `{"play": {"search": "$.search"}}`.
+- The client's shared renderer hands the search to its audio host (`playSearch` on both
+  clients), which runs the catalog provider's `search` operation and plays what it finds through
+  the same floating player, disc and queue as any other playback.
+- The document `requires` client `media.audio` and capability `audio.library`; both clients
+  claim `media.audio` and know `audio.library` v1.
+- `play` was the one contract addition this needed (contract 1.2): actions could only reach the
+  Satellite's own routes or navigate.
+
+The Engine tests build such a consumer in a temporary folder (`PlayActionConsumerTest` in
+`engine/tests/test_ui_contract.py`); the repository ships no example of it. A `track-picker`
+block (the counterpart of `file-browser`) is still not designed: nothing needs one yet.
 
 ### Risks
 

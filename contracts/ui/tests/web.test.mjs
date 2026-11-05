@@ -78,6 +78,11 @@ test("requirements and capability providers", () => {
     assert.equal(contract.findProvider(providers, "files.browse").satellite, "On");
     assert.equal(contract.findProvider({ "files.browse": [{ version: 2, enabled: true }] }, "files.browse"), null);
     assert.deepEqual(contract.missingRequirements({ capabilities: ["files.browse"] }, providers), []);
+    // the play action (1.2): this client offers media.audio, and plays from any audio.library provider
+    const audio = { "audio.library": [{ satellite: "Anything", version: 1, enabled: true, operations: { search: "s", track: "t", resolve: "r", artwork: "a" } }] };
+    assert.deepEqual(contract.missingRequirements({ client: ["media.audio"], capabilities: ["audio.library"] }, audio), []);
+    assert.deepEqual(contract.missingRequirements({ client: ["media.audio"], capabilities: ["audio.library"] }, {}),
+        [{ kind: "capability", name: "audio.library" }]);
     assert.deepEqual(contract.missingRequirements({ client: ["device.biometrics"], capabilities: ["future.thing"] }, providers),
         [{ kind: "client", name: "device.biometrics" }, { kind: "capability", name: "future.thing" }]);
 });

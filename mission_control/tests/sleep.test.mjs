@@ -49,6 +49,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 async function start(options = {}) {
     const instance = player();
     instance.cancelSleep();
+    instance.shuffle = false;  // a test that shuffles must not reorder the next one's queue
     instance.repeat = options.repeat || "off";
     instance.engine.gapless = options.gapless !== false;
     instance.engine.crossfade = options.crossfade || 0;

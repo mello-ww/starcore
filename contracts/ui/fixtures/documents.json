@@ -2,6 +2,15 @@
   "_about": "Whole documents. `valid` must load; each `invalid` entry must be refused by the Engine with an error mentioning `error`. Entries with \"client\": true must also be refused by both clients' own checks (contract compatibility and structure), since a client cannot assume every server validated what it sends.",
   "valid": [
     {
+      "name": "play-action",
+      "_why": "1.2: a button asks the client to play what the audio.library provider finds; it needs the media.audio client capability and an audio.library provider.",
+      "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.audio"], "capabilities": ["audio.library"]},
+                   "entry": "home", "pages": {"home": {"blocks": [
+                     {"type": "button", "label": "Play", "action": {"play": {"search": "$.query"}}},
+                     {"type": "list", "items": "$.moods", "item": {"title": "$.name"}, "action": {"play": {"search": "$.name"}}}
+                   ]}}}
+    },
+    {
       "name": "smallest",
       "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": []}}}
     },
@@ -77,6 +86,30 @@
     {"name": "every-1.1-feature", "document": {"contract": "starcore.ui/1.1", "title": "System", "entry": "overview", "header": {"source": {"route": "view", "refresh": 5}, "blocks": [{"type": "text", "style": "eyebrow", "text": "$.node"}, {"type": "heading", "text": "System"}, {"type": "status", "label": "$.health.label", "tone": "$.health.tone", "detail": "$.health.detail"}]}, "widgets": [{"id": "summary", "title": "Summary", "icon": "activity", "blocks": [{"type": "metric", "label": "CPU", "value": "$.cpu", "format": "percent", "max": 100}], "action": {"navigate": "overview"}}], "navigation": [{"page": "overview", "label": "Overview", "icon": "activity"}, {"page": "diag", "label": "Diagnostics", "developer": true}], "pages": {"overview": {"template": "dashboard", "source": {"route": "view", "refresh": 5}, "sources": {"trend": {"route": "history?period=1h", "refresh": 30}}, "blocks": [{"type": "metric", "label": "CPU", "value": "$.cpu", "format": "percent", "max": 100, "tone": "$.cpu_tone", "detail": "$.cpu_detail", "trend": "$sources.trend.series.cpu.points", "action": {"navigate": "diag"}}, {"type": "field", "label": "Booted", "value": "$.boot", "format": "datetime", "detail": "$.uptime"}, {"type": "chart", "title": "CPU", "series": [{"label": "CPU", "points": "$sources.trend.series.cpu.points"}], "format": "percent", "max": 100, "from": "$sources.trend.from", "to": "$sources.trend.to", "resolution": "$sources.trend.resolution", "empty": "No samples yet"}, {"type": "chart", "kind": "bars", "series": [{"label": "Per thread", "points": "$.per_core"}], "format": "percent", "max": 100}, {"type": "table", "rows": "$.drives", "empty": "No drives", "columns": [{"label": "Drive", "value": "$.mount"}, {"label": "Used", "value": "$.percent", "format": "percent", "max": 100, "align": "end", "tone": "$.tone"}]}, {"type": "list", "items": "$.warnings", "item": {"title": "$.title", "subtitle": "$.detail", "value": "$.level", "tone": "$.tone"}, "empty": "No warnings."}]}, "diag": {"state": {"period": "24h"}, "source": {"route": "history?period={$state.period}"}, "blocks": [{"type": "choice", "key": "period", "label": "Range", "options": [{"value": "1h", "label": "1 hour"}, {"value": "24h", "label": "24 hours"}]}, {"type": "text", "text": "$state.period", "style": "mono"}, {"type": "code", "value": "$", "label": "Raw", "copy": true}]}}}}
   ],
   "invalid": [
+    {
+      "name": "play-in-1.1",
+      "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Play", "action": {"play": {"search": "jazz"}}}]}}},
+      "error": "needs starcore.ui/1.2"
+    },
+    {
+      "name": "play-without-search",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Play", "action": {"play": {}}}]}}},
+      "error": "must be {search"
+    },
+    {
+      "name": "play-with-a-route",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Play", "action": {"play": {"search": "jazz", "route": "x"}, "route": "x"}}]}}},
+      "error": "unknown key"
+    },
+    {
+      "name": "play-blank-search",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Play", "action": {"play": {"search": "  "}}}]}}},
+      "error": "non-empty"
+    },
     {"name": "not-an-object", "document": [], "error": "must be an object", "client": true},
     {"name": "no-contract", "document": {"entry": "home", "pages": {"home": {"blocks": []}}}, "error": "contract", "client": true},
     {"name": "other-major", "document": {"contract": "starcore.ui/2.0", "entry": "home", "pages": {"home": {"blocks": []}}}, "error": "contract", "client": true},

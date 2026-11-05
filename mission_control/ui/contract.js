@@ -6,7 +6,7 @@
 
 export const CONTRACT_NAME = "starcore.ui";
 export const MAJOR = 1;
-export const MINOR = 1;
+export const MINOR = 2;
 
 export const BLOCK_TYPES = new Set([
     "heading", "text", "field", "metric", "card", "list", "button",
@@ -25,11 +25,12 @@ export const ICONS = new Set([
     "folder", "grid", "hard-drive", "home", "image", "info", "layers", "list", "lock",
     "music", "plus", "settings", "sliders", "star", "zap",
 ]);
-// device features this client offers a document beyond its blocks - none in 1.0
-export const CLIENT_CAPABILITIES = new Set();
+// device features this client offers a document beyond its blocks: the shared audio host
+// (mission_control/media/), which the play action plays through
+export const CLIENT_CAPABILITIES = new Set(["media.audio"]);
 // Satellite capabilities this client has a shared block for, and the
 // protocol versions it speaks
-export const CAPABILITY_VERSIONS = { "files.browse": [1] };
+export const CAPABILITY_VERSIONS = { "files.browse": [1], "audio.library": [1] };
 
 const RESERVED_SEGMENTS = new Set(["assets", "enable", "disable", "reload", "ui"]);
 const FIRST_SEGMENT = /^[A-Za-z0-9_-]+$/;

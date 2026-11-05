@@ -61,6 +61,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   shell after sign-in. It plays from the catalog's `audio.library` provider, so the bar, disc and
   saved queue are there on every page and after a reload, before Music's page is opened. Music's
   page keeps its library views and adds its track menu and links to the player.
+- **UI contract 1.2: the `play` action.** `{"play": {"search": ...}}` plays what the catalog's
+  `audio.library` provider finds, through the client's audio host. Both clients now offer the
+  `media.audio` client capability, so any Satellite can play audio without naming the one that
+  provides it.
 - **Home widgets.** Home on both clients draws every Satellite's widgets; neither names Status
   any more (the Android app keeps its Status card for older servers).
 - Mission Control's charts, meters and sparklines, and the app's column chart, meter, bars and
@@ -80,6 +84,8 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Fixed
 
+- On Android, a Satellite screen's notices now appear above the floating player instead of
+  behind it.
 - Mission Control's "Sleep timer: end of this track" now stops playback when the track ends,
   also with gapless playback or a crossfade, which used to move straight into the next track.
   While it is set, no next track is lined up.

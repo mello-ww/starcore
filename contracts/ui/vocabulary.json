@@ -1,6 +1,6 @@
 {
   "contract": "starcore.ui",
-  "version": "1.1",
+  "version": "1.2",
   "description": "The closed vocabulary of StarCore UI contract v1.1 - see docs/ui-contract.md. The Engine (engine/starcore/ui_contract.py), Mission Control (mission_control/ui/contract.js) and the Android app (mobile/src/satellites/ui/contract.ts) each test that they implement exactly this list. 1.1 only adds to 1.0: every 1.0 document is a valid 1.1 document.",
   "blocks": {
     "heading": {"required": ["text"], "optional": []},
@@ -28,6 +28,10 @@
                "page.state", "page.sources", "page.template", "navigation.developer", "document.header", "document.widgets"],
       "formats": ["bitrate", "byterate", "date", "time", "datetime", "relative"],
       "bindings": ["$state.", "$sources."]
+    },
+    "1.2": {
+      "actions": ["play"],
+      "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library."
     }
   },
   "common_block_keys": ["type", "id", "visible", "required", "developer"],
@@ -85,7 +89,7 @@
     }
   },
   "client_capabilities": {
-    "_note": "Device features a client may offer a document beyond rendering blocks. Reserved names only: no 1.x block uses one yet, so neither client claims any, and a document that requires one is shown as needing a newer app.",
+    "_note": "Device features a client may offer a document beyond rendering blocks. media.audio (the shared audio host, docs/media-audio.md) is what the play action needs; the rest are reserved names no client claims yet. A document that requires one a client doesn't offer is shown as needing a newer app.",
     "reserved": ["device.biometrics", "device.background-tasks", "media.audio", "secure.screen"]
   },
   "limits": {

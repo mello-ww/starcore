@@ -346,6 +346,65 @@ class UiApiTest(unittest.TestCase):
             self.assertEqual(body, "")
 
 
+PLAY_CONSUMER_UI = {
+    "contract": "starcore.ui/1.2",
+    "requires": {"client": ["media.audio"], "capabilities": ["audio.library"]},
+    "entry": "home",
+    "pages": {"home": {"source": {"route": "searches"}, "blocks": [
+        {"type": "list", "items": "$.searches", "item": {"title": "$.name"}, "action": {"play": {"search": "$.search"}}},
+        {"type": "button", "label": "Play", "action": {"play": {"search": "$.searches.0.search"}}},
+    ]}},
+}
+
+
+class PlayActionConsumerTest(unittest.TestCase):
+    """A second consumer of the audio capabilities, built here in a temporary folder: a
+    Satellite whose interface plays from whichever Satellite provides audio.library with the
+    play action (contract 1.2), without naming one (docs/media-audio.md)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.directory = Path(tempfile.mkdtemp(prefix="starcore-play-"))
+        folder = cls.directory / "consumer"
+        folder.mkdir()
+        (folder / "satellite.toml").write_text(
+            'name = "PlayConsumer"\nversion = "1.0.0"\nauthor = "tests"\ndescription = "Plays through the client."\n'
+            'icon_name = "music"\n', encoding="utf-8")
+        (folder / "api.py").write_text(
+            "from starcore.api.response import json_response\n\n\n"
+            "def routes():\n    return {'searches': lambda request: json_response("
+            "{'searches': [{'name': 'Tide', 'search': 'tide'}]})}\n", encoding="utf-8")
+        (folder / "ui.json").write_text(json.dumps(PLAY_CONSUMER_UI), encoding="utf-8")
+        cls.engine = start_engine(mission_control=True)
+        cls.consumer = add_satellite(cls.engine, folder)
+
+    @classmethod
+    def tearDownClass(cls):
+        stop_engine(cls.engine)
+        shutil.rmtree(cls.directory, ignore_errors=True)
+
+    def test_a_document_that_plays_is_accepted_and_served(self):
+        self.assertIsNone(self.consumer.ui.error)
+        status, payload, _ = request(self.engine, "/api/satellites/PlayConsumer/ui")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["document"]["contract"], "starcore.ui/1.2")
+        self.assertEqual(payload["document"]["requires"], {"client": ["media.audio"], "capabilities": ["audio.library"]})
+        status, data, _ = request(self.engine, "/api/satellites/PlayConsumer/searches")
+        self.assertEqual((status, data["searches"][0]["search"]), (200, "tide"))
+
+    def test_the_catalog_offers_the_audio_library_it_plays_from(self):
+        _, catalog, _ = request(self.engine, "/api/catalog")
+        self.assertEqual(catalog["contract"]["version"], f"{ui_contract.MAJOR}.{ui_contract.MINOR}")
+        self.assertTrue(any(provider["enabled"] for provider in catalog["capabilities"]["audio.library"]))
+        self.assertNotIn("PlayConsumer", [provider["satellite"] for providers in catalog["capabilities"].values()
+                                          for provider in providers])
+
+    def test_the_same_document_declaring_1_1_is_refused(self):
+        document = {**PLAY_CONSUMER_UI, "contract": "starcore.ui/1.1"}
+        errors = ui_contract.validate(document)
+        self.assertTrue(any("needs starcore.ui/1.2" in error for error in errors), errors)
+
+
 class ShowcaseRoutesTest(unittest.TestCase):
     """The routes the Showcase document binds to, exercised the way a client
     acts on them: every action is an ordinary, validated Satellite route."""

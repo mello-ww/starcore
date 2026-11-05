@@ -22,6 +22,22 @@ async function catalog() {
     }
 }
 
+/** Plays what the audio.library provider finds for `text` (the UI contract's play action,
+ * 1.2), from the start. Resolves with how many tracks it found; the search is the provider's
+ * own operation, so this never names a Satellite. */
+export async function playSearch(text) {
+    await start();
+    if (!library.currentProvider()) {
+        throw new Error("There is no audio library to play from.");
+    }
+    const found = await library.get("operations", "search", library.query({ q: text }));
+    const tracks = ((found && found.tracks) || []).filter((track) => track && track.id);
+    if (tracks.length) {
+        await player().play(tracks, 0, `search:${text}`);
+    }
+    return tracks.length;
+}
+
 /** Starts the host once; later calls return the same promise. Settles with the provider,
  * or null when the server offers no audio library (then nothing is drawn). */
 export function start() {

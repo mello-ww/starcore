@@ -90,6 +90,12 @@ describe('UI contract (shared fixtures)', () => {
     };
     expect(contract.findProvider(providers, 'files.browse')?.satellite).toBe('On');
     expect(contract.missingRequirements({capabilities: ['files.browse']}, providers)).toEqual([]);
+    // the play action (1.2): this app offers media.audio, and plays from any audio.library provider
+    const audio = {'audio.library': [{satellite: 'Anything', version: 1, enabled: true, operations: {search: 's', track: 't', resolve: 'r', artwork: 'a'}}]};
+    expect(contract.missingRequirements({client: ['media.audio'], capabilities: ['audio.library']}, audio)).toEqual([]);
+    expect(contract.missingRequirements({client: ['media.audio'], capabilities: ['audio.library']}, {})).toEqual([
+      {kind: 'capability', name: 'audio.library'},
+    ]);
     expect(contract.missingRequirements({client: ['device.biometrics'], capabilities: ['media.gallery']}, providers)).toEqual([
       {kind: 'client', name: 'device.biometrics'},
       {kind: 'capability', name: 'media.gallery'},

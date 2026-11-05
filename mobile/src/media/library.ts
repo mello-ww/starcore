@@ -137,6 +137,10 @@ export class AudioLibraryClient {
 
   // ---------- audio.library v1 ----------
 
+  async search(query: string, limit = 50) {
+    return this.get<{tracks?: Track[]}>(this.route('operations', 'search', `?q=${enc(query)}&limit=${limit}`), 'Search failed.');
+  }
+
   async playback(trackId: string, quality: Quality) {
     return this.get<PlaybackInfo>(this.route('operations', 'resolve', `/${enc(trackId)}?quality=${quality}`), 'Could not prepare playback.');
   }

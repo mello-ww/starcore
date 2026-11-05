@@ -239,6 +239,13 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
   - `{navigate, params}` opens a page, where `$.` refers to the action's **response**, which is
     how "add an item, then open it" works.
 - **`navigate`** on its own is a navigation-only action.
+- **`play`** (1.2), on its own: `{"play": {"search": "$.query"}}` asks the client to play what
+  the catalog's `audio.library` provider finds for `search` (text or a binding), through the
+  client's own audio host. It reaches no route, so it can't reach anything the provider doesn't
+  already offer. A document that uses it declares
+  `"requires": {"client": ["media.audio"], "capabilities": ["audio.library"]}`: a client without
+  an audio host, or a server without an audio library, then says so instead of opening it. When
+  nothing is found, the client says so as a notice. See [Audio playback](media-audio.md).
 
 A response may carry `{"message": "..."}`, shown as a short notice; an error response's
 `error` is shown the same way. Either way, the page then shows what is actually true again.
@@ -404,7 +411,8 @@ The contract is `starcore.ui/<major>.<minor>`:
 - The Engine checks strictly for its own minor: an unknown block or key is a typo, refused
   with a reason. A newer minor is checked leniently.
 - A document must declare the minor it uses: a `starcore.ui/1.0` document that uses a 1.1 block,
-  key, format or binding is refused ("needs starcore.ui/1.1"), so a client that knows only 1.0
+  key, format or binding (or a 1.1 document that uses the 1.2 `play` action) is refused
+  ("needs starcore.ui/1.1"), so a client that knows only 1.0
   is never handed one it would draw half of. `vocabulary.json` lists what arrived in each minor
   (`since`).
 
@@ -469,11 +477,11 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 
 ## Current implementation and target
 
-| | Now (contract 1.1) | Target |
+| | Now (contract 1.2) | Target |
 |---|---|---|
 | Blocks | the 16 above, including `chart` and `table`; the `dashboard` template | more, minor by minor: `image`, `map`, `tabs`; templates `list-detail`, `settings`, `media-gallery`, `media-library` |
-| Satellite capabilities | `files.browse` | `media.gallery` (Photos), `audio.library` and `audio.stream` (Music), `vault` (Locked Folder) |
-| Client capabilities | none claimed | `media.audio` (reserved, specified in [Audio playback](media-audio.md); it replaced the never-claimed `media.audio-playback`), `secure.screen`, `device.biometrics`, `device.background-tasks` - each a native module written once in the app, behind a shared block |
+| Satellite capabilities | `files.browse`, `audio.library`, `audio.session` | `media.gallery` (Photos), `vault` (Locked Folder) |
+| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action | `secure.screen`, `device.biometrics`, `device.background-tasks` - each a native module written once in the app, behind a shared block |
 | Home | `widgets` in each document, drawn by both clients; Android keeps the Status card only for servers older than Status's `ui.json` | the fallback card removed once older servers are gone |
 | Sections | `section_of`, but Photo still names the Locked Folder | the host discovers its sections from the catalog |
 | Icons | `icon_name` from the shared set; an Android fallback list for older servers | the fallback list removed once older servers are gone |

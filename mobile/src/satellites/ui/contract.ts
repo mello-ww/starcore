@@ -8,7 +8,7 @@
 
 export const CONTRACT_NAME = 'starcore.ui';
 export const MAJOR = 1;
-export const MINOR = 1;
+export const MINOR = 2;
 
 export const BLOCK_TYPES = new Set([
   'heading', 'text', 'field', 'metric', 'card', 'list', 'button', 'toggle', 'slider', 'form', 'file-browser',
@@ -27,10 +27,11 @@ export const ICONS = new Set([
   'folder', 'grid', 'hard-drive', 'home', 'image', 'info', 'layers', 'list', 'lock',
   'music', 'plus', 'settings', 'sliders', 'star', 'zap',
 ]);
-/** Device features this app offers a document beyond its blocks - none in 1.0. */
-export const CLIENT_CAPABILITIES = new Set<string>();
+/** Device features this app offers a document beyond its blocks: the shared audio host
+ * (src/media/), which the play action plays through. */
+export const CLIENT_CAPABILITIES = new Set<string>(['media.audio']);
 /** Satellite capabilities this app has a shared block for, and the protocol versions it speaks. */
-export const CAPABILITY_VERSIONS: Record<string, number[]> = {'files.browse': [1]};
+export const CAPABILITY_VERSIONS: Record<string, number[]> = {'files.browse': [1], 'audio.library': [1]};
 
 const RESERVED_SEGMENTS = new Set(['assets', 'enable', 'disable', 'reload', 'ui']);
 const FIRST_SEGMENT = /^[A-Za-z0-9_-]+$/;
@@ -48,6 +49,8 @@ export interface UiAction {
   body?: Record<string, Json>;
   confirm?: string;
   then?: 'refresh' | 'back' | {navigate: string; params?: Record<string, Json>};
+  /** 1.2: play what the audio.library provider finds, through the app's audio host. */
+  play?: {search: Json};
 }
 
 /** One block. Deliberately loose: a document is network data, so every
