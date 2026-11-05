@@ -7,6 +7,7 @@ import {Slider} from '../../components/Slider';
 import {StarSwitch} from '../../components/StarSwitch';
 import {Surface} from '../../components/Surface';
 import {TOUCH_TARGET, tokens, useAccent} from '../../theme';
+import {MapBlock} from './MapBlock';
 import {MediaGridBlock} from './MediaGrid';
 import {
   BLOCK_TYPES, findProvider, formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate, toneOf,
@@ -232,6 +233,10 @@ function UiBlockView({block, scope, context}: {block: UiBlock; scope: Scope; con
       return <MediaListBlock block={block} scope={scope} context={context} />;
     case 'media-grid':
       return <MediaGridBlock block={block} scope={scope} context={context} />;
+    case 'search':
+      return <SearchBlock block={block} scope={scope} context={context} />;
+    case 'map':
+      return <MapBlock block={block} scope={scope} context={context} />;
     case 'chart':
       return block.kind === 'bars' ? <BarsBlock block={block} scope={scope} /> : <ChartBlock block={block} scope={scope} context={context} />;
     case 'table':
@@ -907,6 +912,64 @@ function Cell({column, scope, title}: {column: any; scope: Scope; title?: boolea
   return text;
 }
 
+/** A search field (1.2): it sets the page state `key` a moment after the person stops typing,
+ * and routes templated with $state.<key> load the results, as for a choice. */
+const SEARCH_PAUSE = 300;
+
+function SearchBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const {color: accent} = useAccent();
+  const current = context.pageState?.[block.key];
+  const [text, setText] = useState(typeof current === 'string' ? current : '');
+  const [focused, setFocused] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const {setPageState} = context;
+  const commit = (value: string) => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+    }
+    setPageState?.(block.key, value.trim());
+  };
+  useEffect(() => () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+    }
+  }, []);
+  const label = block.label !== undefined ? asText(resolve(block.label, scope)) : '';
+  const placeholder = block.placeholder !== undefined ? asText(resolve(block.placeholder, scope)) : label || 'Search';
+  return (
+    <View style={[styles.search, focused && {borderColor: accent}]}>
+      <Icon name="search" size={18} color={palette.text3} />
+      <TextInput
+        value={text}
+        onChangeText={value => {
+          setText(value);
+          if (timer.current) {
+            clearTimeout(timer.current);
+          }
+          timer.current = setTimeout(() => commit(value), SEARCH_PAUSE);
+        }}
+        onSubmitEditing={() => commit(text)}
+        onFocus={() => {
+          setFocused(true);
+          context.setEditing(true);
+        }}
+        onBlur={() => {
+          setFocused(false);
+          context.setEditing(false);
+        }}
+        placeholder={placeholder}
+        placeholderTextColor={palette.text3}
+        accessibilityLabel={label || placeholder}
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="search"
+        style={styles.searchInput}
+        testID={`ui-search-${block.key}`}
+      />
+    </View>
+  );
+}
+
 function ChoiceBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
   const {color: accent, onColor} = useAccent();
   const current = context.pageState?.[block.key];
@@ -1040,6 +1103,18 @@ const styles = StyleSheet.create({
   },
   rowMain: {flex: 1, minWidth: 0, gap: 2},
   mediaRow: {minHeight: 64},
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 48,
+    paddingHorizontal: space.lg,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: palette.control,
+  },
+  searchInput: {flex: 1, color: palette.text, fontSize: 15, paddingVertical: space.sm},
   mediaFrame: {
     overflow: 'hidden',
     alignItems: 'center',

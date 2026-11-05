@@ -1684,3 +1684,189 @@ body.ui-viewer-open {
 @media (prefers-reduced-motion: reduce) {
     .ui-picker { animation: none; }
 }
+
+/* ---------- search (1.2) ---------- */
+
+.ui-search {
+    display: flex;
+    align-items: center;
+    gap: var(--sc-space-2);
+    min-height: 44px;
+    padding: 0 var(--sc-space-4);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: var(--sc-control);
+    color: var(--sc-text-3);
+}
+
+.ui-search:focus-within {
+    border-color: var(--sc-accent);
+    color: var(--sc-text-2);
+}
+
+.ui-search-input {
+    flex: 1;
+    min-width: 0;
+    height: 42px;
+    border: 0;
+    background: transparent;
+    color: var(--sc-text);
+    font: 400 15px/1 var(--sc-font-sans);
+    outline: none;
+}
+
+.ui-search-input::placeholder {
+    color: var(--sc-text-3);
+}
+
+/* ---------- map (1.2) ---------- */
+
+.ui-map-canvas {
+    height: clamp(320px, 62vh, 720px);
+    overflow: hidden;
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-control);
+}
+
+/* the standard OpenStreetMap tiles recoloured for StarCore's near-black surfaces (as on
+   Photo's own map); only the imagery is filtered, never the markers or controls above it */
+.ui-map-canvas .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.12);
+}
+
+.ui-map-canvas .leaflet-container {
+    background: var(--sc-bg);
+}
+
+.ui-map-canvas .leaflet-bar {
+    border: 0;
+    border-radius: var(--sc-radius-control);
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.ui-map-canvas .leaflet-bar a {
+    border-bottom-color: var(--sc-line);
+    background: var(--sc-card);
+    color: var(--sc-text);
+}
+
+.ui-map-canvas .leaflet-bar a:hover {
+    background: var(--sc-control-strong);
+}
+
+.ui-map-canvas .leaflet-control-attribution {
+    background: rgba(10, 10, 12, 0.72);
+    color: var(--sc-text-3);
+}
+
+.ui-map-canvas .leaflet-control-attribution a {
+    color: var(--sc-text-2);
+}
+
+.ui-map-notice {
+    margin: 0;
+    padding: var(--sc-space-5);
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+    color: var(--sc-text-2);
+    font: 400 14px/1.5 var(--sc-font-sans);
+}
+
+/* over Leaflet's own .leaflet-div-icon box, whose stylesheet loads after this one */
+.leaflet-marker-icon.ui-map-marker {
+    display: grid;
+    place-items: center;
+    background: none;
+    border: 0;
+}
+
+.ui-map-marker-dot {
+    width: 18px;
+    height: 18px;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    background: var(--sc-accent);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.ui-map-marker-count {
+    position: absolute;
+    top: -8px;
+    right: -10px;
+    min-width: 20px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--sc-card);
+    color: var(--sc-text);
+    font: 700 11px/1.2 var(--sc-font-sans);
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.ui-map-leaflet-popup .leaflet-popup-content-wrapper,
+.ui-map-leaflet-popup .leaflet-popup-tip {
+    background: var(--sc-card);
+    color: var(--sc-text);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.ui-map-leaflet-popup .leaflet-popup-content-wrapper {
+    border-radius: var(--sc-radius-card);
+}
+
+.ui-map-leaflet-popup .leaflet-popup-content {
+    margin: var(--sc-space-3);
+}
+
+.ui-map-popup-title {
+    margin: 0 0 var(--sc-space-2);
+    color: var(--sc-text-2);
+    font: 600 13px/1.3 var(--sc-font-sans);
+}
+
+.ui-map-popup-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 56px);
+    gap: 4px;
+}
+
+.ui-map-popup-thumb {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: 8px;
+    background: var(--sc-control-strong);
+    cursor: pointer;
+}
+
+.ui-map-popup-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ui-map-popup-thumb.is-video::after {
+    content: "▶";
+    position: absolute;
+    right: 4px;
+    bottom: 2px;
+    color: #fff;
+    font-size: 10px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.ui-map-popup-thumb:focus-visible {
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 2px;
+}
+
+.ui-map-popup-more {
+    margin-top: var(--sc-space-2);
+    width: 100%;
+    justify-content: center;
+}

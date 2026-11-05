@@ -78,6 +78,7 @@ IMAGE_FITS = set(VOCABULARY["image_fits"])
 MEDIA_KINDS = set(VOCABULARY["media_kinds"])
 MEDIA_GRID_ITEM_KEYS = set(VOCABULARY["media_grid_item_keys"])
 MEDIA_VIEWER_KEYS = set(VOCABULARY["media_viewer_keys"])
+MAP_ITEM_KEYS = set(VOCABULARY["map_item_keys"])
 # capabilities the client's media picker can choose from (the pick action)
 PICKABLE = {"media.gallery"}
 FORMATS_1_1 = set(SINCE_1_1["formats"])
@@ -485,6 +486,10 @@ class _Validator:
             self.check_media_list(where, block)
         elif kind == "media-grid":
             self.check_media_grid(where, block)
+        elif kind == "search":
+            self.check_search(where, block)
+        elif kind == "map":
+            self.check_map(where, block)
         elif kind == "list":
             self.check_list(where, block)
         elif kind == "form":
@@ -700,6 +705,44 @@ class _Validator:
             self.error(f"{where}.size", f"must be one of {sorted(IMAGE_SIZES)}")
         if "shape" in block and block["shape"] not in IMAGE_SHAPES:
             self.error(f"{where}.shape", f"must be one of {sorted(IMAGE_SHAPES)}")
+
+    def check_search(self, where: str, block: dict):
+        """{type: search, key} (1.2): a search field that sets the page state `key` as the
+        person types (after a short pause), so routes templated with $state.<key> load the
+        results - like a choice, for free text."""
+        key = block.get("key")
+        if not isinstance(key, str) or key not in self.state_keys:
+            self.error(f"{where}.key", f"must name one of the page's state keys (got {key!r})")
+        if "placeholder" in block:
+            self.check_text(f"{where}.placeholder", block["placeholder"])
+
+    def check_map(self, where: str, block: dict):
+        """{type: map, items, item} (1.2): items with a latitude and longitude on an
+        interactive map, grouped into clusters that separate as it zooms. A marker opens the
+        shared viewer on its items (`viewer`) or runs `action` - not both. Items without a
+        location are left out. No map service is named: each client draws its own."""
+        self.check_items(f"{where}.items", block.get("items"))
+        if "viewer" in block and "action" in block:
+            self.error(where, "a map's markers open the viewer or run an action, not both")
+        item = block.get("item")
+        if not isinstance(item, dict):
+            self.error(f"{where}.item", "must be an object")
+        else:
+            self.unknown_keys(f"{where}.item", item, MAP_ITEM_KEYS)
+            for key in ("lat", "lon"):
+                if key not in item:
+                    self.error(f"{where}.item", f"needs '{key}'")
+                else:
+                    self.check_number_or_binding(f"{where}.item.{key}", item[key])
+            if "image" in item:
+                self.check_route(f"{where}.item.image", item["image"])
+            for key in ("key", "title"):
+                if key in item:
+                    self.check_text(f"{where}.item.{key}", item[key])
+            if "kind" in item and item["kind"] not in MEDIA_KINDS:
+                self.check_binding(f"{where}.item.kind", item["kind"], required=True, choices=MEDIA_KINDS)
+        if "viewer" in block:
+            self.check_viewer(f"{where}.viewer", block["viewer"])
 
     def check_viewer(self, where: str, viewer):
         """The shared full-screen viewer of a media-grid: the full image (or the tile's own

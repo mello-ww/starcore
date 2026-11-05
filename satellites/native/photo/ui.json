@@ -6,7 +6,9 @@
   "entry": "library",
   "navigation": [
     {"page": "library", "label": "Library", "icon": "image"},
-    {"page": "albums", "label": "Albums", "icon": "folder"}
+    {"page": "albums", "label": "Albums", "icon": "folder"},
+    {"page": "search", "label": "Search", "icon": "search"},
+    {"page": "map", "label": "Map", "icon": "map-pin"}
   ],
   "pages": {
     "library": {
@@ -54,6 +56,97 @@
                "action": {"route": "albums/favorites/photos", "body": {"photo_id": "$.id"}, "then": "refresh"}},
               {"label": "Move to bin", "icon": "trash-2", "style": "danger",
                "action": {"route": "trash/{$.id}", "confirm": "Move the selected items to the recycle bin? They can be restored from there.", "then": "refresh"}}
+            ]
+          }
+        }
+      ]
+    },
+    "search": {
+      "state": {"q": "", "kind": "all"},
+      "source": {"route": "gallery/search?q={$state.q}&kind={$state.kind}"},
+      "blocks": [
+        {"type": "search", "key": "q", "label": "Search", "placeholder": "Search filenames, camera, date…"},
+        {"type": "choice", "key": "kind", "label": "Show",
+         "options": [{"value": "all", "label": "All"}, {"value": "image", "label": "Photos"}, {"value": "video", "label": "Videos"}]},
+        {"type": "text", "style": "caption", "text": "$.prompt", "visible": "$.prompt"},
+        {"type": "text", "style": "caption", "text": "$.summary", "visible": "$.summary"},
+        {"type": "media-list", "id": "search-albums", "items": "$.albums", "visible": "$.albums", "size": "medium",
+         "item": {"title": "$.title", "subtitle": "$.subtitle", "image": "thumbnails/{$.cover}"},
+         "action": {"navigate": "album", "params": {"id": "$.id"}}},
+        {
+          "type": "media-grid",
+          "id": "search-results",
+          "visible": "$.items",
+          "items": "$.items",
+          "size": "medium",
+          "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration"},
+          "viewer": {
+            "image": "originals/{$.id}",
+            "video": "originals/{$.id}",
+            "title": "$.title",
+            "subtitle": "$.date",
+            "fields": [
+              {"label": "Taken", "value": "$.taken", "format": "datetime"},
+              {"label": "Length", "value": "$.duration", "format": "duration"},
+              {"label": "Size", "value": "$.size", "format": "bytes"},
+              {"label": "Dimensions", "value": "$.dimensions"},
+              {"label": "Resolution", "value": "$.megapixels"},
+              {"label": "Format", "value": "$.format"},
+              {"label": "Camera", "value": "$.camera"},
+              {"label": "Lens", "value": "$.lens"},
+              {"label": "Location", "value": "$.location"},
+              {"label": "Folder", "value": "$.folder"},
+              {"label": "File", "value": "$.title"},
+              {"label": "Imported", "value": "$.imported", "format": "datetime"}
+            ],
+            "actions": [
+              {"label": "Favorite", "icon": "heart", "visible": "$.can_favorite",
+               "action": {"route": "albums/favorites/photos", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+              {"label": "Unfavorite", "icon": "heart", "style": "primary", "visible": "$.favorite",
+               "action": {"route": "albums/favorites/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+              {"label": "Move to bin", "icon": "trash-2", "style": "danger",
+               "action": {"route": "trash/{$.id}", "confirm": "Move this to the recycle bin? It can be restored from there.", "then": "refresh"}}
+            ]
+          }
+        }
+      ]
+    },
+    "map": {
+      "source": {"route": "gallery/map"},
+      "blocks": [
+        {"type": "text", "style": "caption", "text": "$.summary", "visible": "$.summary"},
+        {
+          "type": "map",
+          "id": "places",
+          "items": "$.items",
+          "empty": "No photos have location data yet. Photos with GPS metadata will appear here automatically.",
+          "item": {"lat": "$.lat", "lon": "$.lon", "key": "$.id", "image": "thumbnails/{$.id}", "title": "$.title", "kind": "$.kind"},
+          "viewer": {
+            "image": "originals/{$.id}",
+            "video": "originals/{$.id}",
+            "title": "$.title",
+            "subtitle": "$.date",
+            "fields": [
+              {"label": "Taken", "value": "$.taken", "format": "datetime"},
+              {"label": "Length", "value": "$.duration", "format": "duration"},
+              {"label": "Size", "value": "$.size", "format": "bytes"},
+              {"label": "Dimensions", "value": "$.dimensions"},
+              {"label": "Resolution", "value": "$.megapixels"},
+              {"label": "Format", "value": "$.format"},
+              {"label": "Camera", "value": "$.camera"},
+              {"label": "Lens", "value": "$.lens"},
+              {"label": "Location", "value": "$.location"},
+              {"label": "Folder", "value": "$.folder"},
+              {"label": "File", "value": "$.title"},
+              {"label": "Imported", "value": "$.imported", "format": "datetime"}
+            ],
+            "actions": [
+              {"label": "Favorite", "icon": "heart", "visible": "$.can_favorite",
+               "action": {"route": "albums/favorites/photos", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+              {"label": "Unfavorite", "icon": "heart", "style": "primary", "visible": "$.favorite",
+               "action": {"route": "albums/favorites/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+              {"label": "Move to bin", "icon": "trash-2", "style": "danger",
+               "action": {"route": "trash/{$.id}", "confirm": "Move this to the recycle bin? It can be restored from there.", "then": "refresh"}}
             ]
           }
         }

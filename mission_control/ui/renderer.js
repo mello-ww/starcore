@@ -15,6 +15,7 @@ import {
 } from "./contract.js";
 import { createGallery } from "./gallery.js";
 import { icon } from "./icons.js";
+import { createMaps } from "./map.js";
 import { pickMedia } from "./picker.js";
 
 const STYLESHEET = "/ui/ui.css";
@@ -159,6 +160,13 @@ export function mount(context) {
         },
     });
 
+    // the map block (1.2): its Leaflet map lives across renders, and its markers open the
+    // gallery's shared viewer
+    const maps = createMaps({ satelliteBase, runAction: (...args) => runAction(...args), gallery });
+    // the search block (1.2): one input per block, kept across renders so typing is never lost
+    let searchInputs = new WeakMap();
+    const SEARCH_PAUSE = 300;
+
     // ---------- navigation ----------
 
     function navigationItems() {
@@ -206,6 +214,8 @@ export function mount(context) {
             state.sources = {};
             state.forms = {};
             gallery.reset();
+            maps.reset();
+            searchInputs = new WeakMap();
             for (const [name, timer] of state.timers) {
                 if (name !== "header") {
                     clearTimeout(timer);
@@ -665,6 +675,44 @@ export function mount(context) {
         },
 
         "media-grid": (block, scope) => gallery.render(block, scope),
+
+        map: (block, scope) => maps.render(block, scope),
+
+        // A search field: it sets the page state `key` a moment after the person stops
+        // typing, and routes templated with $state.<key> load the results, as for a choice.
+        search: (block, scope) => {
+            let entry = searchInputs.get(block);
+            if (!entry) {
+                const wrapper = el("label", "ui-search");
+                const glyph = icon("search", 18);
+                if (glyph) {
+                    wrapper.appendChild(glyph);
+                }
+                const input = el("input", "ui-search-input");
+                input.type = "search";
+                input.autocomplete = "off";
+                input.spellcheck = false;
+                input.value = state.pageState[block.key] ?? "";
+                let timer = null;
+                input.addEventListener("input", () => {
+                    clearTimeout(timer);
+                    timer = setTimeout(() => setPageState(block.key, input.value.trim()), SEARCH_PAUSE);
+                });
+                input.addEventListener("keydown", (event) => {
+                    if (event.key === "Enter") {
+                        clearTimeout(timer);
+                        setPageState(block.key, input.value.trim());
+                    }
+                });
+                wrapper.appendChild(input);
+                entry = { wrapper, input };
+                searchInputs.set(block, entry);
+            }
+            const label = block.label !== undefined ? text(block.label, scope) : "";
+            entry.input.placeholder = block.placeholder !== undefined ? text(block.placeholder, scope) : (label || "Search");
+            entry.input.setAttribute("aria-label", label || entry.input.placeholder);
+            return entry.wrapper;
+        },
 
         "media-list": (block, scope) => {
             const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
@@ -1306,6 +1354,10 @@ export function mount(context) {
         const page = pageDefinition();
         const scope = scopeFor(state.data || {});
         const template = page.template || "stack";
+        // a field kept across renders (a search) keeps its focus and caret through a redraw
+        const active = document.activeElement;
+        const keep = active && root.contains(active) && active.classList.contains("ui-search-input")
+            ? { node: active, start: active.selectionStart, end: active.selectionEnd } : null;
         root.replaceChildren();
         root.classList.toggle("ui-wide", template === "dashboard");
 
@@ -1354,6 +1406,14 @@ export function mount(context) {
         root.appendChild(body);
         markLoading();
         gallery.afterRender();
+        if (keep && root.contains(keep.node)) {
+            keep.node.focus({ preventScroll: true });
+            try {
+                keep.node.setSelectionRange(keep.start, keep.end);
+            } catch {
+                // not every input type has a caret to restore
+            }
+        }
     }
 
     function fail(message) {
@@ -1414,6 +1474,7 @@ export function mount(context) {
         root.remove();
         noticeSlot.remove();
         gallery.dispose();
+        maps.reset();
     };
     cleanup.showSection = showSection;
     cleanup.revision = () => state.revision;

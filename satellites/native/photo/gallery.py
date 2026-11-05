@@ -11,6 +11,8 @@ GET gallery                   every active photo and video, newest first, groupe
 GET gallery/albums            physical albums, Favorites and custom albums, with their covers
 GET gallery/albums/<id>       one album's photos
 GET gallery/trash             what's in the recycle bin
+GET gallery/search?q=&kind=   photos and albums matching a search, for the shared Search page
+GET gallery/map               every photo with a location, for the shared Map page
 GET media?kinds=              the media.gallery capability's list: what a picker may offer
 """
 
@@ -160,6 +162,52 @@ def album_view(satellite, album_id: str) -> dict:
             "favorites": "Everything you marked as a favourite.",
         }.get(kind),
         "items": [{**item(photo, favorites), "removable": custom} for photo in photos],
+    }
+
+
+def _matches(photo: dict, query: str) -> bool:
+    """The same fields the app's own Search tab looks in (PhotoSearchTab.matches()): the file
+    name, the camera and lens, and the capture date."""
+    metadata = photo.get("metadata") or {}
+    haystack = " ".join(str(value) for value in (
+        photo.get("filename"), metadata.get("camera_make"), metadata.get("camera_model"),
+        metadata.get("lens_model"), photo.get("captured_at"),
+    ) if value).lower()
+    return query in haystack
+
+
+def search_view(satellite, query=None, kind=None) -> dict:
+    """Photos and albums matching `query`, for the shared Search page. Nothing is listed until
+    there is something to look for; `kind` (image, video, or all) narrows the photos."""
+    text = (query or "").strip().lower()
+    if not text:
+        return {"items": [], "albums": [], "prompt": "Type to search your library.", "summary": None}
+    favorites = _favorites(satellite)
+    photos = [photo for photo in library(satellite).all() if _matches(photo, text)]
+    if kind in ("image", "video"):
+        photos = [photo for photo in photos if ("video" if photo.get("media_type") == "video" else "image") == kind]
+    albums = [album for album in albums_view(satellite)["albums"] if text in album["title"].lower()]
+    count = len(photos)
+    summary = (f"{count} {'result' if count == 1 else 'results'}" if count
+               else None if albums else "No photos match your search.")
+    return {"items": [item(photo, favorites) for photo in photos], "albums": albums, "prompt": None,
+            "summary": summary}
+
+
+def map_view(satellite) -> dict:
+    """Every active photo with a location, for the shared Map page - the same photos the Map
+    tabs of Photo's own page and screens plot. A photo without GPS metadata is left out."""
+    favorites = _favorites(satellite)
+    items = []
+    for photo in library(satellite).all():
+        metadata = photo.get("metadata") or {}
+        lat, lon = metadata.get("gps_latitude"), metadata.get("gps_longitude")
+        if isinstance(lat, (int, float)) and isinstance(lon, (int, float)) and -90 <= lat <= 90 and -180 <= lon <= 180:
+            items.append({**item(photo, favorites), "lat": lat, "lon": lon})
+    count = len(items)
+    return {
+        "items": items,
+        "summary": f"{count} {'item' if count == 1 else 'items'} with a location" if count else None,
     }
 
 

@@ -21,7 +21,9 @@
     "code": {"required": ["value"], "optional": ["label", "copy"]},
     "image": {"required": ["src"], "optional": ["alt", "caption", "size", "shape", "fit"]},
     "media-list": {"required": ["items", "item"], "optional": ["empty", "action", "size", "shape"]},
-    "media-grid": {"required": ["items", "item"], "optional": ["empty", "action", "viewer", "selection", "size", "shape"]}
+    "media-grid": {"required": ["items", "item"], "optional": ["empty", "action", "viewer", "selection", "size", "shape"]},
+    "search": {"required": ["key"], "optional": ["label", "placeholder"]},
+    "map": {"required": ["items", "item"], "optional": ["empty", "action", "viewer"]}
   },
   "since": {
     "_note": "The minor each block, key or format arrived in. A document that declares an older minor may not use them.",
@@ -33,10 +35,10 @@
       "bindings": ["$state.", "$sources."]
     },
     "1.2": {
-      "blocks": ["image", "media-list", "media-grid"],
+      "blocks": ["image", "media-list", "media-grid", "search", "map"],
       "actions": ["play", "pick"],
       "keys": ["document.preview"],
-      "icons": ["chevron-left", "chevron-right", "edit-2", "heart", "play", "rotate-ccw", "trash-2", "x"],
+      "icons": ["chevron-left", "chevron-right", "edit-2", "heart", "map-pin", "play", "rotate-ccw", "search", "trash-2", "x"],
       "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library."
     }
   },
@@ -55,6 +57,7 @@
   "media_kinds": ["image", "video"],
   "media_grid_item_keys": ["image", "key", "title", "subtitle", "kind", "duration", "group", "format"],
   "media_viewer_keys": ["image", "video", "title", "subtitle", "fields", "actions"],
+  "map_item_keys": ["lat", "lon", "key", "image", "title", "kind"],
   "column_align": ["start", "end"],
   "page_templates": ["stack", "dashboard"],
   "action_then": ["refresh", "back"],
@@ -62,8 +65,8 @@
   "icons": [
     "activity", "box", "camera", "check", "chevron-left", "chevron-right", "circle", "clock", "cpu",
     "edit-2", "file", "file-text", "folder", "grid", "hard-drive", "heart", "home", "image", "info",
-    "layers", "list", "lock", "music", "play", "plus", "rotate-ccw", "settings", "sliders", "star",
-    "trash-2", "x", "zap"
+    "layers", "list", "lock", "map-pin", "music", "play", "plus", "rotate-ccw", "search", "settings",
+    "sliders", "star", "trash-2", "x", "zap"
   ],
   "satellite_capabilities": {
     "files.browse": {

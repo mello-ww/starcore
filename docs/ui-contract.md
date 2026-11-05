@@ -16,6 +16,7 @@ machine-readable in [`contracts/ui/vocabulary.json`](../contracts/ui/vocabulary.
 - [Blocks](#blocks)
 - [Media: image and media-list](#media-image-and-media-list)
 - [Media gallery: media-grid](#media-gallery-media-grid)
+- [Search and map](#search-and-map)
 - [Bindings](#bindings)
 - [Actions](#actions)
 - [Formats](#formats)
@@ -158,6 +159,8 @@ Keys starting with `_` are comments and are ignored.
 | `image` (1.2) | `src` | `alt`, `caption`, `size`, `shape`, `fit` | an image from one of the Satellite's own routes - see [Media](#media-image-and-media-list) |
 | `media-list` (1.2) | `items`, `item` | `empty`, `action`, `size`, `shape` | rows with a thumbnail; `item` maps `title`, `subtitle`, `meta`, `image` and `format` (`{subtitle, meta}`) - see [Media](#media-image-and-media-list) |
 | `media-grid` (1.2) | `items`, `item` | `empty`, `action` or `viewer`, `selection`, `size`, `shape` | a grid of images and videos with the shared viewer and selection - see [Media gallery](#media-gallery-media-grid) |
+| `search` (1.2) | `key` | `label`, `placeholder` | a search field that sets the page state `key` as the person types - see [Search and map](#search-and-map) |
+| `map` (1.2) | `items`, `item` | `empty`, `action` or `viewer` | located items on an interactive map, in clusters, opening the shared viewer - see [Search and map](#search-and-map) |
 
 1.1 also adds:
 
@@ -276,6 +279,48 @@ collection: the document says where each picture comes from and what can be done
   (the web) or downsampled (Android), each with the placeholder and image glyph of `image`.
 - Images and videos load with the client's own session, as for `image`. A route outside the
   Satellite loads nothing and shows the image glyph.
+
+## Search and map
+
+Both arrived in 1.2, for a Satellite whose data has text to look through or places to show.
+
+```json
+"find": {
+  "state": {"q": "", "kind": "all"},
+  "source": {"route": "search?q={$state.q}&kind={$state.kind}"},
+  "blocks": [
+    {"type": "search", "key": "q", "label": "Search", "placeholder": "Names, cameras, dates"},
+    {"type": "choice", "key": "kind", "options": [{"value": "all", "label": "All"}, {"value": "video", "label": "Videos"}]},
+    {"type": "media-grid", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"}, "viewer": {}}
+  ]
+}
+{"type": "map", "items": "$.items", "empty": "Nothing has a location yet.",
+ "item": {"lat": "$.lat", "lon": "$.lon", "key": "$.id", "image": "thumbs/{$.id}", "title": "$.name", "kind": "$.kind"},
+ "viewer": {"image": "full/{$.id}", "title": "$.name"}}
+```
+
+**`search`** is a search field bound to one of the page's `state` keys, like a `choice`. A
+moment (300 ms) after the person stops typing, or at once on Enter, it sets the key to the
+trimmed text, and every route templated with `$state.<key>` loads again. The Satellite does
+the searching, so it decides what matches, and the results are ordinary blocks (`media-grid`,
+`media-list`, `list`). Filters are `choice` blocks on other state keys. The field keeps its
+focus, text and caret while the results reload, on both clients.
+
+**`map`** places items on an interactive map:
+
+- `item.lat` and `item.lon` (degrees) are required. An item without a valid pair is left out.
+  `key`, `image` (a route template, as for `media-grid`), `title` and `kind` describe a marker.
+- Markers group into clusters on a grid about 64 px wide on screen, so thousands of items stay
+  a handful of markers, and clusters separate as the map zooms in. A cluster shows its count.
+- A marker opens the shared viewer on its items (`viewer`, the same keys as a `media-grid`'s)
+  or runs `action` on a single item - not both. On the web a cluster first shows up to 12
+  thumbnails in a popup; on Android it opens the viewer on its items.
+- The map fits its items when they change, and never asks for the device's location.
+- With no located items it shows `empty`.
+- Each client draws with the map it already had: Mission Control with Leaflet and
+  OpenStreetMap tiles (loaded only when a map is shown), the Android app with
+  react-native-maps, which needs a Google Maps key in `android/gradle.properties` to draw
+  tiles and markers. No new map service or key comes with the block.
 
 ## Bindings
 
@@ -591,7 +636,7 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 
 | | Now (contract 1.2) | Target |
 |---|---|---|
-| Blocks | the 19 above, including `chart`, `table`, `image`, `media-list` and `media-grid`; the `dashboard` template | more, minor by minor: `map`, `tabs`; templates `list-detail`, `settings`, `media-library` |
+| Blocks | the 21 above, including `chart`, `table`, `image`, `media-list`, `media-grid`, `search` and `map`; the `dashboard` template | more, minor by minor: `tabs`; templates `list-detail`, `settings`, `media-library` |
 | Satellite capabilities | `files.browse`, `audio.library`, `audio.session`, `media.gallery` (Photo) | `vault` (Locked Folder); more pickable capabilities (files) |
 | Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action | `secure.screen`, `device.biometrics`, `device.background-tasks` - each a native module written once in the app, behind a shared block |
 | Home | `widgets` in each document, drawn by both clients; Android keeps the Status card only for servers older than Status's `ui.json` | the fallback card removed once older servers are gone |

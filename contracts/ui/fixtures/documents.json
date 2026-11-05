@@ -33,6 +33,25 @@
       }}
     },
     {
+      "name": "search-and-map",
+      "_why": "1.2: a search field and a filter set page state, which the source route is templated with; results in a media-grid, and located items on a map that opens the shared viewer.",
+      "document": {"contract": "starcore.ui/1.2", "entry": "find", "navigation": [{"page": "find", "label": "Search", "icon": "search"}, {"page": "places", "label": "Map", "icon": "map-pin"}],
+        "pages": {
+          "find": {"state": {"q": "", "kind": "all"}, "source": {"route": "search?q={$state.q}&kind={$state.kind}"}, "blocks": [
+            {"type": "search", "key": "q", "label": "Search", "placeholder": "Names, cameras, dates"},
+            {"type": "choice", "key": "kind", "options": [{"value": "all", "label": "All"}, {"value": "video", "label": "Videos"}]},
+            {"type": "media-grid", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"}}
+          ]},
+          "places": {"source": {"route": "located"}, "blocks": [
+            {"type": "map", "items": "$.items", "empty": "Nothing has a location yet.",
+             "item": {"lat": "$.lat", "lon": "$.lon", "key": "$.id", "image": "thumbs/{$.id}", "title": "$.name", "kind": "$.kind"},
+             "viewer": {"image": "full/{$.id}", "title": "$.name"}},
+            {"type": "map", "items": [{"lat": 48.85, "lon": 2.35, "id": "p"}], "item": {"lat": "$.lat", "lon": "$.lon"},
+             "action": {"navigate": "find"}}
+          ]}
+        }}
+    },
+    {
       "name": "pick-action",
       "_why": "1.2: the client's media picker chooses from whichever Satellite provides media.gallery, then the action's route gets the references as $value.",
       "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.picker"], "capabilities": ["media.gallery"]},
@@ -62,7 +81,7 @@
       "_why": "A Satellite written for 1.4 still loads on an Engine and clients that know 1.0: blocks they don't know are skipped.",
       "document": {"contract": "starcore.ui/1.4", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "heading", "text": "Hi"},
-        {"type": "map", "pins": "$.places"}
+        {"type": "tabs", "pages": "$.sections"}
       ]}}}
     },
     {
@@ -213,6 +232,36 @@
       "error": "needs starcore.ui/1.2"
     },
     {
+      "name": "search-in-1.1",
+      "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"state": {"q": ""}, "blocks": [
+        {"type": "search", "key": "q"}]}}},
+      "error": "needs starcore.ui/1.2"
+    },
+    {
+      "name": "search-key-not-in-state",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "search", "key": "q"}]}}},
+      "error": "state keys"
+    },
+    {
+      "name": "map-without-longitude",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "map", "items": [], "item": {"lat": "$.lat"}}]}}},
+      "error": "needs 'lon'"
+    },
+    {
+      "name": "map-image-outside",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "map", "items": [], "item": {"lat": "$.lat", "lon": "$.lon", "image": "https://tiles.example/{$.id}"}}]}}},
+      "error": "relative to the Satellite"
+    },
+    {
+      "name": "map-viewer-and-action",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "map", "items": [], "item": {"lat": "$.lat", "lon": "$.lon"}, "viewer": {}, "action": {"navigate": "home"}}]}}},
+      "error": "not both"
+    },
+    {
       "name": "pick-in-1.1",
       "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "button", "label": "Add", "action": {"pick": {"capability": "media.gallery"}, "route": "pins"}}]}}},
@@ -268,7 +317,7 @@
     {"name": "entry-missing", "document": {"contract": "starcore.ui/1.0", "entry": "nope", "pages": {"home": {"blocks": []}}}, "error": "entry", "client": true},
     {"name": "entry-needs-params", "document": {"contract": "starcore.ui/1.0", "entry": "row", "pages": {"row": {"params": ["id"], "blocks": []}}}, "error": "entry"},
     {"name": "bad-page-id", "document": {"contract": "starcore.ui/1.0", "entry": "Home Page", "pages": {"Home Page": {"blocks": []}}}, "error": "page id"},
-    {"name": "unknown-block-same-minor", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "map"}]}}}, "error": "unknown block type"},
+    {"name": "unknown-block-same-minor", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "tabs"}]}}}, "error": "unknown block type"},
     {"name": "missing-required-key", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "slider", "label": "x", "value": 1, "min": 0, "action": {"route": "a"}}]}}}, "error": "max"},
     {"name": "unknown-key", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "heading", "text": "x", "colour": "red"}]}}}, "error": "colour"},
     {"name": "absolute-route", "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "Stop", "action": {"route": "/api/shutdown"}}]}}}, "error": "route"},

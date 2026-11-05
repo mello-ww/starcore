@@ -65,6 +65,15 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   `audio.library` provider finds, through the client's audio host. Both clients now offer the
   `media.audio` client capability, so any Satellite can play audio without naming the one that
   provides it.
+- **UI contract 1.2: `search` and `map` blocks.** A search field bound to page state (results
+  reload as the person types, and the field keeps its focus), and located items on an
+  interactive map with clusters that stay a handful of markers for thousands of items, opening
+  the shared viewer. Each client draws the map it already had (Leaflet and OpenStreetMap on the
+  web, react-native-maps on Android): no new map service or key.
+- **Photo's shared Search and Map (preview).** Photo's `ui.json` adds Search (file name, camera,
+  lens, date and album names, with a Photos/Videos filter) and Map pages, bound to new
+  read-only `gallery/search` and `gallery/map` routes. Photo's own page and screens remain the
+  default.
 - **A reusable media picker (UI contract 1.2's `pick` action).** Any interface can let a
   person choose images or videos, one or several, from whichever Satellite provides the new
   `media.gallery` capability, through the client's picker (`media.picker`, on both clients:

@@ -621,10 +621,30 @@ export function createGallery(host) {
         drawViewer();
     }
 
+    /** Opens the shared viewer on `items` of another block (a map's marker): the block's
+     * `item` and `viewer` say what to show, as for a grid. */
+    function view(block, items, scope, key) {
+        const grid = gridState(block);
+        grid.items = items;
+        grid.scope = scope;
+        grid.keys = items.map((item, index) => itemKey(block, item, index, scope));
+        openViewer(block, key, document.activeElement);
+    }
+
+    /** Fresh items for a block the viewer may be showing (after a refresh). */
+    function update(block, items, scope) {
+        const grid = grids.get(block);
+        if (grid) {
+            grid.items = items;
+            grid.scope = scope;
+            grid.keys = items.map((item, index) => itemKey(block, item, index, scope));
+        }
+    }
+
     function reset() {
         closeViewer();
         grids = new WeakMap();
     }
 
-    return { render, afterRender, reset, dispose: reset };
+    return { render, afterRender, view, update, reset, dispose: reset };
 }

@@ -53,10 +53,20 @@ class PhotoUiDocumentTest(unittest.TestCase):
 
     def test_it_uses_the_shared_gallery_for_the_library_and_albums(self):
         pages = self.document["pages"]
-        self.assertEqual([item["page"] for item in self.document["navigation"]], ["library", "albums"])
-        for page in ("library", "album", "trash"):
+        self.assertEqual([item["page"] for item in self.document["navigation"]], ["library", "albums", "search", "map"])
+        for page in ("library", "album", "trash", "search"):
             kinds = [block["type"] for block in pages[page]["blocks"]]
             self.assertIn("media-grid", kinds, page)
+
+    def test_search_and_map_use_the_shared_blocks(self):
+        pages = self.document["pages"]
+        search = {block["type"]: block for block in pages["search"]["blocks"]}
+        self.assertEqual(search["search"]["key"], "q")
+        self.assertIn("{$state.q}", pages["search"]["source"]["route"])
+        self.assertEqual(search["choice"]["key"], "kind")
+        located = next(block for block in pages["map"]["blocks"] if block["type"] == "map")
+        self.assertEqual((located["item"]["lat"], located["item"]["lon"]), ("$.lat", "$.lon"))
+        self.assertIn("viewer", located)
 
     def test_it_never_names_the_locked_folder(self):
         text = (PHOTO_DIR / "ui.json").read_text(encoding="utf-8")
@@ -245,6 +255,64 @@ class PhotoGalleryApiTest(unittest.TestCase):
         self.assertEqual(add["action"]["pick"]["capability"], "media.gallery")
         self.assertEqual(add["action"]["route"], "albums/{$params.id}/photos")
         self.assertEqual(add["action"]["body"], {"items": "$value"})
+
+
+    # ---------- the shared Search and Map pages ----------
+
+    def locate(self, photo_id, lat, lon, **metadata):
+        """Gives a test photo GPS (and other) metadata, as an EXIF block would have."""
+        from satellites.native.photo.library import library
+
+        record = library(self.satellite).get(photo_id)
+        record["metadata"].update({"gps_latitude": lat, "gps_longitude": lon, **metadata})
+
+    def test_search_waits_for_text_and_matches_the_same_fields_as_the_app(self):
+        photos = self.import_photos("beach.png", "city.png")
+        self.locate(photos["city.png"]["id"], None, None, camera_make="Fixture", camera_model="Zoom 9", lens_model="Wide 24")
+
+        empty = self.json_request("/api/satellites/photo/gallery/search?q=&kind=all")[1]
+        self.assertEqual((empty["items"], empty["prompt"]), ([], "Type to search your library."))
+
+        for query, expected in (("BEACH", "beach.png"), ("zoom 9", "city.png"), ("wide", "city.png")):
+            found = self.json_request(f"/api/satellites/photo/gallery/search?q={query.replace(' ', '%20')}&kind=all")[1]
+            self.assertEqual([item["title"] for item in found["items"]], [expected], query)
+            self.assertEqual(found["summary"], "1 result")
+
+        none = self.json_request("/api/satellites/photo/gallery/search?q=nothing-like-this&kind=all")[1]
+        self.assertEqual((none["items"], none["summary"]), ([], "No photos match your search."))
+
+    def test_search_filters_by_kind_and_finds_albums(self):
+        self.import_photos("trip-1.png")
+        self.json_request("/api/satellites/photo/albums", "POST", {"name": "Summer trip"})
+
+        found = self.json_request("/api/satellites/photo/gallery/search?q=trip&kind=video")[1]
+        self.assertEqual(found["items"], [])  # no videos
+        self.assertEqual([album["title"] for album in found["albums"]], ["Summer trip"])
+        self.assertIsNone(found["summary"])  # the albums answer it
+        self.assertEqual(len(self.json_request("/api/satellites/photo/gallery/search?q=trip&kind=image")[1]["items"]), 1)
+
+    def test_search_never_finds_the_recycle_bin(self):
+        photos = self.import_photos("gone.png")
+        self.json_request(f"/api/satellites/photo/trash/{photos['gone.png']['id']}", "POST")
+        self.assertEqual(self.json_request("/api/satellites/photo/gallery/search?q=gone&kind=all")[1]["items"], [])
+
+    def test_the_map_lists_located_photos_only(self):
+        photos = self.import_photos("paris.png", "nowhere.png", "broken.png", "gone.png")
+        self.locate(photos["paris.png"]["id"], 48.8584, 2.2945)
+        self.locate(photos["broken.png"]["id"], 123.0, 2.0)  # out of range: never placed
+        self.locate(photos["gone.png"]["id"], 51.5, -0.12)
+        self.json_request(f"/api/satellites/photo/trash/{photos['gone.png']['id']}", "POST")
+
+        located = self.json_request("/api/satellites/photo/gallery/map")[1]
+
+        self.assertEqual([(item["title"], item["lat"], item["lon"]) for item in located["items"]],
+                         [("paris.png", 48.8584, 2.2945)])
+        self.assertEqual(located["summary"], "1 item with a location")
+
+    def test_an_empty_map_says_nothing_is_located(self):
+        self.import_photos("plain.png")
+        located = self.json_request("/api/satellites/photo/gallery/map")[1]
+        self.assertEqual((located["items"], located["summary"]), ([], None))
 
 
 if __name__ == "__main__":

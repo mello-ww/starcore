@@ -196,6 +196,8 @@ GET  /api/satellites/photo/gallery/albums     every album as a tile with its cov
 GET  /api/satellites/photo/gallery/albums/<id>   one album's photos, for the shared gallery
 GET  /api/satellites/photo/gallery/trash      the recycle bin, for the shared gallery
 GET  /api/satellites/photo/media?kinds=       media.gallery's list: what a media picker may offer
+GET  /api/satellites/photo/gallery/search?q=&kind=   photos and albums matching a search, for the shared Search page
+GET  /api/satellites/photo/gallery/map        every photo with a location, for the shared Map page
 GET  /api/satellites/photo/trash              what's in the recycle bin, and its retention period
 POST /api/satellites/photo/trash/<id>         move an active photo to the recycle bin
 GET  /api/satellites/photo/trash/<id>/thumbnail   preview a trashed photo's thumbnail
@@ -275,12 +277,26 @@ What it covers:
 | Add a photo to a custom album | yes, from a photo | yes, from the album: "Add photos" opens the client's media picker |
 | Recycle bin: restore, delete for good, retention | yes | yes, from the viewer and from a selection |
 | Grouping by camera, pinch to change columns (Android) | yes | no |
-| Search (Android), Map, import and upload, phone sync, settings | yes | no - Photo's own screens |
+| Search: file name, camera, lens, date; matching albums | Android only | yes, both clients, with a Photos/Videos filter |
+| Map: located photos, opening the viewer | yes | yes (see below) |
+| Map clustering | web only, by rounded coordinates | both clients, a grid about 64 px wide on screen |
+| Import and upload, phone sync, settings | yes | no - Photo's own screens |
 | Locked Folder | yes | no - stays on Photo's own screens; its security-sensitive behaviour isn't migrated |
 | Offline cache of the library (Android) | yes | no: the shared interface caches the document, not page data |
 
-It binds to four read-only routes, `gallery`, `gallery/albums`, `gallery/albums/<id>` and
-`gallery/trash` (`gallery.py`), which shape the same library, albums and recycle bin for
+Search looks in the same fields as the app's own Search tab, on the server
+(`gallery/search`): nothing is listed until there is text to look for, a photo in the recycle bin
+is never found, and album names are matched too. The Map page (`gallery/map`) places the same
+photos as the Map tabs - only those whose GPS metadata is a valid pair; no location is ever
+requested from the device. On the web it uses the same Leaflet and OpenStreetMap tiles as the
+Map tab, recoloured for the dark theme. On Android it uses react-native-maps like the app's own
+Map tab, so both need a Google Maps key in `android/gradle.properties` to draw anything; without
+one the map area stays blank and the Library, Search and viewer work as usual. Differences that
+remain: on Android a cluster opens the viewer directly (the web shows its thumbnails first), and
+the web's single-photo popup is replaced by opening the viewer at once.
+
+It binds to read-only routes, `gallery`, `gallery/albums`, `gallery/albums/<id>`,
+`gallery/trash`, `gallery/search` and `gallery/map` (`gallery.py`), which shape the same library, albums and recycle bin for
 display: the month a photo belongs to, its dimensions and camera as text, whether it is a
 favourite. Every action goes to the routes above, unchanged (`albums/favorites/photos`,
 `trash/<id>`, `albums/<id>/...`); no route or storage format changed.

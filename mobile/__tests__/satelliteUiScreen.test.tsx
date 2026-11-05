@@ -213,7 +213,7 @@ describe('SatelliteUiScreen', () => {
     const document = {
       contract: 'starcore.ui/1.3',
       entry: 'home',
-      pages: {home: {blocks: [{type: 'heading', text: 'Hello'}, {type: 'chart'}, {type: 'map', required: true}]}},
+      pages: {home: {blocks: [{type: 'heading', text: 'Hello'}, {type: 'chart'}, {type: 'tabs', required: true}]}},
     };
     __mocks.document.mockResolvedValue({document, revision: 'r', offline: false});
     const {tree} = await mount({params: {name: 'Future'}});

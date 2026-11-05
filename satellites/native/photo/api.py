@@ -70,6 +70,10 @@ def gallery_route(request):
             return error_response(str(error), status=404)
     if path == ("trash",):
         return json_response(gallery.trash_view(request.satellite))
+    if path == ("search",):
+        return json_response(gallery.search_view(request.satellite, request.query.get("q"), request.query.get("kind")))
+    if path == ("map",):
+        return json_response(gallery.map_view(request.satellite))
 
     return error_response(f"unknown endpoint 'gallery/{'/'.join(path)}'")
 
