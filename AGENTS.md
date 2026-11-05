@@ -42,5 +42,5 @@ Explorer still need architectural work before moving to the contract.
 
 - Engine: `cd engine && .venv/Scripts/python -m unittest discover -s tests -t .`
 - UI contract (web): `node --test contracts/ui/tests/web.test.mjs`
-- Web audio host: `node --test mission_control/tests/media.test.mjs`
+- Web audio host: `node --test mission_control/tests/media.test.mjs mission_control/tests/sleep.test.mjs`
 - Android: `cd mobile && npm test && npm run typecheck && npm run lint`

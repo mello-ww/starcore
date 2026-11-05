@@ -78,6 +78,12 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   keep the last data (dimmed, with its age) when a refresh fails, and offer a retry when the
   first one does.
 
+### Fixed
+
+- Mission Control's "Sleep timer: end of this track" now stops playback when the track ends,
+  also with gapless playback or a crossfade, which used to move straight into the next track.
+  While it is set, no next track is lined up.
+
 ## 0.1.0-alpha.1 - unreleased
 
 The first Alpha: a stable, reproducible checkpoint of the Engine, Mission Control, the native

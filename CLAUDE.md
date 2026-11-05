@@ -77,7 +77,7 @@ Codex.
 | --- | --- |
 | Engine and Satellites | `cd engine && .venv/Scripts/python -m unittest discover -s tests -t .` |
 | UI contract, web | `node --test contracts/ui/tests/web.test.mjs` |
-| Web audio host | `node --test mission_control/tests/media.test.mjs` |
+| Web audio host | `node --test mission_control/tests/media.test.mjs mission_control/tests/sleep.test.mjs` |
 | Android | `cd mobile && npm test`, `npm run typecheck`, `npm run lint` |
 | Android release build | `cd mobile/android && ./gradlew assembleRelease`, with `JAVA_HOME` set to a JDK 17 for that command only |
 

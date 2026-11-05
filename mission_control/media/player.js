@@ -190,7 +190,9 @@ class Player {
     }
 
     prefetch() {
-        this.engine.setNext(this.upcoming);
+        // with "end of this track" set, nothing is lined up: gapless playback and crossfade would
+        // otherwise move straight into the next track, and the current one would never end
+        this.engine.setNext(this.sleep && this.sleep.endOfTrack ? null : this.upcoming);
     }
 
     shufflePlay(tracks, context) {
@@ -438,6 +440,21 @@ class Player {
     }
 
     onAdvance() {
+        // a transition already under way when "end of this track" was set (a crossfade that had
+        // begun): the track it was set for is over, so stop here
+        if (this.sleep && this.sleep.endOfTrack) {
+            this.engine.cancelFade();
+            this.engine.pause();
+            this.report(false);
+            this.listened = 0;
+            this.lastTime = null;
+            this.index = this.index + 1 < this.queue.length ? this.index + 1 : 0;
+            this.cancelSleep();
+            this.emit("queue");
+            this.scheduleSave();
+            session.toast("Sleep timer: playback stopped");
+            return;
+        }
         this.report(false);
         this.listened = 0;
         this.lastTime = null;
@@ -480,6 +497,7 @@ class Player {
         this.cancelSleep();
         if (minutes === "track") {
             this.sleep = { endOfTrack: true };
+            this.prefetch();
         } else if (minutes > 0) {
             const until = Date.now() + minutes * 60000;
             this.sleep = { until, timer: setTimeout(() => this.fadeToSleep(), minutes * 60000) };
@@ -501,10 +519,14 @@ class Player {
     }
 
     cancelSleep() {
+        const endOfTrack = Boolean(this.sleep && this.sleep.endOfTrack);
         if (this.sleep && this.sleep.timer) {
             clearTimeout(this.sleep.timer);
         }
         this.sleep = null;
+        if (endOfTrack) {
+            this.prefetch();
+        }
         this.emit("sleep");
     }
 
