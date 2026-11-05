@@ -218,7 +218,7 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] Specify `media.audio` and `audio.library` from Music's player (`docs/media-audio.md`)
 - [x] Audio contract groundwork: `audio.library` v1 in the vocabulary, provided by Music; `media.audio` reserved
 - [x] Audio: the Android AudioHost (`mobile/src/media/`), playing from the catalog's `audio.library` provider
-- [ ] Audio: version `audio.session` in the shared vocabulary before the web host relies on it
+- [x] Audio: `audio.session` v1 in the shared vocabulary (`queue` required, the rest optional)
 - [ ] Audio: the lock-screen position reads 0:00 after pausing on Android (investigate)
 - [ ] Audio: the web AudioHost (`docs/media-audio.md`, "Migration plan")
 - [ ] Remove `mobile/src/satellites/builtins.tsx` once Music's declarative interface replaces its native screens

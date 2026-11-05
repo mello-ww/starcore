@@ -52,6 +52,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   catalog's `audio.library` provider, with Music's routes as the fallback on older servers.
   Music also declares `audio.session`, its queue, history, radio, preferences, likes and
   Connect. Nothing about playback changes for listeners.
+- **`audio.session` capability (v1).** The playback session beside an audio library is now in
+  the shared vocabulary: `queue` is required; `history`, `radio`, `preferences`, `favorites`,
+  `stream` and `connect` are optional, and the Engine checks declarations like any other.
+  The Android player sends nothing for an operation a provider doesn't offer.
 - **Home widgets.** Home on both clients draws every Satellite's widgets; neither names Status
   any more (the Android app keeps its Status card for older servers).
 - Mission Control's charts, meters and sparklines, and the app's column chart, meter, bars and

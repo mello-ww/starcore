@@ -67,6 +67,21 @@
         "lyrics": "GET /<id>?language= -> synced lines or plain text"
       },
       "_note": "Track: {id, title, artist, album, album_id, duration, has_artwork, quality: {label, lossless, hires}}; providers may add keys. See docs/media-audio.md."
+    },
+    "audio.session": {
+      "versions": [1],
+      "operations": {
+        "queue": "GET ?device=&expand=1 -> {state: QueueState (+ tracks) | null}; POST {device, state, name, kind} saves it"
+      },
+      "optional_operations": {
+        "history": "POST {track_id, seconds, device, context} records a play",
+        "radio": "GET /<track|artist|album|genre>/<id> -> {tracks: [Track]}, to continue when the queue ends",
+        "preferences": "GET -> preferences; POST {key: value} -> preferences (streaming and download quality, effects, speed)",
+        "favorites": "GET -> {ids: {track: [id]}}; POST {kind, ids, liked} -> {ids}",
+        "stream": "GET /<id>?quality=&format= -> the audio, answering Range requests; used when resolve can't plan a stream",
+        "connect": "StarCore Connect under this route: POST register, state, command, transfer; GET devices, events"
+      },
+      "_note": "A provider's playback session beside its audio.library, from the same Satellite. QueueState: {tracks: [id], order, position, shuffle, repeat, seconds, context}. See docs/media-audio.md."
     }
   },
   "client_capabilities": {

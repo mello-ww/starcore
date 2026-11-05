@@ -20,12 +20,13 @@ export interface CatalogProvider {
 export type Catalog = Record<string, CatalogProvider[] | undefined>;
 
 export const AUDIO_LIBRARY = 'audio.library';
-/** The playback session a provider may offer beside its library: the saved queue, play
- * history, radio, listener preferences, likes, a stream route and StarCore Connect. Not yet
- * in the shared vocabulary, so the Engine registers it as declared; the host uses each
- * operation only when the same Satellite declares it. */
+/** The playback session a provider may offer beside its library (audio.session v1): the
+ * saved queue (required), and optionally play history, radio, listener preferences, likes, a
+ * stream route and StarCore Connect. The host uses it only from the same Satellite as the
+ * library, and each optional operation only when it is declared. */
 export const AUDIO_SESSION = 'audio.session';
 const LIBRARY_VERSIONS = [1];
+const SESSION_VERSIONS = [1];
 
 export interface AudioProvider {
   satellite: string;
@@ -45,7 +46,9 @@ export function resolveAudioProvider(catalog: Catalog | null | undefined, fallba
   if (!library) {
     return catalog?.[AUDIO_LIBRARY]?.length ? null : fallback;
   }
-  const session = (catalog?.[AUDIO_SESSION] ?? []).find(entry => entry.enabled && entry.satellite === library.satellite);
+  const session = (catalog?.[AUDIO_SESSION] ?? []).find(
+    entry => entry.enabled && entry.satellite === library.satellite && SESSION_VERSIONS.includes(entry.version),
+  );
   return {satellite: library.satellite, operations: library.operations, session: session?.operations ?? {}};
 }
 
@@ -87,7 +90,9 @@ export class AudioLibraryClient {
     return Boolean(this.provider?.session[operation]);
   }
 
-  /** A route inside the provider, `<route>/<rest>`, for a URL or a request. */
+  /** A route inside the provider, `<route>/<rest>`, for a URL or a request. Every request
+   * method is async, so an operation the provider doesn't offer is a rejected promise the
+   * caller already handles, never a synchronous throw. */
   private route(table: 'operations' | 'session', operation: string, rest = ''): string {
     const route = this.provider?.[table][operation];
     if (!route) {
@@ -132,45 +137,45 @@ export class AudioLibraryClient {
 
   // ---------- audio.library v1 ----------
 
-  playback(trackId: string, quality: Quality) {
+  async playback(trackId: string, quality: Quality) {
     return this.get<PlaybackInfo>(this.route('operations', 'resolve', `/${enc(trackId)}?quality=${quality}`), 'Could not prepare playback.');
   }
 
-  track(id: string) {
+  async track(id: string) {
     return this.get<Track>(this.route('operations', 'track', `/${enc(id)}`), 'Could not load this track.');
   }
 
-  lyrics(trackId: string, language?: string) {
+  async lyrics(trackId: string, language?: string) {
     return this.get<Lyrics>(this.route('operations', 'lyrics', `/${enc(trackId)}${language ? `?language=${enc(language)}` : ''}`), 'No lyrics.');
   }
 
-  setLyricsOffset(trackId: string, offset: number) {
+  async setLyricsOffset(trackId: string, offset: number) {
     return this.post(this.route('operations', 'lyrics', `/${enc(trackId)}`), {offset}, 'Could not save the offset.');
   }
 
   // ---------- audio.session (optional) ----------
 
-  preferences() {
+  async preferences() {
     return this.get<MusicPreferences>(this.route('session', 'preferences'), 'Could not load playback settings.');
   }
 
-  updatePreferences(changes: Partial<MusicPreferences>) {
+  async updatePreferences(changes: Partial<MusicPreferences>) {
     return this.post<MusicPreferences>(this.route('session', 'preferences'), changes, 'Could not save playback settings.');
   }
 
-  favorites() {
+  async favorites() {
     return this.get<{ids: Record<string, string[]>}>(this.route('session', 'favorites'), 'Could not load your likes.');
   }
 
-  setFavorite(kind: 'track' | 'album' | 'artist' | 'playlist', ids: string[], liked: boolean) {
+  async setFavorite(kind: 'track' | 'album' | 'artist' | 'playlist', ids: string[], liked: boolean) {
     return this.post<{ids: Record<string, string[]>}>(this.route('session', 'favorites'), {kind, ids, liked}, 'Could not update your likes.');
   }
 
-  recordPlay(trackId: string, seconds: number, device: string, context: string | null) {
+  async recordPlay(trackId: string, seconds: number, device: string, context: string | null) {
     return this.post(this.route('session', 'history'), {track_id: trackId, seconds, device, context}, 'Could not record the play.');
   }
 
-  radio(kind: 'track' | 'artist' | 'album' | 'genre', id: string) {
+  async radio(kind: 'track' | 'artist' | 'album' | 'genre', id: string) {
     return this.get<{tracks: Track[]}>(this.route('session', 'radio', `/${kind}/${enc(id)}`), 'Could not start the radio.');
   }
 
@@ -181,11 +186,11 @@ export class AudioLibraryClient {
     )).state;
   }
 
-  saveQueue(device: string, state: QueueState, name: string) {
+  async saveQueue(device: string, state: QueueState, name: string) {
     return this.post(this.route('session', 'queue'), {device, state, name, kind: 'mobile'}, 'Could not save the queue.');
   }
 
-  registerDevice(deviceId: string, name: string) {
+  async registerDevice(deviceId: string, name: string) {
     return this.post<{cursor: number}>(
       this.route('session', 'connect', '/register'),
       {device_id: deviceId, name, kind: 'mobile', capabilities: {play: true, remote: true, volume: true, offline: true}},
@@ -193,26 +198,26 @@ export class AudioLibraryClient {
     );
   }
 
-  devices() {
+  async devices() {
     return this.get<{devices: ConnectDevice[]; active: {device: string; state: QueueState} | null}>(
       this.route('session', 'connect', '/devices'),
       'Could not load devices.',
     );
   }
 
-  publishState(deviceId: string, state: QueueState) {
+  async publishState(deviceId: string, state: QueueState) {
     return this.post(this.route('session', 'connect', '/state'), {device_id: deviceId, state}, 'Could not publish playback state.');
   }
 
-  command(deviceId: string, target: string, command: string, args: Record<string, unknown> = {}) {
+  async command(deviceId: string, target: string, command: string, args: Record<string, unknown> = {}) {
     return this.post(this.route('session', 'connect', '/command'), {device_id: deviceId, target, command, arguments: args}, 'The device did not respond.');
   }
 
-  transfer(deviceId: string, target: string, play = true) {
+  async transfer(deviceId: string, target: string, play = true) {
     return this.post(this.route('session', 'connect', '/transfer'), {device_id: deviceId, target, play}, 'Could not move playback.');
   }
 
-  events(deviceId: string, since: number, timeout = 25) {
+  async events(deviceId: string, since: number, timeout = 25) {
     return this.get<{events: ConnectEvent[]; cursor: number}>(
       this.route('session', 'connect', `/events?device=${enc(deviceId)}&since=${since}&timeout=${timeout}`),
       'Lost the connection to StarCore Connect.',

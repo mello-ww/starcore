@@ -55,22 +55,27 @@ second provider or consumer needs them (a new version beside v1, as the contract
 
 ### `audio.session` - the playback session beside a library
 
-What a host does around playback, beyond the library itself, uses a second capability from
-the **same** Satellite. It is not yet in the shared vocabulary, so the Engine registers it as
-declared and doesn't check it. A host uses each operation only when the provider declares it;
-without one, that feature is simply absent.
+What a host does around playback, beyond the library itself, uses a second capability,
+`audio.session` v1, in the shared vocabulary. A host uses it only from the **same** Satellite
+as its `audio.library` provider, and only a version it knows. The Engine checks a declaration
+like any other: `queue` is required, the rest are optional, and an operation v1 doesn't
+define, a malformed route or an unknown version leaves the whole capability out.
 
-| Operation | Used for | Music's route |
-|---|---|---|
-| `queue` | the server copy of the queue, and resolving tracks for a Connect transfer | `queue` |
-| `history` | reporting plays | `history` |
-| `radio` | continuing when the queue ends ("autoplay") | `radio` |
-| `preferences` | streaming quality, effects, speed, downloads | `preferences` |
-| `favorites` | the like button | `favorites` |
-| `stream` | a stream when the resolve step can't plan one | `stream` |
-| `connect` | StarCore Connect (`connect/register`, `state`, `events`, `command`, `transfer`, `devices`) | `connect` |
+`queue` is the one required operation because it is what makes a session. It lets a listener
+pick up where they left off on another device, and Connect transfers resolve their tracks
+through it. Without an optional operation, its feature is simply absent: a request for it is
+never sent, likes and preferences stay unchanged, and Connect and the full player's Devices
+tab aren't offered.
 
-It is a candidate for the shared vocabulary once a second provider needs part of it.
+| Operation | Required | Used for | Music's route |
+|---|---|---|---|
+| `queue` | yes | the server copy of the queue (`GET ?device=&expand=1`, `POST {device, state, name, kind}`), and resolving tracks for a Connect transfer | `queue` |
+| `history` | no | reporting plays (`POST {track_id, seconds, device, context}`) | `history` |
+| `radio` | no | continuing when the queue ends ("autoplay"): `GET /<kind>/<id>` → `{tracks}` | `radio` |
+| `preferences` | no | streaming and download quality, effects, speed: `GET`, `POST {key: value}` | `preferences` |
+| `favorites` | no | the like button: `GET` → `{ids: {track}}`, `POST {kind, ids, liked}` | `favorites` |
+| `stream` | no | a stream (`GET /<id>?quality=&format=`, with `Range`) when the resolve step can't plan one | `stream` |
+| `connect` | no | StarCore Connect under this route: `register`, `state`, `events`, `command`, `transfer`, `devices` | `connect` |
 
 ## `media.audio` - the client side (the AudioHost)
 
@@ -190,9 +195,7 @@ What it is now:
   (`engine/tests/test_client_modularity.py`) is lowered at each step.
 
 Follow-ups found while building it:
-- **Formalize `audio.session`:** add it to the shared vocabulary with a version and its
-  required and optional operations, checked by the Engine like `audio.library`, before the
-  web host relies on it.
+- **Formalize `audio.session`** - done: v1 is in the shared vocabulary (see above).
 - **Lock-screen position after a pause:** after pausing from the lock screen, Android's
   media controls showed the position as 0:00 (seen on the emulator). The output component
   (react-native-video's `<Video>` and its props) was moved unchanged, so this looks like

@@ -329,12 +329,13 @@ says so in place, and a document that `requires` it is not opened.
 |---|---|---|---|
 | `files.browse` | 1 | `list`: `GET ?path=` → `{path, parent, entries: [{name, type: dir\|file, size, modified}]}`; at the roots (`path` empty) each entry's name is itself an absolute path | `file-browser` |
 | `audio.library` | 1 | `search`, `track`, `resolve`, `artwork`; optional `lyrics` - see [Audio playback](media-audio.md) | none yet; the `media.audio` client capability will play it |
+| `audio.session` | 1 | `queue`; optional `history`, `radio`, `preferences`, `favorites`, `stream`, `connect` - see [Audio playback](media-audio.md) | none; the audio host uses it beside the same Satellite's `audio.library` |
 
 A capability's operations are required unless the vocabulary lists them under
 `optional_operations`. An operation the version doesn't define is a problem too, so a typo
 never registers a provider that only half works.
 
-File Explorer provides `files.browse`; Music provides `audio.library`. Mission Control's folder picker for `"path"`-typed
+File Explorer provides `files.browse`; Music provides `audio.library` and `audio.session`. Mission Control's folder picker for `"path"`-typed
 settings also uses it, so no generic code names File Explorer any more.
 
 A capability is a long-term protocol. It is designed from what an existing Satellite already

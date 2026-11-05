@@ -13,10 +13,9 @@ icon_name = "music"
 version = 1
 operations = { search = "search", track = "tracks", resolve = "playback", artwork = "artwork", lyrics = "lyrics" }
 
-# the playback session beside the library: the saved queue, play history, radio, listener
-# preferences, likes, the stream route and StarCore Connect. Not in the shared vocabulary yet
-# (registered as declared); the shared audio player uses each operation only when the
-# audio.library provider declares it too.
+# the playback session beside the library (audio.session v1): the saved queue, and the
+# optional play history, radio, listener preferences, likes, stream route and StarCore Connect.
+# The shared audio player uses it with this Satellite's audio.library.
 [provides."audio.session"]
 version = 1
 operations = { queue = "queue", history = "history", radio = "radio", preferences = "preferences", favorites = "favorites", stream = "stream", connect = "connect" }

@@ -190,6 +190,33 @@ class ProvidesTest(unittest.TestCase):
         self.assertEqual(provides, {})
         self.assertIn("version 2", problems[0])
 
+    SESSION = {"queue": "queue", "history": "history", "radio": "radio", "preferences": "preferences",
+               "favorites": "favorites", "stream": "stream", "connect": "connect"}
+
+    def test_audio_session_needs_only_its_queue(self):
+        for operations in ({"queue": "queue"}, self.SESSION):
+            provides, problems = ui_contract.normalise_provides(
+                {"audio.session": {"version": 1, "operations": operations}})
+            self.assertEqual(problems, [])
+            self.assertEqual(provides["audio.session"], {"version": 1, "operations": operations})
+
+    def test_a_broken_audio_session_is_left_out(self):
+        without_queue = {key: value for key, value in self.SESSION.items() if key != "queue"}
+        for entry in ({"version": 1, "operations": without_queue},                          # incomplete
+                      {"version": 1, "operations": {**self.SESSION, "lyrics": "lyrics"}},  # not a session operation
+                      {"version": 1, "operations": {"queue": "queue", "connect": "/api/x"}},  # malformed route
+                      {"version": 2, "operations": self.SESSION},                          # a version this Engine doesn't know
+                      {"version": "1", "operations": self.SESSION}):                       # not an integer
+            provides, problems = ui_contract.normalise_provides({"audio.session": entry})
+            self.assertEqual(provides, {}, entry)
+            self.assertTrue(problems, entry)
+        # one broken capability doesn't take the Satellite's other ones with it
+        provides, problems = ui_contract.normalise_provides(
+            {"audio.library": {"version": 1, "operations": self.AUDIO},
+             "audio.session": {"version": 1, "operations": without_queue}})
+        self.assertEqual(list(provides), ["audio.library"])
+        self.assertIn("missing operations ['queue']", problems[0])
+
     def test_the_media_audio_client_capability_replaces_the_old_reserved_name(self):
         reserved = ui_contract.VOCABULARY["client_capabilities"]["reserved"]
         self.assertIn("media.audio", reserved)
@@ -279,6 +306,13 @@ class UiApiTest(unittest.TestCase):
         self.assertEqual(providers[0]["satellite"], "FileExplorer")
         self.assertEqual(providers[0]["operations"], {"list": "entries"})
         self.assertEqual(payload["contract"]["capabilities"]["audio.library"], [1])
+        self.assertEqual(payload["contract"]["capabilities"]["audio.session"], [1])
+        session = payload["capabilities"]["audio.session"]
+        self.assertEqual([provider["satellite"] for provider in session], ["Music"])
+        self.assertEqual(session[0]["version"], 1)
+        self.assertEqual(session[0]["operations"]["queue"], "queue")
+        self.assertEqual(set(session[0]["operations"]),
+                         {"queue", "history", "radio", "preferences", "favorites", "stream", "connect"})
         audio = payload["capabilities"]["audio.library"]
         self.assertEqual([provider["satellite"] for provider in audio], ["Music"])
         self.assertEqual(audio[0]["version"], 1)

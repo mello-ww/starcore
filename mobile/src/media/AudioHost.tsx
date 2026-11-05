@@ -240,6 +240,9 @@ export function AudioHost({
 
   const updatePreferences = useCallback(
     async (changes: Partial<MusicPreferences>) => {
+      if (!library.offersSession('preferences')) {
+        return;
+      }
       setPreferences(current => (current ? {...current, ...changes} : current));
       const saved = await library.updatePreferences(changes);
       setPreferences(saved);
@@ -249,6 +252,10 @@ export function AudioHost({
 
   const setLiked = useCallback(
     async (trackIds: string[], isLiked: boolean) => {
+      // a provider without favorites keeps no likes: nothing to change or to send
+      if (!library.offersSession('favorites')) {
+        return;
+      }
       setLikedState(current => {
         const next = new Set(current);
         trackIds.forEach(id => (isLiked ? next.add(id) : next.delete(id)));

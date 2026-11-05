@@ -28,6 +28,14 @@ describe('resolveAudioProvider', () => {
     expect(resolveAudioProvider(catalog)?.session).toEqual({history: 'log'});
   });
 
+  it('ignores a session of a version it does not know', () => {
+    const catalog: Catalog = {
+      'audio.library': [radio],
+      'audio.session': [{satellite: 'Radio', version: 2, enabled: true, operations: {queue: 'queue'}}],
+    };
+    expect(resolveAudioProvider(catalog)?.session).toEqual({});
+  });
+
   it('falls back only for a server whose catalog lists no audio library at all', () => {
     expect(resolveAudioProvider(null, testProvider)).toBe(testProvider);
     expect(resolveAudioProvider({}, testProvider)).toBe(testProvider);
@@ -126,5 +134,44 @@ describe('a queue restored at launch', () => {
     expect(player.state.error).toBeNull();
     expect(player.state.source?.uri).toContain('https://server-a.test/api/satellites/music/stream/');
     player.dispose();
+  });
+});
+
+describe('a session with only its required queue', () => {
+  const provider = {satellite: 'Radio', operations: radio.operations, session: {queue: 'saved'}};
+
+  it('rejects the operations it lacks instead of throwing, so the callers catch them', async () => {
+    const http = {get: jest.fn(async () => ({status: 200, body: {state: null}})), post: jest.fn(async () => ({status: 200, body: {}}))};
+    const library = new AudioLibraryClient(http as any, provider);
+    let pending: Promise<unknown> | null = null;
+    expect(() => (pending = library.recordPlay('t', 30, 'd', null))).not.toThrow();
+    await expect(pending).rejects.toThrow("doesn't offer history");
+    await expect(library.publishState('d', {} as any)).rejects.toThrow("doesn't offer connect");
+    await expect(library.radio('track', 't')).rejects.toThrow("doesn't offer radio");
+    expect(library.streamPath('t', 'original', 'opus')).toBeNull();
+    await library.saveQueue('d', {} as any, 'StarCore Mobile');
+    expect(http.post).toHaveBeenCalledWith('/api/satellites/Radio/saved', expect.objectContaining({device: 'd'}));
+    expect(http.post).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends nothing for likes or preferences it lacks, and offers no Connect', async () => {
+    const http = client({'audio.library': [radio],
+                         'audio.session': [{satellite: 'Radio', version: 1, enabled: true, operations: {queue: 'saved'}}]});
+    (useAuth as jest.Mock).mockReturnValue({client: http, state: {status: 'signed-in', session: {token: 'token-a'}}});
+    (useServers as jest.Mock).mockReturnValue({activeServer: {id: 'server-a', baseUrl: 'https://server-a.test'}});
+    let tree!: ReturnType<typeof renderer.create>;
+    await act(async () => {
+      tree = renderer.create(<AudioHost><Probe /></AudioHost>);
+    });
+    expect(captured!.provider?.session).toEqual({queue: 'saved'});
+    await act(async () => {
+      await captured!.setLiked(['t'], true);
+      await captured!.updatePreferences({speed: 1.5});
+    });
+    expect(http.post).not.toHaveBeenCalled();
+    expect(captured!.liked.size).toBe(0);
+    expect(captured!.connect).toBeNull();
+    expect(http.get.mock.calls.map(([path]) => path)).toEqual(['/api/catalog']);
+    tree.unmount();
   });
 });
