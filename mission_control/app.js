@@ -2252,6 +2252,14 @@ function startApp() {
     loadCommands();
     refresh();
     pollTimer = setInterval(refresh, REFRESH_MS);
+    startAudioHost();
+}
+
+// the shared audio player (media/host.js, docs/media-audio.md): on every page from sign-in on,
+// playing from whichever Satellite the catalog lists as an audio library. A module, so it
+// loads on its own; without it (an older browser) Mission Control works as before, silent.
+function startAudioHost() {
+    import("/media/host.js").then((host) => host.start()).catch((error) => console.warn("audio host:", error));
 }
 
 function setAuthMode(bootstrapped, setupCodeRequired = false) {

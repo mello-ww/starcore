@@ -49,8 +49,8 @@ Codex.
 - **Music** has its cross-platform redesign: StarCore tokens, pill controls and a
   retractable floating player whose top-bar disc shows the playing cover. It still uses its
   own `page.js` and native screens, not `ui.json`. On Android its player is now the shared
-  AudioHost (`mobile/src/media/`), fed by the `audio.library` capability. The web host is
-  next (`docs/media-audio.md`). Native Satellite screens are wired in only by
+  AudioHost (`mobile/src/media/`), and on the web Mission Control's (`mission_control/media/`),
+  both fed by the `audio.library` and `audio.session` capabilities (`docs/media-audio.md`). Native Satellite screens are wired in only by
   `mobile/src/satellites/builtins.tsx`.
 - **Photos and File Explorer** still use Satellite-specific client code and need architectural
   work (shared capabilities such as a media gallery) before they move to the contract.
@@ -77,6 +77,7 @@ Codex.
 | --- | --- |
 | Engine and Satellites | `cd engine && .venv/Scripts/python -m unittest discover -s tests -t .` |
 | UI contract, web | `node --test contracts/ui/tests/web.test.mjs` |
+| Web audio host | `node --test mission_control/tests/media.test.mjs` |
 | Android | `cd mobile && npm test`, `npm run typecheck`, `npm run lint` |
 | Android release build | `cd mobile/android && ./gradlew assembleRelease`, with `JAVA_HOME` set to a JDK 17 for that command only |
 

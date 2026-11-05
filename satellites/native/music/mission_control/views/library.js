@@ -1,7 +1,7 @@
 import * as api from "../api.js";
 import * as store from "../store.js";
 import { encode, go } from "../router.js";
-import { button, debounce, el, emptyState, icon, plural } from "../ui/dom.js";
+import { button, debounce, el, emptyState, icon, plural } from "/media/dom.js";
 import { albumCard, artistCard, grid, header, link, playButtons, playlistCard, totals, trackList } from "../ui/lists.js";
 import { createPlaylist, importPlaylist, smartPlaylist } from "./playlist.js";
 

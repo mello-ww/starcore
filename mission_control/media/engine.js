@@ -1,4 +1,4 @@
-import * as api from "../api.js";
+import * as library from "./library.js";
 import { Effects, dbToGain } from "./effects.js";
 
 const RETRIES = 4;
@@ -195,9 +195,9 @@ export class Engine {
     }
 
     async prepare(track, quality = this.quality) {
-        const info = await api.get(`playback/${encodeURIComponent(track.id)}${api.query({ quality, format: this.format })}`);
+        const info = await library.get("operations", "resolve", `/${encodeURIComponent(track.id)}${library.query({ quality, format: this.format })}`);
         const gain = this.replaygain === "off" ? 0 : Math.max(-24, Math.min(Number(info.gain && info.gain.db) || 0, 12));
-        return { track: info.track || track, plan: info.plan, src: api.url(info.stream), level: dbToGain(gain), gain: info.gain };
+        return { track: info.track || track, plan: info.plan, src: library.url(info.stream), level: dbToGain(gain), gain: info.gain };
     }
 
     async load(track, { position = 0, autoplay = true } = {}) {

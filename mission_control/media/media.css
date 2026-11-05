@@ -1,0 +1,160 @@
+/* Mission Control's shared audio player (docs/media-audio.md): its design tokens, the shared
+   pieces it draws with, and its own surfaces. Loaded by the shell, so the player works on every
+   page, before any Satellite's page has loaded. The --mu-* names are the player's tokens. */
+@import url("./components.css");
+@import url("./player.css");
+
+/* The player's tokens, on Mission Control's. Every themed surface carries data-mu-theme. */
+
+[data-mu-theme="dark"] {
+    --mu-bg: var(--sc-bg, #101114);
+    --mu-surface: var(--sc-card, #212228);
+    --mu-raised: var(--sc-control, #24252b);
+    --mu-line: var(--sc-line, #222329);
+    --mu-line-bright: var(--sc-control-strong, #34363d);
+    --mu-text: var(--sc-text, #ffffff);
+    --mu-dim: var(--sc-text-2, #a6a8b1);
+    --mu-faint: var(--sc-text-3, #8b8f9a);
+    --mu-hover: rgba(255, 255, 255, 0.06);
+    --mu-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+}
+
+[data-mu-theme="light"] {
+    --mu-bg: #f4f6fb;
+    --mu-surface: #ffffff;
+    --mu-raised: #eef1f8;
+    --mu-line: #dde3ef;
+    --mu-line-bright: #c9d2e4;
+    --mu-text: #111a33;
+    --mu-dim: #4a5672;
+    --mu-faint: #77839d;
+    --mu-hover: rgba(10, 20, 60, 0.06);
+    --mu-shadow: 0 18px 50px rgba(20, 30, 70, 0.18);
+    color-scheme: light;
+}
+
+:root {
+    /* The player follows StarCore's accent unless the listener's preference says otherwise (theme.js
+       sets these inline on the root then): a colour of their own, or, in "artwork" mode, the playing cover's
+       colour for the now-playing controls only. The on-* tokens are the text colour that reads on each. */
+    --mu-accent: var(--sc-accent, rgb(238, 68, 75));
+    --mu-on-accent: var(--sc-on-accent, #141215);
+    --mu-player-accent: var(--mu-accent);
+    --mu-player-on-accent: var(--mu-on-accent);
+    --mu-radius: var(--sc-radius-card, 16px);
+    --mu-bar-height: 84px;
+    --mu-bar-inset: 12px;
+}
+
+[data-mu-theme] {
+    --mu-gap: 1.25rem;
+    --mu-row: 52px;
+    color: var(--mu-text);
+    font-family: var(--sans, system-ui, sans-serif);
+}
+
+[data-mu-density="compact"] {
+    --mu-gap: 0.8rem;
+    --mu-row: 40px;
+}
+
+body.mu-has-bar .main {
+    padding-bottom: calc(var(--mu-bar-height) + var(--mu-bar-inset) * 2);
+}
+
+/* StarCore's rounded language for the player's controls: rows and menus soften, fields and
+   selects become pills, small badges round off. Artwork keeps its own corners. */
+.mu-track,
+.mu-queue-row,
+.mu-choose-item,
+.mu-menu-item,
+.mu-lyric-line {
+    border-radius: 12px;
+}
+
+.mu-menu,
+.mu-toast,
+.mu-device {
+    border-radius: 16px;
+}
+
+.mu-modal,
+.mu-drawer {
+    border-radius: var(--mu-radius);
+}
+
+.mu-select,
+.mu-badge,
+input.mu-input {
+    border-radius: 999px;
+}
+
+textarea.mu-input {
+    border-radius: 16px;
+}
+
+.mu-input,
+.mu-select {
+    border-color: transparent;
+    background: var(--mu-raised);
+}
+
+.mu-input:focus,
+.mu-select:focus {
+    border-color: var(--mu-accent);
+}
+
+/* chips and tabs are filled pills, as on Status; selected ones take the accent */
+.mu-chip,
+.mu-tab {
+    min-height: 34px;
+    padding: 0 14px;
+    border: 0;
+    background: var(--mu-raised);
+    color: var(--mu-dim);
+    font-weight: 600;
+    opacity: 1;
+}
+
+.mu-chip {
+    display: inline-flex;
+    align-items: center;
+}
+
+.mu-chip:hover,
+.mu-tab:hover {
+    background: var(--mu-line-bright);
+    color: var(--mu-text);
+}
+
+.mu-chip-accent,
+.mu-chip-accent:hover {
+    background: var(--mu-accent);
+    color: var(--mu-on-accent);
+}
+
+.mu-tab-accent {
+    background: color-mix(in srgb, var(--mu-accent) 18%, var(--mu-raised));
+    color: var(--mu-text);
+}
+
+/* "Show all", "Clear" and the like: quiet pills that light up on hover */
+.mu-text-button {
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+}
+
+.mu-text-button:hover {
+    background: var(--mu-hover);
+    color: var(--mu-text);
+}
+
+.mu-art {
+    border-radius: 10px;
+}
+
+.mu-tab.active:hover {
+    background: var(--mu-accent);
+    color: var(--mu-on-accent);
+}

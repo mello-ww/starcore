@@ -1,9 +1,9 @@
 import * as store from "../store.js";
 import { encode, go } from "../router.js";
-import { player } from "../player/player.js";
+import { player } from "/media/player.js";
 import { albumMenu, trackMenu } from "./actions.js";
 import { artwork, mosaic } from "./artwork.js";
-import { button, duration, el, icon, iconButton, longDuration, plural } from "./dom.js";
+import { button, duration, el, icon, iconButton, longDuration, plural } from "/media/dom.js";
 
 function markPlaying() {
     const current = player().engine.track;
@@ -24,24 +24,11 @@ function watch() {
     watching = true;
     player().on("track", markPlaying);
     player().on("state", markPlaying);
-    store.on("favorites", () => {
-        for (const node of document.querySelectorAll("[data-like-kind]")) {
-            const liked = store.isLiked(node.dataset.likeKind, node.dataset.likeId);
-            node.classList.toggle("liked", liked);
-            node.setAttribute("aria-pressed", String(liked));
-        }
-    });
 }
 
-export function likeButton(kind, id, label = "Like") {
-    const node = iconButton("heart", label, () => store.toggleLiked(kind, id).catch((error) => store.toast(error.message, "error")), "mu-icon-button mu-like");
-    node.dataset.likeKind = kind;
-    node.dataset.likeId = id;
-    const liked = store.isLiked(kind, id);
-    node.classList.toggle("liked", liked);
-    node.setAttribute("aria-pressed", String(liked));
-    return node;
-}
+import { likeButton, qualityBadge } from "/media/widgets.js";
+
+export { likeButton, qualityBadge };
 
 export function link(text, path, className = "mu-link") {
     const node = el("a", className, text);
@@ -64,15 +51,6 @@ export function artistLinks(track) {
         wrap.append(artist.id ? link(artist.name, `artist/${encode(artist.id)}`) : artist.name);
     });
     return wrap;
-}
-
-export function qualityBadge(quality) {
-    if (!quality || !(quality.lossless || quality.hires)) {
-        return null;
-    }
-    const node = el("span", `mu-badge ${quality.hires ? "mu-badge-hires" : "mu-badge-lossless"}`, quality.hires ? "Hi-Res" : "Lossless");
-    node.title = quality.label;
-    return node;
 }
 
 // Builds the first `size` items now and the rest as the end of the list scrolls into view,

@@ -1,6 +1,6 @@
-import * as api from "../api.js";
-import * as store from "../store.js";
-import { Engine } from "../audio/engine.js";
+import * as library from "./library.js";
+import * as session from "./session.js";
+import { Engine } from "./engine.js";
 
 const SAVE_DELAY = 1500;
 const DEVICE_KEY = "starcore.music.device";
@@ -63,14 +63,14 @@ class Player {
         this.engine.on("track", () => { this.emit("track"); this.updateMediaSession(); });
         this.engine.on("seek", () => { this.lastTime = null; this.scheduleSave(); this.emit("seek"); });
         this.engine.on("blocked", () => { this.blocked = true; this.emit("blocked"); });
-        this.engine.on("notice", (message) => store.toast(message));
+        this.engine.on("notice", (message) => session.toast(message));
         this.engine.on("error", (error) => {
-            store.toast(error.message, "error");
+            session.toast(error.message, "error");
             if (error.fatal) {
                 this.next();
             }
         });
-        store.on("preferences", (prefs) => this.engine.configure(prefs));
+        session.on("preferences", (prefs) => this.engine.configure(prefs));
         this.setupMediaSession();
         window.addEventListener("pagehide", () => this.save(true));
     }
@@ -116,12 +116,12 @@ class Player {
             return;
         }
         this.restored = true;
-        await store.load().catch(() => {});
-        if (store.state.preferences) {
-            this.engine.configure(store.state.preferences);
+        await session.load().catch(() => {});
+        if (session.state.preferences) {
+            this.engine.configure(session.state.preferences);
         }
         try {
-            const payload = await api.get(`queue${api.query({ device: this.device, expand: 1 })}`);
+            const payload = await library.get("session", "queue", library.query({ device: this.device, expand: 1 }));
             const saved = payload.state;
             if (saved && saved.tracks && saved.tracks.length) {
                 this.applyState(saved, saved.tracks, false);
@@ -212,7 +212,7 @@ class Player {
             this.original.push(...list);
         }
         this.changed();
-        store.toast(list.length === 1 ? `"${list[0].title}" plays next` : `${list.length} tracks play next`);
+        session.toast(list.length === 1 ? `"${list[0].title}" plays next` : `${list.length} tracks play next`);
     }
 
     addToQueue(tracks) {
@@ -228,7 +228,7 @@ class Player {
             this.original.push(...list);
         }
         this.changed();
-        store.toast(list.length === 1 ? `Added "${list[0].title}" to the queue` : `Added ${list.length} tracks to the queue`);
+        session.toast(list.length === 1 ? `Added "${list[0].title}" to the queue` : `Added ${list.length} tracks to the queue`);
     }
 
     remove(position) {
@@ -397,11 +397,11 @@ class Player {
     }
 
     async autoplay() {
-        if (store.preference("queue_end", "stop") !== "autoplay" || !this.current) {
+        if (session.preference("queue_end", "stop") !== "autoplay" || !this.current) {
             return false;
         }
         try {
-            const station = await api.get(`radio/track/${encodeURIComponent(this.current.id)}`);
+            const station = await library.get("session", "radio", `/track/${encodeURIComponent(this.current.id)}`);
             const known = new Set(this.queue.map((track) => track.id));
             const fresh = station.tracks.filter((track) => !known.has(track.id)).slice(0, 25);
             if (!fresh.length) {
@@ -412,7 +412,7 @@ class Player {
                 this.original.push(...fresh);
             }
             this.emit("queue");
-            store.toast("Autoplay: continuing with similar tracks from your library");
+            session.toast("Autoplay: continuing with similar tracks from your library");
             return true;
         } catch (error) {
             return false;
@@ -424,7 +424,7 @@ class Player {
             this.report(false);
             this.cancelSleep();
             this.engine.pause();
-            store.toast("Sleep timer: playback stopped");
+            session.toast("Sleep timer: playback stopped");
             return;
         }
         if (this.repeat === "one") {
@@ -470,7 +470,7 @@ class Player {
         }
         const seconds = Math.round(this.listened);
         this.listened = 0;
-        api.post("history", { track_id: track.id, seconds, device: this.device, context: this.context || (manual ? "queue:manual" : null) }, { keepalive: true })
+        library.post("session", "history", "", { track_id: track.id, seconds, device: this.device, context: this.context || (manual ? "queue:manual" : null) }, { keepalive: true })
             .catch(() => {});
     }
 
@@ -497,7 +497,7 @@ class Player {
         this.engine.setVolume(start);
         this.sleep = null;
         this.emit("sleep");
-        store.toast("Sleep timer: playback stopped");
+        session.toast("Sleep timer: playback stopped");
     }
 
     cancelSleep() {
@@ -542,7 +542,7 @@ class Player {
             state.playing = false;
         }
         this.emit("saved", state);
-        return api.post("queue", { device: this.device, name: deviceName(), kind: "web", state }, { keepalive: final }).catch(() => {});
+        return library.post("session", "queue", "", { device: this.device, name: deviceName(), kind: "web", state }, { keepalive: final }).catch(() => {});
     }
 
     // ---------- remote control (StarCore Connect) ----------
@@ -557,8 +557,8 @@ class Player {
         if (!this.remote) {
             return null;
         }
-        return api.post("connect/command", { device_id: this.device, target: this.remote.device.id, command, arguments: args })
-            .catch((error) => store.toast(error.message, "error"));
+        return library.post("session", "connect", "/command", { device_id: this.device, target: this.remote.device.id, command, arguments: args })
+            .catch((error) => session.toast(error.message, "error"));
     }
 
     // ---------- Media Session ----------
@@ -597,7 +597,7 @@ class Player {
         }
         if (this.metadataFor !== track.id) {
             this.metadataFor = track.id;
-            const artwork = track.album_id ? [96, 300, 600].map((size) => ({ src: api.artworkUrl(track.album_id, size), sizes: `${size}x${size}` })) : [];
+            const artwork = track.album_id ? [96, 300, 600].map((size) => ({ src: library.artworkUrl(track.album_id, size), sizes: `${size}x${size}` })) : [];
             navigator.mediaSession.metadata = new MediaMetadata({ title: track.title || "", artist: track.artist || track.album_artist || "", album: track.album || "", artwork });
         }
         navigator.mediaSession.playbackState = this.engine.playing ? "playing" : "paused";

@@ -1,9 +1,9 @@
 import * as api from "../api.js";
 import { encode, go } from "../router.js";
 import { artwork } from "../ui/artwork.js";
-import { button, debounce, el, emptyState, iconButton } from "../ui/dom.js";
+import { button, debounce, el, emptyState, iconButton } from "/media/dom.js";
 import { albumCard, artistCard, playlistCard, shelf, trackList } from "../ui/lists.js";
-import { player } from "../player/player.js";
+import { player } from "/media/player.js";
 
 const QUALITIES = [["", "Any quality"], ["lossless", "Lossless"], ["hires", "Hi-Res"], ["lossy", "Lossy"]];
 

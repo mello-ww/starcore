@@ -1,9 +1,9 @@
 import * as api from "../api.js";
 import { encode, go } from "../router.js";
 import { artwork } from "../ui/artwork.js";
-import { button, el, emptyState, plural, size } from "../ui/dom.js";
+import { button, el, emptyState, plural, size } from "/media/dom.js";
 import { link } from "../ui/lists.js";
-import { player } from "../player/player.js";
+import { player } from "/media/player.js";
 
 const RANGES = [[7, "Last 7 days"], [30, "Last 30 days"], [365, "Last year"], [0, "All time"]];
 

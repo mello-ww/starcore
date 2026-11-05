@@ -1,7 +1,7 @@
 import * as api from "../api.js";
 import { encode } from "../router.js";
 import { mosaic } from "../ui/artwork.js";
-import { emptyState } from "../ui/dom.js";
+import { emptyState } from "/media/dom.js";
 import { albumCard, header, playButtons, shelf, totals, trackList } from "../ui/lists.js";
 
 // mixes, radio stations, moods and genres: generated lists that all render the same way

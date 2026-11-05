@@ -1,11 +1,11 @@
 import * as api from "../api.js";
 import * as store from "../store.js";
-import { BANDS, PRESETS } from "../audio/effects.js";
-import { connect } from "../connect.js";
-import { player } from "../player/player.js";
-import { button, debounce, el, longDuration, plural, size } from "../ui/dom.js";
+import { BANDS, PRESETS } from "/media/effects.js";
+import { connect } from "/media/connect.js";
+import { player } from "/media/player.js";
+import { button, debounce, el, longDuration, plural, size } from "/media/dom.js";
 import { trackList } from "../ui/lists.js";
-import { confirm } from "../ui/overlay.js";
+import { confirm } from "/media/overlay.js";
 
 let pending = {};
 const save = debounce(() => {

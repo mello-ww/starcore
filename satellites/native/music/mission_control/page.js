@@ -1,14 +1,13 @@
 import * as api from "./api.js";
 import * as store from "./store.js";
-import { connect } from "./connect.js";
-import { current, go, setSatellite } from "./router.js";
-import { register } from "./theme.js";
-import { mountBar, toggleQueue } from "./player/bar.js";
-import { installKeys } from "./player/keys.js";
-import { player } from "./player/player.js";
+import { current, encode, go, href, setSatellite } from "./router.js";
+import { register } from "/media/theme.js";
+import { setExtensions } from "/media/extensions.js";
+import { start as startAudioHost } from "/media/host.js";
+import { addToPlaylist, trackMenu } from "./ui/actions.js";
 import { mosaic } from "./ui/artwork.js";
-import { button, el, errorState, icon } from "./ui/dom.js";
-import "./ui/overlay.js";
+import { button, el, errorState, icon } from "/media/dom.js";
+import "/media/overlay.js";
 
 const VIEWS = {
     home: () => import("./views/home.js"),
@@ -28,35 +27,39 @@ const VIEWS = {
 
 const NAV = [["home", "Home", "home"], ["search", "Search", "search"], ["library", "Your Library", "library"], ["stats", "Stats", "stats"], ["settings", "Settings", "settings"]];
 
-let started = false;
-
-function start() {
-    if (started) {
-        return;
-    }
-    started = true;
-    mountBar();
-    const instance = player();
-    instance.restore();
-    connect(instance).start();
-    installKeys(() => {
-        if (!current()) {
-            return;
-        }
-        const field = document.querySelector(".mu-search-input");
-        if (field) {
-            field.focus();
-        } else {
-            go("search");
-        }
-    }, toggleQueue);
+// What Music adds to Mission Control's shared player (docs/media-audio.md): its track menu,
+// its playlists, and links into its own views. The player itself is the shell's.
+function registerExtensions() {
+    setExtensions({
+        trackMenu,
+        addToPlaylist,
+        albumHref: (id) => href(`album/${encode(id)}`),
+        artistHref: (id) => href(`artist/${encode(id)}`),
+        openAlbum: (id) => go(`album/${encode(id)}`),
+        openArtist: (id) => go(`artist/${encode(id)}`),
+        openLibrary: { label: "Open Music", action: () => go("") },
+        focusSearch: () => {
+            if (!current()) {
+                return;
+            }
+            const field = document.querySelector(".mu-search-input");
+            if (field) {
+                field.focus();
+            } else {
+                go("search");
+            }
+        },
+    });
 }
 
 export function mount(context) {
     const { element, satellite, api: client } = context;
     api.setBase(client.url(""));
     setSatellite(satellite.name);
-    start();
+    store.setOwner(satellite.name);
+    registerExtensions();
+    // the shell normally started it already; a no-op then
+    startAudioHost();
 
     const root = el("div", "mu-root");
     const unregister = register(root);

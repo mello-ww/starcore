@@ -1,6 +1,6 @@
-import * as store from "../store.js";
+import * as session from "./session.js";
 import { button, el, iconButton } from "./dom.js";
-import { register } from "../theme.js";
+import { register } from "./theme.js";
 
 let openMenu = null;
 
@@ -186,7 +186,7 @@ function toastLayer() {
     return toastHost;
 }
 
-store.on("toast", ({ message, kind }) => {
+session.on("toast", ({ message, kind }) => {
     const node = el("div", `mu-toast mu-toast-${kind}`, message);
     toastLayer().appendChild(node);
     setTimeout(() => node.classList.add("leaving"), 3600);

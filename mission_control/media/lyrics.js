@@ -1,6 +1,6 @@
-import * as api from "../api.js";
-import * as store from "../store.js";
-import { button, el, emptyState } from "../ui/dom.js";
+import * as library from "./library.js";
+import * as session from "./session.js";
+import { button, el, emptyState } from "./dom.js";
 import { player } from "./player.js";
 
 const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -36,7 +36,7 @@ export function lyricsPanel({ karaoke = false } = {}) {
         data = undefined;
         body.replaceChildren(el("div", "mu-skeleton mu-skeleton-lyrics"));
         try {
-            data = await api.get(`lyrics/${encodeURIComponent(track.id)}${api.query({ language })}`);
+            data = await library.get("operations", "lyrics", `/${encodeURIComponent(track.id)}${library.query({ language })}`);
         } catch (error) {
             data = null;
         }
@@ -55,7 +55,7 @@ export function lyricsPanel({ karaoke = false } = {}) {
             lines = [];
             return;
         }
-        offset = Number(data.offset || 0) + Number(store.preference("lyrics_offset", 0));
+        offset = Number(data.offset || 0) + Number(session.preference("lyrics_offset", 0));
         if (data.languages && data.languages.length > 1) {
             const select = el("select", "mu-select");
             select.setAttribute("aria-label", "Lyrics language");
@@ -77,9 +77,9 @@ export function lyricsPanel({ karaoke = false } = {}) {
             const change = (delta) => {
                 const own = Number(data.offset || 0) + delta;
                 data.offset = own;
-                offset = own + Number(store.preference("lyrics_offset", 0));
+                offset = own + Number(session.preference("lyrics_offset", 0));
                 label.textContent = offsetLabel();
-                api.post(`lyrics/${encodeURIComponent(trackId)}`, { offset: own }).catch((error) => store.toast(error.message, "error"));
+                library.post("operations", "lyrics", `/${encodeURIComponent(trackId)}`, { offset: own }).catch((error) => session.toast(error.message, "error"));
             };
             toolbar.append(button("−0.25s", "mu-chip", () => change(-250), "Show lyrics later"), label,
                 button("+0.25s", "mu-chip", () => change(250), "Show lyrics earlier"));
@@ -170,7 +170,7 @@ export function lyricsPanel({ karaoke = false } = {}) {
     }
 
     const stopTrack = player().on("track", () => { language = null; load(); });
-    const stopPrefs = store.on("preferences", () => data && render());
+    const stopPrefs = session.on("preferences", () => data && render());
     load();
     tick();
     node.dispose = () => {

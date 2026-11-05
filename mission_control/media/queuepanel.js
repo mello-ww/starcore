@@ -1,7 +1,7 @@
-import { encode, go } from "../router.js";
-import { trackMenu } from "../ui/actions.js";
-import { artwork } from "../ui/artwork.js";
-import { button, duration, el, emptyState, icon, iconButton } from "../ui/dom.js";
+import { extension } from "./extensions.js";
+import { menu } from "./overlay.js";
+import { artwork } from "./artwork.js";
+import { button, duration, el, emptyState, icon, iconButton } from "./dom.js";
 import { player } from "./player.js";
 
 export function queuePanel() {
@@ -33,7 +33,13 @@ export function queuePanel() {
         });
         item.addEventListener("contextmenu", (event) => {
             event.preventDefault();
-            trackMenu(track, event, [{ label: "Remove from queue", action: () => player().remove(position), disabled: position === player().index }]);
+            const remove = [{ label: "Remove from queue", action: () => player().remove(position), disabled: position === player().index }];
+            const trackMenu = extension("trackMenu");
+            if (trackMenu) {
+                trackMenu(track, event, remove);
+            } else {
+                menu([{ label: "Play next", action: () => player().playNext([track]) }, ...remove], event);
+            }
         });
         item.addEventListener("dragstart", (event) => {
             event.dataTransfer.setData("text/plain", String(position));
@@ -84,8 +90,9 @@ export function queuePanel() {
             items.push(el("p", "mu-queue-note", `Repeat is on: ${instance.index} earlier song${instance.index === 1 ? "" : "s"} play again after these.`));
         }
         const footer = el("div", "mu-queue-foot");
-        if (current && current.album_id) {
-            footer.append(button("Go to album", "mu-text-button", () => go(`album/${encode(current.album_id)}`)));
+        const openAlbum = extension("openAlbum");
+        if (current && current.album_id && openAlbum) {
+            footer.append(button("Go to album", "mu-text-button", () => openAlbum(current.album_id)));
         }
         items.push(footer);
         node.replaceChildren(...items);

@@ -113,6 +113,11 @@ its blocks, live data from its routes, and actions that call them. The renderer 
 [UI contract](ui-contract.md), never a Satellite. A new revision of the document (after an
 update or a rediscovery) remounts the page.
 
+Audio plays through the shell's shared player (`mission_control/media/`, see
+[Audio playback](media-audio.md)): started after sign-in, it plays from whichever Satellite
+the catalog lists as the `audio.library` provider, and its floating bar and top-bar disc stay
+across every page, reloads included.
+
 A Satellite that ships both a `ui.json` and a `page.js` gets the shared interface; its
 `page.js` is the fallback if the document is refused. In Developer Mode, the button beside the
 Satellite's title switches between the two (remembered per browser), so a Satellite moving to

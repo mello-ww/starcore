@@ -3,7 +3,7 @@ import * as store from "../store.js";
 import { encode, go } from "../router.js";
 import { startRadio } from "../ui/actions.js";
 import { artwork } from "../ui/artwork.js";
-import { button, el, iconButton, plural } from "../ui/dom.js";
+import { button, el, iconButton, plural } from "/media/dom.js";
 import { albumCard, header, playButtons, shelf, trackList } from "../ui/lists.js";
 
 export async function render({ node, parts, alive }) {

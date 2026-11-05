@@ -1,5 +1,5 @@
-import * as store from "../store.js";
-import { isTyping } from "../ui/dom.js";
+import * as session from "./session.js";
+import { isTyping } from "./dom.js";
 import { isFullscreenOpen } from "./fullscreen.js";
 import { player } from "./player.js";
 
@@ -42,7 +42,7 @@ export function installKeys(focusSearch, toggleQueue) {
         } else if (key === "m" || key === "M") {
             instance.engine.toggleMute();
         } else if ((key === "l" || key === "L") && instance.current) {
-            store.toggleLiked("track", instance.current.id);
+            session.toggleLiked("track", instance.current.id);
         } else if (key === "q" || key === "Q") {
             toggleQueue();
         } else if (key === "/") {

@@ -220,7 +220,27 @@ Accepted when:
   on a physical device as well as the emulator.
 - The existing Music tests pass unchanged, plus tests for catalog resolution.
 
-### 4. Web AudioHost
+### 4. Web AudioHost - done
+
+What it is now:
+- `mission_control/media/` holds the host: `host.js` (started by the shell after sign-in),
+  `library.js` (provider resolution and requests by operation), `session.js` (preferences,
+  likes, notices and the event bus), the controller, audio engine and effects, Connect, the
+  bar, seek, full screen, queue, devices, lyrics, keys, and `media.css` (the `--mu-*` tokens,
+  shared pieces and the player's styles, loaded on every page).
+- Music's page keeps its library views. It shares the host's event bus. Its preferences and
+  likes are the host's session when the host plays from Music, and its own routes otherwise.
+  It registers what it adds to the player with `setExtensions` (`/media/extensions.js`): its
+  track menu, Add to playlist, and links to its album, artist and library views.
+- Until a Satellite's page has registered them, the player offers less: no Add to playlist,
+  the title and artist are plain text, and More is hidden. Lyrics and Devices appear only when
+  the provider offers `lyrics` and the session `connect`.
+- No fallback for older servers is needed on the web: Mission Control is served by the same
+  Engine, so it always has the catalog.
+- Tests: `node --test mission_control/tests/media.test.mjs` (a provider the client doesn't
+  know, found only through the catalog; missing operations) and the modularity guard (the
+  host imports only its own folder).
+
 
 - Move `player/`, `audio/` and the bar into `mission_control/media/`, started by the shell at
   sign-in rather than by Music's page.

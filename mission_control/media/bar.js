@@ -1,11 +1,11 @@
-import * as store from "../store.js";
-import { encode, go, href } from "../router.js";
-import { register, followArtwork } from "../theme.js";
-import { addToPlaylist } from "../ui/actions.js";
-import { artwork } from "../ui/artwork.js";
-import { button, el, icon, iconButton } from "../ui/dom.js";
-import { likeButton, qualityBadge } from "../ui/lists.js";
-import { menu } from "../ui/overlay.js";
+import * as library from "./library.js";
+import * as session from "./session.js";
+import { register, followArtwork } from "./theme.js";
+import { extension } from "./extensions.js";
+import { artwork } from "./artwork.js";
+import { button, el, icon, iconButton } from "./dom.js";
+import { likeButton, qualityBadge } from "./widgets.js";
+import { menu } from "./overlay.js";
 import { devicesPanel } from "./devices.js";
 import { openFullscreen } from "./fullscreen.js";
 import { player } from "./player.js";
@@ -13,6 +13,15 @@ import { queuePanel } from "./queuepanel.js";
 import { seekBar } from "./seek.js";
 
 let bar = null;
+
+// a title or artist links into the provider's own page when it offers one, else it is text
+function setHref(node, target) {
+    if (target) {
+        node.href = target;
+    } else {
+        node.removeAttribute("href");
+    }
+}
 
 // The bar can be put away: it then lives in the top bar as the playing cover, a spinning disc.
 const COLLAPSED_KEY = "starcore.music.playerCollapsed";
@@ -41,8 +50,8 @@ export function sleepMenu(anchor) {
     menu([
         sleeping ? { label: "Turn off sleep timer", action: () => instance.cancelSleep() } : null,
         sleeping ? "-" : null,
-        ...[5, 15, 30, 45, 60, 90].map((minutes) => ({ label: `${minutes} minutes`, action: () => { instance.setSleep(minutes); store.toast(`Sleep timer set for ${minutes} minutes`); } })),
-        { label: "End of this track", action: () => { instance.setSleep("track"); store.toast("Playback stops when this track ends"); } },
+        ...[5, 15, 30, 45, 60, 90].map((minutes) => ({ label: `${minutes} minutes`, action: () => { instance.setSleep(minutes); session.toast(`Sleep timer set for ${minutes} minutes`); } })),
+        { label: "End of this track", action: () => { instance.setSleep("track"); session.toast("Playback stops when this track ends"); } },
     ], anchor);
 }
 
@@ -168,17 +177,31 @@ export function mountBar() {
     const more = iconButton("more", "More", (event) => {
         const track = player().current;
         if (track) {
+            // what the provider's own page added (see extensions.js); nothing else to offer without it
+            const add = extension("addToPlaylist");
+            const album = extension("openAlbum");
+            const artist = extension("openArtist");
+            const library = extension("openLibrary");
             menu([
-                { label: "Add to playlist…", action: () => addToPlaylist([track]) },
-                track.album_id ? { label: "Go to album", action: () => go(`album/${encode(track.album_id)}`) } : null,
-                track.artist_id ? { label: "Go to artist", action: () => go(`artist/${encode(track.artist_id)}`) } : null,
-                { label: "Open Music", action: () => go("") },
+                add ? { label: "Add to playlist…", action: () => add([track]) } : null,
+                track.album_id && album ? { label: "Go to album", action: () => album(track.album_id) } : null,
+                track.artist_id && artist ? { label: "Go to artist", action: () => artist(track.artist_id) } : null,
+                library ? { label: library.label, action: library.action } : null,
             ], event);
         }
     });
+    // More lists only what the provider's page added; with nothing to offer it stays out of the way
+    const updateMore = () => {
+        more.hidden = !["addToPlaylist", "openAlbum", "openArtist", "openLibrary"].some((name) => extension(name));
+    };
+    session.on("extensions", updateMore);
+    updateMore();
     const expand = iconButton("expand", "Full-screen player", () => openFullscreen());
     const retract = iconButton("retract", "Put the player away", () => setCollapsed(true), "mu-icon-button mu-retract");
     tools.append(lyrics, queue, devices, sleep, volumeControl(), more, expand, retract);
+    // Lyrics and Connect only from a provider that offers them
+    lyrics.hidden = !library.offers("lyrics");
+    devices.hidden = !library.offersSession("connect");
     element.append(now, center, tools);
     document.body.appendChild(element);
     bar = { element, drawer: null };
@@ -303,14 +326,14 @@ export function mountBar() {
             followArtwork(track.album_id);
         }
         title.textContent = track.title || "";
-        title.href = track.album_id ? href(`album/${encode(track.album_id)}`) : href();
+        setHref(title, track.album_id && extension("albumHref") ? extension("albumHref")(track.album_id) : null);
         subtitle.replaceChildren();
         const badge = qualityBadge(track.quality);
         if (badge) {
             subtitle.append(badge);
         }
         const artist = el("a", "mu-link", track.artist || track.album_artist || "");
-        artist.href = track.artist_id ? href(`artist/${encode(track.artist_id)}`) : href();
+        setHref(artist, track.artist_id && extension("artistHref") ? extension("artistHref")(track.artist_id) : null);
         subtitle.append(artist);
         if (like.dataset.track !== track.id) {
             like.dataset.track = track.id;
@@ -344,6 +367,8 @@ export function mountBar() {
     for (const name of ["track", "queue", "remote", "state"]) {
         player().on(name, update);
     }
+    // links into the provider's page appear once that page has registered them
+    session.on("extensions", update);
     for (const name of ["state", "blocked", "sleep", "remote", "track"]) {
         player().on(name, updateStatus);
     }

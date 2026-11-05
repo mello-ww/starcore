@@ -1,12 +1,13 @@
-import * as store from "../store.js";
-import { encode, go } from "../router.js";
-import { register } from "../theme.js";
-import { visualizer } from "../audio/visualizer.js";
-import { addToPlaylist, trackDetails } from "../ui/actions.js";
-import { artwork } from "../ui/artwork.js";
-import { button, el, emptyState, iconButton } from "../ui/dom.js";
-import { artistLinks, likeButton, qualityBadge } from "../ui/lists.js";
-import { menu } from "../ui/overlay.js";
+import * as library from "./library.js";
+import * as session from "./session.js";
+import { extension } from "./extensions.js";
+import { trackDetails } from "./details.js";
+import { register } from "./theme.js";
+import { visualizer } from "./visualizer.js";
+import { artwork } from "./artwork.js";
+import { button, el, emptyState, iconButton } from "./dom.js";
+import { likeButton, qualityBadge } from "./widgets.js";
+import { menu } from "./overlay.js";
 import { devicesPanel } from "./devices.js";
 import { lyricsPanel } from "./lyrics.js";
 import { player } from "./player.js";
@@ -14,6 +15,34 @@ import { queuePanel } from "./queuepanel.js";
 import { seekBar } from "./seek.js";
 
 let open = null;
+
+// text that opens a view of the provider's own page, or plain text when it offers none
+function jump(text, action) {
+    if (!action) {
+        return text;
+    }
+    const node = el("a", "mu-link", text);
+    node.href = "#";
+    node.addEventListener("click", (event) => {
+        event.preventDefault();
+        closeFullscreen();
+        action();
+    });
+    return node;
+}
+
+function artistLine(track) {
+    const wrap = el("span", "mu-artists");
+    const artists = track.artists && track.artists.length ? track.artists : [{ id: track.artist_id, name: track.artist || track.album_artist || "Unknown artist" }];
+    const open = extension("openArtist");
+    artists.forEach((artist, index) => {
+        if (index) {
+            wrap.append(", ");
+        }
+        wrap.append(jump(artist.name, artist.id && open && (() => open(artist.id))));
+    });
+    return wrap;
+}
 const TABS = [["lyrics", "Lyrics"], ["queue", "Queue"], ["info", "Info"], ["devices", "Devices"]];
 const SPEEDS = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 2];
 
@@ -64,7 +93,9 @@ export async function openFullscreen(tab = "lyrics") {
     let content = null;
     let karaoke = false;
     const buttons = new Map();
-    for (const [key, label] of TABS) {
+    // Lyrics only from a provider that offers them, Devices only with its session's Connect
+    const offered = TABS.filter(([key]) => (key !== "lyrics" || library.offers("lyrics")) && (key !== "devices" || library.offersSession("connect")));
+    for (const [key, label] of offered) {
         const node = button(label, "mu-tab", () => select(key));
         node.setAttribute("role", "tab");
         buttons.set(key, node);
@@ -76,9 +107,14 @@ export async function openFullscreen(tab = "lyrics") {
         karaokeButton.classList.toggle("active", karaoke);
         select("lyrics", true);
     });
-    tabs.append(karaokeButton);
+    if (library.offers("lyrics")) {
+        tabs.append(karaokeButton);
+    }
 
     function select(key, force = false) {
+        if (!offered.some(([name]) => name === key)) {
+            key = "queue";
+        }
         if (key === current && !force) {
             return;
         }
@@ -114,7 +150,7 @@ export async function openFullscreen(tab = "lyrics") {
         return node;
     }
 
-    const viz = visualizer(canvas, player().engine.effects, () => store.preference("visualizer", "off"));
+    const viz = visualizer(canvas, player().engine.effects, () => session.preference("visualizer", "off"));
     viz.start();
 
     function render() {
@@ -131,16 +167,9 @@ export async function openFullscreen(tab = "lyrics") {
         }
         const title = el("h2", "mu-full-title", track.title);
         const line = el("div", "mu-full-sub");
-        line.append(artistLinks(track));
+        line.append(artistLine(track));
         if (track.album_id) {
-            const album = el("a", "mu-link", track.album || "");
-            album.href = "#";
-            album.addEventListener("click", (event) => {
-                event.preventDefault();
-                closeFullscreen();
-                go(`album/${encode(track.album_id)}`);
-            });
-            line.append(" · ", album);
+            line.append(" · ", jump(track.album || "", extension("openAlbum") && (() => extension("openAlbum")(track.album_id))));
         }
         const badges = el("div", "mu-full-badges");
         const badge = qualityBadge(track.quality);
@@ -157,21 +186,22 @@ export async function openFullscreen(tab = "lyrics") {
             badges.append(el("span", "mu-badge mu-badge-plain", `On ${instance.remote.device.name}`));
         }
         titles.replaceChildren(title, line, badges);
-        extras.replaceChildren(likeButton("track", track.id), iconButton("plus", "Add to playlist", () => addToPlaylist([track])),
+        const add = extension("addToPlaylist");
+        extras.replaceChildren(likeButton("track", track.id), ...(add ? [iconButton("plus", "Add to playlist", () => add([track]))] : []),
             button(`${instance.engine.speed}×`, "mu-chip", (event) => speedMenu(event), "Playback speed"),
             iconButton("timer", "Sleep timer", (event) => sleepMenu(event)));
-        canvas.hidden = store.preference("visualizer", "off") === "off";
+        canvas.hidden = session.preference("visualizer", "off") === "off";
     }
 
     function speedMenu(anchor) {
         menu([
-            ...SPEEDS.map((speed) => ({ label: `${speed}×${speed === 1 ? " (normal)" : ""}`, action: () => store.setPreferences({ speed }) })),
+            ...SPEEDS.map((speed) => ({ label: `${speed}×${speed === 1 ? " (normal)" : ""}`, action: () => session.setPreferences({ speed }) })),
             "-",
-            { label: store.preference("preserve_pitch", true) ? "✓ Keep pitch when changing speed" : "Keep pitch when changing speed", action: () => store.setPreferences({ preserve_pitch: !store.preference("preserve_pitch", true) }) },
+            { label: session.preference("preserve_pitch", true) ? "✓ Keep pitch when changing speed" : "Keep pitch when changing speed", action: () => session.setPreferences({ preserve_pitch: !session.preference("preserve_pitch", true) }) },
         ], anchor);
     }
 
-    const stops = [player().on("track", render), player().on("remote", render), player().on("state", render), store.on("preferences", render)];
+    const stops = [player().on("track", render), player().on("remote", render), player().on("state", render), session.on("preferences", render)];
     const onKey = (event) => {
         if (event.key === "Escape") {
             closeFullscreen();

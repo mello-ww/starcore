@@ -1,6 +1,6 @@
-import { connect } from "../connect.js";
-import * as store from "../store.js";
-import { button, el, emptyState, icon } from "../ui/dom.js";
+import { connect } from "./connect.js";
+import * as session from "./session.js";
+import { button, el, emptyState, icon } from "./dom.js";
 import { player } from "./player.js";
 
 export function devicesPanel() {
@@ -16,14 +16,14 @@ export function devicesPanel() {
         if (!hub.online) {
             items.push(el("p", "mu-devices-note", "Reconnecting to StarCore Connect…"));
         }
-        const local = button(null, `mu-device${!remote ? " current" : ""}`, () => hub.transfer(me).catch((error) => store.toast(error.message, "error")));
+        const local = button(null, `mu-device${!remote ? " current" : ""}`, () => hub.transfer(me).catch((error) => session.toast(error.message, "error")));
         local.append(icon("devices"), el("span", "mu-device-name", "This browser"), el("span", "mu-device-state", !remote ? "Listening here" : "Move playback here"));
         items.push(local);
         const others = hub.devices.filter((device) => device.id !== me);
         for (const device of others) {
             const entry = button(null, `mu-device${remote && remote.device.id === device.id ? " current" : ""}${device.online ? "" : " offline"}`, async () => {
                 if (!device.online) {
-                    store.toast(`${device.name} is offline`);
+                    session.toast(`${device.name} is offline`);
                     return;
                 }
                 try {
@@ -33,7 +33,7 @@ export function devicesPanel() {
                         hub.control(device);
                     }
                 } catch (error) {
-                    store.toast(error.message, "error");
+                    session.toast(error.message, "error");
                 }
             });
             entry.disabled = !device.online;

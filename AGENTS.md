@@ -34,12 +34,13 @@ Start with `docs/architecture.md`, `docs/ui-contract.md`, `docs/satellites.md` a
 ## Current state
 
 Status runs on the declarative UI contract 1.1 on both clients. Music has its cross-platform
-redesign and a retractable floating player, but keeps its own client code. On Android its player
-is the shared AudioHost (`mobile/src/media/`); the web host is next (`docs/media-audio.md`). Photos and File
+redesign and a retractable floating player, but keeps its own client code. Its player is the shared
+AudioHost on both clients (`mobile/src/media/`, `mission_control/media/`; `docs/media-audio.md`). Photos and File
 Explorer still need architectural work before moving to the contract.
 
 ## Checks
 
 - Engine: `cd engine && .venv/Scripts/python -m unittest discover -s tests -t .`
 - UI contract (web): `node --test contracts/ui/tests/web.test.mjs`
+- Web audio host: `node --test mission_control/tests/media.test.mjs`
 - Android: `cd mobile && npm test && npm run typecheck && npm run lint`

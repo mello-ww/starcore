@@ -1,7 +1,7 @@
 import * as api from "../api.js";
 import { encode, go } from "../router.js";
 import { mosaic } from "../ui/artwork.js";
-import { button, el, emptyState, skeletonRows } from "../ui/dom.js";
+import { button, el, emptyState, skeletonRows } from "/media/dom.js";
 import { albumCard, artistCard, mixCard, playlistCard, shelf, trackList } from "../ui/lists.js";
 
 function contextCard(entry) {

@@ -1,6 +1,6 @@
-import * as api from "./api.js";
-import * as store from "./store.js";
-import { deviceName } from "./player/player.js";
+import * as library from "./library.js";
+import * as session from "./session.js";
+import { deviceName } from "./player.js";
 
 const MAX_BACKOFF = 30000;
 
@@ -9,7 +9,7 @@ export async function fetchTracks(ids) {
     const found = new Map();
     for (let start = 0; start < unique.length; start += 12) {
         const chunk = unique.slice(start, start + 12);
-        const results = await Promise.all(chunk.map((id) => api.get(`tracks/${encodeURIComponent(id)}`).catch(() => null)));
+        const results = await Promise.all(chunk.map((id) => library.get("operations", "track", `/${encodeURIComponent(id)}`).catch(() => null)));
         for (const track of results) {
             if (track) {
                 found.set(track.id, track);
@@ -58,7 +58,7 @@ class Connect {
     }
 
     async register() {
-        const payload = await api.post("connect/register", {
+        const payload = await library.post("session", "connect", "/register", {
             device_id: this.player.device,
             name: deviceName(),
             kind: "web",
@@ -71,14 +71,14 @@ class Connect {
 
     async refresh() {
         try {
-            const payload = await api.get("connect/devices");
+            const payload = await library.get("session", "connect", "/devices");
             this.devices = payload.devices;
             this.active = payload.active;
             if (this.player.remote) {
                 const device = this.devices.find((entry) => entry.id === this.player.remote.device.id);
                 if (!device || !device.online) {
                     this.player.setRemote(null);
-                    store.toast("The remote device went offline");
+                    session.toast("The remote device went offline");
                 }
             }
             this.notify();
@@ -93,7 +93,7 @@ class Connect {
                 if (!this.online) {
                     await this.register();
                 }
-                const payload = await api.get(`connect/events${api.query({ device: this.player.device, since: this.cursor, timeout: 25 })}`);
+                const payload = await library.get("session", "connect", `/events${library.query({ device: this.player.device, since: this.cursor, timeout: 25 })}`);
                 this.backoff = 1000;
                 for (const event of payload.events) {
                     await this.handle(event);
@@ -143,7 +143,7 @@ class Connect {
         if (this.trackCache && this.trackCache.id === id) {
             return this.trackCache;
         }
-        this.trackCache = await api.get(`tracks/${encodeURIComponent(id)}`).catch(() => null);
+        this.trackCache = await library.get("operations", "track", `/${encodeURIComponent(id)}`).catch(() => null);
         return this.trackCache;
     }
 
@@ -219,7 +219,7 @@ class Connect {
         let tracks = [];
         if (fromDevice) {
             try {
-                const payload = await api.get(`queue${api.query({ device: fromDevice, expand: 1 })}`);
+                const payload = await library.get("session", "queue", library.query({ device: fromDevice, expand: 1 }));
                 tracks = (payload.state && payload.state.tracks) || [];
             } catch (error) {
                 tracks = [];
@@ -231,7 +231,7 @@ class Connect {
             tracks = tracks.concat(await fetchTracks(missing));
         }
         await player.applyState(state, tracks, state.playing);
-        store.toast("Playback moved to this browser");
+        session.toast("Playback moved to this browser");
     }
 
     control(device) {
@@ -251,12 +251,12 @@ class Connect {
                 return;
             }
             const source = player.remote.device.id;
-            await api.post("connect/transfer", { device_id: player.device, target: player.device, source, play: true });
+            await library.post("session", "connect", "/transfer", { device_id: player.device, target: player.device, source, play: true });
             return;
         }
         await player.save();
         const device = this.devices.find((entry) => entry.id === target);
-        await api.post("connect/transfer", {
+        await library.post("session", "connect", "/transfer", {
             device_id: player.device,
             target,
             source: player.remote ? player.remote.device.id : player.device,
@@ -266,7 +266,7 @@ class Connect {
         if (device) {
             this.control(device);
         }
-        store.toast(`Playing on ${device ? device.name : "another device"}`);
+        session.toast(`Playing on ${device ? device.name : "another device"}`);
     }
 
     disconnectRemote() {

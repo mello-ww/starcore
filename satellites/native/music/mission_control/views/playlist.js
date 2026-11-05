@@ -2,9 +2,9 @@ import * as api from "../api.js";
 import * as store from "../store.js";
 import { encode, go } from "../router.js";
 import { mosaic } from "../ui/artwork.js";
-import { button, el, emptyState, iconButton, longDuration, plural } from "../ui/dom.js";
+import { button, el, emptyState, iconButton, longDuration, plural } from "/media/dom.js";
 import { header, playButtons, trackList } from "../ui/lists.js";
-import { confirm, menu, modal, prompt } from "../ui/overlay.js";
+import { confirm, menu, modal, prompt } from "/media/overlay.js";
 
 const FIELDS = {
     title: ["Title", "text"], artist: ["Artist", "text"], album: ["Album", "text"], album_artist: ["Album artist", "text"],

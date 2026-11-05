@@ -1,4 +1,4 @@
-import { duration, el } from "../ui/dom.js";
+import { duration, el } from "./dom.js";
 import { player } from "./player.js";
 
 // a seek bar that follows playback (or the remote device) and only seeks once the drag is released

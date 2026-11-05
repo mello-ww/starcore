@@ -943,3 +943,35 @@ textarea.mu-input {
     grid-column: 1 / -1;
     height: 1px;
 }
+
+/* ---------- tabs ---------- */
+
+.mu-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.mu-tab {
+    padding: 0.4rem 0.9rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--mu-hover);
+    color: inherit;
+    font: inherit;
+    font-size: 0.84rem;
+    cursor: pointer;
+    opacity: 0.85;
+}
+
+.mu-tab.active,
+.mu-full .mu-tab.active {
+    background: var(--mu-accent);
+    color: var(--mu-on-accent);
+    font-weight: 600;
+    opacity: 1;
+}
+
+.mu-tab-accent {
+    background: color-mix(in srgb, var(--mu-accent) 25%, transparent);
+}

@@ -1,5 +1,5 @@
-import * as api from "./api.js";
-import * as store from "./store.js";
+import * as library from "./library.js";
+import * as session from "./session.js";
 
 const palettes = new Map();
 let playingAlbum = null; // the playing track's album: its cover colours the player in "artwork" mode
@@ -10,7 +10,7 @@ const media = window.matchMedia ? window.matchMedia("(prefers-color-scheme: ligh
 // colour for Music only, and "artwork" also follows StarCore except in the player, which takes
 // the playing cover's colour. Anything not yet loaded or unknown reads as "starcore".
 function accentMode() {
-    const value = String(store.preference("accent", "starcore") || "starcore").toLowerCase();
+    const value = String(session.preference("accent", "starcore") || "starcore").toLowerCase();
     return value === "artwork" || /^#[0-9a-f]{6}$/.test(value) ? value : "starcore";
 }
 
@@ -21,7 +21,7 @@ export function register(node) {
 }
 
 function resolvedTheme() {
-    const theme = store.preference("theme", "system");
+    const theme = session.preference("theme", "system");
     if (theme === "system") {
         return media && media.matches ? "light" : "dark";
     }
@@ -30,7 +30,7 @@ function resolvedTheme() {
 
 export function apply() {
     const theme = resolvedTheme();
-    const density = store.preference("density", "comfortable");
+    const density = session.preference("density", "comfortable");
     for (const node of themed) {
         node.dataset.muTheme = theme;
         node.dataset.muDensity = density;
@@ -47,7 +47,7 @@ export function apply() {
 if (media && media.addEventListener) {
     media.addEventListener("change", apply);
 }
-store.on("preferences", apply);
+session.on("preferences", apply);
 
 function hexToRgb(hex) {
     const value = parseInt(hex.slice(1), 16);
@@ -120,7 +120,7 @@ export function palette(albumId) {
             }
         };
         image.onerror = () => resolve(null);
-        image.src = api.artworkUrl(albumId, 96);
+        image.src = library.artworkUrl(albumId, 96);
     });
     palettes.set(albumId, promise);
     return promise;

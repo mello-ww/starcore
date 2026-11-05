@@ -1,26 +1,10 @@
+// Music's playlist covers: an uploaded cover or a mosaic of four album covers, from Music's
+// own routes. A single album cover is the shared player's artwork().
 import * as api from "../api.js";
-import { el, icon } from "./dom.js";
+import { artwork } from "/media/artwork.js";
+import { el } from "/media/dom.js";
 
-export function artwork(albumId, size = 300, className = "mu-art") {
-    const frame = el("div", className);
-    if (albumId) {
-        const image = el("img");
-        image.loading = "lazy";
-        image.decoding = "async";
-        image.alt = "";
-        image.src = api.artworkUrl(albumId, size);
-        image.addEventListener("error", () => {
-            image.remove();
-            frame.classList.add("mu-art-empty");
-            frame.appendChild(icon("library", 28));
-        });
-        frame.appendChild(image);
-    } else {
-        frame.classList.add("mu-art-empty");
-        frame.appendChild(icon("library", 28));
-    }
-    return frame;
-}
+export { artwork };
 
 export function mosaic(albumIds, cover, className = "mu-art", size = 300) {
     if (cover) {

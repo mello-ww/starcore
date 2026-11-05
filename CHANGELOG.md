@@ -56,6 +56,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   the shared vocabulary: `queue` is required; `history`, `radio`, `preferences`, `favorites`,
   `stream` and `connect` are optional, and the Engine checks declarations like any other.
   The Android player sends nothing for an operation a provider doesn't offer.
+- **Mission Control: one shared audio player.** The player, its queue, effects, Media Session,
+  Connect, the floating bar and the top-bar disc moved to `mission_control/media/`, started by the
+  shell after sign-in. It plays from the catalog's `audio.library` provider, so the bar, disc and
+  saved queue are there on every page and after a reload, before Music's page is opened. Music's
+  page keeps its library views and adds its track menu and links to the player.
 - **Home widgets.** Home on both clients draws every Satellite's widgets; neither names Status
   any more (the Android app keeps its Status card for older servers).
 - Mission Control's charts, meters and sparklines, and the app's column chart, meter, bars and

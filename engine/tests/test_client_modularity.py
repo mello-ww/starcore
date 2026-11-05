@@ -80,7 +80,8 @@ def references(path: Path, names: list) -> list:
 
 
 def generic_client_files() -> list:
-    files = [*REPO.glob("mission_control/*.js"), *REPO.glob("mission_control/ui/*.js")]
+    files = [*REPO.glob("mission_control/*.js"), *REPO.glob("mission_control/ui/*.js"),
+             *REPO.glob("mission_control/media/*.js")]
     for path in [*REPO.glob("mobile/src/**/*.ts"), *REPO.glob("mobile/src/**/*.tsx")]:
         relative = path.relative_to(REPO).as_posix()
         if not relative.startswith(SATELLITE_SPECIFIC):
@@ -89,6 +90,9 @@ def generic_client_files() -> list:
 
 
 IMPORT = re.compile(r"""\bfrom\s+['"](\.[^'"]*)['"]|\brequire\(\s*['"](\.[^'"]*)['"]|\bimport\(\s*['"](\.[^'"]*)['"]""")
+
+
+IMPORT_ANY = re.compile(r"""\bfrom\s+['"]([^'"]+)['"]|\bimport\(\s*['"]([^'"]+)['"]|^import\s+['"]([^'"]+)['"]""", re.M)
 
 
 def satellite_imports(path: Path) -> dict:
@@ -134,6 +138,17 @@ class ClientModularityTest(unittest.TestCase):
             if found != allowed:
                 problems.append(f"{relative} imports Satellite folders {found} (listed: {allowed})")
         self.assertEqual(problems, [])
+
+    def test_the_web_audio_host_imports_no_satellite_code(self):
+        """Mission Control's shared player (mission_control/media/) stays Satellite-agnostic:
+        it imports only its own folder, never a Satellite's page modules."""
+        files = sorted(REPO.glob("mission_control/media/*.js"))
+        self.assertTrue(files)
+        for path in files:
+            for match in IMPORT_ANY.finditer(path.read_text(encoding="utf-8")):
+                target = next(group for group in match.groups() if group)
+                self.assertTrue(target.startswith("./") and "/" not in target[2:],
+                                f"{path.relative_to(REPO).as_posix()} imports {target}")
 
     def test_the_audio_host_and_shared_layout_import_no_satellite_folder(self):
         """The shared player and the shell around it stay Satellite-agnostic (docs/media-audio.md)."""
