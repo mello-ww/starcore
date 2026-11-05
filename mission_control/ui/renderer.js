@@ -485,6 +485,33 @@ export function mount(context) {
         }
     }
 
+    // ---------- media (1.2) ----------
+
+    // An image from one of the Satellite's own routes: loaded with this session, lazily, with a
+    // quiet placeholder while it loads and the image glyph if it can't be.
+    function mediaFrame(template, scope, className, alt) {
+        const frame = el("div", `${className} ui-media-frame is-loading`);
+        const route = template === undefined ? null : resolveTemplate(template, scope);
+        const failed = () => {
+            frame.classList.remove("is-loading");
+            frame.classList.add("is-empty");
+            frame.replaceChildren(icon("image") || el("span"));
+        };
+        if (!route || !isSafeRoute(route)) {
+            failed();
+            return frame;
+        }
+        const image = el("img");
+        image.loading = "lazy";
+        image.decoding = "async";
+        image.alt = alt || "";
+        image.addEventListener("load", () => frame.classList.remove("is-loading"), { once: true });
+        image.addEventListener("error", failed, { once: true });
+        image.src = `${satelliteBase}/${route}`;
+        frame.appendChild(image);
+        return frame;
+    }
+
     function renderBlock(block, scope) {
         if (!block || typeof block !== "object") {
             return null;
@@ -572,6 +599,59 @@ export function mount(context) {
                 row.appendChild(main);
                 if (block.item.value !== undefined) {
                     row.appendChild(el("span", "ui-list-value", formatValue(resolve(block.item.value, itemScope), formats.value)));
+                }
+                if (block.action) {
+                    row.appendChild(el("span", "ui-list-chevron", "›"));
+                }
+                list.appendChild(row);
+            }
+            return list;
+        },
+
+        image: (block, scope) => {
+            const figure = el("figure", `ui-image ui-image-${block.size || "medium"} ui-shape-${block.shape || "square"} ui-fit-${block.fit || "cover"}`);
+            figure.appendChild(mediaFrame(block.src, scope, "ui-image-frame", block.alt !== undefined ? text(block.alt, scope) : ""));
+            if (block.caption !== undefined) {
+                const caption = text(block.caption, scope);
+                if (caption) {
+                    figure.appendChild(el("figcaption", "ui-image-caption", caption));
+                }
+            }
+            return figure;
+        },
+
+        "media-list": (block, scope) => {
+            const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
+            const list = el("div", `ui-list ui-media-list ui-media-${block.size || "small"} ui-shape-${block.shape || "square"}`);
+            if (!Array.isArray(items) || items.length === 0) {
+                list.appendChild(el("p", "ui-text ui-text-caption", block.empty ? text(block.empty, scope) : "Nothing here."));
+                return list;
+            }
+            const formats = (block.item && block.item.format) || {};
+            for (const item of items) {
+                const itemScope = { ...scope, data: item };
+                const row = el(block.action ? "button" : "div", "ui-list-row ui-media-row");
+                if (block.action) {
+                    row.type = "button";
+                    row.addEventListener("click", () => runAction(block.action, itemScope));
+                }
+                if (block.item.image !== undefined) {
+                    row.appendChild(mediaFrame(block.item.image, itemScope, "ui-media-thumb", ""));
+                }
+                const main = el("span", "ui-list-main");
+                main.appendChild(el("span", "ui-list-title", text(block.item.title, itemScope)));
+                if (block.item.subtitle !== undefined) {
+                    const subtitle = resolve(block.item.subtitle, itemScope);
+                    if (subtitle !== null && subtitle !== undefined && subtitle !== "") {
+                        main.appendChild(el("span", "ui-list-subtitle", formatValue(subtitle, formats.subtitle)));
+                    }
+                }
+                row.appendChild(main);
+                if (block.item.meta !== undefined) {
+                    const meta = resolve(block.item.meta, itemScope);
+                    if (meta !== null && meta !== undefined && meta !== "") {
+                        row.appendChild(el("span", "ui-list-value", formatValue(meta, formats.meta)));
+                    }
                 }
                 if (block.action) {
                     row.appendChild(el("span", "ui-list-chevron", "›"));

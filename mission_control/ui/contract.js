@@ -13,6 +13,8 @@ export const BLOCK_TYPES = new Set([
     "toggle", "slider", "form", "file-browser",
     // 1.1
     "chart", "table", "choice", "status", "code",
+    // 1.2
+    "image", "media-list",
 ]);
 export const FORMATS = new Set([
     "text", "number", "integer", "percent", "bytes", "duration",

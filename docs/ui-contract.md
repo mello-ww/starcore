@@ -14,6 +14,7 @@ machine-readable in [`contracts/ui/vocabulary.json`](../contracts/ui/vocabulary.
 - [Two kinds of capability](#two-kinds-of-capability)
 - [The document](#the-document)
 - [Blocks](#blocks)
+- [Media: image and media-list](#media-image-and-media-list)
 - [Bindings](#bindings)
 - [Actions](#actions)
 - [Formats](#formats)
@@ -150,6 +151,8 @@ Keys starting with `_` are comments and are ignored.
 | `choice` (1.1) | `key`, `options` | `label` | a segmented control that sets the page state `key`; `options` are `[{value, label}]`, at most 8 |
 | `status` (1.1) | `label` | `tone`, `detail` | a state as a dot and a word, never colour alone ("Healthy", "2 warnings") |
 | `code` (1.1) | `value` | `label`, `copy` | text or JSON, folded under `label`, with a Copy button when `copy` is true |
+| `image` (1.2) | `src` | `alt`, `caption`, `size`, `shape`, `fit` | an image from one of the Satellite's own routes - see [Media](#media-image-and-media-list) |
+| `media-list` (1.2) | `items`, `item` | `empty`, `action`, `size`, `shape` | rows with a thumbnail; `item` maps `title`, `subtitle`, `meta`, `image` and `format` (`{subtitle, meta}`) - see [Media](#media-image-and-media-list) |
 
 1.1 also adds:
 
@@ -191,6 +194,38 @@ natively.
 
 There is deliberately no layout language: no arbitrary nesting, styles, colours or sizes.
 Blocks look like the rest of StarCore on each platform because each client draws them.
+
+## Media: image and media-list
+
+Both arrived in 1.2. They show images from the Satellite's **own** routes, so any Satellite can
+use them without the client knowing what the images are.
+
+```json
+{"type": "image", "src": "covers/{$.id}?size=600", "alt": "$.title", "caption": "$.title", "size": "large"}
+{"type": "media-list", "items": "$.entries", "size": "medium",
+ "item": {"title": "$.title", "subtitle": "$.added", "meta": "$.size", "image": "thumbs/{$.id}",
+          "format": {"subtitle": "relative", "meta": "bytes"}},
+ "action": {"navigate": "entry", "params": {"id": "$.id"}}}
+```
+
+- **`src`** and a row's **`image`** are route templates with the same rules as an action's
+  `route`: relative to the Satellite, every `{binding}` URL-encoded, never another Satellite or
+  a Core endpoint. The client loads the image with its own session (the browser's cookie, the
+  app's bearer header), so a Satellite needs nothing more than an authenticated route that
+  answers with the image.
+- **`size`**: `small` (48 px), `medium` (96, the default), `large` (240) or `full` (the
+  available width) for an image. For a media-list's thumbnails: `small` (40, the default),
+  `medium` (56), `large` (72) or `full` (96).
+- **`shape`**: `square` (the default), `round`, or `wide` (16:9). Corners follow StarCore's
+  rounded surfaces; `round` is a circle.
+- **`fit`** (image only): `cover` (the default) fills the frame, `contain` shows all of it.
+- While an image loads, its frame shows a quiet placeholder; it fades in once loaded (no motion
+  with reduced motion on). An image that can't be loaded, or a route that isn't the Satellite's
+  own, shows the image glyph in its place. Images load lazily on the web.
+- A media-list row takes the block's `action`, any action (`navigate`, a route, `play`), with
+  the row as `$.`, like a `list`. `meta` is a short piece of text at the end of the row.
+- `size`, `shape` and `fit` are fixed words, never bindings, so the layout is known before any
+  data arrives.
 
 ## Bindings
 
@@ -479,7 +514,7 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 
 | | Now (contract 1.2) | Target |
 |---|---|---|
-| Blocks | the 16 above, including `chart` and `table`; the `dashboard` template | more, minor by minor: `image`, `map`, `tabs`; templates `list-detail`, `settings`, `media-gallery`, `media-library` |
+| Blocks | the 18 above, including `chart`, `table`, `image` and `media-list`; the `dashboard` template | more, minor by minor: `map`, `tabs`; templates `list-detail`, `settings`, `media-gallery`, `media-library` |
 | Satellite capabilities | `files.browse`, `audio.library`, `audio.session` | `media.gallery` (Photos), `vault` (Locked Folder) |
 | Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action | `secure.screen`, `device.biometrics`, `device.background-tasks` - each a native module written once in the app, behind a shared block |
 | Home | `widgets` in each document, drawn by both clients; Android keeps the Status card only for servers older than Status's `ui.json` | the fallback card removed once older servers are gone |

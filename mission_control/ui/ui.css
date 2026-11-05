@@ -1094,3 +1094,85 @@ button.ui-list-row:hover {
         gap: 16px;
     }
 }
+
+/* ---------- media (1.2): image and media-list ---------- */
+
+.ui-image {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-2);
+    margin: 0;
+}
+
+.ui-media-frame {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: none;
+    overflow: hidden;
+    border-radius: var(--sc-radius-control);
+    background: var(--sc-control);
+    color: var(--sc-text-3);
+}
+
+.ui-media-frame img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 180ms ease;
+}
+
+.ui-fit-contain .ui-media-frame img {
+    object-fit: contain;
+}
+
+/* a quiet pulse while it loads; the image glyph when it can't */
+.ui-media-frame.is-loading {
+    animation: ui-media-pulse 1.4s ease-in-out infinite;
+}
+
+.ui-media-frame.is-loading img {
+    opacity: 0;
+}
+
+@keyframes ui-media-pulse {
+    50% { background: var(--sc-control-strong); }
+}
+
+.ui-shape-round .ui-media-frame {
+    border-radius: 50%;
+}
+
+.ui-image-small .ui-image-frame { width: 48px; aspect-ratio: 1; }
+.ui-image-medium .ui-image-frame { width: 96px; aspect-ratio: 1; }
+.ui-image-large .ui-image-frame { width: min(240px, 100%); aspect-ratio: 1; border-radius: var(--sc-radius-card); }
+.ui-image-full .ui-image-frame { width: 100%; max-width: 720px; aspect-ratio: 1; border-radius: var(--sc-radius-card); }
+.ui-image.ui-shape-wide .ui-image-frame { aspect-ratio: 16 / 9; }
+.ui-image-small.ui-shape-wide .ui-image-frame { width: 86px; }
+.ui-image-medium.ui-shape-wide .ui-image-frame { width: 170px; }
+.ui-image-large.ui-shape-wide .ui-image-frame { width: min(420px, 100%); }
+.ui-image.ui-shape-round .ui-image-frame { aspect-ratio: 1; border-radius: 50%; }
+
+.ui-image-caption {
+    color: var(--sc-text-2);
+    font: 400 13px/1.4 var(--sc-font-sans);
+}
+
+.ui-media-row {
+    min-height: 64px;
+}
+
+.ui-media-thumb { width: 40px; height: 40px; }
+.ui-media-medium .ui-media-thumb { width: 56px; height: 56px; }
+.ui-media-large .ui-media-thumb { width: 72px; height: 72px; }
+.ui-media-full .ui-media-thumb { width: 96px; height: 96px; }
+.ui-media-list.ui-shape-wide .ui-media-thumb { width: 72px; height: auto; aspect-ratio: 16 / 9; }
+.ui-media-medium.ui-shape-wide .ui-media-thumb { width: 100px; }
+.ui-media-large.ui-shape-wide .ui-media-thumb,
+.ui-media-full.ui-shape-wide .ui-media-thumb { width: 128px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-media-frame.is-loading { animation: none; }
+    .ui-media-frame img { transition: none; }
+}

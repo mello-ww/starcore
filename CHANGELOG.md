@@ -65,6 +65,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   `audio.library` provider finds, through the client's audio host. Both clients now offer the
   `media.audio` client capability, so any Satellite can play audio without naming the one that
   provides it.
+- **UI contract 1.2: `image` and `media-list` blocks.** Images from a Satellite's own routes,
+  loaded with the client's session, with sizes, shapes, a loading placeholder and an error
+  state; and rows with a thumbnail, title, subtitle, metadata and any action. Drawn by both
+  clients' shared renderers; no Satellite uses them yet.
 - **Home widgets.** Home on both clients draws every Satellite's widgets; neither names Status
   any more (the Android app keeps its Status card for older servers).
 - Mission Control's charts, meters and sparklines, and the app's column chart, meter, bars and

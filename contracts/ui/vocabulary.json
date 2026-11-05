@@ -18,7 +18,9 @@
     "table": {"required": ["rows", "columns"], "optional": ["empty"]},
     "choice": {"required": ["key", "options"], "optional": ["label"]},
     "status": {"required": ["label"], "optional": ["tone", "detail"]},
-    "code": {"required": ["value"], "optional": ["label", "copy"]}
+    "code": {"required": ["value"], "optional": ["label", "copy"]},
+    "image": {"required": ["src"], "optional": ["alt", "caption", "size", "shape", "fit"]},
+    "media-list": {"required": ["items", "item"], "optional": ["empty", "action", "size", "shape"]}
   },
   "since": {
     "_note": "The minor each block, key or format arrived in. A document that declares an older minor may not use them.",
@@ -30,6 +32,7 @@
       "bindings": ["$state.", "$sources."]
     },
     "1.2": {
+      "blocks": ["image", "media-list"],
       "actions": ["play"],
       "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library."
     }
@@ -43,6 +46,9 @@
   "form_field_kinds": ["text", "number", "select", "toggle"],
   "file_browser_select": ["none", "directory", "file"],
   "chart_kinds": ["columns", "bars"],
+  "image_sizes": ["small", "medium", "large", "full"],
+  "image_shapes": ["square", "round", "wide"],
+  "image_fits": ["cover", "contain"],
   "column_align": ["start", "end"],
   "page_templates": ["stack", "dashboard"],
   "action_then": ["refresh", "back"],

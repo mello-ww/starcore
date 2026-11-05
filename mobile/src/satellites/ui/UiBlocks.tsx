@@ -1,5 +1,5 @@
-import React, {useEffect, useState} from 'react';
-import {Alert, Clipboard, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
+import React, {useEffect, useRef, useState} from 'react';
+import {Alert, Animated, Clipboard, Image, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {Bars, ChartScale, ColumnChart, Meter, Sparkline} from '../../components/charts';
 import {PrimaryButton} from '../../components/PrimaryButton';
@@ -8,7 +8,7 @@ import {StarSwitch} from '../../components/StarSwitch';
 import {Surface} from '../../components/Surface';
 import {TOUCH_TARGET, tokens, useAccent} from '../../theme';
 import {
-  BLOCK_TYPES, findProvider, formatValue, ICONS, isSafeRoute, isVisible, resolve, toneOf,
+  BLOCK_TYPES, findProvider, formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate, toneOf,
   type Providers, type Scope, type UiAction, type UiBlock,
 } from './contract';
 
@@ -29,6 +29,9 @@ export interface BlockContext {
   runAction: (action: UiAction | undefined, scope: Scope, value?: unknown) => Promise<boolean>;
   /** Reads one operation of a capability provider - another Satellite's route. */
   readCapability: (satellite: string, route: string) => Promise<any>;
+  /** An image from one of the Satellite's own routes, with this session (1.2's image and
+   * media-list); null when the route is unsafe or there is no screen to load it from. */
+  mediaSource?: (route: string) => {uri: string; headers?: Record<string, string>} | null;
   /** Form values survive a data refresh, keyed per form block. */
   forms: Record<string, Record<string, any>>;
   /** A slider or text field is being used - background refresh holds off. */
@@ -208,6 +211,10 @@ function UiBlockView({block, scope, context}: {block: UiBlock; scope: Scope; con
       return <FormBlock block={block} scope={scope} context={context} />;
     case 'file-browser':
       return <FileBrowserBlock block={block} scope={scope} context={context} />;
+    case 'image':
+      return <ImageBlock block={block} scope={scope} context={context} />;
+    case 'media-list':
+      return <MediaListBlock block={block} scope={scope} context={context} />;
     case 'chart':
       return block.kind === 'bars' ? <BarsBlock block={block} scope={scope} /> : <ChartBlock block={block} scope={scope} context={context} />;
     case 'table':
@@ -333,6 +340,134 @@ function ListBlock({block, scope, context}: {block: UiBlock; scope: Scope; conte
             value={block.item?.value !== undefined ? formatValue(resolve(block.item.value, itemScope), formats.value) : undefined}
             onPress={block.action ? () => context.runAction(block.action, itemScope) : undefined}
           />
+        );
+      })}
+    </View>
+  );
+}
+
+// ---------- media (1.2) ----------
+
+const IMAGE_SIZES: Record<string, number> = {small: 48, medium: 96, large: 240};
+const THUMB_SIZES: Record<string, number> = {small: 40, medium: 56, large: 72, full: 96};
+
+/** An image from one of the Satellite's own routes: a quiet placeholder while it loads, a fade
+ * in once it has, the image glyph if it can't be. */
+function MediaFrame({
+  template, scope, context, width, aspect, round, fit, large, alt,
+}: {
+  template: unknown; scope: Scope; context: BlockContext; width: number | '100%'; aspect: number;
+  round: boolean; fit: 'cover' | 'contain'; large?: boolean; alt?: string;
+}) {
+  const route = typeof template === 'string' ? resolveTemplate(template, scope) : null;
+  const source = route && isSafeRoute(route) ? context.mediaSource?.(route) ?? null : null;
+  const [failed, setFailed] = useState(false);
+  const shown = useRef(new Animated.Value(0)).current;
+  const uri = source?.uri;
+  useEffect(() => {
+    setFailed(false);
+    shown.setValue(0);
+  }, [uri, shown]);
+  const frame = [
+    styles.mediaFrame,
+    {width, aspectRatio: aspect},
+    round ? {borderRadius: 9999} : large ? {borderRadius: radii.card} : null,
+  ];
+  return (
+    <View style={frame} accessible={!!alt} accessibilityRole={alt ? 'image' : undefined} accessibilityLabel={alt || undefined}>
+      {source && !failed ? (
+        <Animated.View style={[StyleSheet.absoluteFill, {opacity: shown}]}>
+          <Image
+            source={source}
+            resizeMode={fit}
+            style={StyleSheet.absoluteFill}
+            onLoad={() => Animated.timing(shown, {toValue: 1, duration: 180, useNativeDriver: true}).start()}
+            onError={() => setFailed(true)}
+          />
+        </Animated.View>
+      ) : (
+        <Icon name="image" size={18} color={palette.text3} />
+      )}
+    </View>
+  );
+}
+
+function ImageBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const size = typeof block.size === 'string' ? block.size : 'medium';
+  const shape = typeof block.shape === 'string' ? block.shape : 'square';
+  const wide = shape === 'wide';
+  const width = size === 'full' ? '100%' : (IMAGE_SIZES[size] ?? 96) * (wide ? 16 / 9 : 1);
+  const caption = block.caption !== undefined ? asText(resolve(block.caption, scope)) : '';
+  return (
+    <View style={styles.image}>
+      <MediaFrame
+        template={block.src}
+        scope={scope}
+        context={context}
+        width={typeof width === 'number' ? Math.min(width, 640) : width}
+        aspect={wide ? 16 / 9 : 1}
+        round={shape === 'round'}
+        fit={block.fit === 'contain' ? 'contain' : 'cover'}
+        large={size === 'large' || size === 'full'}
+        alt={block.alt !== undefined ? asText(resolve(block.alt, scope)) : undefined}
+      />
+      {caption ? <Text style={type.caption}>{caption}</Text> : null}
+    </View>
+  );
+}
+
+function MediaListBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
+  if (!Array.isArray(items) || items.length === 0) {
+    return <Text style={type.caption}>{block.empty !== undefined ? asText(resolve(block.empty, scope)) : 'Nothing here.'}</Text>;
+  }
+  const size = typeof block.size === 'string' ? block.size : 'small';
+  const shape = typeof block.shape === 'string' ? block.shape : 'square';
+  const thumb = THUMB_SIZES[size] ?? 40;
+  const formats = block.item?.format ?? {};
+  return (
+    <View style={styles.list}>
+      {items.map((item: any, index: number) => {
+        const itemScope = {...scope, data: item};
+        const title = asText(resolve(block.item?.title, itemScope));
+        const subtitle = block.item?.subtitle !== undefined ? resolve(block.item.subtitle, itemScope) : undefined;
+        const meta = block.item?.meta !== undefined ? resolve(block.item.meta, itemScope) : undefined;
+        const content = (
+          <>
+            {block.item?.image !== undefined && (
+              <MediaFrame
+                template={block.item.image}
+                scope={itemScope}
+                context={context}
+                width={shape === 'wide' ? Math.round(thumb * 16 / 9) : thumb}
+                aspect={shape === 'wide' ? 16 / 9 : 1}
+                round={shape === 'round'}
+                fit="cover"
+              />
+            )}
+            <View style={styles.rowMain}>
+              <Text style={styles.rowTitle} numberOfLines={1}>{title}</Text>
+              {subtitle !== undefined && subtitle !== null && subtitle !== '' && (
+                <Text style={type.caption} numberOfLines={1}>{formatValue(subtitle, formats.subtitle)}</Text>
+              )}
+            </View>
+            {meta !== undefined && meta !== null && meta !== '' && <Text style={type.caption}>{formatValue(meta, formats.meta)}</Text>}
+            {block.action && <Icon name="chevron-right" size={18} color={palette.text3} />}
+          </>
+        );
+        return block.action ? (
+          <Pressable
+            key={item?.id ?? index}
+            accessibilityRole="button"
+            accessibilityLabel={title}
+            onPress={() => context.runAction(block.action, itemScope)}
+            style={({pressed}) => [styles.row, styles.mediaRow, pressed && styles.pressed]}>
+            {content}
+          </Pressable>
+        ) : (
+          <View key={item?.id ?? index} style={[styles.row, styles.mediaRow]}>
+            {content}
+          </View>
         );
       })}
     </View>
@@ -887,6 +1022,15 @@ const styles = StyleSheet.create({
     backgroundColor: palette.control,
   },
   rowMain: {flex: 1, minWidth: 0, gap: 2},
+  mediaRow: {minHeight: 64},
+  mediaFrame: {
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.control,
+    backgroundColor: palette.controlStrong,
+  },
+  image: {gap: space.sm},
   rowTitle: {...type.label, fontWeight: '600'},
   pressed: {opacity: 0.8},
   toggle: {flexDirection: 'row', alignItems: 'center', gap: space.md},

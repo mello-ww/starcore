@@ -2,6 +2,18 @@
   "_about": "Whole documents. `valid` must load; each `invalid` entry must be refused by the Engine with an error mentioning `error`. Entries with \"client\": true must also be refused by both clients' own checks (contract compatibility and structure), since a client cannot assume every server validated what it sends.",
   "valid": [
     {
+      "name": "media-blocks",
+      "_why": "1.2: an image and a media-list, both loaded from the Satellite's own routes.",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "image", "src": "covers/{$.id}?size=600", "alt": "$.title", "caption": "$.title", "size": "large", "shape": "square", "fit": "cover"},
+        {"type": "image", "src": "banner", "size": "full", "shape": "wide", "fit": "contain"},
+        {"type": "media-list", "items": "$.entries", "size": "medium", "shape": "round", "empty": "Nothing yet.",
+         "item": {"title": "$.title", "subtitle": "$.added", "meta": "$.size", "image": "thumbs/{$.id}", "format": {"subtitle": "relative", "meta": "bytes"}},
+         "action": {"navigate": "home"}},
+        {"type": "media-list", "items": [{"title": "One"}], "item": {"title": "$.title"}}
+      ]}}}
+    },
+    {
       "name": "play-action",
       "_why": "1.2: a button asks the client to play what the audio.library provider finds; it needs the media.audio client capability and an audio.library provider.",
       "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.audio"], "capabilities": ["audio.library"]},
@@ -86,6 +98,42 @@
     {"name": "every-1.1-feature", "document": {"contract": "starcore.ui/1.1", "title": "System", "entry": "overview", "header": {"source": {"route": "view", "refresh": 5}, "blocks": [{"type": "text", "style": "eyebrow", "text": "$.node"}, {"type": "heading", "text": "System"}, {"type": "status", "label": "$.health.label", "tone": "$.health.tone", "detail": "$.health.detail"}]}, "widgets": [{"id": "summary", "title": "Summary", "icon": "activity", "blocks": [{"type": "metric", "label": "CPU", "value": "$.cpu", "format": "percent", "max": 100}], "action": {"navigate": "overview"}}], "navigation": [{"page": "overview", "label": "Overview", "icon": "activity"}, {"page": "diag", "label": "Diagnostics", "developer": true}], "pages": {"overview": {"template": "dashboard", "source": {"route": "view", "refresh": 5}, "sources": {"trend": {"route": "history?period=1h", "refresh": 30}}, "blocks": [{"type": "metric", "label": "CPU", "value": "$.cpu", "format": "percent", "max": 100, "tone": "$.cpu_tone", "detail": "$.cpu_detail", "trend": "$sources.trend.series.cpu.points", "action": {"navigate": "diag"}}, {"type": "field", "label": "Booted", "value": "$.boot", "format": "datetime", "detail": "$.uptime"}, {"type": "chart", "title": "CPU", "series": [{"label": "CPU", "points": "$sources.trend.series.cpu.points"}], "format": "percent", "max": 100, "from": "$sources.trend.from", "to": "$sources.trend.to", "resolution": "$sources.trend.resolution", "empty": "No samples yet"}, {"type": "chart", "kind": "bars", "series": [{"label": "Per thread", "points": "$.per_core"}], "format": "percent", "max": 100}, {"type": "table", "rows": "$.drives", "empty": "No drives", "columns": [{"label": "Drive", "value": "$.mount"}, {"label": "Used", "value": "$.percent", "format": "percent", "max": 100, "align": "end", "tone": "$.tone"}]}, {"type": "list", "items": "$.warnings", "item": {"title": "$.title", "subtitle": "$.detail", "value": "$.level", "tone": "$.tone"}, "empty": "No warnings."}]}, "diag": {"state": {"period": "24h"}, "source": {"route": "history?period={$state.period}"}, "blocks": [{"type": "choice", "key": "period", "label": "Range", "options": [{"value": "1h", "label": "1 hour"}, {"value": "24h", "label": "24 hours"}]}, {"type": "text", "text": "$state.period", "style": "mono"}, {"type": "code", "value": "$", "label": "Raw", "copy": true}]}}}}
   ],
   "invalid": [
+    {
+      "name": "image-in-1.1",
+      "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "image", "src": "cover"}]}}},
+      "error": "needs starcore.ui/1.2"
+    },
+    {
+      "name": "image-outside-its-satellite",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "image", "src": "/api/satellites/Other/cover"}]}}},
+      "error": "relative to the Satellite"
+    },
+    {
+      "name": "image-unknown-size",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "image", "src": "cover", "size": "huge"}]}}},
+      "error": "must be one of"
+    },
+    {
+      "name": "media-list-without-title",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-list", "items": [], "item": {"subtitle": "$.x"}}]}}},
+      "error": "needs 'title'"
+    },
+    {
+      "name": "media-list-image-outside",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-list", "items": [], "item": {"title": "$.t", "image": "../music/artwork/{$.id}"}}]}}},
+      "error": "relative to the Satellite"
+    },
+    {
+      "name": "media-list-fit",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-list", "items": [], "item": {"title": "$.t"}, "fit": "contain"}]}}},
+      "error": "unknown key"
+    },
     {
       "name": "play-in-1.1",
       "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [

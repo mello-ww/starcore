@@ -69,6 +69,12 @@ PAGE_TEMPLATES = set(VOCABULARY["page_templates"])
 # skip a newer document's unknown blocks; a 1.0 one must not have any)
 SINCE_1_1 = VOCABULARY["since"]["1.1"]
 BLOCKS_1_1 = set(SINCE_1_1["blocks"])
+# the minor each later block arrived in: a document declaring an older one may not use it
+BLOCK_SINCE = {block: int(minor.split(".")[1]) for minor, added in VOCABULARY["since"].items()
+               if not minor.startswith("_") for block in added.get("blocks", [])}
+IMAGE_SIZES = set(VOCABULARY["image_sizes"])
+IMAGE_SHAPES = set(VOCABULARY["image_shapes"])
+IMAGE_FITS = set(VOCABULARY["image_fits"])
 FORMATS_1_1 = set(SINCE_1_1["formats"])
 # Satellite capabilities with a protocol this Engine knows: their versions, the
 # operations every provider must offer and those it may. A Satellite may also
@@ -418,8 +424,8 @@ class _Validator:
             if not self.lenient:
                 self.error(where, f"unknown block type {kind!r}")
             return
-        if kind in BLOCKS_1_1:
-            self.since(where, f"the {kind} block")
+        if kind in BLOCK_SINCE:
+            self.since(where, f"the {kind} block", BLOCK_SINCE[kind])
         required, optional = BLOCKS[kind]
         for key in sorted(required - block.keys()):
             self.error(where, f"{kind} needs {key!r}")
@@ -462,6 +468,10 @@ class _Validator:
             self.check_blocks(f"{where}.blocks", block["blocks"], depth + 1)
         elif kind == "card" and "blocks" in block:
             self.error(f"{where}.blocks", "must be a list")
+        elif kind == "image":
+            self.check_image(where, block)
+        elif kind == "media-list":
+            self.check_media_list(where, block)
         elif kind == "list":
             self.check_list(where, block)
         elif kind == "form":
@@ -588,6 +598,49 @@ class _Validator:
         else:
             for key, value in formats.items():
                 self.check_format(f"{where}.item.format.{key}", value)
+
+    def check_media_options(self, where: str, block: dict):
+        """size, shape and fit, shared by image and media-list: fixed words, never bindings,
+        so a layout is known before any data arrives."""
+        for key, choices in (("size", IMAGE_SIZES), ("shape", IMAGE_SHAPES), ("fit", IMAGE_FITS)):
+            if key in block and block[key] not in choices:
+                self.error(f"{where}.{key}", f"must be one of {sorted(choices)}")
+
+    def check_image(self, where: str, block: dict):
+        """{type: image, src} (1.2): `src` is a route template inside the Satellite, like an
+        action's route, so the client loads it with its own session and it can't point
+        anywhere else."""
+        self.check_route(f"{where}.src", block.get("src"))
+        for key in ("alt", "caption"):
+            if key in block:
+                self.check_text(f"{where}.{key}", block[key])
+        self.check_media_options(where, block)
+
+    def check_media_list(self, where: str, block: dict):
+        """{type: media-list, items, item} (1.2): rows with a thumbnail from the Satellite's
+        own routes, a title, a subtitle and a short piece of metadata; the row action is any
+        action (navigate, a route, play)."""
+        self.check_items(f"{where}.items", block.get("items"))
+        item = block.get("item")
+        if not isinstance(item, dict):
+            self.error(f"{where}.item", "must be an object")
+            return
+        self.unknown_keys(f"{where}.item", item, {"title", "subtitle", "meta", "image", "format"})
+        if "title" not in item:
+            self.error(f"{where}.item", "needs 'title'")
+        for key in ("title", "subtitle", "meta"):
+            if key in item:
+                self.check_text(f"{where}.item.{key}", item[key])
+        if "image" in item:
+            self.check_route(f"{where}.item.image", item["image"])
+        formats = item.get("format", {})
+        if not isinstance(formats, dict) or not set(formats) <= {"subtitle", "meta"} or any(
+                value not in FORMATS for value in formats.values()):
+            self.error(f"{where}.item.format", "must map 'subtitle'/'meta' to a known format")
+        else:
+            for key, value in formats.items():
+                self.check_format(f"{where}.item.format.{key}", value)
+        self.check_media_options(where, block)
 
     def check_form(self, where: str, block: dict):
         fields = block.get("fields")

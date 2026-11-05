@@ -50,7 +50,8 @@ function usePolling(source: UiSource | undefined, active: boolean, load: () => v
  */
 export function SatelliteUiScreen({route, navigation}: Props) {
   const {name, page: requestedPage, params = {}, revision} = route.params;
-  const {client} = useAuth();
+  const {client, state: authState} = useAuth();
+  const sessionToken = authState?.status === 'signed-in' ? authState.session.token : null;
   const {activeServer} = useServers();
   const {enabled: developer} = useDeveloperMode();
   const {color: accent, onColor} = useAccent();
@@ -339,6 +340,11 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     providers,
     runAction,
     readCapability: (satellite, capabilityRoute) => api.read(satellite, capabilityRoute),
+    // images (1.2) load from this Satellite's own routes, with the signed-in session
+    mediaSource: mediaRoute => ({
+      uri: `${activeServer?.baseUrl ?? ''}/api/satellites/${encodeURIComponent(name)}/${mediaRoute}`,
+      headers: sessionToken ? {Authorization: `Bearer ${sessionToken}`} : undefined,
+    }),
     forms,
     setEditing: value => {
       editing.current = value;
