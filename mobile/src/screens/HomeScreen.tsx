@@ -53,6 +53,21 @@ export const DEDICATED_SCREENS: Record<string, 'PhotoHome' | 'MusicHome' | 'Stat
   Status: 'StatusHome',
 };
 
+/**
+ * Whether a Satellite opens in its shared interface (its ui.json, SatelliteUiScreen). It does
+ * whenever it has one, unless the document is a preview (UI contract 1.2) and this app has a
+ * screen of the Satellite's own: that screen stays the default until the document reaches
+ * parity, and Developer Mode offers the shared one beside it.
+ */
+export function opensSharedInterface(satellite: SatelliteSummary): boolean {
+  return Boolean(satellite.ui?.revision) && !(satellite.ui?.preview === true && DEDICATED_SCREENS[satellite.name]);
+}
+
+/** A preview document beside the app's own screen for it: what Developer Mode can open. */
+export function hasSharedPreview(satellite: SatelliteSummary): boolean {
+  return Boolean(satellite.ui?.revision) && satellite.ui?.preview === true && Boolean(DEDICATED_SCREENS[satellite.name]);
+}
+
 export function alertsFor(satellites: SatelliteSummary[]) {
   return satellites
     .filter(satellite => satellite.status === 'error' || satellite.status === 'stopped')
@@ -114,7 +129,7 @@ export function HomeScreen() {
   };
 
   const open = (satellite: SatelliteSummary, page?: string, pageParams?: Record<string, any>) => {
-    const declarative = Boolean(satellite.ui?.revision);
+    const declarative = opensSharedInterface(satellite);
     const screen: string = declarative ? 'SatelliteUi' : DEDICATED_SCREENS[satellite.name] ?? 'SatelliteDetail';
     const params =
       screen === 'SatelliteUi'

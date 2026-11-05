@@ -31,7 +31,9 @@ export interface SatelliteSummary {
   /** Its declarative interface (ui.json): a revision when the Engine
    * validated one, an error when it refused it, null when there is none.
    * Absent on servers older than UI contract 1.0. */
-  ui?: {contract: string | null; revision: string | null; error: string | null} | null;
+  /** `preview` (UI contract 1.2): the document doesn't replace the Satellite's own screens yet -
+   * they stay the default, and Developer Mode offers the shared interface beside them. */
+  ui?: {contract: string | null; revision: string | null; error: string | null; preview?: boolean} | null;
 }
 
 /** The declarative UI schema a Satellite's "mobile" route answers with -

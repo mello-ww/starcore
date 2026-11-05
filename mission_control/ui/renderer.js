@@ -13,6 +13,7 @@ import {
     BLOCK_TYPES, checkDocument, findProvider, formatValue, isSafeRoute, isVisible,
     missingRequirements, resolve, resolveTemplate, toneOf,
 } from "./contract.js";
+import { createGallery } from "./gallery.js";
 import { icon } from "./icons.js";
 
 const STYLESHEET = "/ui/ui.css";
@@ -141,6 +142,22 @@ export function mount(context) {
         openTables: new WeakSet(),
     };
 
+    // the media-grid block and its viewer (1.2), which keep their own state across renders
+    const gallery = createGallery({
+        satelliteBase,
+        runAction: (...args) => runAction(...args),
+        setNotice: (...args) => setNotice(...args),
+        afterSelection: (then) => {
+            if (then === "back") {
+                goBack();
+            } else if (then === "refresh") {
+                loadData({ background: false });
+            } else {
+                render();
+            }
+        },
+    });
+
     // ---------- navigation ----------
 
     function navigationItems() {
@@ -187,6 +204,7 @@ export function mount(context) {
             state.lastGood = 0;
             state.sources = {};
             state.forms = {};
+            gallery.reset();
             for (const [name, timer] of state.timers) {
                 if (name !== "header") {
                     clearTimeout(timer);
@@ -361,8 +379,9 @@ export function mount(context) {
         }
     }
 
-    /** Runs one action; true once its request (if any) succeeded. */
-    async function runAction(action, scope, value) {
+    /** Runs one action; true once its request (if any) succeeded. `quiet` (one item of a
+     * selection) leaves notices and refreshing to the caller. */
+    async function runAction(action, scope, value, { quiet = false } = {}) {
         if (!action) {
             return false;
         }
@@ -401,11 +420,15 @@ export function mount(context) {
                 body: JSON.stringify(body),
             });
         } catch (error) {
-            setNotice(error.message, "error");
-            loadData({ background: true });  // show what's actually true now
+            if (!quiet) {
+                setNotice(error.message, "error");
+                loadData({ background: true });  // show what's actually true now
+            }
             return false;
         }
-        setNotice(result && typeof result.message === "string" ? result.message : null);
+        if (!quiet) {
+            setNotice(result && typeof result.message === "string" ? result.message : null);
+        }
         const then = action.then;
         if (then === "back") {
             goBack();
@@ -619,6 +642,8 @@ export function mount(context) {
             }
             return figure;
         },
+
+        "media-grid": (block, scope) => gallery.render(block, scope),
 
         "media-list": (block, scope) => {
             const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
@@ -1307,6 +1332,7 @@ export function mount(context) {
         renderPageBlocks(page.blocks, scope, body, template);
         root.appendChild(body);
         markLoading();
+        gallery.afterRender();
     }
 
     function fail(message) {
@@ -1366,6 +1392,7 @@ export function mount(context) {
         unsubscribe();
         root.remove();
         noticeSlot.remove();
+        gallery.dispose();
     };
     cleanup.showSection = showSection;
     cleanup.revision = () => state.revision;

@@ -75,6 +75,9 @@ BLOCK_SINCE = {block: int(minor.split(".")[1]) for minor, added in VOCABULARY["s
 IMAGE_SIZES = set(VOCABULARY["image_sizes"])
 IMAGE_SHAPES = set(VOCABULARY["image_shapes"])
 IMAGE_FITS = set(VOCABULARY["image_fits"])
+MEDIA_KINDS = set(VOCABULARY["media_kinds"])
+MEDIA_GRID_ITEM_KEYS = set(VOCABULARY["media_grid_item_keys"])
+MEDIA_VIEWER_KEYS = set(VOCABULARY["media_viewer_keys"])
 FORMATS_1_1 = set(SINCE_1_1["formats"])
 # Satellite capabilities with a protocol this Engine knows: their versions, the
 # operations every provider must offer and those it may. A Satellite may also
@@ -214,10 +217,16 @@ class _Validator:
         self.lenient = version[1] > MINOR
         self.minor = version[1]
 
-        known = {"contract", "title", "requires", "entry", "navigation", "pages", "header", "widgets"}
+        known = {"contract", "title", "requires", "entry", "navigation", "pages", "header", "widgets", "preview"}
         self.unknown_keys("", document, known)
         if "title" in document and not isinstance(document["title"], str):
             self.error("title", "must be a string")
+        if "preview" in document:
+            # 1.2: the document doesn't replace the Satellite's own interface yet - a client
+            # that has one keeps opening it, and offers this one in Developer Mode
+            self.since("preview", "a preview document", 2)
+            if not isinstance(document["preview"], bool):
+                self.error("preview", "must be true or false")
         self.check_requires(document.get("requires"))
 
         pages = document.get("pages")
@@ -472,6 +481,8 @@ class _Validator:
             self.check_image(where, block)
         elif kind == "media-list":
             self.check_media_list(where, block)
+        elif kind == "media-grid":
+            self.check_media_grid(where, block)
         elif kind == "list":
             self.check_list(where, block)
         elif kind == "form":
@@ -641,6 +652,119 @@ class _Validator:
             for key, value in formats.items():
                 self.check_format(f"{where}.item.format.{key}", value)
         self.check_media_options(where, block)
+
+    def check_media_grid(self, where: str, block: dict):
+        """{type: media-grid, items, item} (1.2): a grid of images and videos from the
+        Satellite's own routes, in groups, revealed page by page as it scrolls. A tile opens
+        the shared viewer (`viewer`) or runs `action`; `selection` offers actions over the
+        selected tiles. Nothing in it is specific to one kind of collection."""
+        self.check_items(f"{where}.items", block.get("items"))
+        if "viewer" in block and "action" in block:
+            self.error(where, "a media-grid's tiles open the viewer or run an action, not both")
+        item = block.get("item")
+        if not isinstance(item, dict):
+            self.error(f"{where}.item", "must be an object")
+        else:
+            self.unknown_keys(f"{where}.item", item, MEDIA_GRID_ITEM_KEYS)
+            if "image" not in item:
+                self.error(f"{where}.item", "needs 'image'")
+            else:
+                self.check_route(f"{where}.item.image", item["image"])
+            for key in ("key", "title", "subtitle", "group"):
+                if key in item:
+                    self.check_text(f"{where}.item.{key}", item[key])
+            if "kind" in item and item["kind"] not in MEDIA_KINDS:
+                self.check_binding(f"{where}.item.kind", item["kind"], required=True, choices=MEDIA_KINDS)
+            if "duration" in item:
+                self.check_number_or_binding(f"{where}.item.duration", item["duration"])
+            formats = item.get("format", {})
+            if not isinstance(formats, dict) or not set(formats) <= {"subtitle", "group"} or any(
+                    value not in FORMATS for value in formats.values()):
+                self.error(f"{where}.item.format", "must map 'subtitle'/'group' to a known format")
+            else:
+                for key, value in formats.items():
+                    self.check_format(f"{where}.item.format.{key}", value)
+        if "viewer" in block:
+            self.check_viewer(f"{where}.viewer", block["viewer"])
+        if "selection" in block:
+            selection = block["selection"]
+            if not isinstance(selection, dict):
+                self.error(f"{where}.selection", "must be {actions: [...]}")
+            else:
+                self.unknown_keys(f"{where}.selection", selection, {"actions"})
+                self.check_media_actions(f"{where}.selection.actions", selection.get("actions"),
+                                         LIMITS["selection_actions"], required=True)
+        if "size" in block and block["size"] not in IMAGE_SIZES:
+            self.error(f"{where}.size", f"must be one of {sorted(IMAGE_SIZES)}")
+        if "shape" in block and block["shape"] not in IMAGE_SHAPES:
+            self.error(f"{where}.shape", f"must be one of {sorted(IMAGE_SHAPES)}")
+
+    def check_viewer(self, where: str, viewer):
+        """The shared full-screen viewer of a media-grid: the full image (or the tile's own
+        image), a video to play in its place, a title, facts and actions on the item shown."""
+        if not isinstance(viewer, dict):
+            self.error(where, "must be an object")
+            return
+        self.unknown_keys(where, viewer, MEDIA_VIEWER_KEYS)
+        for key in ("image", "video"):
+            if key in viewer:
+                self.check_route(f"{where}.{key}", viewer[key])
+        for key in ("title", "subtitle"):
+            if key in viewer:
+                self.check_text(f"{where}.{key}", viewer[key])
+        fields = viewer.get("fields", [])
+        if not isinstance(fields, list):
+            self.error(f"{where}.fields", "must be a list of {label, value}")
+            fields = []
+        if len(fields) > LIMITS["viewer_fields"]:
+            self.error(f"{where}.fields", f"at most {LIMITS['viewer_fields']} fields")
+        for index, field in enumerate(fields):
+            at = f"{where}.fields[{index}]"
+            if not isinstance(field, dict):
+                self.error(at, "must be an object")
+                continue
+            self.unknown_keys(at, field, {"label", "value", "format", "unit"})
+            if not isinstance(field.get("label"), str):
+                self.error(at, "needs a 'label'")
+            if "value" not in field:
+                self.error(at, "needs a 'value'")
+            else:
+                self.check_value(f"{at}.value", field["value"])
+            if "format" in field:
+                self.check_format(f"{at}.format", field["format"])
+            if "unit" in field:
+                self.check_text(f"{at}.unit", field["unit"])
+        if "actions" in viewer:
+            self.check_media_actions(f"{where}.actions", viewer["actions"], LIMITS["viewer_actions"])
+
+    def check_media_actions(self, where: str, actions, limit: int, required: bool = False):
+        """[{label, action, icon, style, visible}]: the viewer's actions on the item shown, or a
+        selection's on each selected item."""
+        if not isinstance(actions, list) or (required and not actions):
+            self.error(where, "must be a list of {label, action}")
+            return
+        if len(actions) > limit:
+            self.error(where, f"at most {limit} actions")
+        for index, entry in enumerate(actions):
+            at = f"{where}[{index}]"
+            if not isinstance(entry, dict):
+                self.error(at, "must be an object")
+                continue
+            self.unknown_keys(at, entry, {"label", "action", "icon", "style", "visible"})
+            if "label" not in entry:
+                self.error(at, "needs a 'label'")
+            else:
+                self.check_text(f"{at}.label", entry["label"])
+            if "action" not in entry:
+                self.error(at, "needs an 'action'")
+            else:
+                self.check_action(f"{at}.action", entry["action"])
+            if "icon" in entry and entry["icon"] not in ICONS:
+                self.error(f"{at}.icon", f"unknown icon {entry['icon']!r}")
+            if "style" in entry and entry["style"] not in BUTTON_STYLES:
+                self.error(f"{at}.style", f"must be one of {sorted(BUTTON_STYLES)}")
+            if "visible" in entry and not isinstance(entry["visible"], bool):
+                self.check_text(f"{at}.visible", entry["visible"])
 
     def check_form(self, where: str, block: dict):
         fields = block.get("fields")
@@ -859,7 +983,11 @@ class UiDefinition:
     def describe(self):
         if self.error:
             return {"contract": None, "revision": None, "error": self.error}
-        return {"contract": self.document["contract"], "revision": self.revision, "error": None}
+        described = {"contract": self.document["contract"], "revision": self.revision, "error": None}
+        if self.document.get("preview") is True:
+            # 1.2: clients with the Satellite's own interface keep opening it (docs/ui-contract.md)
+            described["preview"] = True
+        return described
 
 
 def load_definition(satellite_dir: Path, satellite_name: str):

@@ -14,7 +14,7 @@ export const BLOCK_TYPES = new Set([
     // 1.1
     "chart", "table", "choice", "status", "code",
     // 1.2
-    "image", "media-list",
+    "image", "media-list", "media-grid",
 ]);
 export const FORMATS = new Set([
     "text", "number", "integer", "percent", "bytes", "duration",
@@ -26,6 +26,8 @@ export const ICONS = new Set([
     "activity", "box", "camera", "check", "circle", "clock", "cpu", "file", "file-text",
     "folder", "grid", "hard-drive", "home", "image", "info", "layers", "list", "lock",
     "music", "plus", "settings", "sliders", "star", "zap",
+    // 1.2
+    "chevron-left", "chevron-right", "edit-2", "heart", "play", "rotate-ccw", "trash-2", "x",
 ]);
 // device features this client offers a document beyond its blocks: the shared audio host
 // (mission_control/media/), which the play action plays through

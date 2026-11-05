@@ -141,20 +141,42 @@ function hasUiDocument(satellite) {
 // A Satellite's ui.json is drawn by the shared renderer (ui/renderer.js). Its own
 // page.js is used when it has no valid ui.json - or, in Developer Mode, when its
 // "own page" is chosen: a Satellite migrating to ui.json keeps its page.js for
-// comparison until it retires it.
+// comparison until it retires it. A preview document (1.2, "preview": true) is the
+// other way round: the page.js stays the default and Developer Mode can show the
+// shared interface, until the document reaches parity with it.
 const OWN_PAGE_KEY = "starcore.ownPage";
+const SHARED_PAGE_KEY = "starcore.sharedPage";
 
-function ownPagePreferred() {
+function storedNames(key) {
     try {
-        return new Set(JSON.parse(localStorage.getItem(OWN_PAGE_KEY) || "[]"));
+        return new Set(JSON.parse(localStorage.getItem(key) || "[]"));
     } catch {
         return new Set();
     }
 }
 
+function isPreviewDocument(satellite) {
+    return hasUiDocument(satellite) && satellite.ui.preview === true;
+}
+
+// the names remembered for the switch: own pages chosen over a document, or shared
+// interfaces chosen over a page.js while their document is a preview
+function switchKey(satellite) {
+    return isPreviewDocument(satellite) ? SHARED_PAGE_KEY : OWN_PAGE_KEY;
+}
+
+function switched(satellite) {
+    return developerMode && storedNames(switchKey(satellite)).has(satellite.name);
+}
+
 function usesOwnPage(satellite) {
-    return Boolean(satellite.page)
-        && (!hasUiDocument(satellite) || (developerMode && ownPagePreferred().has(satellite.name)));
+    if (!satellite.page) {
+        return false;
+    }
+    if (!hasUiDocument(satellite)) {
+        return true;
+    }
+    return isPreviewDocument(satellite) ? !switched(satellite) : switched(satellite);
 }
 
 // what a mounted page was built from: a page.js, or one revision of a ui.json -
@@ -1631,20 +1653,21 @@ function updateSatelliteOwnPageButton() {
         button.onclick = null;
         return;
     }
-    const chosen = ownPagePreferred().has(satellite.name);
+    const key = switchKey(satellite);
+    const chosen = storedNames(key).has(satellite.name);
     button.hidden = false;
     button.setAttribute("aria-pressed", String(chosen));
-    button.title = chosen ? "Show the shared interface (ui.json)" : "Show the Satellite's own page (page.js)";
+    button.title = usesOwnPage(satellite) ? "Show the shared interface (ui.json)" : "Show the Satellite's own page (page.js)";
     button.setAttribute("aria-label", button.title);
     button.onclick = () => {
-        const names = ownPagePreferred();
+        const names = storedNames(key);
         if (names.has(satellite.name)) {
             names.delete(satellite.name);
         } else {
             names.add(satellite.name);
         }
         try {
-            localStorage.setItem(OWN_PAGE_KEY, JSON.stringify([...names]));
+            localStorage.setItem(key, JSON.stringify([...names]));
         } catch {
             // without storage the choice lasts until the page is reloaded
         }

@@ -80,6 +80,19 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const [toast, setToast] = useState<{text: string; error: boolean} | null>(null);
   const [now, setNow] = useState(Date.now());
   const forms = useRef<Record<string, Record<string, any>>>({}).current;
+  // 1.2's media-grid: a floating bar over the bottom edge, and the "near the end" signal that
+  // reveals a grid's next page
+  const [overlay, setOverlay] = useState<React.ReactNode>(null);
+  const nearEndListeners = useRef(new Set<() => void>()).current;
+  const onNearEnd = useCallback(
+    (listener: () => void) => {
+      nearEndListeners.add(listener);
+      return () => {
+        nearEndListeners.delete(listener);
+      };
+    },
+    [nearEndListeners],
+  );
   const editing = useRef(false);
   const loadToken = useRef(0);
   const sourceTokens = useRef<Record<string, number>>({});
@@ -286,7 +299,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   );
 
   const runAction = useCallback(
-    async (action: UiAction | undefined, scope: Scope, value?: unknown): Promise<boolean> => {
+    async (action: UiAction | undefined, scope: Scope, value?: unknown, options?: {quiet?: boolean}): Promise<boolean> => {
+      const quiet = Boolean(options?.quiet);
       if (!action) {
         return false;
       }
@@ -317,11 +331,15 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         const body = action.body !== undefined ? resolve(action.body, scoped) : scope.form ?? {};
         result = await api.act(name, resolveTemplate(action.route ?? '', scoped), action.method ?? 'POST', body);
       } catch (err: any) {
-        showToast(err?.message || 'That action failed.', true);
-        loadData(); // show what's actually true now
+        if (!quiet) {
+          showToast(err?.message || 'That action failed.', true);
+          loadData(); // show what's actually true now
+        }
         return false;
       }
-      showToast(typeof result?.message === 'string' ? result.message : null);
+      if (!quiet) {
+        showToast(typeof result?.message === 'string' ? result.message : null);
+      }
       const then = action.then;
       if (then === 'back') {
         navigation.goBack();
@@ -335,16 +353,39 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     [api, name, go, loadData, navigation, showToast, audio],
   );
 
+  // images (1.2) load from this Satellite's own routes, with the signed-in session
+  const baseUrl = activeServer?.baseUrl ?? '';
+  const mediaSource = useCallback(
+    (mediaRoute: string) => ({
+      uri: `${baseUrl}/api/satellites/${encodeURIComponent(name)}/${mediaRoute}`,
+      headers: sessionToken ? {Authorization: `Bearer ${sessionToken}`} : undefined,
+    }),
+    [baseUrl, name, sessionToken],
+  );
+  const afterSelection = useCallback(
+    (then: UiAction['then'], failed: number, total: number) => {
+      if (failed) {
+        showToast(`${failed} of ${total} could not be done.`, true);
+      }
+      if (then === 'back') {
+        navigation.goBack();
+      } else if (then === 'refresh') {
+        loadData();
+      }
+    },
+    [showToast, navigation, loadData],
+  );
+
   const context: BlockContext = {
     developer,
     providers,
     runAction,
     readCapability: (satellite, capabilityRoute) => api.read(satellite, capabilityRoute),
-    // images (1.2) load from this Satellite's own routes, with the signed-in session
-    mediaSource: mediaRoute => ({
-      uri: `${activeServer?.baseUrl ?? ''}/api/satellites/${encodeURIComponent(name)}/${mediaRoute}`,
-      headers: sessionToken ? {Authorization: `Bearer ${sessionToken}`} : undefined,
-    }),
+    mediaSource,
+    onNearEnd,
+    setOverlay,
+    confirm: confirmAction,
+    afterSelection,
     forms,
     setEditing: value => {
       editing.current = value;
@@ -391,6 +432,13 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={100}
+        onScroll={event => {
+          const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
+          if (nearEndListeners.size && layoutMeasurement.height + contentOffset.y >= contentSize.height - 900) {
+            nearEndListeners.forEach(listener => listener());
+          }
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -458,6 +506,11 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         )}
         <FloatingPlayerSpacer />
       </ScrollView>
+      {overlay && (
+        <View style={[styles.overlay, {bottom: space.lg + playerInset}]} pointerEvents="box-none">
+          {overlay}
+        </View>
+      )}
       {toast && (
         <View
           pointerEvents="none"
@@ -523,5 +576,6 @@ const styles = StyleSheet.create({
     backgroundColor: palette.controlStrong,
   },
   toastError: {backgroundColor: '#3a1c1f'},
+  overlay: {position: 'absolute', left: space.lg, right: space.lg},
   toastText: {...type.caption, color: palette.text},
 });

@@ -9,7 +9,8 @@ import {getCachedSatellites, setCachedSatellites} from '../satellites/cache';
 import {STATUS_LABELS, satelliteIcon, statusDotColor} from '../satellites/icons';
 import type {SatelliteSummary} from '../satellites/types';
 import {ScreenTitle} from '../components/ScreenTitle';
-import {DEDICATED_SCREENS} from './HomeScreen';
+import {DEDICATED_SCREENS, hasSharedPreview, opensSharedInterface} from './HomeScreen';
+import {useDeveloperMode} from '../developer/DeveloperModeContext';
 import {Surface} from '../components/Surface';
 import {tokens, useAccent, useTopInset} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
@@ -28,6 +29,7 @@ type Props = NativeStackScreenProps<SatellitesStackParamList, 'SatellitesList'>;
  */
 export function SatellitesListScreen({navigation}: Props) {
   const {client} = useAuth();
+  const {enabled: developer} = useDeveloperMode();
   const {activeServer} = useServers();
   const {color: accent} = useAccent();
   const top = useTopInset();
@@ -89,10 +91,13 @@ export function SatellitesListScreen({navigation}: Props) {
           // a ui.json the Engine validated (UI contract 1.x) - drawn by the
           // generic SatelliteUiScreen, so a new Satellite needs no app change.
           // It comes first: a dedicated screen is what a Satellite without one
-          // uses (Photo, Music), or the fallback for a server older than its ui.json.
-          const declarative = Boolean(item.ui?.revision);
+          // uses (Photo, Music), or the fallback for a server older than its ui.json. A
+          // preview document (1.2) leaves the dedicated screen first; Developer Mode
+          // offers the shared interface beside it.
+          const declarative = opensSharedInterface(item);
           const dedicated = declarative ? undefined : DEDICATED_SCREENS[item.name];
-          const openable = item.mobile_ui || declarative;
+          const preview = developer && hasSharedPreview(item);
+          const openable = item.mobile_ui || Boolean(item.ui?.revision);
           return (
           <Pressable
             disabled={!openable}
@@ -119,6 +124,17 @@ export function SatellitesListScreen({navigation}: Props) {
               <Text style={type.body} numberOfLines={2}>
                 {item.description}
               </Text>
+              {preview && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open the shared ${item.name} interface`}
+                  testID={`shared-preview-${item.name}`}
+                  onPress={() => navigation.navigate('SatelliteUi', {name: item.name, revision: item.ui?.revision})}
+                  style={({pressed}) => [styles.previewPill, pressed && styles.pressed]}>
+                  <Icon name="layers" size={14} color={palette.text2} />
+                  <Text style={styles.previewLabel}>Shared interface (preview)</Text>
+                </Pressable>
+              )}
               {!openable && <Text style={styles.noUi}>No mobile interface yet</Text>}
             </Surface>
           </Pressable>
@@ -137,6 +153,17 @@ const styles = StyleSheet.create({
   list: {paddingHorizontal: space.lg, paddingBottom: space.xxl, gap: space.md},
   header: {gap: space.sm, marginBottom: space.sm},
   card: {gap: space.md},
+  previewPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: space.xs,
+    minHeight: 36,
+    paddingHorizontal: space.md,
+    borderRadius: 999,
+    backgroundColor: palette.control,
+  },
+  previewLabel: {...type.caption, color: palette.text2, fontWeight: '600'},
   row: {flexDirection: 'row', alignItems: 'center', gap: space.sm},
   name: {flex: 1, marginLeft: space.xs},
   dot: {width: 6, height: 6, borderRadius: 3},

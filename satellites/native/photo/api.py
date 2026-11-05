@@ -3,7 +3,7 @@
 from starcore.api.response import error_response, file_response, json_response
 
 from . import albums as albums_module
-from . import configuration, sync
+from . import configuration, gallery, sync
 from . import state as state_module
 from .albums import AlbumError, AlbumNotFound, albums
 from .images import UnsupportedImage
@@ -36,6 +36,9 @@ def routes() -> dict:
         "sync_upload": sync_upload_route,
         "albums": albums_route,
         "trash": trash_route,
+        # read-only: the library shaped for ui.json's shared gallery (see gallery.py);
+        # every action there goes to the routes above, unchanged
+        "gallery": gallery_route,
         # naming a route "configuration" is the whole contract with the Core's
         # generic satellite configuration mechanism - see docs/satellites.md
         "configuration": configuration_route,
@@ -47,6 +50,26 @@ def routes() -> dict:
         # status-style declarative screen Status's worked example uses.
         "mobile": mobile,
     }
+
+
+def gallery_route(request):
+    if request.method != "GET":
+        return error_response("only GET is supported here", status=405)
+
+    path = tuple(request.path)
+    if path == ():
+        return json_response(gallery.library_view(request.satellite))
+    if path == ("albums",):
+        return json_response(gallery.albums_view(request.satellite))
+    if len(path) == 2 and path[0] == "albums":
+        try:
+            return json_response(gallery.album_view(request.satellite, path[1]))
+        except AlbumNotFound as error:
+            return error_response(str(error), status=404)
+    if path == ("trash",):
+        return json_response(gallery.trash_view(request.satellite))
+
+    return error_response(f"unknown endpoint 'gallery/{'/'.join(path)}'")
 
 
 def sync_status(request):

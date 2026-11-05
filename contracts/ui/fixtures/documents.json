@@ -14,6 +14,25 @@
       ]}}}
     },
     {
+      "name": "media-grid",
+      "_why": "1.2: a gallery of images and videos from the Satellite's own routes, grouped, with the shared viewer and selection; a preview document, so a client with the Satellite's own interface keeps it.",
+      "document": {"contract": "starcore.ui/1.2", "preview": true, "entry": "home", "pages": {
+        "home": {"source": {"route": "items"}, "blocks": [
+          {"type": "media-grid", "items": "$.items", "size": "medium", "empty": "Nothing here yet.",
+           "item": {"image": "thumbs/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.seconds",
+                    "group": "$.month", "title": "$.name", "subtitle": "$.taken", "format": {"subtitle": "date"}},
+           "viewer": {"image": "full/{$.id}", "video": "play/{$.id}", "title": "$.name", "subtitle": "$.taken",
+                      "fields": [{"label": "Taken", "value": "$.taken", "format": "datetime"}, {"label": "Size", "value": "$.bytes", "format": "bytes"}],
+                      "actions": [{"label": "Favorite", "icon": "heart", "visible": "$.can_favorite", "action": {"route": "favorites", "body": {"id": "$.id"}, "then": "refresh"}},
+                                  {"label": "Delete", "icon": "trash-2", "style": "danger", "action": {"route": "items/{$.id}/delete", "confirm": "Delete it?", "then": "refresh"}}]},
+           "selection": {"actions": [{"label": "Delete", "icon": "trash-2", "style": "danger", "action": {"route": "items/{$.id}/delete", "confirm": "Delete the selected items?", "then": "refresh"}}]}},
+          {"type": "media-grid", "items": [{"id": "a"}], "item": {"image": "thumbs/{$.id}"}, "shape": "wide", "size": "large",
+           "action": {"navigate": "detail", "params": {"id": "$.id"}}}
+        ]},
+        "detail": {"params": ["id"], "blocks": []}
+      }}
+    },
+    {
       "name": "play-action",
       "_why": "1.2: a button asks the client to play what the audio.library provider finds; it needs the media.audio client capability and an audio.library provider.",
       "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.audio"], "capabilities": ["audio.library"]},
@@ -133,6 +152,53 @@
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "media-list", "items": [], "item": {"title": "$.t"}, "fit": "contain"}]}}},
       "error": "unknown key"
+    },
+    {
+      "name": "media-grid-in-1.1",
+      "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "thumbs/{$.id}"}}]}}},
+      "error": "needs starcore.ui/1.2"
+    },
+    {
+      "name": "media-grid-without-image",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"title": "$.name"}}]}}},
+      "error": "needs 'image'"
+    },
+    {
+      "name": "media-grid-video-outside",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "thumbs/{$.id}"}, "viewer": {"video": "../other/{$.id}"}}]}}},
+      "error": "relative to the Satellite"
+    },
+    {
+      "name": "media-grid-viewer-and-action",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "viewer": {}, "action": {"navigate": "home"}}]}}},
+      "error": "not both"
+    },
+    {
+      "name": "media-grid-unknown-kind",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t", "kind": "audio"}}]}}},
+      "error": "must be one of"
+    },
+    {
+      "name": "media-grid-empty-selection",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "selection": {"actions": []}}]}}},
+      "error": "selection.actions"
+    },
+    {
+      "name": "media-grid-viewer-action-without-label",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "viewer": {"actions": [{"action": {"route": "x"}}]}}]}}},
+      "error": "needs a 'label'"
+    },
+    {
+      "name": "preview-in-1.1",
+      "document": {"contract": "starcore.ui/1.1", "preview": true, "entry": "home", "pages": {"home": {"blocks": []}}},
+      "error": "needs starcore.ui/1.2"
     },
     {
       "name": "play-in-1.1",

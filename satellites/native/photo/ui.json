@@ -1,0 +1,190 @@
+{
+  "_about": "Photo's shared interface (UI contract 1.2): the library and albums in the shared media-grid and viewer. A preview: both clients keep opening Photo's own screens, and Developer Mode shows this one beside them, until it reaches parity (docs/satellites/photo.md, \"Shared interface\"). Search, Map, upload and import, phone sync, settings and the Locked Folder stay on those screens. It binds to the read-only gallery routes (gallery.py); every action goes to Photo's existing routes.",
+  "contract": "starcore.ui/1.2",
+  "preview": true,
+  "title": "Photos",
+  "entry": "library",
+  "navigation": [
+    {"page": "library", "label": "Library", "icon": "image"},
+    {"page": "albums", "label": "Albums", "icon": "folder"}
+  ],
+  "pages": {
+    "library": {
+      "source": {"route": "gallery"},
+      "blocks": [
+        {"type": "text", "style": "caption", "text": "$.summary"},
+        {
+          "type": "media-grid",
+          "id": "library",
+          "items": "$.items",
+          "size": "medium",
+          "empty": "No photos yet. Import some, or turn on phone sync, from Photo's own page.",
+          "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration", "group": "$.month"},
+          "viewer": {
+            "image": "originals/{$.id}",
+            "video": "originals/{$.id}",
+            "title": "$.title",
+            "subtitle": "$.date",
+            "fields": [
+              {"label": "Taken", "value": "$.taken", "format": "datetime"},
+              {"label": "Length", "value": "$.duration", "format": "duration"},
+              {"label": "Size", "value": "$.size", "format": "bytes"},
+              {"label": "Dimensions", "value": "$.dimensions"},
+              {"label": "Resolution", "value": "$.megapixels"},
+              {"label": "Format", "value": "$.format"},
+              {"label": "Camera", "value": "$.camera"},
+              {"label": "Lens", "value": "$.lens"},
+              {"label": "Location", "value": "$.location"},
+              {"label": "Folder", "value": "$.folder"},
+              {"label": "File", "value": "$.title"},
+              {"label": "Imported", "value": "$.imported", "format": "datetime"}
+            ],
+            "actions": [
+              {"label": "Favorite", "icon": "heart", "visible": "$.can_favorite",
+               "action": {"route": "albums/favorites/photos", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+              {"label": "Unfavorite", "icon": "heart", "style": "primary", "visible": "$.favorite",
+               "action": {"route": "albums/favorites/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+              {"label": "Move to bin", "icon": "trash-2", "style": "danger",
+               "action": {"route": "trash/{$.id}", "confirm": "Move this to the recycle bin? It can be restored from there.", "then": "refresh"}}
+            ]
+          },
+          "selection": {
+            "actions": [
+              {"label": "Favorite", "icon": "heart",
+               "action": {"route": "albums/favorites/photos", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+              {"label": "Move to bin", "icon": "trash-2", "style": "danger",
+               "action": {"route": "trash/{$.id}", "confirm": "Move the selected items to the recycle bin? They can be restored from there.", "then": "refresh"}}
+            ]
+          }
+        }
+      ]
+    },
+    "albums": {
+      "source": {"route": "gallery/albums"},
+      "blocks": [
+        {
+          "type": "media-grid",
+          "id": "albums",
+          "items": "$.albums",
+          "size": "large",
+          "empty": "No albums yet.",
+          "item": {"image": "thumbnails/{$.cover}", "key": "$.id", "title": "$.title", "subtitle": "$.subtitle", "group": "$.group"},
+          "action": {"navigate": "album", "params": {"id": "$.id"}}
+        },
+        {
+          "type": "card",
+          "title": "New album",
+          "blocks": [
+            {"type": "form",
+             "fields": [{"key": "name", "label": "Name", "kind": "text", "placeholder": "Holidays", "required": true}],
+             "submit": {"label": "Create album",
+                        "action": {"route": "albums", "body": {"name": "$form.name"}, "then": {"navigate": "album", "params": {"id": "$.id"}}}}}
+          ]
+        },
+        {"type": "button", "label": "Recycle bin", "style": "secondary", "action": {"navigate": "trash"}}
+      ]
+    },
+    "album": {
+      "title": "$.name",
+      "params": ["id"],
+      "source": {"route": "gallery/albums/{$params.id}"},
+      "blocks": [
+        {"type": "text", "style": "caption", "text": "$.summary"},
+        {"type": "text", "style": "caption", "text": "$.description", "visible": "$.description"},
+        {
+          "type": "media-grid",
+          "id": "album",
+          "items": "$.items",
+          "size": "medium",
+          "empty": "This album is empty.",
+          "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration", "group": "$.month"},
+          "viewer": {
+            "image": "originals/{$.id}",
+            "video": "originals/{$.id}",
+            "title": "$.title",
+            "subtitle": "$.date",
+            "fields": [
+              {"label": "Taken", "value": "$.taken", "format": "datetime"},
+              {"label": "Length", "value": "$.duration", "format": "duration"},
+              {"label": "Size", "value": "$.size", "format": "bytes"},
+              {"label": "Dimensions", "value": "$.dimensions"},
+              {"label": "Format", "value": "$.format"},
+              {"label": "Camera", "value": "$.camera"},
+              {"label": "Location", "value": "$.location"},
+              {"label": "File", "value": "$.title"}
+            ],
+            "actions": [
+              {"label": "Favorite", "icon": "heart", "visible": "$.can_favorite",
+               "action": {"route": "albums/favorites/photos", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+              {"label": "Unfavorite", "icon": "heart", "style": "primary", "visible": "$.favorite",
+               "action": {"route": "albums/favorites/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+              {"label": "Remove from album", "icon": "x", "visible": "$.removable",
+               "action": {"route": "albums/{$params.id}/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+              {"label": "Move to bin", "icon": "trash-2", "style": "danger",
+               "action": {"route": "trash/{$.id}", "confirm": "Move this to the recycle bin? It can be restored from there.", "then": "refresh"}}
+            ]
+          },
+          "selection": {
+            "actions": [
+              {"label": "Move to bin", "icon": "trash-2", "style": "danger",
+               "action": {"route": "trash/{$.id}", "confirm": "Move the selected items to the recycle bin? They can be restored from there.", "then": "refresh"}}
+            ]
+          }
+        },
+        {
+          "type": "card",
+          "title": "Album",
+          "visible": "$.editable",
+          "blocks": [
+            {"type": "form",
+             "fields": [{"key": "name", "label": "Name", "kind": "text", "value": "$.name", "required": true}],
+             "submit": {"label": "Rename", "action": {"route": "albums/{$params.id}", "body": {"name": "$form.name"}, "then": "refresh"}}},
+            {"type": "button", "label": "Delete album", "style": "danger",
+             "action": {"route": "albums/{$params.id}/delete", "confirm": "Delete this album? The photos in it stay in your library.", "then": "back"}}
+          ]
+        }
+      ]
+    },
+    "trash": {
+      "title": "Recycle bin",
+      "source": {"route": "gallery/trash"},
+      "blocks": [
+        {"type": "text", "style": "caption", "text": "$.note"},
+        {
+          "type": "media-grid",
+          "id": "trash",
+          "items": "$.items",
+          "size": "medium",
+          "empty": "The recycle bin is empty.",
+          "item": {"image": "trash/{$.id}/thumbnail", "key": "$.id", "kind": "$.kind", "duration": "$.duration"},
+          "viewer": {
+            "image": "trash/{$.id}/original",
+            "video": "trash/{$.id}/original",
+            "title": "$.title",
+            "subtitle": "$.date",
+            "fields": [
+              {"label": "Moved here", "value": "$.trashed", "format": "datetime"},
+              {"label": "Taken", "value": "$.taken", "format": "datetime"},
+              {"label": "Size", "value": "$.size", "format": "bytes"},
+              {"label": "File", "value": "$.title"}
+            ],
+            "actions": [
+              {"label": "Restore", "icon": "rotate-ccw", "style": "primary",
+               "action": {"route": "trash/{$.id}/restore", "then": "refresh"}},
+              {"label": "Delete forever", "icon": "trash-2", "style": "danger",
+               "action": {"route": "trash/{$.id}/erase", "confirm": "Delete this for good? This can't be undone.", "then": "refresh"}}
+            ]
+          },
+          "selection": {
+            "actions": [
+              {"label": "Restore", "icon": "rotate-ccw",
+               "action": {"route": "trash/{$.id}/restore", "then": "refresh"}},
+              {"label": "Delete forever", "icon": "trash-2", "style": "danger",
+               "action": {"route": "trash/{$.id}/erase", "confirm": "Delete the selected items for good? This can't be undone.", "then": "refresh"}}
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

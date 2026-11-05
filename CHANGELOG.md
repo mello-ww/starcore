@@ -65,6 +65,18 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   `audio.library` provider finds, through the client's audio host. Both clients now offer the
   `media.audio` client capability, so any Satellite can play audio without naming the one that
   provides it.
+- **UI contract 1.2: the `media-grid` block and a shared media viewer.** A grid of images and
+  videos from a Satellite's own routes: groups, responsive columns, 60 tiles at a time as it
+  scrolls, video badges, loading and error states, a selection with the document's actions,
+  and a full-screen viewer (image, video playback, details, actions). Drawn by both clients'
+  shared renderers; nothing in it is specific to Photo.
+- **UI contract 1.2: preview documents.** `"preview": true` keeps a Satellite's own page or
+  screen as the default and offers the shared interface in Developer Mode, while a migration
+  reaches parity.
+- **Photo's shared Library and Albums (preview).** Photo's new `ui.json` draws its library,
+  albums, album pages and recycle bin with the shared gallery, bound to new read-only
+  `gallery` routes. Photo's own page and screens remain the default; search, map, import,
+  sync, settings and the Locked Folder stay there.
 - **UI contract 1.2: `image` and `media-list` blocks.** Images from a Satellite's own routes,
   loaded with the client's session, with sizes, shapes, a loading placeholder and an error
   state; and rows with a thumbnail, title, subtitle, metadata and any action. Drawn by both

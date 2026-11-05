@@ -191,6 +191,10 @@ POST /api/satellites/photo/albums/<id>        rename a custom album  {"name": ..
 POST /api/satellites/photo/albums/<id>/delete    delete a custom album (rejected for Favorites/physical)
 POST /api/satellites/photo/albums/<id>/photos           add a photo   {"photo_id": ...}
 POST /api/satellites/photo/albums/<id>/photos/remove    remove a photo {"photo_id": ...}
+GET  /api/satellites/photo/gallery            the library shaped for ui.json's shared gallery (read-only)
+GET  /api/satellites/photo/gallery/albums     every album as a tile with its cover
+GET  /api/satellites/photo/gallery/albums/<id>   one album's photos, for the shared gallery
+GET  /api/satellites/photo/gallery/trash      the recycle bin, for the shared gallery
 GET  /api/satellites/photo/trash              what's in the recycle bin, and its retention period
 POST /api/satellites/photo/trash/<id>         move an active photo to the recycle bin
 GET  /api/satellites/photo/trash/<id>/thumbnail   preview a trashed photo's thumbnail
@@ -248,6 +252,37 @@ Automatic phone sync (below) has no segment of its own: its enable/disable, Wi-F
 now" and status live inside the Photo configuration screen, alongside `source_paths`,
 `sync_default_path` and every other Photo setting - see "Real automatic phone sync" and
 "Configuration" above.
+
+## Shared interface
+
+Photo also describes its Library and Albums in a `ui.json` (UI contract 1.2), drawn by both
+clients' shared `media-grid` block and viewer - the first step of moving Photo off client code
+of its own. It is a **preview** document: Mission Control and the app keep opening Photo's own
+page and screens, and Developer Mode shows the shared one beside them (on the web, the button
+beside the Satellite's title; in the app, "Shared interface (preview)" on Photo's card in
+Satellites). The released Alpha app ignores it.
+
+What it covers:
+
+| | Photo's own page and screens | Shared interface |
+| --- | --- | --- |
+| Library grid, newest first, by month; video badge and duration | yes | yes |
+| Viewer: full image, video playback, previous and next, details | yes | yes (no pinch-to-zoom on Android, no OpenStreetMap link) |
+| Favourite and unfavourite; move to the recycle bin | yes | yes, from the viewer and from a selection |
+| Albums: physical, Favorites, custom, with covers; open an album | yes | yes |
+| Create, rename, delete a custom album; remove a photo from it | yes | yes |
+| Add a photo to a custom album | yes | no: needs a picker the contract doesn't have yet |
+| Recycle bin: restore, delete for good, retention | yes | yes, from the viewer and from a selection |
+| Grouping by camera, pinch to change columns (Android) | yes | no |
+| Search (Android), Map, import and upload, phone sync, settings | yes | no - Photo's own screens |
+| Locked Folder | yes | no - stays on Photo's own screens; its security-sensitive behaviour isn't migrated |
+| Offline cache of the library (Android) | yes | no: the shared interface caches the document, not page data |
+
+It binds to four read-only routes, `gallery`, `gallery/albums`, `gallery/albums/<id>` and
+`gallery/trash` (`gallery.py`), which shape the same library, albums and recycle bin for
+display: the month a photo belongs to, its dimensions and camera as text, whether it is a
+favourite. Every action goes to the routes above, unchanged (`albums/favorites/photos`,
+`trash/<id>`, `albums/<id>/...`); no route or storage format changed.
 
 ## Command
 

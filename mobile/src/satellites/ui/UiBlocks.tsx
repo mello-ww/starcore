@@ -7,6 +7,7 @@ import {Slider} from '../../components/Slider';
 import {StarSwitch} from '../../components/StarSwitch';
 import {Surface} from '../../components/Surface';
 import {TOUCH_TARGET, tokens, useAccent} from '../../theme';
+import {MediaGridBlock} from './MediaGrid';
 import {
   BLOCK_TYPES, findProvider, formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate, toneOf,
   type Providers, type Scope, type UiAction, type UiBlock,
@@ -25,8 +26,9 @@ const {palette, space, type, radii} = tokens;
 export interface BlockContext {
   developer: boolean;
   providers: Providers;
-  /** Runs an action; resolves true once its request (if any) succeeded. */
-  runAction: (action: UiAction | undefined, scope: Scope, value?: unknown) => Promise<boolean>;
+  /** Runs an action; resolves true once its request (if any) succeeded. `quiet` (one item of
+   * a selection) leaves notices and refreshing to the caller. */
+  runAction: (action: UiAction | undefined, scope: Scope, value?: unknown, options?: {quiet?: boolean}) => Promise<boolean>;
   /** Reads one operation of a capability provider - another Satellite's route. */
   readCapability: (satellite: string, route: string) => Promise<any>;
   /** An image from one of the Satellite's own routes, with this session (1.2's image and
@@ -43,6 +45,16 @@ export interface BlockContext {
   refreshing?: boolean;
   /** The header: a field reads as one line of context ("Updated 12s ago · Sampling every 5 s"). */
   inline?: boolean;
+  /** 1.2's media-grid: calls `listener` whenever the screen scrolls near its end, so the grid
+   * reveals its next page; returns the unsubscribe. Stable across renders. */
+  onNearEnd?: (listener: () => void) => () => void;
+  /** 1.2's media-grid: what floats over the screen's bottom edge (a selection bar), or null.
+   * Stable across renders. */
+  setOverlay?: (node: React.ReactNode) => void;
+  /** Asks before an action (a selection's confirm). */
+  confirm?: (message: string) => Promise<boolean>;
+  /** After a selection's action ran on each selected item: its `then`, and how many failed. */
+  afterSelection?: (then: UiAction['then'], failed: number, total: number) => void;
 }
 
 const asText = (value: unknown) => (value === null || value === undefined ? '' : String(value));
@@ -215,6 +227,8 @@ function UiBlockView({block, scope, context}: {block: UiBlock; scope: Scope; con
       return <ImageBlock block={block} scope={scope} context={context} />;
     case 'media-list':
       return <MediaListBlock block={block} scope={scope} context={context} />;
+    case 'media-grid':
+      return <MediaGridBlock block={block} scope={scope} context={context} />;
     case 'chart':
       return block.kind === 'bars' ? <BarsBlock block={block} scope={scope} /> : <ChartBlock block={block} scope={scope} context={context} />;
     case 'table':

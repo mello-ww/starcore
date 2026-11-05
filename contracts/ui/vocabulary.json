@@ -20,7 +20,8 @@
     "status": {"required": ["label"], "optional": ["tone", "detail"]},
     "code": {"required": ["value"], "optional": ["label", "copy"]},
     "image": {"required": ["src"], "optional": ["alt", "caption", "size", "shape", "fit"]},
-    "media-list": {"required": ["items", "item"], "optional": ["empty", "action", "size", "shape"]}
+    "media-list": {"required": ["items", "item"], "optional": ["empty", "action", "size", "shape"]},
+    "media-grid": {"required": ["items", "item"], "optional": ["empty", "action", "viewer", "selection", "size", "shape"]}
   },
   "since": {
     "_note": "The minor each block, key or format arrived in. A document that declares an older minor may not use them.",
@@ -32,8 +33,10 @@
       "bindings": ["$state.", "$sources."]
     },
     "1.2": {
-      "blocks": ["image", "media-list"],
+      "blocks": ["image", "media-list", "media-grid"],
       "actions": ["play"],
+      "keys": ["document.preview"],
+      "icons": ["chevron-left", "chevron-right", "edit-2", "heart", "play", "rotate-ccw", "trash-2", "x"],
       "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library."
     }
   },
@@ -49,14 +52,18 @@
   "image_sizes": ["small", "medium", "large", "full"],
   "image_shapes": ["square", "round", "wide"],
   "image_fits": ["cover", "contain"],
+  "media_kinds": ["image", "video"],
+  "media_grid_item_keys": ["image", "key", "title", "subtitle", "kind", "duration", "group", "format"],
+  "media_viewer_keys": ["image", "video", "title", "subtitle", "fields", "actions"],
   "column_align": ["start", "end"],
   "page_templates": ["stack", "dashboard"],
   "action_then": ["refresh", "back"],
   "methods": ["GET", "POST"],
   "icons": [
-    "activity", "box", "camera", "check", "circle", "clock", "cpu", "file", "file-text",
-    "folder", "grid", "hard-drive", "home", "image", "info", "layers", "list", "lock",
-    "music", "plus", "settings", "sliders", "star", "zap"
+    "activity", "box", "camera", "check", "chevron-left", "chevron-right", "circle", "clock", "cpu",
+    "edit-2", "file", "file-text", "folder", "grid", "hard-drive", "heart", "home", "image", "info",
+    "layers", "list", "lock", "music", "play", "plus", "rotate-ccw", "settings", "sliders", "star",
+    "trash-2", "x", "zap"
   ],
   "satellite_capabilities": {
     "files.browse": {
@@ -108,6 +115,9 @@
     "widgets": 4,
     "chart_series": 4,
     "table_columns": 10,
-    "choice_options": 8
+    "choice_options": 8,
+    "viewer_fields": 12,
+    "viewer_actions": 6,
+    "selection_actions": 4
   }
 }
