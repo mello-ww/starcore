@@ -47,10 +47,13 @@ export function clock(seconds) {
 }
 
 /**
- * host: {satelliteBase, runAction(action, scope), afterSelection(then), setNotice(text, kind)}.
+ * host: {satelliteBase, runAction(action, scope), afterSelection(then), setNotice(text, kind)},
+ * and for the media picker `picking: {multiple, onChange(selectedItems)}`: every tile then
+ * selects (one at a time unless `multiple`), and the picker draws its own bar.
  * Returns {render(block, scope), afterRender(), reset(), dispose()}.
  */
 export function createGallery(host) {
+    const picking = host.picking || null;
     let grids = new WeakMap();
     // the one viewer a page can have open: {block, key, index, overlay, stageKey}
     let viewer = null;
@@ -59,7 +62,7 @@ export function createGallery(host) {
     function gridState(block) {
         let entry = grids.get(block);
         if (!entry) {
-            entry = { shown: GRID_PAGE, selected: new Set(), selecting: false, items: [], keys: [], scope: null, tiles: new Map(), bar: null };
+            entry = { shown: GRID_PAGE, selected: new Set(), selecting: Boolean(picking), items: [], keys: [], scope: null, tiles: new Map(), bar: null };
             grids.set(block, entry);
         }
         return entry;
@@ -121,7 +124,7 @@ export function createGallery(host) {
                 empty === null || empty === undefined || empty === "" ? "Nothing here." : String(empty)));
             return wrapper;
         }
-        if (block.selection) {
+        if (block.selection && !picking) {
             grid.bar = el("div", "ui-media-selection");
             wrapper.appendChild(grid.bar);
             renderSelectionBar(block, grid);
@@ -197,7 +200,7 @@ export function createGallery(host) {
         const title = block.item.title !== undefined ? resolve(block.item.title, itemScope) : null;
         const subtitle = block.item.subtitle !== undefined ? resolve(block.item.subtitle, itemScope) : null;
         const label = title === null || title === undefined || title === "" ? null : String(title);
-        const opens = Boolean(block.viewer || block.action || block.selection);
+        const opens = Boolean(picking || block.viewer || block.action || block.selection);
 
         const tile = el(opens ? "button" : "div", "ui-media-tile");
         if (opens) {
@@ -243,7 +246,9 @@ export function createGallery(host) {
         }
         if (opens) {
             tile.addEventListener("click", (event) => {
-                if (block.selection && (grid.selecting || event.shiftKey || event.ctrlKey || event.metaKey)) {
+                if (picking) {
+                    toggleSelected(block, grid, key);
+                } else if (block.selection && (grid.selecting || event.shiftKey || event.ctrlKey || event.metaKey)) {
                     toggleSelected(block, grid, key);
                 } else if (block.viewer) {
                     openViewer(block, key, tile);
@@ -264,6 +269,15 @@ export function createGallery(host) {
         if (grid.selected.has(key)) {
             grid.selected.delete(key);
         } else {
+            if (picking && !picking.multiple) {
+                // one at a time: choosing another replaces the choice
+                for (const other of grid.selected) {
+                    const tile = grid.tiles.get(other);
+                    tile?.classList.remove("is-selected");
+                    tile?.setAttribute("aria-pressed", "false");
+                }
+                grid.selected.clear();
+            }
             grid.selected.add(key);
         }
         grid.selecting = grid.selected.size > 0 || grid.selecting;
@@ -274,6 +288,9 @@ export function createGallery(host) {
             tile.setAttribute("aria-pressed", String(selected));
         }
         renderSelectionBar(block, grid);
+        if (picking) {
+            picking.onChange(grid.items.filter((item, index) => grid.selected.has(grid.keys[index])));
+        }
     }
 
     function clearSelection(block, grid) {

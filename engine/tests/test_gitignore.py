@@ -114,6 +114,19 @@ class GitignoreDoesNotHideSourceTest(unittest.TestCase):
     that a normal source, config, or documentation file gets silently
     swallowed too."""
 
+    def test_ai_agent_instructions_and_settings_are_ignored(self):
+        paths = [
+            "CLAUDE.md",
+            "CLAUDE.local.md",
+            "AGENTS.md",
+            "mobile/CLAUDE.md",
+            ".claude/settings.local.json",
+            ".claude/agents/reviewer.md",
+            ".codex/config.toml",
+            ".mcp.json",
+        ]
+        self.assertEqual(_ignored(paths), set(paths))
+
     def test_tracked_source_and_configuration_files_are_never_ignored(self):
         paths = [
             "engine/starcore/auth.py",
@@ -137,6 +150,10 @@ class GitignoreDoesNotHideSourceTest(unittest.TestCase):
             "mobile/android/app/src/main/AndroidManifest.xml",
             "mobile/android/app/src/main/java/com/starcore/mobile/MainActivity.kt",
             "mobile/README.md",
+            "README.md",
+            "CHANGELOG.md",
+            "docs/ui-contract.md",
+            "docs/media-audio.md",
         ]
         self.assertEqual(_ignored(paths), set())
 

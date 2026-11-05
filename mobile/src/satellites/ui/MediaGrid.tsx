@@ -119,8 +119,13 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
   );
 
   const [shown, setShown] = useState(GRID_PAGE);
+  // the media picker (media.picker): every tile selects, one at a time unless `multiple`
+  const picking = context.picking;
+  const pickingRef = useRef(picking);
+  pickingRef.current = picking;
+  const multiplePick = picking ? picking.multiple : true;
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [selecting, setSelecting] = useState(false);
+  const [selecting, setSelecting] = useState(Boolean(picking));
   const [viewerKey, setViewerKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -142,18 +147,26 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
     });
   }, [entries]);
 
-  const toggle = useCallback((key: string) => {
-    setSelecting(true);
-    setSelected(current => {
-      const next = new Set(current);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  }, []);
+  const toggle = useCallback(
+    (key: string) => {
+      setSelecting(true);
+      setSelected(current => {
+        const next = new Set(multiplePick ? current : []);
+        if (current.has(key)) {
+          next.delete(key);
+        } else {
+          next.add(key);
+        }
+        return next;
+      });
+    },
+    [multiplePick],
+  );
+
+  // the picker hears what is chosen
+  useEffect(() => {
+    pickingRef.current?.onChange(entries.filter(entry => selected.has(entry.key)).map(entry => entry.item));
+  }, [selected, entries]);
 
   const clearSelection = useCallback(() => {
     setSelected(new Set());
@@ -196,7 +209,7 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
   const selection = block.selection as {actions?: any[]} | undefined;
   const selectionBar = useMemo(() => {
     const selectionActions: any[] = Array.isArray(selection?.actions) ? selection!.actions! : [];
-    if (!block.selection || !selecting) {
+    if (!block.selection || !selecting || picking) {
       return null;
     }
     return (
@@ -218,7 +231,7 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
         </ScrollView>
       </View>
     );
-  }, [block.selection, selection, selecting, selected, busy, clearSelection]);
+  }, [block.selection, selection, selecting, selected, busy, clearSelection, picking]);
   useEffect(() => {
     setOverlay?.(selectionBar);
   }, [setOverlay, selectionBar]);
@@ -262,10 +275,10 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
     return out;
   }, [entries, shown, columns, item.group, formats.group]);
 
-  const opens = Boolean(block.viewer || block.action || block.selection);
+  const opens = Boolean(picking || block.viewer || block.action || block.selection);
   const onPress = useCallback(
     (entry: Entry) => {
-      if (block.selection && selecting) {
+      if (picking || (block.selection && selecting)) {
         toggle(entry.key);
       } else if (block.viewer) {
         setViewerKey(entry.key);
@@ -275,7 +288,7 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
         toggle(entry.key);
       }
     },
-    [block.selection, block.viewer, block.action, selecting, toggle, runAction],
+    [picking, block.selection, block.viewer, block.action, selecting, toggle, runAction],
   );
 
   if (!entries.length) {
@@ -311,14 +324,14 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
                 subtitle={item.subtitle !== undefined ? resolve(item.subtitle, entry.scope) : null}
                 subtitleFormat={formats.subtitle}
                 duration={item.duration !== undefined ? resolve(item.duration, entry.scope) : null}
-                selectable={Boolean(block.selection)}
+                selectable={Boolean(block.selection || picking)}
                 selecting={selecting}
                 selected={selected.has(entry.key)}
                 accent={accent}
                 onAccent={onColor}
                 reduced={reduced}
                 onPress={opens ? onPress : undefined}
-                onLongPress={block.selection ? toggle : undefined}
+                onLongPress={block.selection || picking ? toggle : undefined}
               />
             ))}
           </View>

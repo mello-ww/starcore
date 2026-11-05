@@ -175,5 +175,77 @@ class PhotoGalleryApiTest(unittest.TestCase):
         self.assertIs(photo["ui"]["preview"], True)
 
 
+    # ---------- media.gallery: what the media picker chooses from ----------
+
+    def test_photo_provides_media_gallery_through_the_catalog(self):
+        status, catalog = self.json_request("/api/catalog")
+        self.assertEqual(status, 200)
+        providers = catalog["capabilities"]["media.gallery"]
+        self.assertEqual([provider["satellite"] for provider in providers], ["Photo"])
+        self.assertEqual(providers[0]["operations"], {"list": "media", "thumbnail": "thumbnails"})
+        self.assertEqual(catalog["contract"]["capabilities"]["media.gallery"], [1])
+
+    def test_the_locked_folder_offers_nothing_to_pick(self):
+        status, catalog = self.json_request("/api/catalog")
+        self.assertEqual(status, 200)
+        for name, providers in catalog["capabilities"].items():
+            self.assertNotIn("LockedFolder", [provider["satellite"] for provider in providers], name)
+
+    def test_the_media_list_offers_the_active_library_only(self):
+        photos = self.import_photos("a.png", "b.png")
+        trashed = photos["b.png"]["id"]
+        self.json_request(f"/api/satellites/photo/trash/{trashed}", "POST")
+
+        status, listing = self.json_request("/api/satellites/photo/media?kinds=image")
+
+        self.assertEqual(status, 200)
+        self.assertEqual([item["id"] for item in listing["items"]], [photos["a.png"]["id"]])
+        item = listing["items"][0]
+        self.assertEqual(set(item), {"id", "kind", "title", "duration", "group"})  # never a path
+        self.assertEqual(item["kind"], "image")
+        self.assertEqual(self.json_request("/api/satellites/photo/media?kinds=video")[1]["items"], [])
+
+    def test_picked_references_are_added_to_an_album(self):
+        photos = self.import_photos("a.png", "b.png")
+        album = self.json_request("/api/satellites/photo/albums", "POST", {"name": "Trip"})[1]
+        items = [{"provider": "Photo", "capability": "media.gallery", "id": photos[name]["id"], "kind": "image"}
+                 for name in ("a.png", "b.png")]
+
+        status, payload = self.json_request(f"/api/satellites/photo/albums/{album['id']}/photos", "POST",
+                                            {"items": items + items[:1]})
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["photo_ids"], [photos["a.png"]["id"], photos["b.png"]["id"]])
+        self.assertEqual(payload["message"], "Added 2 items.")
+        # the single-photo form is unchanged
+        status, _ = self.json_request(f"/api/satellites/photo/albums/{album['id']}/photos", "POST",
+                                      {"photo_id": photos["a.png"]["id"]})
+        self.assertEqual(status, 200)
+
+    def test_references_from_elsewhere_or_to_hidden_photos_are_refused(self):
+        photos = self.import_photos("a.png", "b.png")
+        album = self.json_request("/api/satellites/photo/albums", "POST", {"name": "Trip"})[1]
+        route = f"/api/satellites/photo/albums/{album['id']}/photos"
+        photo_id = photos["a.png"]["id"]
+        self.json_request(f"/api/satellites/photo/trash/{photos['b.png']['id']}", "POST")
+
+        for items in ([{"provider": "Music", "capability": "media.gallery", "id": photo_id, "kind": "image"}],
+                      [{"provider": "Photo", "capability": "files.browse", "id": photo_id, "kind": "image"}],
+                      [{"provider": "Photo", "capability": "media.gallery", "id": photos["b.png"]["id"], "kind": "image"}],
+                      [{"provider": "Photo", "capability": "media.gallery", "id": "../../etc/passwd", "kind": "image"}],
+                      [], "a.png"):
+            status, payload = self.json_request(route, "POST", {"items": items})
+            self.assertEqual(status, 400, items)
+        self.assertEqual(self.json_request(f"/api/satellites/photo/gallery/albums/{album['id']}")[1]["items"], [])
+
+    def test_the_album_page_adds_photos_through_the_picker(self):
+        document = ui_contract.load(PHOTO_DIR / "ui.json")
+        blocks = document["pages"]["album"]["blocks"]
+        add = next(block for block in blocks if block.get("label") == "Add photos")
+        self.assertEqual(add["action"]["pick"]["capability"], "media.gallery")
+        self.assertEqual(add["action"]["route"], "albums/{$params.id}/photos")
+        self.assertEqual(add["action"]["body"], {"items": "$value"})
+
+
 if __name__ == "__main__":
     unittest.main()

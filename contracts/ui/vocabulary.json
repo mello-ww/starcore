@@ -34,7 +34,7 @@
     },
     "1.2": {
       "blocks": ["image", "media-list", "media-grid"],
-      "actions": ["play"],
+      "actions": ["play", "pick"],
       "keys": ["document.preview"],
       "icons": ["chevron-left", "chevron-right", "edit-2", "heart", "play", "rotate-ccw", "trash-2", "x"],
       "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library."
@@ -85,6 +85,14 @@
       },
       "_note": "Track: {id, title, artist, album, album_id, duration, has_artwork, quality: {label, lossless, hires}}; providers may add keys. See docs/media-audio.md."
     },
+    "media.gallery": {
+      "versions": [1],
+      "operations": {
+        "list": "GET ?kinds=image,video -> {items: [{id, kind: image|video, title, duration, group}]}: what a person may pick, newest first",
+        "thumbnail": "GET /<id> -> an image"
+      },
+      "_note": "Picked through the client's media.picker (the pick action). A pick returns references, never paths: [{provider, capability, id, kind}], where provider is the providing Satellite's name. A provider lists only what the signed-in session may see; private or protected media is never listed."
+    },
     "audio.session": {
       "versions": [1],
       "operations": {
@@ -103,7 +111,7 @@
   },
   "client_capabilities": {
     "_note": "Device features a client may offer a document beyond rendering blocks. media.audio (the shared audio host, docs/media-audio.md) is what the play action needs; the rest are reserved names no client claims yet. A document that requires one a client doesn't offer is shown as needing a newer app.",
-    "reserved": ["device.biometrics", "device.background-tasks", "media.audio", "secure.screen"]
+    "reserved": ["device.biometrics", "device.background-tasks", "media.audio", "media.picker", "secure.screen"]
   },
   "limits": {
     "document_bytes": 262144,

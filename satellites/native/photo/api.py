@@ -39,6 +39,8 @@ def routes() -> dict:
         # read-only: the library shaped for ui.json's shared gallery (see gallery.py);
         # every action there goes to the routes above, unchanged
         "gallery": gallery_route,
+        # the media.gallery capability's list (see satellite.toml): what a media picker offers
+        "media": media_route,
         # naming a route "configuration" is the whole contract with the Core's
         # generic satellite configuration mechanism - see docs/satellites.md
         "configuration": configuration_route,
@@ -70,6 +72,15 @@ def gallery_route(request):
         return json_response(gallery.trash_view(request.satellite))
 
     return error_response(f"unknown endpoint 'gallery/{'/'.join(path)}'")
+
+
+def media_route(request):
+    if request.method != "GET":
+        return error_response("only GET is supported here", status=405)
+    if request.path:
+        return error_response(f"unknown endpoint 'media/{'/'.join(request.path)}'")
+
+    return json_response(gallery.media_view(request.satellite, request.query.get("kinds")))
 
 
 def sync_status(request):
@@ -317,6 +328,21 @@ def _albums_post(request, store):
 
 
 def _album_add_photo(request, store, album_id, body):
+    if "items" in body:
+        # what the media picker chose (the pick action): references to this library's own
+        # media.gallery, added together; the photo_id form below is unchanged
+        try:
+            photo_ids = gallery.picked_ids(request.satellite, body["items"])
+        except ValueError as error:
+            return error_response(str(error), status=400)
+        album = store.get(album_id)
+        if album is None:
+            raise AlbumNotFound(f"unknown album '{album_id}'")
+        for photo_id in photo_ids:
+            album = store.add_photo(album_id, photo_id)
+        count = len(photo_ids)
+        return json_response({**album, "message": f"Added {count} {'item' if count == 1 else 'items'}."})
+
     photo_id = body.get("photo_id")
     if not isinstance(photo_id, str) or not photo_id:
         return error_response("'photo_id' must be a string", status=400)

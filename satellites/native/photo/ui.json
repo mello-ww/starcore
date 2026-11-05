@@ -91,6 +91,9 @@
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary"},
         {"type": "text", "style": "caption", "text": "$.description", "visible": "$.description"},
+        {"type": "button", "label": "Add photos", "style": "primary", "visible": "$.editable",
+         "action": {"pick": {"capability": "media.gallery", "multiple": true, "title": "Add to album"},
+                    "route": "albums/{$params.id}/photos", "body": {"items": "$value"}, "then": "refresh"}},
         {
           "type": "media-grid",
           "id": "album",

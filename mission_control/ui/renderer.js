@@ -15,6 +15,7 @@ import {
 } from "./contract.js";
 import { createGallery } from "./gallery.js";
 import { icon } from "./icons.js";
+import { pickMedia } from "./picker.js";
 
 const STYLESHEET = "/ui/ui.css";
 const TONE_LEVEL = { warn: "warning", danger: "critical" };
@@ -401,6 +402,26 @@ export function mount(context) {
                 setNotice(error.message, "error");
                 return false;
             }
+        }
+        if (action.pick) {
+            // 1.2: the person chooses through the media picker, from whichever Satellite the
+            // catalog says provides the capability; the route then gets the references as $value
+            const provider = findProvider(state.catalog && state.catalog.capabilities, action.pick.capability);
+            if (!provider) {
+                setNotice(`No enabled Satellite provides ${action.pick.capability}, so there is nothing to choose from.`, "error");
+                return false;
+            }
+            const picked = await pickMedia({
+                provider,
+                capability: action.pick.capability,
+                kinds: action.pick.kinds,
+                multiple: action.pick.multiple === true,
+                title: action.pick.title !== undefined ? text(action.pick.title, scope) : "",
+            });
+            if (!picked) {
+                return false;  // cancelled: nothing runs
+            }
+            bindings.value = picked;
         }
         if (action.confirm && !window.confirm(String(resolve(action.confirm, bindings)))) {
             return false;

@@ -117,6 +117,16 @@ mobile/.vscode/
 mobile/.idea/
 
 # Graphify knowledge-graph output - generated locally, large, and never part of the
-# repository (see CLAUDE.md, "Working rules").
+# repository (see the local agent instructions, "Working rules").
 graphify-out/
 .graphify*
+
+# AI coding agents' own instructions, settings and session state - kept locally for
+# Claude Code (CLAUDE.md, CLAUDE.local.md, .claude/, .mcp.json) and Codex (AGENTS.md,
+# .codex/), never published. Project documentation lives in README.md and docs/.
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.claude/
+.codex/
+.mcp.json

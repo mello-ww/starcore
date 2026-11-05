@@ -78,6 +78,8 @@ IMAGE_FITS = set(VOCABULARY["image_fits"])
 MEDIA_KINDS = set(VOCABULARY["media_kinds"])
 MEDIA_GRID_ITEM_KEYS = set(VOCABULARY["media_grid_item_keys"])
 MEDIA_VIEWER_KEYS = set(VOCABULARY["media_viewer_keys"])
+# capabilities the client's media picker can choose from (the pick action)
+PICKABLE = {"media.gallery"}
 FORMATS_1_1 = set(SINCE_1_1["formats"])
 # Satellite capabilities with a protocol this Engine knows: their versions, the
 # operations every provider must offer and those it may. A Satellite may also
@@ -811,7 +813,11 @@ class _Validator:
         if "play" in action:
             self.check_play(where, action)
             return
-        self.unknown_keys(where, action, {"route", "method", "body", "confirm", "then"})
+        known = {"route", "method", "body", "confirm", "then"}
+        if "pick" in action:
+            self.check_pick(where, action["pick"])
+            known.add("pick")
+        self.unknown_keys(where, action, known)
         self.check_route(f"{where}.route", action.get("route"))
         if "method" in action and action["method"] not in METHODS:
             self.error(f"{where}.method", "must be GET or POST")
@@ -846,6 +852,26 @@ class _Validator:
             self.error(f"{where}.play.search", "must be a non-empty text or binding")
             return
         self.check_values(f"{where}.play.search", play["search"])
+
+    def check_pick(self, where: str, pick):
+        """{pick: {capability, kinds, multiple, title}, route, body, then} (1.2): the client's
+        media picker lets the person choose from whichever Satellite provides `capability`,
+        then the action's route gets what was chosen as $value - a list of references
+        ({provider, capability, id, kind}), never paths. Cancelling runs nothing."""
+        self.since(f"{where}.pick", "the pick action", 2)
+        if not isinstance(pick, dict):
+            self.error(f"{where}.pick", "must be {capability, kinds, multiple, title}")
+            return
+        self.unknown_keys(f"{where}.pick", pick, {"capability", "kinds", "multiple", "title"})
+        if pick.get("capability") not in PICKABLE:
+            self.error(f"{where}.pick.capability", f"must be one of {sorted(PICKABLE)}")
+        kinds = pick.get("kinds", sorted(MEDIA_KINDS))
+        if not isinstance(kinds, list) or not kinds or not set(kinds) <= MEDIA_KINDS:
+            self.error(f"{where}.pick.kinds", f"must be a non-empty list of {sorted(MEDIA_KINDS)}")
+        if "multiple" in pick and not isinstance(pick["multiple"], bool):
+            self.error(f"{where}.pick.multiple", "must be true or false")
+        if "title" in pick:
+            self.check_text(f"{where}.pick.title", pick["title"])
 
     def check_navigate(self, where: str, action: dict):
         target = action.get("navigate")

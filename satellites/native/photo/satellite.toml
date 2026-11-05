@@ -5,3 +5,9 @@ description = "Local photo library satellite."
 icon = "icon.svg"
 # from the shared icon set every client can draw (contracts/ui/vocabulary.json)
 icon_name = "camera"
+
+# what any interface can pick from through the client's media picker (the pick action in
+# docs/ui-contract.md): the active library only - never the recycle bin or the Locked Folder
+[provides."media.gallery"]
+version = 1
+operations = { list = "media", thumbnail = "thumbnails" }

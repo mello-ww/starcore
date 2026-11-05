@@ -33,6 +33,18 @@
       }}
     },
     {
+      "name": "pick-action",
+      "_why": "1.2: the client's media picker chooses from whichever Satellite provides media.gallery, then the action's route gets the references as $value.",
+      "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.picker"], "capabilities": ["media.gallery"]},
+                   "entry": "home", "pages": {"home": {"blocks": [
+                     {"type": "button", "label": "Add pictures",
+                      "action": {"pick": {"capability": "media.gallery", "kinds": ["image"], "multiple": true, "title": "Add pictures"},
+                                 "route": "pins", "body": {"items": "$value"}, "then": "refresh"}},
+                     {"type": "button", "label": "Choose a clip",
+                      "action": {"pick": {"capability": "media.gallery", "kinds": ["video"]}, "route": "cover", "body": {"items": "$value"}}}
+                   ]}}}
+    },
+    {
       "name": "play-action",
       "_why": "1.2: a button asks the client to play what the audio.library provider finds; it needs the media.audio client capability and an audio.library provider.",
       "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.audio"], "capabilities": ["audio.library"]},
@@ -199,6 +211,30 @@
       "name": "preview-in-1.1",
       "document": {"contract": "starcore.ui/1.1", "preview": true, "entry": "home", "pages": {"home": {"blocks": []}}},
       "error": "needs starcore.ui/1.2"
+    },
+    {
+      "name": "pick-in-1.1",
+      "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Add", "action": {"pick": {"capability": "media.gallery"}, "route": "pins"}}]}}},
+      "error": "needs starcore.ui/1.2"
+    },
+    {
+      "name": "pick-without-route",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Add", "action": {"pick": {"capability": "media.gallery"}}}]}}},
+      "error": "needs a route"
+    },
+    {
+      "name": "pick-from-files",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Add", "action": {"pick": {"capability": "files.browse"}, "route": "pins"}}]}}},
+      "error": "pick.capability"
+    },
+    {
+      "name": "pick-unknown-kind",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Add", "action": {"pick": {"capability": "media.gallery", "kinds": ["audio"]}, "route": "pins"}}]}}},
+      "error": "pick.kinds"
     },
     {
       "name": "play-in-1.1",

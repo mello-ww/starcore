@@ -65,6 +65,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   `audio.library` provider finds, through the client's audio host. Both clients now offer the
   `media.audio` client capability, so any Satellite can play audio without naming the one that
   provides it.
+- **A reusable media picker (UI contract 1.2's `pick` action).** Any interface can let a
+  person choose images or videos, one or several, from whichever Satellite provides the new
+  `media.gallery` capability, through the client's picker (`media.picker`, on both clients:
+  the shared media-grid with confirm and cancel). The route gets references with the
+  provider's identity, never paths. Photo provides `media.gallery` (its active library only,
+  never the recycle bin or the Locked Folder), and its shared Album page's "Add photos" uses
+  the picker.
 - **UI contract 1.2: the `media-grid` block and a shared media viewer.** A grid of images and
   videos from a Satellite's own routes: groups, responsive columns, 60 tiles at a time as it
   scrolls, video badges, loading and error states, a selection with the document's actions,

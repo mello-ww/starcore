@@ -53,6 +53,9 @@ export interface BlockContext {
   setOverlay?: (node: React.ReactNode) => void;
   /** Asks before an action (a selection's confirm). */
   confirm?: (message: string) => Promise<boolean>;
+  /** The media picker's own grid (media.picker): every tile selects, and the picker hears the
+   * chosen items. Set only by the picker. */
+  picking?: {multiple: boolean; onChange: (items: any[]) => void};
   /** After a selection's action ran on each selected item: its `then`, and how many failed. */
   afterSelection?: (then: UiAction['then'], failed: number, total: number) => void;
 }

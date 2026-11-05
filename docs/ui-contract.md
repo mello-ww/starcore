@@ -331,6 +331,30 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
   `"requires": {"client": ["media.audio"], "capabilities": ["audio.library"]}`: a client without
   an audio host, or a server without an audio library, then says so instead of opening it. When
   nothing is found, the client says so as a notice. See [Audio playback](media-audio.md).
+- **`pick`** (1.2), with a `route`: the person chooses media through the client's own media
+  picker, then the route runs with what was chosen as `$value`.
+
+  ```json
+  {"pick": {"capability": "media.gallery", "kinds": ["image"], "multiple": true, "title": "Add pictures"},
+   "route": "pins", "body": {"items": "$value"}, "then": "refresh"}
+  ```
+
+  - `capability` is the Satellite capability to choose from; `media.gallery` is the only one
+    so far. The picker lists from whichever Satellite the catalog says provides it, with the
+    client's own session, so the document never names a Satellite.
+  - `kinds` (`image`, `video`; both by default) limits what is offered; `multiple` (default
+    `false`) allows more than one; `title` heads the picker.
+  - `$value` is always a list of **references**, never paths:
+    `[{"provider": "Photo", "capability": "media.gallery", "id": "...", "kind": "image"}]`.
+    The receiving route decides what it accepts. A reference names the providing Satellite, so
+    a route can refuse one from elsewhere, and only a provider can say what an id means.
+  - Cancelling runs nothing. `confirm` and `then` work as for any route action.
+  - A document that uses it declares
+    `"requires": {"client": ["media.picker"], "capabilities": ["media.gallery"]}` if the whole
+    interface depends on it. Otherwise a client without a picker, or a server without a
+    provider, says so when the action runs.
+  - The picker is the shared `media-grid` (thumbnails, groups, paging) with a confirm and a
+    cancel: a dialog on the web, a full-screen sheet on Android.
 
 A response may carry `{"message": "..."}`, shown as a short notice; an error response's
 `error` is shown the same way. Either way, the page then shows what is actually true again.
@@ -421,13 +445,16 @@ says so in place, and a document that `requires` it is not opened.
 |---|---|---|---|
 | `files.browse` | 1 | `list`: `GET ?path=` → `{path, parent, entries: [{name, type: dir\|file, size, modified}]}`; at the roots (`path` empty) each entry's name is itself an absolute path | `file-browser` |
 | `audio.library` | 1 | `search`, `track`, `resolve`, `artwork`; optional `lyrics` - see [Audio playback](media-audio.md) | none yet; the `media.audio` client capability will play it |
+| `media.gallery` | 1 | `list`: `GET ?kinds=image,video` -> `{items: [{id, kind, title, duration, group}]}`; `thumbnail`: `GET /<id>` -> an image | the client's media picker (the `pick` action) |
 | `audio.session` | 1 | `queue`; optional `history`, `radio`, `preferences`, `favorites`, `stream`, `connect` - see [Audio playback](media-audio.md) | none; the audio host uses it beside the same Satellite's `audio.library` |
 
 A capability's operations are required unless the vocabulary lists them under
 `optional_operations`. An operation the version doesn't define is a problem too, so a typo
 never registers a provider that only half works.
 
-File Explorer provides `files.browse`; Music provides `audio.library` and `audio.session`. Mission Control's folder picker for `"path"`-typed
+File Explorer provides `files.browse`; Music provides `audio.library` and `audio.session`; Photo
+provides `media.gallery` - its active library only: never the recycle bin, and never anything
+in the Locked Folder, which provides no capability at all. Mission Control's folder picker for `"path"`-typed
 settings also uses it, so no generic code names File Explorer any more.
 
 A capability is a long-term protocol. It is designed from what an existing Satellite already
@@ -503,8 +530,8 @@ The contract is `starcore.ui/<major>.<minor>`:
 
 `GET /api/catalog` reports what the Engine supports (`contract.version`, `majors`, and the
 capability protocol versions). Clients check a document's `requires` against their own client
-capabilities and the catalog's providers. No 1.x block uses a client capability, so neither
-client claims any yet; the reserved names are in `vocabulary.json`.
+capabilities and the catalog's providers. Both clients claim `media.audio` (the `play` action)
+and `media.picker` (the `pick` action); the other reserved names are in `vocabulary.json`.
 
 An app released with 1.0 (the Alpha) that meets a 1.1 document draws its 1.0 blocks and skips
 the rest. Status keeps that case simple: the Alpha app opens Status's own dedicated screen,
@@ -565,8 +592,8 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 | | Now (contract 1.2) | Target |
 |---|---|---|
 | Blocks | the 19 above, including `chart`, `table`, `image`, `media-list` and `media-grid`; the `dashboard` template | more, minor by minor: `map`, `tabs`; templates `list-detail`, `settings`, `media-library` |
-| Satellite capabilities | `files.browse`, `audio.library`, `audio.session` | `media.gallery` (Photos), `vault` (Locked Folder) |
-| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action | `secure.screen`, `device.biometrics`, `device.background-tasks` - each a native module written once in the app, behind a shared block |
+| Satellite capabilities | `files.browse`, `audio.library`, `audio.session`, `media.gallery` (Photo) | `vault` (Locked Folder); more pickable capabilities (files) |
+| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action | `secure.screen`, `device.biometrics`, `device.background-tasks` - each a native module written once in the app, behind a shared block |
 | Home | `widgets` in each document, drawn by both clients; Android keeps the Status card only for servers older than Status's `ui.json` | the fallback card removed once older servers are gone |
 | Sections | `section_of`, but Photo still names the Locked Folder | the host discovers its sections from the catalog |
 | Icons | `icon_name` from the shared set; an Android fallback list for older servers | the fallback list removed once older servers are gone |

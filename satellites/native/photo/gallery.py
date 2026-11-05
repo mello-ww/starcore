@@ -11,6 +11,7 @@ GET gallery                   every active photo and video, newest first, groupe
 GET gallery/albums            physical albums, Favorites and custom albums, with their covers
 GET gallery/albums/<id>       one album's photos
 GET gallery/trash             what's in the recycle bin
+GET media?kinds=              the media.gallery capability's list: what a picker may offer
 """
 
 from datetime import datetime
@@ -160,6 +161,47 @@ def album_view(satellite, album_id: str) -> dict:
         }.get(kind),
         "items": [{**item(photo, favorites), "removable": custom} for photo in photos],
     }
+
+
+def media_view(satellite, kinds=None) -> dict:
+    """media.gallery v1's `list`: the active library, newest first, as a picker shows it. Only
+    the active library - a photo in the recycle bin, or anything the Locked Folder holds, is
+    never in it (see library.all() and private_media.py), so a picker can't offer it."""
+    wanted = {kind for kind in (kinds or "").split(",") if kind in ("image", "video")} or {"image", "video"}
+    items = []
+    for photo in library(satellite).all():
+        kind = "video" if photo.get("media_type") == "video" else "image"
+        if kind not in wanted:
+            continue
+        items.append({
+            "id": photo["id"],
+            "kind": kind,
+            "title": photo.get("filename") or photo["id"],
+            "duration": photo.get("duration") if kind == "video" else None,
+            "group": _month(_moment(photo.get("captured_at") or photo.get("imported_at"))),
+        })
+    return {"items": items}
+
+
+def picked_ids(satellite, items) -> list:
+    """The photo ids in a picker's references ([{provider, capability, id, kind}]): only
+    references to this Satellite's own media.gallery, and only to photos the active library
+    has. Raises ValueError for anything else - a reference never names a path."""
+    if not isinstance(items, list) or not items:
+        raise ValueError("'items' must be a non-empty list of picked media")
+    photo_library = library(satellite)
+    ids = []
+    for reference in items:
+        if not isinstance(reference, dict):
+            raise ValueError("each picked item must be an object")
+        if reference.get("provider") != satellite.manifest.name or reference.get("capability") != "media.gallery":
+            raise ValueError("only media picked from this library can be added to its albums")
+        photo_id = reference.get("id")
+        if not isinstance(photo_id, str) or photo_library.get(photo_id) is None:
+            raise ValueError(f"unknown photo '{photo_id}'")
+        if photo_id not in ids:
+            ids.append(photo_id)
+    return ids
 
 
 def trash_view(satellite) -> dict:

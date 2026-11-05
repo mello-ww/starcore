@@ -9,9 +9,10 @@ import {useAppActive} from '../hooks/useAppActive';
 import {useServers} from '../servers/ServersContext';
 import {UiApi} from '../satellites/ui/api';
 import {
-  ICONS, formatValue, missingRequirements, resolve, resolveTemplate,
+  ICONS, findProvider, formatValue, missingRequirements, resolve, resolveTemplate,
   type Providers, type Scope, type UiAction, type UiDocument, type UiSource,
 } from '../satellites/ui/contract';
+import {MediaPicker, type MediaReference, type PickRequest} from '../satellites/ui/MediaPicker';
 import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
@@ -83,6 +84,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   // 1.2's media-grid: a floating bar over the bottom edge, and the "near the end" signal that
   // reveals a grid's next page
   const [overlay, setOverlay] = useState<React.ReactNode>(null);
+  // 1.2's pick action: the media picker open over the screen, until the person chooses or cancels
+  const [pickRequest, setPickRequest] = useState<PickRequest | null>(null);
   const nearEndListeners = useRef(new Set<() => void>()).current;
   const onNearEnd = useCallback(
     (listener: () => void) => {
@@ -323,6 +326,33 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           return false;
         }
       }
+      if (action.pick) {
+        // 1.2: the person chooses through the media picker, from whichever Satellite the catalog
+        // says provides the capability; the route then gets the references as $value
+        const pick = action.pick;
+        const provider = findProvider(providers, pick.capability);
+        if (!provider) {
+          showToast(`No enabled Satellite provides ${pick.capability}, so there is nothing to choose from.`, true);
+          return false;
+        }
+        const picked = await new Promise<MediaReference[] | null>(done =>
+          setPickRequest({
+            provider,
+            capability: pick.capability,
+            kinds: Array.isArray(pick.kinds) ? pick.kinds : undefined,
+            multiple: pick.multiple === true,
+            title: pick.title !== undefined ? String(resolve(pick.title, scoped) ?? '') : '',
+            resolve: value => {
+              setPickRequest(null);
+              done(value);
+            },
+          }),
+        );
+        if (!picked) {
+          return false; // cancelled: nothing runs
+        }
+        scoped.value = picked;
+      }
       if (action.confirm && !(await confirmAction(String(resolve(action.confirm, scoped))))) {
         return false;
       }
@@ -350,7 +380,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       }
       return true;
     },
-    [api, name, go, loadData, navigation, showToast, audio],
+    [api, name, go, loadData, navigation, showToast, audio, providers],
   );
 
   // images (1.2) load from this Satellite's own routes, with the signed-in session
@@ -361,6 +391,15 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       headers: sessionToken ? {Authorization: `Bearer ${sessionToken}`} : undefined,
     }),
     [baseUrl, name, sessionToken],
+  );
+  // the picker reads the provider's routes, and loads its thumbnails, with this session
+  const readProvider = useCallback((satellite: string, providerRoute: string) => api.read(satellite, providerRoute), [api]);
+  const providerSource = useCallback(
+    (satellite: string, providerRoute: string) => ({
+      uri: `${baseUrl}/api/satellites/${encodeURIComponent(satellite)}/${providerRoute}`,
+      headers: sessionToken ? {Authorization: `Bearer ${sessionToken}`} : undefined,
+    }),
+    [baseUrl, sessionToken],
   );
   const afterSelection = useCallback(
     (then: UiAction['then'], failed: number, total: number) => {
@@ -506,6 +545,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         )}
         <FloatingPlayerSpacer />
       </ScrollView>
+      {pickRequest && <MediaPicker request={pickRequest} read={readProvider} mediaSource={providerSource} />}
       {overlay && (
         <View style={[styles.overlay, {bottom: space.lg + playerInset}]} pointerEvents="box-none">
           {overlay}

@@ -189,12 +189,13 @@ GET  /api/satellites/photo/albums/<id>        one album's photos ("physical:<id>
 POST /api/satellites/photo/albums             create a custom album  {"name": ...}
 POST /api/satellites/photo/albums/<id>        rename a custom album  {"name": ...} (rejected for Favorites/physical)
 POST /api/satellites/photo/albums/<id>/delete    delete a custom album (rejected for Favorites/physical)
-POST /api/satellites/photo/albums/<id>/photos           add a photo   {"photo_id": ...}
+POST /api/satellites/photo/albums/<id>/photos           add a photo   {"photo_id": ...}, or picked media {"items": [references]}
 POST /api/satellites/photo/albums/<id>/photos/remove    remove a photo {"photo_id": ...}
 GET  /api/satellites/photo/gallery            the library shaped for ui.json's shared gallery (read-only)
 GET  /api/satellites/photo/gallery/albums     every album as a tile with its cover
 GET  /api/satellites/photo/gallery/albums/<id>   one album's photos, for the shared gallery
 GET  /api/satellites/photo/gallery/trash      the recycle bin, for the shared gallery
+GET  /api/satellites/photo/media?kinds=       media.gallery's list: what a media picker may offer
 GET  /api/satellites/photo/trash              what's in the recycle bin, and its retention period
 POST /api/satellites/photo/trash/<id>         move an active photo to the recycle bin
 GET  /api/satellites/photo/trash/<id>/thumbnail   preview a trashed photo's thumbnail
@@ -271,7 +272,7 @@ What it covers:
 | Favourite and unfavourite; move to the recycle bin | yes | yes, from the viewer and from a selection |
 | Albums: physical, Favorites, custom, with covers; open an album | yes | yes |
 | Create, rename, delete a custom album; remove a photo from it | yes | yes |
-| Add a photo to a custom album | yes | no: needs a picker the contract doesn't have yet |
+| Add a photo to a custom album | yes, from a photo | yes, from the album: "Add photos" opens the client's media picker |
 | Recycle bin: restore, delete for good, retention | yes | yes, from the viewer and from a selection |
 | Grouping by camera, pinch to change columns (Android) | yes | no |
 | Search (Android), Map, import and upload, phone sync, settings | yes | no - Photo's own screens |
@@ -283,6 +284,24 @@ It binds to four read-only routes, `gallery`, `gallery/albums`, `gallery/albums/
 display: the month a photo belongs to, its dimensions and camera as text, whether it is a
 favourite. Every action goes to the routes above, unchanged (`albums/favorites/photos`,
 `trash/<id>`, `albums/<id>/...`); no route or storage format changed.
+
+## Media picker provider
+
+Photo provides the `media.gallery` capability (`satellite.toml`), so any interface can let a
+person choose from the library through the client's media picker without naming Photo (the
+`pick` action in [docs/ui-contract.md](../ui-contract.md)):
+
+- `list` is `GET media?kinds=image,video`: the active library, newest first, with an id, kind,
+  title, duration and month - never a path. A photo in the recycle bin is not listed, and
+  nothing in the Locked Folder ever is (it never enters this library, and the Locked Folder
+  provides no capability). Like every route, it answers signed-in sessions only.
+- `thumbnail` is the existing `thumbnails/<id>`.
+
+A pick returns references, `{"provider": "Photo", "capability": "media.gallery", "id", "kind"}`.
+`POST albums/<id>/photos` accepts them as `{"items": [...]}`: only references to Photo's own
+`media.gallery`, and only to photos the active library has; anything else is refused with 400
+and nothing is added. The shared Album page's "Add photos" uses it. Photo's own page and
+screens keep their existing "add to album" from a photo.
 
 ## Command
 
