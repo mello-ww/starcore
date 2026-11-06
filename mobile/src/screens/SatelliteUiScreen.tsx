@@ -16,6 +16,9 @@ import {MediaPicker, type MediaReference, type PickRequest} from '../satellites/
 import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
 import {DEDICATED_SCREENS} from './HomeScreen';
 import {uiPreferences} from '../satellites/ui/preferences';
+import {
+  collectionKey, forgetOfflineServer, OfflineStore, sessionScope, tidyOffline, type GridPages, type OfflineEntry,
+} from '../satellites/ui/offline';
 import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
@@ -105,6 +108,16 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   );
   const editing = useRef(false);
   const loadToken = useRef(0);
+  // an offline page (UI contract 1.2): what is kept for it, for this server, session and
+  // Satellite - shown only while StarCore can't be reached (src/satellites/ui/offline.ts)
+  const serverId = activeServer?.id ?? 'default';
+  const session = sessionScope(sessionToken);
+  const store = useMemo(() => new OfflineStore(serverId, session, name), [serverId, session, name]);
+  useEffect(() => {
+    tidyOffline(serverId, session);
+  }, [serverId, session]);
+  const kept = useRef<{collection: string; entry: OfflineEntry; fromCache: boolean} | null>(null);
+  const shownData = useRef<any>(null);
   const sourceTokens = useRef<Record<string, number>>({});
 
   const navigationItems = useMemo(
@@ -154,6 +167,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
 
   // a new page starts afresh
   useEffect(() => {
+    kept.current = null;
+    shownData.current = null;
     setSources({});
     setData(null);
     setDataError(null);
@@ -184,6 +199,9 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const stateKey = JSON.stringify(pageState);
   const bindings = useMemo(() => ({params, state: pageState}), [paramsKey, stateKey]);
 
+  const offlinePage = Boolean(page?.offline === true && page.source && !String(page.source.route).includes('$state.'));
+  const collection = pageId ? collectionKey(pageId, params) : '';
+
   const loadData = useCallback(async () => {
     if (!page) {
       return;
@@ -197,21 +215,68 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     try {
       const body = await api.read(name, resolveTemplate(page.source.route, bindings));
       if (token === loadToken.current) {
-        setData(body && typeof body === 'object' ? body : {});
+        const fresh = body && typeof body === 'object' ? body : {};
+        if (offlinePage) {
+          // a live answer replaces what was kept; its grids add their pages as they load them
+          const entry: OfflineEntry = {savedAt: Date.now(), data: fresh, grids: {}};
+          kept.current = {collection, entry, fromCache: false};
+          store.write(collection, entry);
+        }
+        shownData.current = fresh;
+        setData(fresh);
         setDataError(null);
         setUpdatedAt(Date.now());
       }
     } catch (err: any) {
+      if (token !== loadToken.current) {
+        return;
+      }
+      const status = typeof err?.status === 'number' ? err.status : 0;
+      if (status === 401 || status === 403) {
+        // the server no longer lets this session in: nothing it kept may be shown any more
+        kept.current = null;
+        await forgetOfflineServer(serverId);
+      }
+      if (status === 0 && offlinePage && (shownData.current === null || kept.current?.fromCache)) {
+        // StarCore can't be reached: what was kept for this page, marked with its age
+        const entry = await store.read(collection);
+        if (entry && token === loadToken.current) {
+          kept.current = {collection, entry, fromCache: true};
+          shownData.current = entry.data;
+          setData(entry.data);
+          setUpdatedAt(entry.savedAt);
+        }
+      }
       if (token === loadToken.current) {
         setDataError(err?.message || 'Could not load this page.');
-        setUnreachable(!(typeof err?.status === 'number' && err.status > 0));
+        setUnreachable(status === 0);
       }
     } finally {
       if (token === loadToken.current) {
         setLoading(false);
       }
     }
-  }, [api, name, page, bindings]);
+  }, [api, name, page, bindings, offlinePage, collection, store, serverId]);
+
+  // a grid on an offline page: its pages are kept with the page data (never with kept data
+  // shown, which must not be written back as if it were live), and given back with it
+  const offlineGrids = useMemo(
+    () => ({
+      restore: (grid: string): GridPages | null => {
+        const current = kept.current;
+        return current?.fromCache && current.collection === collection ? current.entry.grids[grid] ?? null : null;
+      },
+      save: (grid: string, pages: GridPages) => {
+        const current = kept.current;
+        if (!offlinePage || !current || current.fromCache || current.collection !== collection) {
+          return;
+        }
+        current.entry.grids = {...current.entry.grids, [grid]: pages};
+        store.write(collection, current.entry);
+      },
+    }),
+    [offlinePage, collection, store],
+  );
 
   const loadSource = useCallback(
     async (sourceName: string) => {
@@ -265,6 +330,16 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       loadHeader();
     }
   }, [live, topLevel, loadHeader]);
+
+  // StarCore can't be reached: try again now and then while the screen shows, so the page
+  // turns live again on its own once it can (coming back to the app tries at once)
+  useEffect(() => {
+    if (!live || !dataError || !unreachable) {
+      return;
+    }
+    const timer = setInterval(() => loadData(), 15000);
+    return () => clearInterval(timer);
+  }, [live, dataError, unreachable, loadData]);
 
   // live pages refresh on their own while visible - never under a finger
   const busy = useCallback(() => editing.current, []);
@@ -386,6 +461,10 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         }
         return false;
       }
+      // something changed on the server: what was kept for this Satellite may no longer be true
+      // (an item gone, moved, renamed) - forgotten before the page reloads and keeps afresh
+      kept.current = null;
+      await store.forgetSatellite();
       if (!quiet) {
         showToast(typeof result?.message === 'string' ? result.message : null);
       }
@@ -399,7 +478,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       }
       return true;
     },
-    [api, name, go, loadData, navigation, showToast, audio, providers],
+    [api, name, go, loadData, navigation, showToast, audio, providers, store],
   );
 
   // images (1.2) load from this Satellite's own routes, with the signed-in session
@@ -449,6 +528,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     afterSelection,
     hasOwnScreens: Boolean(DEDICATED_SCREENS[name]),
     preferences,
+    offlineGrids,
     forms,
     setEditing: value => {
       editing.current = value;

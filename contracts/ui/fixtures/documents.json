@@ -83,6 +83,14 @@
                    ]}}}
     },
     {
+      "name": "offline-page",
+      "_why": "1.2: a page the client may keep to show while StarCore can't be reached - its data and a grid's loaded pages.",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"offline": true, "source": {"route": "items?limit=120"}, "blocks": [
+                     {"type": "media-grid", "id": "items", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"},
+                      "more": {"route": "items?limit=120&cursor={$value}", "cursor": "$.next"}}
+                   ]}}}
+    },
+    {
       "name": "play-action",
       "_why": "1.2: a button asks the client to play what the audio.library provider finds; it needs the media.audio client capability and an audio.library provider.",
       "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.audio"], "capabilities": ["audio.library"]},
@@ -321,6 +329,22 @@
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "button", "label": "Add", "action": {"pick": {"capability": "files.browse"}, "route": "pins"}}]}}},
       "error": "pick.capability"
+    },
+    {
+      "name": "offline-in-1.1",
+      "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"offline": true, "source": {"route": "items"}, "blocks": []}}},
+      "error": "offline"
+    },
+    {
+      "name": "offline-on-a-state-source",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"offline": true, "state": {"q": ""},
+        "source": {"route": "search?q={$state.q}"}, "blocks": []}}},
+      "error": "offline"
+    },
+    {
+      "name": "offline-without-a-source",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"offline": true, "blocks": []}}},
+      "error": "offline"
     },
     {
       "name": "own-in-1.1",

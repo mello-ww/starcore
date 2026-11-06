@@ -124,7 +124,10 @@ A **page** has `blocks` and optionally:
   empty and the page standing;
 - `state` (1.1): the page's own values, `{key: default}` - what a `choice` selects - bound as
   `$state.<key>`. Route templates may use them, so a choice can change what the page loads;
-- `template` (1.1): `stack` (the default) or `dashboard`.
+- `template` (1.1): `stack` (the default) or `dashboard`;
+- `offline` (1.2): `true` lets the client keep the page's data - and the pages a `media-grid`
+  on it loaded after that - to show while StarCore can't be reached. A page whose `source`
+  depends on `$state` can't ask for it. See [Offline pages](#offline-pages).
 
 While a page is visible, its sources refresh on their own; a hidden browser tab or an app in
 the background polls nothing. When a refresh fails, the page keeps what it last showed,
@@ -589,10 +592,52 @@ A client that sees the same revision knows its cached copy is current.
   no-cache` with an ETag, so the browser always asks, and an unchanged document costs a 304.
   Mission Control's own files and Satellite assets now work the same way instead of
   `no-store`.
-- Page data is never cached.
+- Page data is cached only for a page that asks for it (`offline`, below), and only on Android.
 - A cached document stands in for the definition **only while the server is unreachable**,
   marked as such. A 401 or 403 is never answered from the cache: cached definitions are never
   treated as permissions or as a session.
+
+### Offline pages
+
+A page with `"offline": true` is kept by the Android app, so a person who loses the connection
+can still browse what they saw. Mission Control keeps nothing: a browser tab without StarCore
+has nowhere to load from.
+
+- **What is kept**: the page's data exactly as the Satellite answered it (its order and fields),
+  and for each `media-grid` the first 4 pages it loaded after that through `more`, with the
+  cursor after the last. Never a token, a resolved URL or an image: images come from the
+  platform's own cache when it still has them, and show the placeholder otherwise.
+- **Scope**: per server, per session (a one-way fingerprint of the session token), per
+  Satellite, and per collection (a page and its `params`). A page that depends on `$state`
+  (a search) is never kept.
+- **When it is shown**: only when StarCore can't be reached - never in place of an answer that
+  refused the request, and never before a live answer has had its chance. The page shows the
+  usual "Offline - showing what StarCore said ..." notice with the age of what is shown, tries
+  again every 15 seconds and on coming back to the app, and is live again as soon as StarCore
+  answers. A grid's next page while offline shows its usual error with "Try again".
+- **When it goes**:
+  - every live answer replaces what was kept for its collection;
+  - any successful action on the Satellite forgets all of that Satellite's collections, so an
+    item that was deleted, moved or renamed can't reappear offline (a page that reloads after
+    the action keeps itself again);
+  - a Satellite's own screens can forget its collections too (Photo's do when they delete a
+    photo or move it into the Locked Folder);
+  - a 401 or 403 forgets everything kept for the server;
+  - signing in, signing out, and removing a server forget everything kept for that server, and
+    an earlier session's leftovers are removed when a page opens;
+  - after 7 days a collection is no longer shown, and goes.
+- **Limits**: 12 collections per server (the least recently used go first) and 512 KB each; a
+  collection too large to keep is not kept at all (an older copy is forgotten with it).
+- **Storage**: AsyncStorage, one entry per collection
+  (`starcore_ui_offline:v1:<server>:<session>:<satellite>:<collection>`) and an index per server.
+  The entry is written before the index lists it; an entry the index doesn't list (an
+  interrupted write), from another session or past its age is removed, and one that can't be
+  read is removed and treated as never kept.
+- **What it can't do**: a change made elsewhere while this phone is offline (a photo deleted
+  from the web, moved into the Locked Folder from another device) is only known once StarCore
+  answers again. Until then, for at most 7 days and only in a session that was signed in, the
+  phone can still list what it kept. A Satellite whose pages must never be seen offline doesn't
+  ask for `offline`.
 
 **Rediscovery** is the **Rediscover** button on Mission Control's Satellites page, and
 `POST /api/catalog/rediscover`. It refreshes metadata from disk without touching code:

@@ -22,6 +22,7 @@ import {privacy} from '../platform/privacy';
 import {colors, spacing, typography, useAccentStyles} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
 import {forgetCachedPhoto} from './cache';
+import {forgetOfflineSatellite} from '../satellites/ui/offline';
 import {durationLabel} from './duration';
 import {photoRemoved} from './photoEvents';
 import type {Photo} from './types';
@@ -113,6 +114,8 @@ export function PhotoViewerScreen({route, navigation}: Props) {
 
   const dropFromViewer = (photoId: string) => {
     photoRemoved(photoId);
+    // the shared interface's offline copies may list it: forgotten, it is gone from the server
+    forgetOfflineSatellite(serverId, 'Photo');
     const remaining = media.filter(item => item.id !== photoId);
     if (remaining.length === 0) {
       navigation.goBack();

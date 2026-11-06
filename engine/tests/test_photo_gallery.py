@@ -89,6 +89,10 @@ class PhotoUiDocumentTest(unittest.TestCase):
         self.assertEqual(grid["item"]["subtitle"], "$.left")
         self.assertIn("$.left", [field["value"] for field in grid["viewer"]["fields"]])
 
+    def test_only_the_library_and_albums_are_kept_offline(self):
+        kept = sorted(name for name, page in self.document["pages"].items() if page.get("offline"))
+        self.assertEqual(kept, ["album", "albums", "library"])  # never the bin, Search or Map
+
     def test_it_never_reaches_the_locked_folder_itself(self):
         # no route or media of the document goes near it: it only opens Photo's own screens,
         # which ask for the PIN as they always did

@@ -1,5 +1,6 @@
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
 import * as store from '../storage/preferences';
+import {forgetOfflineServer} from '../satellites/ui/offline';
 import type {ServerProfile} from './types';
 
 /** A server `addAndActivate` just created and switched to, not yet
@@ -107,6 +108,8 @@ export function ServersProvider({children}: {children: React.ReactNode}) {
   const remove = useCallback(
     async (id: string) => {
       await store.removeServer(id);
+      // nothing kept offline outlives the server it came from
+      await forgetOfflineServer(id);
       const remaining = await store.getServers();
       setServers(remaining);
       if (activeServerId === id) {

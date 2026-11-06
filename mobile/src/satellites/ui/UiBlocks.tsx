@@ -14,6 +14,7 @@ import {
   type Providers, type Scope, type UiAction, type UiBlock,
 } from './contract';
 import type {UiPreferences} from './preferences';
+import type {GridPages} from './offline';
 
 const {palette, space, type, radii} = tokens;
 
@@ -68,6 +69,9 @@ export interface BlockContext {
   hasOwnScreens?: boolean;
   /** What the person chose here before (a media-grid's size), kept per server and Satellite. */
   preferences?: UiPreferences;
+  /** An offline page (1.2): a media-grid hands over the pages it loaded, to keep, and gets them
+   * back when the page data shown came from what was kept. Stable across renders. */
+  offlineGrids?: {restore: (grid: string) => GridPages | null; save: (grid: string, pages: GridPages) => void};
 }
 
 const asText = (value: unknown) => (value === null || value === undefined ? '' : String(value));

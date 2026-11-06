@@ -1,5 +1,5 @@
 {
-  "_about": "Photo's shared interface (UI contract 1.2): Library, Albums, Search, Map, the recycle bin and import from a server folder, in the shared media-grid, viewer, search and map. A preview: both clients keep opening Photo's own screens, and Developer Mode shows this one beside them, until it reaches parity (docs/satellites/photo.md, \"Shared interface\"). Phone sync, settings and the Locked Folder stay on Photo's own screens, which Albums opens through the own action (\"settings\", \"locked\") - they keep their own PIN and permissions; moving a photo into the Locked Folder stays there too. It binds to the read-only gallery routes (gallery.py); every action goes to Photo's existing routes.",
+  "_about": "Photo's shared interface (UI contract 1.2): Library, Albums, Search, Map, the recycle bin and import from a server folder, in the shared media-grid, viewer, search and map. A preview: both clients keep opening Photo's own screens, and Developer Mode shows this one beside them, until it reaches parity (docs/satellites/photo.md, \"Shared interface\"). Library, Albums and an album are kept to show while StarCore can't be reached (\"offline\"); the recycle bin, Search and Map are not. Phone sync, settings and the Locked Folder stay on Photo's own screens, which Albums opens through the own action (\"settings\", \"locked\") - they keep their own PIN and permissions; moving a photo into the Locked Folder stays there too. It binds to the read-only gallery routes (gallery.py); every action goes to Photo's existing routes.",
   "contract": "starcore.ui/1.2",
   "preview": true,
   "title": "Photos",
@@ -12,6 +12,7 @@
   ],
   "pages": {
     "library": {
+      "offline": true,
       "source": {"route": "gallery?limit=120"},
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary"},
@@ -159,6 +160,7 @@
       ]
     },
     "albums": {
+      "offline": true,
       "source": {"route": "gallery/albums"},
       "blocks": [
         {
@@ -188,6 +190,7 @@
     "album": {
       "title": "$.name",
       "params": ["id"],
+      "offline": true,
       "source": {"route": "gallery/albums/{$params.id}?limit=120"},
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary"},

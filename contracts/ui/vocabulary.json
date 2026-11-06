@@ -37,7 +37,7 @@
     "1.2": {
       "blocks": ["image", "media-list", "media-grid", "search", "map"],
       "actions": ["play", "pick", "own"],
-      "keys": ["document.preview", "media-grid.more", "map.viewport", "map.bounds", "map.item.count", "map.item.bounds"],
+      "keys": ["document.preview", "media-grid.more", "map.viewport", "map.bounds", "map.item.count", "map.item.bounds", "page.offline"],
       "bindings": ["$value."],
       "icons": ["chevron-left", "chevron-right", "edit-2", "heart", "map-pin", "play", "rotate-ccw", "search", "trash-2", "x"],
       "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library. {own: section}: the client opens the Satellite's own interface (page.js, native screens) at a section that interface names; a client without one hides the control."

@@ -8,6 +8,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import Video from 'react-native-video';
 import {usePinchColumnsGesture} from '../../components/pinchColumns';
 import {ZoomableImage} from '../../components/ZoomableImage';
+import {keptPages} from './offline';
 import {tokens, useAccent} from '../../theme';
 import {formatValue, isSafeRoute, isVisible, resolve, resolveTemplate, type Scope, type UiAction, type UiBlock} from './contract';
 import type {BlockContext} from './UiBlocks';
@@ -132,6 +133,9 @@ interface Paging {
   base: any[] | null;
   collection: string | null;
   extra: any[];
+  /** the pages behind `extra`, one by one, and the cursor after each - what an offline page keeps */
+  pages: any[][];
+  cursors: (string | null)[];
   cursor: string | null;
   loading: boolean;
   error: string | null;
@@ -196,7 +200,13 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
   const more = block.more as {route?: string; cursor?: string} | undefined;
   const resolved = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
   const base: any[] = Array.isArray(resolved) ? resolved : EMPTY;
-  const paging = useRef<Paging>({base: null, collection: null, extra: [], cursor: null, loading: false, error: null, token: 0, depth: 0});
+  const paging = useRef<Paging>({
+    base: null, collection: null, extra: [], pages: [], cursors: [], cursor: null, loading: false, error: null, token: 0, depth: 0,
+  });
+  // an offline page (UI contract 1.2): the screen keeps this grid's loaded pages, and gives them
+  // back when the page data itself came from what it kept
+  const {offlineGrids} = context;
+  const gridId = typeof block.id === 'string' && block.id ? block.id : 'grid';
   const pg = paging.current;
   let changedCollection = false;
   if (pg.base !== base) {
@@ -208,11 +218,21 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
     pg.base = base;
     pg.collection = collection;
     pg.extra = [];
+    pg.pages = [];
+    pg.cursors = [];
     pg.token += 1;
     pg.loading = false;
     pg.error = null;
     const first = more?.cursor !== undefined ? resolve(more.cursor, scope) : null;
     pg.cursor = present(first) ? String(first) : null;
+    const kept = more?.route ? offlineGrids?.restore(gridId) : null;
+    if (kept) {
+      pg.pages = kept.pages;
+      pg.cursors = kept.pages.map((_, at) => (at === kept.pages.length - 1 ? kept.cursor : null));
+      pg.extra = kept.pages.flat();
+      pg.cursor = kept.cursor;
+      pg.depth = 0;
+    }
   }
 
   const keyOf = useCallback(
@@ -268,7 +288,10 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
         const next = more.cursor !== undefined ? resolve(more.cursor, pageScope) : null;
         state.extra = state.extra.concat(fresh);
         state.cursor = present(next) && String(next) !== state.cursor ? String(next) : null;
+        state.pages = state.pages.concat([fresh]);
+        state.cursors = state.cursors.concat([state.cursor]);
         state.loading = false;
+        offlineGrids?.save(gridId, keptPages(state.pages, state.cursors));
         bump();
       })
       .catch((err: any) => {
@@ -278,7 +301,7 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
           bump();
         }
       });
-  }, [more?.route, more?.cursor, load, block.items, keyOf, scope.page, scope.state]);
+  }, [more?.route, more?.cursor, load, block.items, keyOf, scope.page, scope.state, offlineGrids, gridId]);
 
   // a refresh: back to as many pages as were loaded, so the grid stays where it was
   useEffect(() => {

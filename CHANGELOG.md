@@ -115,6 +115,14 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Changed
 
+- **UI contract 1.2: offline pages.** A page with `"offline": true` is kept by the Android app
+  to show while StarCore can't be reached: its data and the first pages its media-grid loaded,
+  per server, session, Satellite and collection, with the usual offline notice, and live again
+  as soon as StarCore answers. Bounded (12 collections per server, 512 KB each, 7 days), never
+  holding a token, URL or image, and forgotten after any action on the Satellite, on a 401/403,
+  on sign-in, sign-out and server removal. Photos' shared Library, Albums and album pages use
+  it; Photo's own screens forget it when they delete a photo or move one to the Locked Folder.
+  Mission Control keeps nothing.
 - **The shared media viewer zooms, and media-grids take the person's own size.** On Android an
   image in the viewer pinches to zoom and, zoomed, pans with one finger or zooms back on a
   double tap, without taking the swipe between items; it is Photo's own zoomable image, now

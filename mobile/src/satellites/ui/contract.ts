@@ -87,6 +87,8 @@ export interface UiPage {
   state?: Record<string, Json>;
   /** 1.1: 'stack' (the default) or 'dashboard' */
   template?: string;
+  /** 1.2: this page may be kept to show while StarCore can't be reached (satellites/ui/offline.ts) */
+  offline?: boolean;
   blocks: UiBlock[];
 }
 

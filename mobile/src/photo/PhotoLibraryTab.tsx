@@ -3,6 +3,7 @@ import {Alert, StyleSheet, Text, View} from 'react-native';
 import {GestureDetector} from 'react-native-gesture-handler';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {colors, spacing, typography} from '../theme';
+import {forgetOfflineSatellite} from '../satellites/ui/offline';
 import {getCachedPhotos, setCachedPhotos} from './cache';
 import {onPhotoRemoved} from './photoEvents';
 import {PhotoGrid} from './PhotoGrid';
@@ -96,6 +97,10 @@ export function PhotoLibraryTab({onOpenPhoto}: Props) {
           onPress: async () => {
             setSelection(null);
             await Promise.all(ids.map(id => api.trash(id).catch(() => {})));
+            // the shared interface's offline copies may list them
+            if (serverId) {
+              await forgetOfflineSatellite(serverId, 'Photo');
+            }
             await load();
           },
         },

@@ -7,6 +7,7 @@ import {deviceInfo} from '../platform/device';
 import {secureStorage} from '../platform/secureStorage';
 import type {BiometricAvailability, BiometricUnavailableReason} from '../platform/types';
 import {AppLock, UnlockResult} from './appLock';
+import {forgetOfflineServer} from '../satellites/ui/offline';
 import {
   BIOMETRIC_ENABLED_KEY,
   BiometricDisableResult,
@@ -139,6 +140,8 @@ export function AuthProvider({
       setLoginError(null);
       try {
         const session = await sessionManager.login(username, password);
+        // a new session starts with nothing kept offline from an earlier one on this server
+        await forgetOfflineServer(serverId);
         // the server password is itself proof of presence for this server
         appLock.markUnlocked(serverId, true);
         setBiometricUnlockEnabled(await sessionManager.biometricUnlockEnabled());
@@ -155,9 +158,11 @@ export function AuthProvider({
     // the stored preference is kept (see SessionManager.logout); only the
     // in-memory flag is reset until the next sign-in re-reads it
     await sessionManager.logout();
+    // what the shared interfaces kept to show offline goes with the session
+    await forgetOfflineServer(serverId);
     setBiometricUnlockEnabled(false);
     setState({status: 'signed-out'});
-  }, [sessionManager]);
+  }, [sessionManager, serverId]);
 
   const enableBiometricUnlock = useCallback(async (): Promise<BiometricEnableResult> => {
     if (state.status !== 'signed-in') {

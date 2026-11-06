@@ -365,7 +365,18 @@ class _Validator:
         if not isinstance(page, dict):
             self.error(where, "must be an object")
             return
-        self.unknown_keys(where, page, {"title", "params", "source", "sources", "state", "template", "blocks"})
+        self.unknown_keys(where, page, {"title", "params", "source", "sources", "state", "template", "blocks", "offline"})
+        if "offline" in page:
+            # 1.2: the client may keep this page's data (and a grid's loaded pages) to show while
+            # StarCore can't be reached; a page whose source depends on what the person types or
+            # chooses ($state) is never kept, so it can't be offered for one
+            self.since(f"{where}.offline", "offline pages", 2)
+            if not isinstance(page["offline"], bool):
+                self.error(f"{where}.offline", "must be true or false")
+            elif page["offline"] and not isinstance(page.get("source"), dict):
+                self.error(f"{where}.offline", "needs the page's own source")
+            elif page["offline"] and "$state." in str(page["source"].get("route", "")):
+                self.error(f"{where}.offline", "can't keep a source that depends on $state")
         self.state_keys, self.source_names = set(), set()
         if "state" in page:
             self.since(f"{where}.state", "page state")

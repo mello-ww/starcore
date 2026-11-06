@@ -290,7 +290,7 @@ What it covers:
 | Phone sync, settings | yes | opens Photo's own: "Settings and phone sync" on Albums (the web's Configuration tab, the app's Photo configuration) |
 | Locked Folder | yes | opens Photo's own: "Locked Folder" on Albums, with its PIN or biometrics, locked again on leaving; its security-sensitive behaviour isn't migrated |
 | Move a photo into the Locked Folder | yes, from the viewer | no - Photo's own viewer |
-| Offline cache of the library (Android) | yes | no: the shared interface caches the document, not page data |
+| Offline cache of the library (Android) | yes, the whole list (metadata only) | yes: Library, Albums and an album, with up to 600 items each (`offline` pages, see the UI contract's "Offline pages"); never the recycle bin, Search or Map |
 
 Search looks in the same fields as the app's own Search tab, on the server
 (`gallery/search`): nothing is listed until there is text to look for, a photo in the recycle bin
