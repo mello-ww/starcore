@@ -57,6 +57,8 @@ export interface UiAction {
   play?: {search: Json};
   /** 1.2: choose media through the app's picker; the route then gets the references as $value. */
   pick?: {capability: string; kinds?: string[]; multiple?: boolean; title?: Json};
+  /** 1.2: open the Satellite's own native screens at a section they name ("settings"). */
+  own?: string;
 }
 
 /** One block. Deliberately loose: a document is network data, so every

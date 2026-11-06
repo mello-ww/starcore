@@ -1,6 +1,6 @@
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import React, {useEffect, useState} from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import React, {useEffect, useLayoutEffect, useState} from 'react';
+import {ActivityIndicator, Pressable, StyleSheet, Text, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {colors, spacing, typography, useAccentStyles} from '../theme';
 import {SettingsButton} from '../components/SettingsButton';
@@ -40,11 +40,15 @@ const SECTIONS: {key: Section; label: string}[] = [
  * Photo still also answers a plain declarative "mobile" route for any
  * *other* client.
  */
-export function PhotoHomeScreen({navigation}: Props) {
+export function PhotoHomeScreen({navigation, route}: Props) {
   const accentStyle = useAccentStyles();
   const [section, setSection] = useState<Section>('library');
   const {api: lockedApi} = useLockedFolder();
   const [hasLockedFolder, setHasLockedFolder] = useState(false);
+  const [lockedChecked, setLockedChecked] = useState(false);
+  // opened by the shared interface's own action ({"own": "settings"} in Photo's ui.json): one
+  // destination on its own, pushed over the shared screen, so Back returns there
+  const opened = route.params?.section;
   // bumped when photos come back out of the Locked Folder, so Library reloads
   const [libraryKey, setLibraryKey] = useState(0);
 
@@ -52,8 +56,15 @@ export function PhotoHomeScreen({navigation}: Props) {
     lockedApi
       .status()
       .then(status => setHasLockedFolder(status !== null))
-      .catch(() => setHasLockedFolder(false));
+      .catch(() => setHasLockedFolder(false))
+      .finally(() => setLockedChecked(true));
   }, [lockedApi]);
+
+  useLayoutEffect(() => {
+    if (opened === 'settings') {
+      navigation.replace('PhotoConfiguration');
+    }
+  }, [opened, navigation]);
 
   const openPhoto = (photos: Photo[], index: number) => {
     navigation.navigate('PhotoViewer', {
@@ -65,6 +76,28 @@ export function PhotoHomeScreen({navigation}: Props) {
   const openAlbum = (album: AlbumSummary) => {
     navigation.navigate('PhotoAlbum', {albumId: album.id, name: album.name});
   };
+
+  if (opened === 'settings') {
+    return <View style={styles.screen} />;
+  }
+  if (opened === 'locked') {
+    // the Locked Folder alone, exactly as its tab: its PIN or biometrics first, locked again
+    // on leaving, screenshots blocked
+    return (
+      <View style={styles.screen}>
+        <View style={styles.header}>
+          <Text style={typography.title}>Locked Folder</Text>
+        </View>
+        {!lockedChecked ? (
+          <ActivityIndicator style={styles.waiting} color={colors.textDim} />
+        ) : hasLockedFolder ? (
+          <LockedFolderTab onPhotosChanged={() => undefined} />
+        ) : (
+          <Text style={[typography.body, styles.missing]}>This StarCore server has no Locked Folder.</Text>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -118,4 +151,6 @@ const styles = StyleSheet.create({
   segmentIcon: {marginVertical: 2},
   segmentLabel: {color: colors.textDim, fontSize: 14},
   segmentLabelActive: {color: colors.onSelected, fontWeight: '700'},
+  waiting: {marginTop: spacing.xl},
+  missing: {color: colors.textDim, paddingHorizontal: spacing.lg},
 });

@@ -430,6 +430,23 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
   - The picker is the shared `media-grid` (thumbnails, groups, paging) with a confirm and a
     cancel: a dialog on the web, a full-screen sheet on Android.
 
+- **`own`** (1.2), on its own: `{"own": "settings"}` opens the Satellite's **own interface** -
+  its `page.js` on the web, its native screens in the app - at a section that interface names.
+  It is the bridge to what stays native while a Satellite migrates (Photo's settings, phone
+  sync, the Locked Folder):
+  - The section is a name (lowercase letters, digits and `-`, up to 32) that only the
+    Satellite's own interface interprets; shared code passes it through and never names a
+    Satellite. An own interface opens its default view for a section it doesn't know.
+  - It reaches no route and grants nothing: the own interface keeps every rule it has, such as
+    a PIN, a permission or locking again on leaving.
+  - A client without an own interface for the Satellite hides a button that opens one, and
+    says so as a notice if the action runs from elsewhere (a list row).
+  - Back returns to the shared interface: on the web the visit is a browser-history entry of its
+    own, and a reload stays on it; in the app the native screen is pushed over the shared one.
+  - On the web, a section that is another Satellite hosted by this one (`section_of`, such as
+    `#/satellite/Photo/LockedFolder`) always opens the own page, which hosts it, whichever
+    interface Developer Mode has chosen.
+
 A response may carry `{"message": "..."}`, shown as a short notice; an error response's
 `error` is shown the same way. Either way, the page then shows what is actually true again.
 
@@ -605,7 +622,9 @@ The contract is `starcore.ui/<major>.<minor>`:
 `GET /api/catalog` reports what the Engine supports (`contract.version`, `majors`, and the
 capability protocol versions). Clients check a document's `requires` against their own client
 capabilities and the catalog's providers. Both clients claim `media.audio` (the `play` action)
-and `media.picker` (the `pick` action); the other reserved names are in `vocabulary.json`.
+and `media.picker` (the `pick` action); the other reserved names are in `vocabulary.json`. The
+`own` action needs no capability: whether a client has a Satellite's own interface is its own
+knowledge, so it hides what it can't open.
 
 An app released with 1.0 (the Alpha) that meets a 1.1 document draws its 1.0 blocks and skips
 the rest. Status keeps that case simple: the Alpha app opens Status's own dedicated screen,

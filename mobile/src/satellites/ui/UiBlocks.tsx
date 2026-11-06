@@ -62,6 +62,9 @@ export interface BlockContext {
   picking?: {multiple: boolean; onChange: (items: any[]) => void};
   /** After a selection's action ran on each selected item: its `then`, and how many failed. */
   afterSelection?: (then: UiAction['then'], failed: number, total: number) => void;
+  /** 1.2's own action: whether this app has the Satellite's own native screens to open. A
+   * button that opens them is hidden without. */
+  hasOwnScreens?: boolean;
 }
 
 const asText = (value: unknown) => (value === null || value === undefined ? '' : String(value));
@@ -537,6 +540,9 @@ function Row({
 
 function ButtonBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
   const [busy, setBusy] = useState(false);
+  if (block.action?.own !== undefined && !context.hasOwnScreens) {
+    return null; // opens native screens this app doesn't have for the Satellite
+  }
   const label = asText(resolve(block.label, scope));
   const danger = block.style === 'danger';
   const press = async () => {

@@ -120,6 +120,9 @@ export function mount(context) {
     const satelliteBase = `/api/satellites/${encodeURIComponent(satelliteName)}`;
     // a host without Developer Mode shows everything
     const developer = context.developer || { enabled: true, subscribe: () => () => {} };
+    // the Satellite's own interface (its page.js), which the own action (1.2) opens at a
+    // section; null when the host has none for this Satellite, and the action's controls hide
+    const own = context.own && typeof context.own.open === "function" ? context.own : null;
 
     const state = {
         document: null,
@@ -406,6 +409,15 @@ export function mount(context) {
         const bindings = { ...scope, value };
         if (action.navigate) {
             navigate(action.navigate, resolve(action.params || {}, bindings));
+            return true;
+        }
+        if (action.own !== undefined) {
+            // 1.2: the Satellite's own page, at a section it names - nothing runs here
+            if (!own) {
+                setNotice("That isn't available in Mission Control.", "error");
+                return false;
+            }
+            own.open(String(action.own));
             return true;
         }
         if (action.play) {
@@ -763,6 +775,9 @@ export function mount(context) {
         },
 
         button: (block, scope) => {
+            if (block.action && block.action.own !== undefined && !own) {
+                return null;  // opens an own page this Satellite doesn't have here
+            }
             const style = block.style || "secondary";
             const button = el("button", `sc-button ui-button${style === "primary" ? " sc-button-accent" : ""}${style === "danger" ? " ui-button-danger" : ""}`,
                 text(block.label, scope));

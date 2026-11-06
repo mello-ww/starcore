@@ -209,6 +209,40 @@ describe('SatelliteUiScreen', () => {
     expect(texts(tree)).toContain('This interface needs starcore.ui/2.0; update the app.');
   });
 
+  it("opens the Satellite's own screens at a section, over this one (the own action)", async () => {
+    const document = {
+      contract: 'starcore.ui/1.2',
+      entry: 'home',
+      pages: {home: {blocks: [{type: 'button', label: 'Settings', action: {own: 'settings'}}]}},
+    };
+    __mocks.document.mockResolvedValue({document, revision: 'r', offline: false});
+    // a Satellite this app has its own screens for: they are pushed, with the section
+    const {tree, navigation} = await mount({params: {name: 'Photo'}});
+    await press(tree, 'Settings');
+    expect(navigation.push).toHaveBeenCalledWith('PhotoHome', {section: 'settings'});
+    expect(__mocks.act).not.toHaveBeenCalled(); // no route runs
+  });
+
+  it('hides a control that opens own screens this app does not have, and says so otherwise', async () => {
+    const document = {
+      contract: 'starcore.ui/1.2',
+      entry: 'home',
+      pages: {home: {blocks: [
+        {type: 'heading', text: 'Elsewhere'},
+        {type: 'button', label: 'Settings', action: {own: 'settings'}},
+        {type: 'list', items: '$.rows', item: {title: '$.name'}, action: {own: 'settings'}},
+      ], source: {route: 'rows'}}},
+    };
+    __mocks.document.mockResolvedValue({document, revision: 'r', offline: false});
+    __mocks.read.mockResolvedValue({rows: [{name: 'Open settings'}]});
+    const {tree, navigation} = await mount({params: {name: 'Future'}});
+    expect(texts(tree)).toContain('Elsewhere');
+    expect(texts(tree)).not.toContain('Settings');
+    await press(tree, 'Open settings');
+    expect(navigation.push).not.toHaveBeenCalled();
+    expect(texts(tree)).toContain("That isn't available in this app.");
+  });
+
   it('skips a block it does not know, unless the page requires it', async () => {
     const document = {
       contract: 'starcore.ui/1.3',

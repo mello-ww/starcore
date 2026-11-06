@@ -1,5 +1,5 @@
 {
-  "_about": "Photo's shared interface (UI contract 1.2): Library, Albums, Search, Map, the recycle bin and import from a server folder, in the shared media-grid, viewer, search and map. A preview: both clients keep opening Photo's own screens, and Developer Mode shows this one beside them, until it reaches parity (docs/satellites/photo.md, \"Shared interface\"). Phone sync, settings, moving to the Locked Folder and the Locked Folder itself stay on Photo's own screens. It binds to the read-only gallery routes (gallery.py); every action goes to Photo's existing routes.",
+  "_about": "Photo's shared interface (UI contract 1.2): Library, Albums, Search, Map, the recycle bin and import from a server folder, in the shared media-grid, viewer, search and map. A preview: both clients keep opening Photo's own screens, and Developer Mode shows this one beside them, until it reaches parity (docs/satellites/photo.md, \"Shared interface\"). Phone sync, settings and the Locked Folder stay on Photo's own screens, which Albums opens through the own action (\"settings\", \"locked\") - they keep their own PIN and permissions; moving a photo into the Locked Folder stays there too. It binds to the read-only gallery routes (gallery.py); every action goes to Photo's existing routes.",
   "contract": "starcore.ui/1.2",
   "preview": true,
   "title": "Photos",
@@ -180,7 +180,9 @@
                         "action": {"route": "albums", "body": {"name": "$form.name"}, "then": {"navigate": "album", "params": {"id": "$.id"}}}}}
           ]
         },
-        {"type": "button", "label": "Recycle bin", "style": "secondary", "action": {"navigate": "trash"}}
+        {"type": "button", "label": "Recycle bin", "style": "secondary", "action": {"navigate": "trash"}},
+        {"type": "button", "label": "Locked Folder", "style": "secondary", "action": {"own": "locked"}},
+        {"type": "button", "label": "Settings and phone sync", "style": "secondary", "action": {"own": "settings"}}
       ]
     },
     "album": {

@@ -89,9 +89,21 @@ class PhotoUiDocumentTest(unittest.TestCase):
         self.assertEqual(grid["item"]["subtitle"], "$.left")
         self.assertIn("$.left", [field["value"] for field in grid["viewer"]["fields"]])
 
-    def test_it_never_names_the_locked_folder(self):
-        text = (PHOTO_DIR / "ui.json").read_text(encoding="utf-8")
-        self.assertNotIn("locked", text.lower().replace("locked folder", ""))
+    def test_it_never_reaches_the_locked_folder_itself(self):
+        # no route or media of the document goes near it: it only opens Photo's own screens,
+        # which ask for the PIN as they always did
+        for template in routes_in(self.document["pages"]):
+            self.assertNotIn("lock", template.lower(), template)
+
+    def test_settings_sync_and_the_locked_folder_open_photos_own_screens(self):
+        blocks = self.document["pages"]["albums"]["blocks"]
+        opened = {block["label"]: block["action"]["own"] for block in blocks
+                  if block["type"] == "button" and "own" in block.get("action", {})}
+        self.assertEqual(opened, {"Locked Folder": "locked", "Settings and phone sync": "settings"})
+        # Photo's own web page knows both sections, and the Locked Folder's link as well
+        page = (PHOTO_DIR / "mission_control" / "page.js").read_text(encoding="utf-8")
+        self.assertIn('section === "settings" ? "config"', page)
+        self.assertIn('section === LOCKED_FOLDER || section === "locked"', page)
 
 
 class PhotoGalleryApiTest(unittest.TestCase):

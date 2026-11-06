@@ -49,7 +49,9 @@ export type SatellitesStackParamList = {
   /** The "Photo" Satellite is special-cased here rather than going through
    * SatelliteDetail's generic DeclarativeScreen - see PhotoHomeScreen's own
    * docstring and "Exposing a mobile interface" in docs/satellites.md. */
-  PhotoHome: undefined;
+  /** `section` (from a shared interface's own action): "settings" opens Photo configuration,
+   * "locked" the Locked Folder on its own. */
+  PhotoHome: {section?: string} | undefined;
   PhotoAlbum: {albumId: string; name: string};
   /** Reached from PhotoHomeScreen's gear icon, never a bottom-tab segment of
    * its own - see "Photo configuration... reachable via a settings entry"

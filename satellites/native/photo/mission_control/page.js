@@ -11,6 +11,15 @@ const TABS = ["photos", "albums", "map", "locked", "config"];
 const LOCKED_FOLDER = "LockedFolder";
 const LOCKED_URL = `/api/satellites/${LOCKED_FOLDER}`;
 
+// the sections the shared interface's own action opens (ui.json: {"own": "settings"}), and the
+// Locked Folder's own name, which is how Mission Control links to it as a section of this page
+function tabFor(section) {
+    if (section === LOCKED_FOLDER || section === "locked") {
+        return "locked";
+    }
+    return section === "settings" ? "config" : "photos";
+}
+
 function tabLabel(name) {
     if (name === "map") {
         return "Map";
@@ -115,7 +124,7 @@ export function mount(context) {
         configPanel.element);
     root.replaceChildren(buildHead(), body);
 
-    setTab("photos");
+    setTab(tabFor(context.section));
     skeleton();
     refresh();
     detectLockedFolder();
@@ -134,7 +143,7 @@ export function mount(context) {
     };
     // Mission Control calls this when the route names a section of this page
     // (#/satellite/Photo/LockedFolder) while it is already showing
-    cleanup.showSection = (section) => setTab(section === LOCKED_FOLDER ? "locked" : "photos");
+    cleanup.showSection = (section) => setTab(tabFor(section));
     return cleanup;
 
     /* ---------- structure ---------- */
@@ -217,8 +226,12 @@ export function mount(context) {
         if (viewer) {
             viewer.lockButton.hidden = !lockedAvailable;
         }
-        if (lockedAvailable && context.section === LOCKED_FOLDER) {
-            setTab("locked");
+        if (tabFor(context.section) === "locked") {
+            if (lockedAvailable) {
+                setTab("locked");
+            } else {
+                showNotice("This StarCore server has no Locked Folder.", true);
+            }
         }
     }
 
@@ -263,9 +276,10 @@ export function mount(context) {
     function rememberSection(name) {
         // keeps the address in step with the tab, without a navigation
         const base = `#/satellite/${encodeURIComponent(satellite.name)}`;
-        const wanted = name === "locked" ? `${base}/${LOCKED_FOLDER}` : base;
+        const wanted = name === "locked" ? `${base}/${LOCKED_FOLDER}` : name === "config" ? `${base}/settings` : base;
         if (location.hash.startsWith(base) && location.hash !== wanted) {
-            history.replaceState(null, "", wanted);
+            // keeps Mission Control's mark on the entry (a visit from the shared interface)
+            history.replaceState(history.state, "", wanted);
         }
     }
 

@@ -14,6 +14,7 @@ import {
 } from '../satellites/ui/contract';
 import {MediaPicker, type MediaReference, type PickRequest} from '../satellites/ui/MediaPicker';
 import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
+import {DEDICATED_SCREENS} from './HomeScreen';
 import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
@@ -316,6 +317,17 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         go(action.navigate, resolve(action.params ?? {}, scoped));
         return true;
       }
+      if (action.own !== undefined) {
+        // 1.2: the Satellite's own native screens, at a section they name - pushed over this
+        // one, so Back returns here; they keep their own rules (a PIN, a permission)
+        const screen = DEDICATED_SCREENS[name];
+        if (!screen) {
+          showToast("That isn't available in this app.", true);
+          return false;
+        }
+        (navigation as any).push(screen, {section: String(action.own)});
+        return true;
+      }
       if (action.play) {
         // 1.2: played by the app's audio host, from whichever Satellite provides audio.library
         try {
@@ -432,6 +444,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     setOverlay,
     confirm: confirmAction,
     afterSelection,
+    hasOwnScreens: Boolean(DEDICATED_SCREENS[name]),
     forms,
     setEditing: value => {
       editing.current = value;

@@ -75,6 +75,14 @@
                    ]}}}
     },
     {
+      "name": "own-action",
+      "_why": "1.2: a control opens the Satellite's own interface (its page.js, its native screens) at a section, for what stays native; a client without one hides it.",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+                     {"type": "button", "label": "Settings", "action": {"own": "settings"}},
+                     {"type": "list", "items": "$.places", "item": {"title": "$.name"}, "action": {"own": "private-area"}}
+                   ]}}}
+    },
+    {
       "name": "play-action",
       "_why": "1.2: a button asks the client to play what the audio.library provider finds; it needs the media.audio client capability and an audio.library provider.",
       "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.audio"], "capabilities": ["audio.library"]},
@@ -313,6 +321,24 @@
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "button", "label": "Add", "action": {"pick": {"capability": "files.browse"}, "route": "pins"}}]}}},
       "error": "pick.capability"
+    },
+    {
+      "name": "own-in-1.1",
+      "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Settings", "action": {"own": "settings"}}]}}},
+      "error": "own"
+    },
+    {
+      "name": "own-not-a-section-name",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Out", "action": {"own": "../LockedFolder"}}]}}},
+      "error": "own"
+    },
+    {
+      "name": "own-with-a-route",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Both", "action": {"own": "settings", "route": "reset"}}]}}},
+      "error": "route"
     },
     {
       "name": "pick-unknown-kind",

@@ -285,8 +285,9 @@ What it covers:
 | Map: located photos, opening the viewer | yes | yes (see below) |
 | Map clustering | web only, by rounded coordinates | both clients, a grid about 64 px wide on screen |
 | Import from a folder on the server: check, then import | web only | yes, both clients ("Import from a folder" on Library) |
-| Phone sync, settings | yes | no - Photo's own screens |
-| Locked Folder | yes | no - stays on Photo's own screens; its security-sensitive behaviour isn't migrated |
+| Phone sync, settings | yes | opens Photo's own: "Settings and phone sync" on Albums (the web's Configuration tab, the app's Photo configuration) |
+| Locked Folder | yes | opens Photo's own: "Locked Folder" on Albums, with its PIN or biometrics, locked again on leaving; its security-sensitive behaviour isn't migrated |
+| Move a photo into the Locked Folder | yes, from the viewer | no - Photo's own viewer |
 | Offline cache of the library (Android) | yes | no: the shared interface caches the document, not page data |
 
 Search looks in the same fields as the app's own Search tab, on the server
@@ -299,6 +300,15 @@ Map tab, so both need a Google Maps key in `android/gradle.properties` to draw a
 one the map area stays blank and the Library, Search and viewer work as usual. Differences that
 remain: on Android a cluster opens the viewer directly (the web shows its thumbnails first), and
 the web's single-photo popup is replaced by opening the viewer at once.
+
+The two Albums buttons use the contract's `own` action (`{"own": "settings"}`,
+`{"own": "locked"}`): Photo's own web page opens its Configuration or Locked Folder tab for
+them, and the app pushes Photo configuration, or the Locked Folder on its own screen, over the
+shared one, so Back returns there. Nothing about the Locked Folder changes: it asks for its PIN
+or biometrics as before, locks again on leaving, blocks screenshots on Android, and the shared
+document never reaches its routes or media. A server without a Locked Folder says so on that
+screen. `#/satellite/Photo/LockedFolder` keeps opening Photo's own page on the web, also while
+Developer Mode shows the shared interface.
 
 It binds to read-only routes, `gallery`, `gallery/albums`, `gallery/albums/<id>`,
 `gallery/trash`, `gallery/search` and `gallery/map` (`gallery.py`), which shape the same library, albums and recycle bin for

@@ -115,6 +115,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Changed
 
+- **UI contract 1.2: the `own` action** opens a Satellite's own interface (its `page.js`, its
+  native screens) at a section it names, from the shared interface - the bridge to what stays
+  native during a migration. It reaches no route; a client without an own interface hides it,
+  and Back returns to the shared interface. Photos' shared Albums page uses it for "Settings
+  and phone sync" and "Locked Folder", which open Photo's own screens with their PIN and
+  permissions unchanged. `#/satellite/Photo/LockedFolder` keeps opening Photo's own page while
+  Developer Mode shows the shared interface.
 - **Photos' shared interface (preview) moves closer to parity**: an "Import from a folder" page
   (check a server folder, then import it, through the existing `scan` and `import` routes, which
   now also answer with a readable `message`), the days each item has left in the recycle bin,

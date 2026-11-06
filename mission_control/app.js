@@ -173,10 +173,33 @@ function usesOwnPage(satellite) {
     if (!satellite.page) {
         return false;
     }
-    if (!hasUiDocument(satellite)) {
+    if (!hasUiDocument(satellite) || visitsOwnPage(satellite)) {
         return true;
     }
     return isPreviewDocument(satellite) ? !switched(satellite) : switched(satellite);
+}
+
+// The own action (UI contract 1.2) opens a Satellite's own page at a section from its shared
+// interface: that visit is a history entry of its own, marked in history.state, so Back
+// returns to the shared interface and a reload stays on the own page. A section that is
+// another Satellite hosted by this one (section_of) is always on the own page, which hosts
+// it - so #/satellite/<host>/<hosted> keeps working whichever interface is chosen.
+const OWN_VISIT = "starcore.ownPage";
+
+function visitsOwnPage(satellite) {
+    if (route.name !== "satellite" || route.satellite.toLowerCase() !== satellite.name.toLowerCase()) {
+        return false;
+    }
+    if (history.state && history.state[OWN_VISIT] === satellite.name) {
+        return true;
+    }
+    return Boolean(route.section) && satellites.some((other) => other.section_of === satellite.name && other.name === route.section);
+}
+
+function openOwnPage(satellite, section) {
+    const hash = `#/satellite/${encodeURIComponent(satellite.name)}/${encodeURIComponent(section)}`;
+    history.pushState({ [OWN_VISIT]: satellite.name }, "", hash);
+    applyRoute();
 }
 
 // what a mounted page was built from: a page.js, or one revision of a ui.json -
@@ -288,9 +311,11 @@ function applyRoute() {
         route = { name: "overview", satellite: null, section: null };
     }
 
-    // a real navigation to the page already showing: let it switch section
-    if (mounted && route.name === "satellite" && mounted.name.toLowerCase() === route.satellite.toLowerCase()
-        && mounted.section !== route.section) {
+    // a real navigation to the page already showing: let it switch section (unless it now
+    // needs the other interface - back from an own-page visit - which remounts below)
+    const showing = route.name === "satellite" ? findSatellite(route.satellite) : null;
+    if (mounted && showing && mounted.name.toLowerCase() === route.satellite.toLowerCase()
+        && mounted.section !== route.section && mounted.revision === pageRevision(showing)) {
         mounted.section = route.section;
         if (mounted.cleanup && typeof mounted.cleanup.showSection === "function") {
             mounted.cleanup.showSection(route.section);
@@ -1102,6 +1127,8 @@ async function mountSatellitePage(satellite) {
             satellite,
             // the section the route names (#/satellite/<name>/<section>), if any
             section: route.section,
+            // the shared interface's own action (1.2): this Satellite's page.js, at a section
+            own: satellite.page && !ownPage ? { open: (section) => openOwnPage(satellite, section) } : null,
             // Developer Mode, for code that must react to it - see "Developer Mode" above
             developer: developerContext,
             api: {
@@ -1660,6 +1687,13 @@ function updateSatelliteOwnPageButton() {
     button.title = usesOwnPage(satellite) ? "Show the shared interface (ui.json)" : "Show the Satellite's own page (page.js)";
     button.setAttribute("aria-label", button.title);
     button.onclick = () => {
+        if (history.state && history.state[OWN_VISIT] === satellite.name) {
+            // a visit from the shared interface (the own action): leave it, the choice stays
+            history.replaceState(null, "", location.hash);
+            updateSatelliteOwnPageButton();
+            renderSatellitePage();
+            return;
+        }
         const names = storedNames(key);
         if (names.has(satellite.name)) {
             names.delete(satellite.name);

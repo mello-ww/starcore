@@ -81,6 +81,8 @@ MEDIA_VIEWER_KEYS = set(VOCABULARY["media_viewer_keys"])
 MAP_ITEM_KEYS = set(VOCABULARY["map_item_keys"])
 # capabilities the client's media picker can choose from (the pick action)
 PICKABLE = {"media.gallery"}
+# a section of a Satellite's own interface, for the own action (1.2)
+OWN_SECTION = re.compile(r"[a-z][a-z0-9-]{0,31}")
 FORMATS_1_1 = set(SINCE_1_1["formats"])
 # Satellite capabilities with a protocol this Engine knows: their versions, the
 # operations every provider must offer and those it may. A Satellite may also
@@ -888,6 +890,9 @@ class _Validator:
         if "play" in action:
             self.check_play(where, action)
             return
+        if "own" in action:
+            self.check_own(where, action)
+            return
         known = {"route", "method", "body", "confirm", "then"}
         if "pick" in action:
             self.check_pick(where, action["pick"])
@@ -927,6 +932,18 @@ class _Validator:
             self.error(f"{where}.play.search", "must be a non-empty text or binding")
             return
         self.check_values(f"{where}.play.search", play["search"])
+
+    def check_own(self, where: str, action: dict):
+        """{own: section} (1.2): the client opens the Satellite's own interface - its page.js on
+        the web, its native screens in the app - at a section that interface names ("settings").
+        A bridge to what stays native while a Satellite migrates: it reaches no route and grants
+        nothing; the own interface enforces its own rules (a PIN, a permission) as it always did.
+        A client without an own interface for the Satellite hides the control."""
+        self.since(f"{where}.own", "the own action", 2)
+        self.unknown_keys(where, action, {"own"})
+        section = action["own"]
+        if not isinstance(section, str) or not OWN_SECTION.fullmatch(section):
+            self.error(f"{where}.own", "must be a section name: lowercase letters, digits and '-', up to 32")
 
     def check_pick(self, where: str, pick):
         """{pick: {capability, kinds, multiple, title}, route, body, then} (1.2): the client's
