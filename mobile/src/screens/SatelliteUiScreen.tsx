@@ -72,6 +72,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const [fatal, setFatal] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
   const [dataError, setDataError] = useState<string | null>(null);
+  // true when StarCore could not be reached at all; false when it answered with an error
+  const [unreachable, setUnreachable] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [sources, setSources] = useState<Record<string, any>>({});
@@ -198,6 +200,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     } catch (err: any) {
       if (token === loadToken.current) {
         setDataError(err?.message || 'Could not load this page.');
+        setUnreachable(!(typeof err?.status === 'number' && err.status > 0));
       }
     } finally {
       if (token === loadToken.current) {
@@ -522,7 +525,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         {offline && <Text style={styles.offlineLayout}>Showing the last saved layout - StarCore is unreachable.</Text>}
         {stale && (
           <View style={styles.offline} accessibilityRole="alert" testID="ui-stale">
-            <Text style={[type.label, styles.offlineTitle]}>Offline</Text>
+            <Text style={[type.label, styles.offlineTitle]}>{unreachable ? 'Offline' : 'Not refreshed'}</Text>
             <Text style={type.caption}>{`Showing what StarCore said${ago ? ` ${ago}` : ' earlier'}. ${dataError}`}</Text>
           </View>
         )}

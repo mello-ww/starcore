@@ -73,6 +73,8 @@ def gallery_route(request):
         if path == ("search",):
             return json_response(gallery.search_view(request.satellite, request.query.get("q"), request.query.get("kind"),
                                                      limit, cursor))
+        if path == ("import",):
+            return json_response(gallery.import_view(request.satellite))
         if path == ("map",):
             return json_response(gallery.map_view(request.satellite, gallery.viewport(request.query),
                                                   overview=request.query.get("overview") == "1"))
@@ -235,9 +237,12 @@ def scan(request):
                                "default photo_directory", status=400)
 
     try:
-        return json_response(library(request.satellite).scan(source, private=policy(request.engine)))
+        report = library(request.satellite).scan(source, private=policy(request.engine))
     except PhotoImportError as error:
         return error_response(str(error), status=400)
+    # `message` is what a client shows after the action (the shared interface's import form)
+    return json_response({**report, "message": f"Found {_count(report['found'], 'supported file')}: "
+                                               f"{report['new']} new, {report['duplicates']} already in the library."})
 
 
 def import_directory(request):
@@ -250,9 +255,18 @@ def import_directory(request):
                                "default photo_directory", status=400)
 
     try:
-        return json_response(library(request.satellite).import_directory(source, private=policy(request.engine)))
+        report = library(request.satellite).import_directory(source, private=policy(request.engine))
     except PhotoImportError as error:
         return error_response(str(error), status=400)
+    failed = len(report["failed"])
+    message = f"Imported {_count(report['imported'], 'item')}, {report['duplicates']} already in the library"
+    message += f", {failed} failed." if failed else "."
+    return json_response({**report, "message": message})
+
+
+def _count(number: int, noun: str) -> str:
+    return f"{number} {noun}{'' if number == 1 else 's'}"
+
 
 
 def albums_route(request):

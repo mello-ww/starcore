@@ -115,6 +115,14 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Changed
 
+- **Photos' shared interface (preview) moves closer to parity**: an "Import from a folder" page
+  (check a server folder, then import it, through the existing `scan` and `import` routes, which
+  now also answer with a readable `message`), the days each item has left in the recycle bin,
+  and albums in their own order instead of newest first. Photo's own page and screens are
+  unchanged and remain the default.
+- The shared renderers no longer call a page "offline" or "not answering" when StarCore answered
+  with an error: the Android notice says "Not refreshed" and the web one "This page could not be
+  refreshed", keeping "Offline" for when StarCore can't be reached.
 - Mission Control's files and Satellite assets are served `no-cache` with an ETag (revalidated)
   instead of `no-store`.
 - The Android Satellites list refreshes when you return to it.

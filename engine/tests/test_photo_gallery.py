@@ -68,6 +68,27 @@ class PhotoUiDocumentTest(unittest.TestCase):
         self.assertEqual((located["item"]["lat"], located["item"]["lon"]), ("$.lat", "$.lon"))
         self.assertIn("viewer", located)
 
+    def test_it_imports_a_server_folder_through_the_existing_routes(self):
+        page = self.document["pages"]["import"]
+        self.assertEqual(page["source"]["route"], "gallery/import")
+        forms = [block for card in page["blocks"] if card["type"] == "card" for block in card["blocks"] if block["type"] == "form"]
+        self.assertEqual([form["submit"]["action"]["route"] for form in forms], ["scan", "import"])
+        for form in forms:
+            self.assertEqual(form["submit"]["action"]["body"], {"source": "$form.source"})
+            self.assertEqual(form["fields"][0]["value"], "$.directory")
+        library = self.document["pages"]["library"]["blocks"]
+        self.assertIn({"navigate": "import"}, [block.get("action") for block in library if block["type"] == "button"])
+
+    def test_an_album_is_one_grid_in_its_own_order_not_grouped_by_month(self):
+        # its photos come in the order they were added, so month headings would repeat
+        grid = next(block for block in self.document["pages"]["album"]["blocks"] if block["type"] == "media-grid")
+        self.assertNotIn("group", grid["item"])
+
+    def test_the_recycle_bin_shows_the_days_each_item_has_left(self):
+        grid = next(block for block in self.document["pages"]["trash"]["blocks"] if block["type"] == "media-grid")
+        self.assertEqual(grid["item"]["subtitle"], "$.left")
+        self.assertIn("$.left", [field["value"] for field in grid["viewer"]["fields"]])
+
     def test_it_never_names_the_locked_folder(self):
         text = (PHOTO_DIR / "ui.json").read_text(encoding="utf-8")
         self.assertNotIn("locked", text.lower().replace("locked folder", ""))
@@ -170,6 +191,51 @@ class PhotoGalleryApiTest(unittest.TestCase):
 
         favorites = self.json_request("/api/satellites/photo/gallery/albums/favorites")[1]
         self.assertFalse(favorites["editable"])
+
+    def test_an_album_keeps_the_order_photos_were_added_in(self):
+        photos = self.import_photos("a.png", "b.png", "c.png", "d.png")
+        album = self.json_request("/api/satellites/photo/albums", "POST", {"name": "Ordered"})[1]
+        order = [photos[name]["id"] for name in ("c.png", "a.png", "d.png", "b.png")]
+        for photo_id in order:
+            self.json_request(f"/api/satellites/photo/albums/{album['id']}/photos", "POST", {"photo_id": photo_id})
+
+        own = [photo["id"] for photo in self.json_request(f"/api/satellites/photo/albums/{album['id']}")[1]["photos"]]
+        shared = [item["id"] for item in self.json_request(f"/api/satellites/photo/gallery/albums/{album['id']}")[1]["items"]]
+        self.assertEqual(own, order)  # Photo's own screens
+        self.assertEqual(shared, order)
+        first = self.json_request(f"/api/satellites/photo/gallery/albums/{album['id']}?limit=3")[1]
+        rest = self.json_request(f"/api/satellites/photo/gallery/albums/{album['id']}?limit=3&cursor={first['next']}")[1]
+        self.assertEqual([item["id"] for item in first["items"] + rest["items"]], order)
+        self.assertIsNone(rest["next"])
+
+    def test_the_bin_says_how_long_each_item_has_left(self):
+        photos = self.import_photos("old.png")
+        self.json_request(f"/api/satellites/photo/trash/{photos['old.png']['id']}", "POST")
+        self.satellite.config.data["trash_retention_days"] = 7
+        items = self.json_request("/api/satellites/photo/gallery/trash")[1]["items"]
+        self.assertEqual([item["left"] for item in items], ["7 days left"])
+
+    def test_import_and_scan_answer_with_a_message(self):
+        (self.source / "one.png").write_bytes(png(4, 4, bytes([1, 2, 3])))
+        status, scanned = self.json_request("/api/satellites/photo/scan", "POST", {"source": str(self.source)})
+        self.assertEqual(status, 200)
+        self.assertEqual((scanned["found"], scanned["new"]), (1, 1))  # the existing fields, unchanged
+        self.assertEqual(scanned["message"], "Found 1 supported file: 1 new, 0 already in the library.")
+        status, imported = self.json_request("/api/satellites/photo/import", "POST", {"source": str(self.source)})
+        self.assertEqual((status, imported["imported"]), (200, 1))
+        self.assertEqual(imported["message"], "Imported 1 item, 0 already in the library.")
+        again = self.json_request("/api/satellites/photo/import", "POST", {"source": str(self.source)})[1]
+        self.assertEqual(again["message"], "Imported 0 items, 1 already in the library.")
+        status, refused = self.json_request("/api/satellites/photo/import", "POST", {"source": str(self.directory / "nope")})
+        self.assertEqual(status, 400)
+        self.assertIn("error", refused)
+
+    def test_the_import_page_offers_the_default_folder(self):
+        status, view = self.json_request("/api/satellites/photo/gallery/import")
+        self.assertEqual((status, view["directory"]), (200, ""))
+        self.assertIn("JPEG", view["formats"])
+        self.satellite.config.data["photo_directory"] = str(self.source)
+        self.assertEqual(self.json_request("/api/satellites/photo/gallery/import")[1]["directory"], str(self.source))
 
     def test_unknown_gallery_paths_and_albums_are_refused(self):
         self.assertEqual(self.json_request("/api/satellites/photo/gallery/albums/deadbeef")[0], 404)

@@ -302,6 +302,8 @@ export function mount(context) {
                 return;
             }
             state.dataError = error.message || "StarCore did not answer";
+            // an answer with an error status is not StarCore being unreachable
+            state.dataUnreachable = !(error.status > 0);
         }
         state.loading = false;
         render();
@@ -1394,8 +1396,10 @@ export function mount(context) {
         if (state.dataError && state.data) {
             // readings that are no longer current stay visible, dimmed, under the notice
             const seconds = Math.max(1, Math.round((Date.now() - state.lastGood) / 1000));
-            const notice = el("p", "ui-stale", `StarCore is not answering (${state.dataError}). `
-                + `Showing what it said ${formatValue(seconds, "duration")} ago.`);
+            const reason = state.dataUnreachable
+                ? `StarCore is not answering (${state.dataError}).`
+                : `This page could not be refreshed (${state.dataError}).`;
+            const notice = el("p", "ui-stale", `${reason} Showing what StarCore said ${formatValue(seconds, "duration")} ago.`);
             notice.setAttribute("role", "status");
             root.appendChild(notice);
         } else if (state.dataError) {

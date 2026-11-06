@@ -79,6 +79,41 @@ class KeysetPagingTest(unittest.TestCase):
         self.assertEqual(rest, expected_rest)
         self.assertFalse(shown & set(rest))
 
+    def test_an_album_pages_in_its_own_order(self):
+        records = photos(50, seed=4)  # in the order they were added, not by date
+        seen, cursor = [], None
+        while True:
+            chosen, cursor = self.gallery.page_in_order(records, 7, cursor and self.gallery.paging({"limit": "7", "cursor": cursor})[1])
+            seen.extend(photo["id"] for photo in chosen)
+            if cursor is None:
+                break
+        self.assertEqual(seen, [photo["id"] for photo in records])
+        self.assertEqual(self.gallery.page_in_order(records, None, None), (records, None))
+
+    def test_an_album_page_survives_its_last_photo_leaving(self):
+        records = photos(20, seed=5)
+        first, cursor = self.gallery.page_in_order(records, 5, None)
+        key = self.gallery.paging({"limit": "5", "cursor": cursor})[1]
+        # the last photo shown is taken out of the album before the next page
+        changed = [photo for photo in records if photo["id"] != first[-1]["id"]]
+        following, _ = self.gallery.page_in_order(changed, 5, key)
+        self.assertEqual([photo["id"] for photo in following], [photo["id"] for photo in records[5:10]])
+        # an untouched list continues straight after it
+        self.assertEqual(self.gallery.page_in_order(records, 5, key)[0], records[5:10])
+        with self.assertRaises(self.gallery.PagingError):
+            self.gallery.page_in_order(records, 5, ("x", "y"))
+
+    def test_days_left_in_the_bin_read_like_photos_own_screens(self):
+        from datetime import datetime, timezone
+
+        now = datetime(2026, 11, 6, 12, 0, tzinfo=timezone.utc)
+        self.assertEqual(self.gallery.days_left("2026-11-06T11:00:00+00:00", 30, now), "30 days left")
+        self.assertEqual(self.gallery.days_left("2026-10-08T12:00:00+00:00", 30, now), "1 day left")
+        self.assertEqual(self.gallery.days_left("2026-10-01T00:00:00+00:00", 30, now), "Erasing soon")
+        self.assertEqual(self.gallery.days_left("2026-11-05T12:00:00", 7, now), "6 days left")  # no zone: UTC
+        self.assertIsNone(self.gallery.days_left(None, 30, now))
+        self.assertIsNone(self.gallery.days_left("not a date", 30, now))
+
     def test_bad_limits_and_cursors_are_refused(self):
         for query in ({"limit": "0"}, {"limit": "501"}, {"limit": "ten"}, {"cursor": "abc"},
                       {"limit": "10", "cursor": "not-a-cursor!"}, {"limit": "10", "cursor": "WzFd"}):

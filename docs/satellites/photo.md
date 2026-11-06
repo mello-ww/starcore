@@ -179,8 +179,8 @@ GET  /api/satellites/photo/photos             every active photo, newest first
 GET  /api/satellites/photo/photos/<id>        one photo's metadata
 GET  /api/satellites/photo/thumbnails/<id>    cached thumbnail
 GET  /api/satellites/photo/originals/<id>     the stored original
-POST /api/satellites/photo/scan               preview a directory  {"source": "..."}
-POST /api/satellites/photo/import             import a directory   {"source": "..."}
+POST /api/satellites/photo/scan               preview a directory  {"source": "..."}; the answer includes a readable "message"
+POST /api/satellites/photo/import             import a directory   {"source": "..."}; the answer includes a readable "message"
 GET  /api/satellites/photo/configuration      current sync_host/sync_port/trash_retention_days/source_paths/... settings
 POST /api/satellites/photo/configuration      change one            {"key": ..., "value": ...}
 POST /api/satellites/photo/sync_upload        upload one photo/video, authenticated (see "Real automatic phone sync")
@@ -193,8 +193,9 @@ POST /api/satellites/photo/albums/<id>/photos           add a photo   {"photo_id
 POST /api/satellites/photo/albums/<id>/photos/remove    remove a photo {"photo_id": ...}
 GET  /api/satellites/photo/gallery            the library shaped for ui.json's shared gallery (read-only)
 GET  /api/satellites/photo/gallery/albums     every album as a tile with its cover
-GET  /api/satellites/photo/gallery/albums/<id>   one album's photos, for the shared gallery
-GET  /api/satellites/photo/gallery/trash      the recycle bin, for the shared gallery
+GET  /api/satellites/photo/gallery/albums/<id>   one album's photos in the album's own order, for the shared gallery
+GET  /api/satellites/photo/gallery/trash      the recycle bin, with the days each item has left ("left")
+GET  /api/satellites/photo/gallery/import     the default import folder and the formats an import takes in
 GET  /api/satellites/photo/media?kinds=       media.gallery's list: what a media picker may offer
 GET  /api/satellites/photo/gallery/search?q=&kind=   photos and albums matching a search, for the shared Search page
 GET  /api/satellites/photo/gallery/map        every photo with a location, for the shared Map page;
@@ -259,9 +260,9 @@ now" and status live inside the Photo configuration screen, alongside `source_pa
 
 ## Shared interface
 
-Photo also describes its Library and Albums in a `ui.json` (UI contract 1.2), drawn by both
-clients' shared `media-grid` block and viewer - the first step of moving Photo off client code
-of its own. It is a **preview** document: Mission Control and the app keep opening Photo's own
+Photo also describes its Library, Albums, Search, Map, recycle bin and folder import in a
+`ui.json` (UI contract 1.2), drawn by both clients' shared blocks - the first step of moving
+Photo off client code of its own. It is a **preview** document: Mission Control and the app keep opening Photo's own
 page and screens, and Developer Mode shows the shared one beside them (on the web, the button
 beside the Satellite's title; in the app, "Shared interface (preview)" on Photo's card in
 Satellites). The released Alpha app ignores it.
@@ -277,11 +278,14 @@ What it covers:
 | Create, rename, delete a custom album; remove a photo from it | yes | yes |
 | Add a photo to a custom album | yes, from a photo | yes, from the album: "Add photos" opens the client's media picker |
 | Recycle bin: restore, delete for good, retention | yes | yes, from the viewer and from a selection |
+| Recycle bin: days each item has left | yes | yes, under each tile and in the viewer |
+| Album order: the order photos were added (a folder's own order) | yes | yes |
 | Grouping by camera, pinch to change columns (Android) | yes | no |
 | Search: file name, camera, lens, date; matching albums | Android only | yes, both clients, with a Photos/Videos filter |
 | Map: located photos, opening the viewer | yes | yes (see below) |
 | Map clustering | web only, by rounded coordinates | both clients, a grid about 64 px wide on screen |
-| Import and upload, phone sync, settings | yes | no - Photo's own screens |
+| Import from a folder on the server: check, then import | web only | yes, both clients ("Import from a folder" on Library) |
+| Phone sync, settings | yes | no - Photo's own screens |
 | Locked Folder | yes | no - stays on Photo's own screens; its security-sensitive behaviour isn't migrated |
 | Offline cache of the library (Android) | yes | no: the shared interface caches the document, not page data |
 
@@ -311,7 +315,9 @@ Without `limit` it answers everything, as it always did, so older clients are un
 cursor is the last photo's place in a fixed order - newest first, then by id (the recycle bin:
 most recently binned first) - not a page number, so a photo added or removed between two pages
 never makes another appear twice or go missing. A `limit` or `cursor` that can't be used is a
-400. Albums are listed newest first in the shared interface, like the library.
+400. An album keeps its own order - the order photos were added in, or its folder's - like
+Photo's own screens: its cursor holds the last photo shown and its position, and a page starts
+after that photo, or where it was if it has left the album since.
 
 The map pages differently, because clustering needs every point of an area: `gallery/map?overview=1`
 answers only the count and bounds of the located photos, and `gallery/map?bbox=s,w,n,e&zoom=z`

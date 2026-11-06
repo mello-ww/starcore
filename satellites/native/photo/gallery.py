@@ -9,8 +9,9 @@ functions, and never writes: every action in the document goes to the existing r
 
 GET gallery                   every active photo and video, newest first, grouped by month
 GET gallery/albums            physical albums, Favorites and custom albums, with their covers
-GET gallery/albums/<id>       one album's photos
-GET gallery/trash             what's in the recycle bin
+GET gallery/albums/<id>       one album's photos, in the album's own order
+GET gallery/trash             what's in the recycle bin, with the days each item has left
+GET gallery/import            the default import folder and the formats an import takes in
 GET gallery/search?q=&kind=   photos and albums matching a search, for the shared Search page
 GET gallery/map               every photo with a location, for the shared Map page
 GET media?kinds=              the media.gallery capability's list: what a picker may offer
@@ -19,19 +20,22 @@ Every list of photos also takes `limit` (1-500) and `cursor`: it then answers on
 cursor of the next in `next` (null at the end). Without `limit` it answers everything, as it
 always did. The cursor is the position of the page's last photo in a fixed order (newest first,
 then by id), not a page number: a photo added or removed between two pages never makes another
-one appear twice or go missing. The map takes `bbox` and `zoom` instead (see map_view()).
+one appear twice or go missing. An album keeps its own order instead (see page_in_order()). The
+map takes `bbox` and `zoom` instead (see map_view()).
 """
 
 import base64
 import binascii
 import json
-from datetime import datetime
+import math
+from datetime import datetime, timezone
 
 from starcore.ui_contract import format_value
 
 from . import albums as albums_module
 from . import configuration
 from .albums import AlbumNotFound, albums
+from . import images, videos
 from .library import library
 
 MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
@@ -166,6 +170,26 @@ def page(photos: list, limit, cursor, key=_newest_first) -> tuple:
     return chosen, (_cursor(key(chosen[-1])) if more and chosen else None)
 
 
+def page_in_order(photos: list, limit, cursor) -> tuple:
+    """(this page of `photos`, the next cursor or None), keeping `photos` in the order given -
+    an album's own order. The cursor holds the last photo's id and its position: the next page
+    starts after that photo, or, if it has left the album since, where it was."""
+    if limit is None:
+        return list(photos), None
+    start = 0
+    if cursor is not None:
+        position, last_id = cursor
+        if not position.isdigit():
+            raise PagingError("'cursor' is not one this list gave")
+        ids = [photo["id"] for photo in photos]
+        # gone: whatever followed it has moved up into its place
+        start = ids.index(last_id) + 1 if last_id in ids else min(int(position), len(photos))
+    chosen = photos[start:start + limit]
+    end = start + len(chosen)
+    more = end < len(photos)
+    return chosen, (_cursor((str(end - 1), chosen[-1]["id"])) if more and chosen else None)
+
+
 def _favorites(satellite) -> set:
     album = albums(satellite).get(albums_module.FAVORITES_ID)
     return set(album["photo_ids"]) if album else set()
@@ -223,7 +247,8 @@ def album_view(satellite, album_id: str, limit=None, cursor=None) -> dict:
         photos = [photo for photo in (photo_library.get(photo_id) for photo_id in album["photo_ids"]) if photo]
         kind = album.get("kind", "virtual")
     custom = kind == "virtual"
-    shown, following = page(photos, limit, cursor)
+    # the album's own order (when photos were added, or the folder's), like Photo's own screens
+    shown, following = page_in_order(photos, limit, cursor)
     return {
         "id": album["id"],
         "name": album["name"],
@@ -415,15 +440,33 @@ def _binned_first(photo: dict) -> tuple:
     return (photo.get("trashed_at") or "", photo["id"])
 
 
+def days_left(trashed_at, retention_days, now=None):
+    """How long a binned item has before it is erased for good, in the words Photo's own
+    screens use (daysRemaining() in page.js and PhotoTrashTab.tsx), or None if unknown."""
+    trashed = _moment(trashed_at)
+    if trashed is None or retention_days is None:
+        return None
+    if trashed.tzinfo is None:
+        trashed = trashed.replace(tzinfo=timezone.utc)
+    now = now or datetime.now(timezone.utc)
+    elapsed = (now - trashed).total_seconds() / 86400
+    remaining = max(0, math.ceil(retention_days - elapsed))
+    if remaining <= 0:
+        return "Erasing soon"
+    return f"{remaining} day{'' if remaining == 1 else 's'} left"
+
+
 def trash_view(satellite, limit=None, cursor=None) -> dict:
     photo_library = library(satellite)
     retention = configuration.trash_retention_days(satellite)
     photos = photo_library.trashed(retention)
     shown, following = page(photos, limit, cursor, key=_binned_first)
+    now = datetime.now(timezone.utc)
     items = []
     for photo in shown:
         entry = item(photo, set())
         entry["trashed"] = _epoch(_moment(photo.get("trashed_at")))
+        entry["left"] = days_left(photo.get("trashed_at"), retention, now)
         items.append(entry)
     days = "day" if retention == 1 else "days"
     return {
@@ -431,4 +474,15 @@ def trash_view(satellite, limit=None, cursor=None) -> dict:
         "next": following,
         "summary": _summary(len(photos), sum(photo.get("size") or 0 for photo in photos)),
         "note": f"Items are deleted for good {retention} {days} after they were moved here.",
+    }
+
+
+def import_view(satellite) -> dict:
+    """What the shared Import page shows: the configured default folder (pre-filled, as on
+    Photo's own page) and the formats an import takes in."""
+    formats = sorted(set(images.EXTENSIONS) | set(videos.EXTENSIONS))
+    return {
+        "directory": satellite.config.get("photo_directory", "") or "",
+        "formats": f"Takes in {', '.join(name.upper() for name in formats)} files. Originals are never moved, "
+                   "changed or deleted, and importing the same folder twice is safe.",
     }

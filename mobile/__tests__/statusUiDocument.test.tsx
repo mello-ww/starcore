@@ -129,7 +129,21 @@ describe('Status, drawn from its ui.json by the shared screen', () => {
       await tree.root.findByType(RefreshControl).props.onRefresh();
     });
     expect(tree.root.findAllByProps({testID: 'ui-stale'}).length).toBeGreaterThan(0);
+    expect(texts(tree)).toContain('Offline');
     expect(texts(tree)).toContain('CPU'); // the last reading is still there
+  });
+
+  it('does not call an error answer offline', async () => {
+    const {tree} = await mount({params: {name: 'Status', revision: 'rev1'}});
+    const {ApiError} = require('../src/api/types');
+    __mocks.read.mockRejectedValue(new ApiError('Something broke on the server.', 500));
+    const {RefreshControl} = require('react-native');
+    await act(async () => {
+      await tree.root.findByType(RefreshControl).props.onRefresh();
+    });
+    expect(tree.root.findAllByProps({testID: 'ui-stale'}).length).toBeGreaterThan(0);
+    expect(texts(tree)).toContain('Not refreshed');
+    expect(texts(tree)).not.toContain('Offline');
   });
 
   it('says so, with a way to try again, when the first reading fails', async () => {

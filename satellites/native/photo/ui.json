@@ -1,5 +1,5 @@
 {
-  "_about": "Photo's shared interface (UI contract 1.2): the library and albums in the shared media-grid and viewer. A preview: both clients keep opening Photo's own screens, and Developer Mode shows this one beside them, until it reaches parity (docs/satellites/photo.md, \"Shared interface\"). Search, Map, upload and import, phone sync, settings and the Locked Folder stay on those screens. It binds to the read-only gallery routes (gallery.py); every action goes to Photo's existing routes.",
+  "_about": "Photo's shared interface (UI contract 1.2): Library, Albums, Search, Map, the recycle bin and import from a server folder, in the shared media-grid, viewer, search and map. A preview: both clients keep opening Photo's own screens, and Developer Mode shows this one beside them, until it reaches parity (docs/satellites/photo.md, \"Shared interface\"). Phone sync, settings, moving to the Locked Folder and the Locked Folder itself stay on Photo's own screens. It binds to the read-only gallery routes (gallery.py); every action goes to Photo's existing routes.",
   "contract": "starcore.ui/1.2",
   "preview": true,
   "title": "Photos",
@@ -15,13 +15,14 @@
       "source": {"route": "gallery?limit=120"},
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary"},
+        {"type": "button", "label": "Import from a folder", "style": "secondary", "action": {"navigate": "import"}},
         {
           "type": "media-grid",
           "id": "library",
           "items": "$.items",
           "more": {"route": "gallery?limit=120&cursor={$value}", "cursor": "$.next"},
           "size": "medium",
-          "empty": "No photos yet. Import some, or turn on phone sync, from Photo's own page.",
+          "empty": "No photos yet. Import a folder, or turn on phone sync in Photo's settings.",
           "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration", "group": "$.month"},
           "viewer": {
             "image": "originals/{$.id}",
@@ -199,7 +200,7 @@
           "more": {"route": "gallery/albums/{$params.id}?limit=120&cursor={$value}", "cursor": "$.next"},
           "size": "medium",
           "empty": "This album is empty.",
-          "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration", "group": "$.month"},
+          "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration"},
           "viewer": {
             "image": "originals/{$.id}",
             "video": "originals/{$.id}",
@@ -247,6 +248,35 @@
         }
       ]
     },
+    "import": {
+      "title": "Import from a folder",
+      "source": {"route": "gallery/import"},
+      "blocks": [
+        {"type": "text", "style": "caption", "text": "$.formats"},
+        {
+          "type": "card",
+          "title": "Check a folder",
+          "blocks": [
+            {"type": "text", "style": "caption", "text": "Counts what a folder holds and what is new, without importing anything."},
+            {"type": "form",
+             "fields": [{"key": "source", "label": "Folder on the StarCore server", "kind": "text", "value": "$.directory",
+                         "placeholder": "/absolute/path", "required": true}],
+             "submit": {"label": "Check", "action": {"route": "scan", "body": {"source": "$form.source"}}}}
+          ]
+        },
+        {
+          "type": "card",
+          "title": "Import a folder",
+          "blocks": [
+            {"type": "text", "style": "caption", "text": "Copies the folder's photos and videos into the library."},
+            {"type": "form",
+             "fields": [{"key": "source", "label": "Folder on the StarCore server", "kind": "text", "value": "$.directory",
+                         "placeholder": "/absolute/path", "required": true}],
+             "submit": {"label": "Import", "action": {"route": "import", "body": {"source": "$form.source"}}}}
+          ]
+        }
+      ]
+    },
     "trash": {
       "title": "Recycle bin",
       "source": {"route": "gallery/trash?limit=120"},
@@ -259,7 +289,7 @@
           "more": {"route": "gallery/trash?limit=120&cursor={$value}", "cursor": "$.next"},
           "size": "medium",
           "empty": "The recycle bin is empty.",
-          "item": {"image": "trash/{$.id}/thumbnail", "key": "$.id", "kind": "$.kind", "duration": "$.duration"},
+          "item": {"image": "trash/{$.id}/thumbnail", "key": "$.id", "kind": "$.kind", "duration": "$.duration", "subtitle": "$.left"},
           "viewer": {
             "image": "trash/{$.id}/original",
             "video": "trash/{$.id}/original",
@@ -267,6 +297,7 @@
             "subtitle": "$.date",
             "fields": [
               {"label": "Moved here", "value": "$.trashed", "format": "datetime"},
+              {"label": "Remaining", "value": "$.left"},
               {"label": "Taken", "value": "$.taken", "format": "datetime"},
               {"label": "Size", "value": "$.size", "format": "bytes"},
               {"label": "File", "value": "$.title"}
