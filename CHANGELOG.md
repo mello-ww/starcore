@@ -65,6 +65,16 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   `audio.library` provider finds, through the client's audio host. Both clients now offer the
   `media.audio` client capability, so any Satellite can play audio without naming the one that
   provides it.
+- **Scalable media gallery: server paging and Android virtualization.** A media-grid can page
+  through its provider (`more`, with the provider's own cursor): one page at a time, stale pages
+  dropped, loading and error states with retry, a refresh that reloads as many pages as were
+  loaded, and a selection and viewer that work across pages. On Android a grid that is a page's
+  main content is now a virtualized list (memory measured flat at about 130-200 MB while
+  scrolling through thousands of items on the emulator); the web draws the grid in chunks the
+  browser skips off screen. A map can load what is on screen (`viewport`), with the provider's
+  own clusters. Photo's lists take `limit` and `cursor` (stable keyset paging; without them they
+  answer everything, as before), its map answers by area with bounded clusters, and its
+  `media.gallery` list pages for the picker.
 - **UI contract 1.2: `search` and `map` blocks.** A search field bound to page state (results
   reload as the person types, and the field keeps its focus), and located items on an
   interactive map with clusters that stay a handful of markers for thousands of items, opening

@@ -1,7 +1,7 @@
-import React, {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {memo, useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react';
 import {
-  AccessibilityInfo, Animated, FlatList, Image, Modal, Pressable, ScrollView, StatusBar, StyleSheet, Text,
-  useWindowDimensions, View,
+  AccessibilityInfo, ActivityIndicator, Animated, FlatList, Image, Modal, Pressable, ScrollView, StatusBar, StyleSheet,
+  Text, useWindowDimensions, View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import Video from 'react-native-video';
@@ -79,14 +79,58 @@ interface Entry {
 
 type Row = {kind: 'group'; label: string; id: string} | {kind: 'tiles'; entries: Entry[]; id: string};
 
-export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+/** What a grid holds: its page data's items, the pages loaded after them through `more`, and
+ * the provider's cursor for the next. Kept in a ref so a page arriving late can be dropped. */
+interface Paging {
+  base: any[] | null;
+  collection: string | null;
+  extra: any[];
+  cursor: string | null;
+  loading: boolean;
+  error: string | null;
+  token: number;
+  depth: number;
+}
+
+/** The heights a virtualized grid lays its rows out with. */
+const GROUP_HEIGHT = 40;
+const TEXT_HEIGHT = 40;
+
+export interface MediaGridModel {
+  block: UiBlock;
+  entries: Entry[];
+  rows: Row[];
+  /** [offset, length] of each row, for a FlatList's getItemLayout. */
+  layout: Array<[number, number]>;
+  columns: number;
+  cursor: string | null;
+  loading: boolean;
+  error: string | null;
+  loadMore: () => void;
+  renderRow: (row: Row) => React.ReactElement;
+  /** The select button above the grid, when the block offers a selection. */
+  head: React.ReactElement | null;
+  /** Loading, error and retry under the grid. */
+  foot: React.ReactElement | null;
+  /** The viewer, when it is open. */
+  viewer: React.ReactElement | null;
+  empty: string | null;
+}
+
+/**
+ * Everything a media-grid is, apart from where its rows are drawn: paging through `more`
+ * (stale pages dropped, a refresh reloading as many pages as were loaded), the selection
+ * (kept across pages, and pruned only once everything is loaded again), the viewer, rows.
+ */
+export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext, shown = Infinity): MediaGridModel {
   const {width: windowWidth} = useWindowDimensions();
   const {color: accent, onColor} = useAccent();
   const reduced = useReducedMotion();
   const item = (block.item ?? {}) as Record<string, any>;
   const formats = (item.format ?? {}) as Record<string, string>;
   // the screen's context is a new object every render: depend only on its stable functions
-  const {mediaSource, runAction, onNearEnd, setOverlay} = context;
+  const {mediaSource, runAction, setOverlay, load} = context;
+  const [version, bump] = useReducer((value: number) => value + 1, 0);
 
   const source = useCallback(
     (template: unknown, itemScope: Scope): Source | null => {
@@ -99,63 +143,144 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
     [mediaSource],
   );
 
+  // ---------- paging ----------
+  const more = block.more as {route?: string; cursor?: string} | undefined;
   const resolved = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
-  const items: any[] = Array.isArray(resolved) ? resolved : [];
+  const base: any[] = Array.isArray(resolved) ? resolved : EMPTY;
+  const paging = useRef<Paging>({base: null, collection: null, extra: [], cursor: null, loading: false, error: null, token: 0, depth: 0});
+  const pg = paging.current;
+  let changedCollection = false;
+  if (pg.base !== base) {
+    // new page data (first load, a refresh, another filter): what the grid holds starts again
+    const collection = more?.route ? resolveTemplate(more.route, {...scope, value: ''}) : null;
+    const same = pg.base !== null && collection === pg.collection;
+    changedCollection = !same;
+    pg.depth = same ? pg.extra.length : 0;
+    pg.base = base;
+    pg.collection = collection;
+    pg.extra = [];
+    pg.token += 1;
+    pg.loading = false;
+    pg.error = null;
+    const first = more?.cursor !== undefined ? resolve(more.cursor, scope) : null;
+    pg.cursor = present(first) ? String(first) : null;
+  }
+
+  const keyOf = useCallback(
+    (value: any, index: number) => {
+      const key = item.key !== undefined ? resolve(item.key, {...scope, data: value}) : null;
+      return present(key) ? String(key) : `#${index}`;
+    },
+    [item.key, scope.page, scope.state],
+  );
+
   const entries: Entry[] = useMemo(
     () =>
-      items.map((value, index) => {
+      pg.base!.concat(pg.extra).map((value, index) => {
         const itemScope = {...scope, data: value};
-        const key = item.key !== undefined ? resolve(item.key, itemScope) : null;
         return {
           item: value,
-          key: present(key) ? String(key) : `#${index}`,
+          key: keyOf(value, index),
           index,
           scope: itemScope,
           kind: mediaKind(item.kind !== undefined ? resolve(item.kind, itemScope) : 'image'),
           thumb: source(item.image, itemScope),
         };
       }),
-    [resolved, scope.page, scope.state, source],
+    [base, version, scope.page, scope.state, source, keyOf],
   );
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
 
-  const [shown, setShown] = useState(GRID_PAGE);
-  // the media picker (media.picker): every tile selects, one at a time unless `multiple`
+  const loadMore = useCallback(() => {
+    const state = paging.current;
+    if (!more?.route || !state.cursor || state.loading || !load) {
+      return;
+    }
+    const token = state.token;
+    const route = resolveTemplate(more.route, {...scope, value: state.cursor});
+    state.loading = true;
+    state.error = null;
+    bump();
+    (isSafeRoute(route) ? load(route) : Promise.reject(new Error('That page points outside its Satellite.')))
+      .then(data => {
+        if (token !== paging.current.token) {
+          return; // the data changed while this page was on its way
+        }
+        const pageScope = {...scope, data: data ?? {}, page: data ?? {}};
+        const listed = resolve(block.items, pageScope);
+        const known = new Set(entriesRef.current.map(entry => entry.key));
+        const offset = entriesRef.current.length;
+        // a provider's cursor never repeats an item; this keeps a broken one from doing so
+        const fresh = (Array.isArray(listed) ? listed : []).filter((value, index) => {
+          const key = keyOf(value, offset + index);
+          return key.startsWith('#') || !known.has(key);
+        });
+        const next = more.cursor !== undefined ? resolve(more.cursor, pageScope) : null;
+        state.extra = state.extra.concat(fresh);
+        state.cursor = present(next) && String(next) !== state.cursor ? String(next) : null;
+        state.loading = false;
+        bump();
+      })
+      .catch((err: any) => {
+        if (token === paging.current.token) {
+          state.loading = false;
+          state.error = err?.message || 'The next items could not be loaded.';
+          bump();
+        }
+      });
+  }, [more?.route, more?.cursor, load, block.items, keyOf, scope.page, scope.state]);
+
+  // a refresh: back to as many pages as were loaded, so the grid stays where it was
+  useEffect(() => {
+    if (pg.depth > pg.extra.length && pg.cursor && !pg.loading && !pg.error) {
+      loadMore();
+    }
+  });
+
+  // ---------- selection ----------
   const picking = context.picking;
   const pickingRef = useRef(picking);
   pickingRef.current = picking;
   const multiplePick = picking ? picking.multiple : true;
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Map<string, any>>(new Map());
   const [selecting, setSelecting] = useState(Boolean(picking));
   const [viewerKey, setViewerKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // the next page arrives as the screen scrolls near its end
-  const total = entries.length;
+  // another collection (a filter): the selection starts again
   useEffect(() => {
-    if (shown >= total || !onNearEnd) {
+    if (changedCollection) {
+      setSelected(current => (current.size ? new Map() : current));
+      if (!pickingRef.current) {
+        setSelecting(false);
+      }
+    }
+  });
+  // a selection keeps fresh data for what is still there, once everything loaded is loaded again
+  useEffect(() => {
+    if (pg.depth > pg.extra.length && pg.cursor) {
       return;
     }
-    return onNearEnd(() => setShown(current => (current < total ? current + GRID_PAGE : current)));
-  }, [onNearEnd, shown, total]);
-
-  // a selection only keeps what is still there
-  useEffect(() => {
     setSelected(current => {
-      const keys = new Set(entries.map(entry => entry.key));
-      const kept = [...current].filter(key => keys.has(key));
-      return kept.length === current.size ? current : new Set(kept);
+      if (!current.size) {
+        return current;
+      }
+      const byKey = new Map(entries.map(entry => [entry.key, entry.item]));
+      const kept = new Map([...current.keys()].filter(key => byKey.has(key)).map(key => [key, byKey.get(key)]));
+      return kept.size === current.size && [...kept].every(([key, value]) => current.get(key) === value) ? current : kept;
     });
-  }, [entries]);
+  }, [entries, pg]);
 
   const toggle = useCallback(
     (key: string) => {
       setSelecting(true);
       setSelected(current => {
-        const next = new Set(multiplePick ? current : []);
+        const next = new Map(multiplePick ? current : []);
         if (current.has(key)) {
           next.delete(key);
         } else {
-          next.add(key);
+          next.set(key, entriesRef.current.find(entry => entry.key === key)?.item);
         }
         return next;
       });
@@ -165,33 +290,34 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
 
   // the picker hears what is chosen
   useEffect(() => {
-    pickingRef.current?.onChange(entries.filter(entry => selected.has(entry.key)).map(entry => entry.item));
-  }, [selected, entries]);
+    pickingRef.current?.onChange([...selected.values()]);
+  }, [selected]);
 
   const clearSelection = useCallback(() => {
-    setSelected(new Set());
+    setSelected(new Map());
     setSelecting(false);
   }, []);
 
   const runOnSelection = useCallback(
     async (action: UiAction) => {
-      const chosen = entries.filter(entry => selected.has(entry.key));
+      // everything selected, on whichever loaded page it is
+      const chosen = [...selected.values()].map(value => ({...scope, data: value}));
       if (!chosen.length || !action) {
         return;
       }
       if (action.navigate || action.play) {
-        runAction(action, chosen[0].scope);
+        runAction(action, chosen[0]);
         return;
       }
-      const first = {...chosen[0].scope, value: chosen.length};
+      const first = {...chosen[0], value: chosen.length};
       if (action.confirm && context.confirm && !(await context.confirm(asText(resolve(action.confirm, first))))) {
         return;
       }
       setBusy(true);
       const single: UiAction = {...action, confirm: undefined, then: undefined};
       let failed = 0;
-      for (const entry of chosen) {
-        if (!(await runAction(single, entry.scope, undefined, {quiet: true}))) {
+      for (const itemScope of chosen) {
+        if (!(await runAction(single, itemScope, undefined, {quiet: true}))) {
           failed += 1;
         }
       }
@@ -199,7 +325,7 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
       clearSelection();
       context.afterSelection?.(action.then, failed, chosen.length);
     },
-    [entries, selected, context, runAction, clearSelection],
+    [selected, scope, context, runAction, clearSelection],
   );
 
   // the selection bar floats over the screen's bottom edge, above the player. It is rebuilt
@@ -237,12 +363,14 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
   }, [setOverlay, selectionBar]);
   useEffect(() => () => setOverlay?.(null), [setOverlay]);
 
+  // ---------- rows ----------
   const size = typeof block.size === 'string' ? block.size : 'medium';
   const shape = typeof block.shape === 'string' ? block.shape : 'square';
   const available = Math.min(windowWidth - space.lg * 2, 1200);
   const columns = gridColumns(available, size);
   const cell = Math.floor((available - GAP * (columns - 1)) / columns);
   const aspect = shape === 'wide' ? 16 / 9 : 1;
+  const hasText = item.title !== undefined || item.subtitle !== undefined;
 
   const rows: Row[] = useMemo(() => {
     const out: Row[] = [];
@@ -254,7 +382,7 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
         row = [];
       }
     };
-    for (const entry of entries.slice(0, shown)) {
+    for (const entry of shown < entries.length ? entries.slice(0, shown) : entries) {
       if (item.group !== undefined) {
         const raw = resolve(item.group, entry.scope);
         const next = present(raw) ? formatValue(raw, formats.group) : '';
@@ -275,6 +403,17 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
     return out;
   }, [entries, shown, columns, item.group, formats.group]);
 
+  const layout = useMemo(() => {
+    const tileHeight = Math.round(cell / aspect) + GAP + (hasText ? TEXT_HEIGHT : 0);
+    let offset = 0;
+    return rows.map(row => {
+      const length = row.kind === 'group' ? GROUP_HEIGHT : tileHeight;
+      const at: [number, number] = [offset, length];
+      offset += length;
+      return at;
+    });
+  }, [rows, cell, aspect, hasText]);
+
   const opens = Boolean(picking || block.viewer || block.action || block.selection);
   const onPress = useCallback(
     (entry: Entry) => {
@@ -291,74 +430,209 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
     [picking, block.selection, block.viewer, block.action, selecting, toggle, runAction],
   );
 
-  if (!entries.length) {
-    const empty = block.empty !== undefined ? resolve(block.empty, scope) : null;
-    return <Text style={type.caption}>{present(empty) ? String(empty) : 'Nothing here.'}</Text>;
-  }
+  const renderRow = (row: Row) =>
+    row.kind === 'group' ? (
+      <Text key={row.id} style={styles.group} accessibilityRole="header" numberOfLines={1}>
+        {row.label}
+      </Text>
+    ) : (
+      <View key={row.id} style={styles.row}>
+        {row.entries.map(entry => (
+          <Tile
+            key={entry.key}
+            entry={entry}
+            size={cell}
+            textHeight={hasText ? TEXT_HEIGHT : 0}
+            aspect={aspect}
+            round={shape === 'round'}
+            title={item.title !== undefined ? asText(resolve(item.title, entry.scope)) : ''}
+            subtitle={item.subtitle !== undefined ? resolve(item.subtitle, entry.scope) : null}
+            subtitleFormat={formats.subtitle}
+            duration={item.duration !== undefined ? resolve(item.duration, entry.scope) : null}
+            selectable={Boolean(block.selection || picking)}
+            selecting={selecting}
+            selected={selected.has(entry.key)}
+            accent={accent}
+            onAccent={onColor}
+            reduced={reduced}
+            onPress={opens ? onPress : undefined}
+            onLongPress={block.selection || picking ? toggle : undefined}
+          />
+        ))}
+      </View>
+    );
 
+  const head =
+    block.selection && !selecting ? (
+      <Pressable
+        onPress={() => setSelecting(true)}
+        accessibilityRole="button"
+        style={({pressed}) => [styles.selectButton, pressed && styles.pressed]}>
+        <Text style={styles.pillLabel}>Select</Text>
+      </Pressable>
+    ) : null;
+
+  const foot = pg.error ? (
+    <View style={styles.foot} testID="media-grid-error">
+      <Text style={type.caption}>{pg.error}</Text>
+      <ActionPill entry={{label: 'Try again'}} scope={scope} onPress={loadMore} />
+    </View>
+  ) : pg.loading ? (
+    <View style={styles.foot} testID="media-grid-loading">
+      <ActivityIndicator color={accent} />
+    </View>
+  ) : null;
+
+  const viewer =
+    block.viewer && viewerKey !== null ? (
+      <MediaViewer
+        block={block}
+        entries={entries}
+        startKey={viewerKey}
+        context={context}
+        source={source}
+        reduced={reduced}
+        more={Boolean(pg.cursor)}
+        onEnd={loadMore}
+        onClose={() => setViewerKey(null)}
+      />
+    ) : null;
+
+  const emptyText = block.empty !== undefined ? resolve(block.empty, scope) : null;
+  return {
+    block,
+    entries,
+    rows,
+    layout,
+    columns,
+    cursor: pg.cursor,
+    loading: pg.loading,
+    error: pg.error,
+    loadMore,
+    renderRow,
+    head,
+    foot,
+    viewer,
+    empty: entries.length ? null : present(emptyText) ? String(emptyText) : 'Nothing here.',
+  };
+}
+
+const EMPTY: any[] = [];
+
+/** A media-grid drawn in place, inside a page that scrolls as a whole (a card, the picker's
+ * old layout, a page with more than one grid): its tiles are revealed a page at a time as the
+ * screen nears its end, and its next page loads when all are shown. */
+export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const [shown, setShown] = useState(GRID_PAGE);
+  const model = useMediaGrid(block, scope, context, shown);
+  const {onNearEnd} = context;
+  const total = model.entries.length;
+  const latest = useRef(model);
+  latest.current = model;
+  useEffect(() => {
+    if (!onNearEnd || (shown >= total && !model.cursor)) {
+      return;
+    }
+    return onNearEnd(() => {
+      if (shown < latest.current.entries.length) {
+        setShown(current => current + GRID_PAGE);
+      } else {
+        latest.current.loadMore();
+      }
+    });
+  }, [onNearEnd, shown, total, model.cursor]);
+
+  if (model.empty !== null) {
+    return <Text style={type.caption}>{model.empty}</Text>;
+  }
   return (
     <View style={styles.grid} testID="media-grid">
-      {block.selection && !selecting && (
-        <Pressable
-          onPress={() => setSelecting(true)}
-          accessibilityRole="button"
-          style={({pressed}) => [styles.selectButton, pressed && styles.pressed]}>
-          <Text style={styles.pillLabel}>Select</Text>
-        </Pressable>
-      )}
-      {rows.map(row =>
-        row.kind === 'group' ? (
-          <Text key={row.id} style={styles.group} accessibilityRole="header">
-            {row.label}
-          </Text>
-        ) : (
-          <View key={row.id} style={styles.row}>
-            {row.entries.map(entry => (
-              <Tile
-                key={entry.key}
-                entry={entry}
-                size={cell}
-                aspect={aspect}
-                round={shape === 'round'}
-                title={item.title !== undefined ? asText(resolve(item.title, entry.scope)) : ''}
-                subtitle={item.subtitle !== undefined ? resolve(item.subtitle, entry.scope) : null}
-                subtitleFormat={formats.subtitle}
-                duration={item.duration !== undefined ? resolve(item.duration, entry.scope) : null}
-                selectable={Boolean(block.selection || picking)}
-                selecting={selecting}
-                selected={selected.has(entry.key)}
-                accent={accent}
-                onAccent={onColor}
-                reduced={reduced}
-                onPress={opens ? onPress : undefined}
-                onLongPress={block.selection || picking ? toggle : undefined}
-              />
-            ))}
-          </View>
-        ),
-      )}
-      {block.viewer && viewerKey !== null && (
-        <MediaViewer
-          block={block}
-          entries={entries}
-          startKey={viewerKey}
-          context={context}
-          source={source}
-          reduced={reduced}
-          onClose={() => setViewerKey(null)}
-        />
-      )}
+      {model.head}
+      {model.rows.map(model.renderRow)}
+      {model.foot}
+      {model.viewer}
     </View>
   );
 }
 
+/**
+ * A media-grid that is a page's main content, as the page's own virtualized list: only the
+ * rows near the screen are mounted, so a library of any size keeps a bounded number of tiles
+ * (and their images) in memory. What the page shows above and below the grid comes in as
+ * `header` and `footer`; the next page loads as the list nears its end.
+ */
+export function VirtualMediaGrid({
+  block, scope, context, header, footer, refreshControl, contentContainerStyle, testID,
+}: {
+  block: UiBlock;
+  scope: Scope;
+  context: BlockContext;
+  header?: React.ReactElement | null;
+  footer?: React.ReactElement | null;
+  refreshControl?: React.ReactElement<any>;
+  contentContainerStyle?: any;
+  testID?: string;
+}) {
+  const model = useMediaGrid(block, scope, context);
+  const {layout} = model;
+  const getItemLayout = useCallback(
+    (_: unknown, index: number) => ({length: layout[index]?.[1] ?? 0, offset: layout[index]?.[0] ?? 0, index}),
+    [layout],
+  );
+  return (
+    <>
+      <FlatList
+        testID={testID ?? 'media-grid-list'}
+        data={model.rows}
+        keyExtractor={row => row.id}
+        renderItem={({item: row}) => model.renderRow(row)}
+        getItemLayout={getItemLayout}
+        initialNumToRender={8}
+        maxToRenderPerBatch={6}
+        updateCellsBatchingPeriod={40}
+        windowSize={7}
+        removeClippedSubviews
+        onEndReachedThreshold={1.5}
+        onEndReached={() => model.loadMore()}
+        // FlatList reports its end once per content length: after new page data of the same
+        // length (a reload), the scroll position itself says when the next page is due
+        scrollEventThrottle={100}
+        onScroll={event => {
+          const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
+          if (contentSize.height - (contentOffset.y + layoutMeasurement.height) < layoutMeasurement.height * 1.5) {
+            model.loadMore();
+          }
+        }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={refreshControl}
+        contentContainerStyle={contentContainerStyle}
+        ListHeaderComponent={
+          <View style={styles.virtualHead}>
+            {header}
+            {model.empty !== null ? <Text style={type.caption}>{model.empty}</Text> : model.head}
+          </View>
+        }
+        ListFooterComponent={
+          <View style={styles.virtualFoot}>
+            {model.foot}
+            {footer}
+          </View>
+        }
+      />
+      {model.viewer}
+    </>
+  );
+}
+
 const Tile = memo(function Tile({
-  entry, size, aspect, round, title, subtitle, subtitleFormat, duration, selectable, selecting, selected, accent,
-  onAccent, reduced, onPress, onLongPress,
+  entry, size, textHeight = 0, aspect, round, title, subtitle, subtitleFormat, duration, selectable, selecting, selected,
+  accent, onAccent, reduced, onPress, onLongPress,
 }: {
   entry: Entry; size: number; aspect: number; round: boolean; title: string; subtitle: unknown; subtitleFormat?: string;
   duration: unknown; selectable: boolean; selecting: boolean; selected: boolean; accent: string; onAccent: string;
   reduced: boolean; onPress?: (entry: Entry) => void; onLongPress?: (key: string) => void;
+  /** A fixed height for the text under the tile, so every row of a grid is as tall. */
+  textHeight?: number;
 }) {
   const [failed, setFailed] = useState(false);
   const opacity = useRef(new Animated.Value(reduced ? 1 : 0)).current;
@@ -409,8 +683,8 @@ const Tile = memo(function Tile({
           </View>
         )}
       </View>
-      {(title !== '' || present(subtitle)) && (
-        <View style={[styles.tileText, {width: size}]}>
+      {(textHeight > 0 || title !== '' || present(subtitle)) && (
+        <View style={[styles.tileText, {width: size}, textHeight > 0 && {height: textHeight}]}>
           {title !== '' && (
             <Text style={styles.tileTitle} numberOfLines={1}>
               {title}
@@ -474,10 +748,13 @@ function ActionPill({
 /** The shared full-screen viewer: swipe between items, a video plays in place (only on the
  * page shown, so swiping away stops it), facts and actions come from the document. */
 export function MediaViewer({
-  block, entries, startKey, context, source, reduced, onClose,
+  block, entries, startKey, context, source, reduced, onClose, more = false, onEnd,
 }: {
   block: UiBlock; entries: Entry[]; startKey: string; context: BlockContext;
   source: (template: unknown, scope: Scope) => Source | null; reduced: boolean; onClose: () => void;
+  /** More items come after these (the grid's next page): swiping near the end loads them. */
+  more?: boolean;
+  onEnd?: () => void;
 }) {
   const {width, height} = useWindowDimensions();
   const spec = (block.viewer ?? {}) as Record<string, any>;
@@ -513,7 +790,7 @@ export function MediaViewer({
   const scope = current.scope;
   const title = spec.title !== undefined ? asText(resolve(spec.title, scope)) : '';
   const subtitle = spec.subtitle !== undefined ? asText(resolve(spec.subtitle, scope)) : '';
-  const position = `${index + 1} of ${entries.length}`;
+  const position = `${index + 1} of ${entries.length}${more ? '+' : ''}`;
   const fields: any[] = (Array.isArray(spec.fields) ? spec.fields : []).filter((field: any) => present(resolve(field.value, scope)));
   const actions: any[] = (Array.isArray(spec.actions) ? spec.actions : []).filter(
     (entry: any) => entry.visible === undefined || isVisible(resolve(entry.visible, scope)),
@@ -535,6 +812,8 @@ export function MediaViewer({
           windowSize={3}
           initialNumToRender={1}
           maxToRenderPerBatch={2}
+          onEndReachedThreshold={2}
+          onEndReached={() => more && onEnd?.()}
           onMomentumScrollEnd={event => {
             const at = Math.round(event.nativeEvent.contentOffset.x / width);
             if (entries[at]) {
@@ -649,9 +928,22 @@ function ViewerButton({icon, label, onPress, active}: {icon: string; label: stri
 }
 
 const styles = StyleSheet.create({
-  grid: {gap: GAP},
-  row: {flexDirection: 'row', gap: GAP},
-  group: {...type.caption, color: palette.text2, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: space.md, marginBottom: space.xs},
+  grid: {},
+  virtualHead: {gap: space.md, marginBottom: space.md},
+  virtualFoot: {gap: space.md, marginTop: space.md},
+  foot: {alignItems: 'center', gap: space.sm, paddingVertical: space.md},
+  // rows are spaced by their own padding, so a virtualized list knows each row's height
+  row: {flexDirection: 'row', gap: GAP, paddingBottom: GAP},
+  group: {
+    ...type.caption,
+    height: GROUP_HEIGHT,
+    paddingBottom: space.xs,
+    textAlignVertical: 'bottom',
+    color: palette.text2,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   frame: {
     overflow: 'hidden',
     alignItems: 'center',

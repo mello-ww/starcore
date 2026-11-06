@@ -197,7 +197,8 @@ GET  /api/satellites/photo/gallery/albums/<id>   one album's photos, for the sha
 GET  /api/satellites/photo/gallery/trash      the recycle bin, for the shared gallery
 GET  /api/satellites/photo/media?kinds=       media.gallery's list: what a media picker may offer
 GET  /api/satellites/photo/gallery/search?q=&kind=   photos and albums matching a search, for the shared Search page
-GET  /api/satellites/photo/gallery/map        every photo with a location, for the shared Map page
+GET  /api/satellites/photo/gallery/map        every photo with a location, for the shared Map page;
+                                               ?overview=1 its count and bounds only; ?bbox=&zoom= what is in an area
 GET  /api/satellites/photo/trash              what's in the recycle bin, and its retention period
 POST /api/satellites/photo/trash/<id>         move an active photo to the recycle bin
 GET  /api/satellites/photo/trash/<id>/thumbnail   preview a trashed photo's thumbnail
@@ -301,13 +302,44 @@ display: the month a photo belongs to, its dimensions and camera as text, whethe
 favourite. Every action goes to the routes above, unchanged (`albums/favorites/photos`,
 `trash/<id>`, `albums/<id>/...`); no route or storage format changed.
 
+## Large libraries
+
+Every list the shared interface and the media picker read - `gallery`, `gallery/search`,
+`gallery/albums/<id>`, `gallery/trash` and `media` - takes an optional `limit` (1-500) and
+`cursor`, and then answers one page with the cursor of the next in `next` (null at the end).
+Without `limit` it answers everything, as it always did, so older clients are unaffected. The
+cursor is the last photo's place in a fixed order - newest first, then by id (the recycle bin:
+most recently binned first) - not a page number, so a photo added or removed between two pages
+never makes another appear twice or go missing. A `limit` or `cursor` that can't be used is a
+400. Albums are listed newest first in the shared interface, like the library.
+
+The map pages differently, because clustering needs every point of an area: `gallery/map?overview=1`
+answers only the count and bounds of the located photos, and `gallery/map?bbox=s,w,n,e&zoom=z`
+the photos in that area - one by one up to 300, and beyond that one cluster per cell of a grid
+about 64 px wide at that zoom, with its count, bounds and newest photo as its cover. Nothing in
+the area is left out: the counts add up. `gallery/map` alone still answers every located photo.
+
+Measured on an isolated demo with 50,000 photos (Windows, Python 3.14, the development machine):
+
+| | Time | Size |
+| --- | --- | --- |
+| `gallery` without `limit` (what older clients read) | 1.9 s | 24 MB |
+| `gallery?limit=120`, first or later page | ~115 ms | 59 KB |
+| `media?limit=200` (the picker) | ~90 ms | 30 KB |
+| `gallery/map` without parameters | 0.44 s | 8.7 MB |
+| `gallery/map?bbox=…&zoom=4` (all of Europe, 15,000 located photos) | ~125 ms | 1.9 KB, 6 markers |
+| a walk through all 99 pages of 500 | 11 s | 49,500 items, none twice, same order |
+
+Each page sorts the library, which is most of those ~115 ms; Photo's own Android screen, which
+reads the whole library at once, did not finish loading it on the emulator within a minute.
+
 ## Media picker provider
 
 Photo provides the `media.gallery` capability (`satellite.toml`), so any interface can let a
 person choose from the library through the client's media picker without naming Photo (the
 `pick` action in [docs/ui-contract.md](../ui-contract.md)):
 
-- `list` is `GET media?kinds=image,video`: the active library, newest first, with an id, kind,
+- `list` is `GET media?kinds=image,video[&limit=N&cursor=C]`: the active library, newest first, with an id, kind,
   title, duration and month - never a path. A photo in the recycle bin is not listed, and
   nothing in the Locked Folder ever is (it never enters this library, and the Locked Folder
   provides no capability). Like every route, it answers signed-in sessions only.

@@ -147,6 +147,8 @@ export function mount(context) {
     // the media-grid block and its viewer (1.2), which keep their own state across renders
     const gallery = createGallery({
         satelliteBase,
+        // a grid's next page (`more`), from the Satellite's own route, with this session
+        load: (route) => requestJson(`${satelliteBase}/${route}`),
         runAction: (...args) => runAction(...args),
         setNotice: (...args) => setNotice(...args),
         afterSelection: (then) => {
@@ -162,7 +164,10 @@ export function mount(context) {
 
     // the map block (1.2): its Leaflet map lives across renders, and its markers open the
     // gallery's shared viewer
-    const maps = createMaps({ satelliteBase, runAction: (...args) => runAction(...args), gallery });
+    const maps = createMaps({
+        satelliteBase, runAction: (...args) => runAction(...args), gallery,
+        load: (route) => requestJson(`${satelliteBase}/${route}`),
+    });
     // the search block (1.2): one input per block, kept across renders so typing is never lost
     let searchInputs = new WeakMap();
     const SEARCH_PAUSE = 300;

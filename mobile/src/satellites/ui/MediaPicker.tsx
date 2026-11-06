@@ -1,9 +1,9 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {ActivityIndicator, Modal, Pressable, ScrollView, StatusBar, StyleSheet, Text, View} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {ActivityIndicator, Modal, Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {tokens, useAccent} from '../../theme';
 import {isSafeRoute, type CapabilityProvider} from './contract';
-import {mediaKind, MediaGridBlock} from './MediaGrid';
+import {mediaKind, VirtualMediaGrid} from './MediaGrid';
 import type {BlockContext} from './UiBlocks';
 
 const {palette, space, type, radii} = tokens;
@@ -36,15 +36,20 @@ export function references(provider: CapabilityProvider, capability: string, ite
   return items.map(item => ({provider: provider.satellite, capability, id: String(item.id), kind: mediaKind(item.kind)}));
 }
 
-/** The provider's `list` route for these kinds, or null when it isn't a safe route. */
-export function listRoute(provider: CapabilityProvider, kinds?: string[]): string | null {
+/** What the picker asks a provider for at a time (media.gallery's optional paging). */
+export const PICK_PAGE = 200;
+
+/** The provider's `list` route for these kinds, or null when it isn't a safe route. With
+ * `paged`, it asks for PICK_PAGE at a time; a provider without paging answers everything. */
+export function listRoute(provider: CapabilityProvider, kinds?: string[], paged = false): string | null {
   const route = provider.operations?.list;
   if (!route || !isSafeRoute(route)) {
     return null;
   }
   const wanted = (kinds && kinds.length ? kinds : ['image', 'video']).filter(kind => kind === 'image' || kind === 'video');
   // the comma is encoded: a route stays within the contract's URL-safe characters
-  return `${route}${route.includes('?') ? '&' : '?'}kinds=${wanted.join('%2C')}`;
+  const listed = `${route}${route.includes('?') ? '&' : '?'}kinds=${wanted.join('%2C')}`;
+  return paged ? `${listed}&limit=${PICK_PAGE}` : listed;
 }
 
 export function MediaPicker({
@@ -58,14 +63,13 @@ export function MediaPicker({
 }) {
   const {color: accent, onColor} = useAccent();
   const {provider, capability, kinds, multiple, title, resolve} = request;
-  const [items, setItems] = useState<any[] | null>(null);
+  const [data, setData] = useState<{items: any[]; next?: unknown} | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [chosen, setChosen] = useState<any[]>([]);
-  const listeners = useRef(new Set<() => void>()).current;
   const thumbnail = provider.operations?.thumbnail;
+  const route = listRoute(provider, kinds, true);
 
   useEffect(() => {
-    const route = listRoute(provider, kinds);
     if (!route || !thumbnail || !isSafeRoute(thumbnail)) {
       setError(`${provider.satellite} doesn't offer anything to choose from.`);
       return;
@@ -77,36 +81,30 @@ export function MediaPicker({
         if (!cancelled) {
           // a provider answers for the kinds asked; the picker never offers another kind
           const listed = Array.isArray(payload?.items) ? payload.items : [];
-          setItems(listed.filter((item: any) => item && item.id !== undefined && accepted.has(mediaKind(item.kind))));
+          setData({...payload, items: listed.filter((item: any) => item && item.id !== undefined && accepted.has(mediaKind(item.kind)))});
         }
       })
       .catch((err: any) => !cancelled && setError(err?.message || 'Could not load what there is to choose from.'));
     return () => {
       cancelled = true;
     };
-  }, [provider, kinds, thumbnail, read]);
+  }, [provider, kinds, thumbnail, read, route]);
 
   const block = useMemo(
     () => ({
       type: 'media-grid',
-      items: items ?? [],
+      items: '$.items',
       size: 'medium',
       empty: 'There is nothing to choose from yet.',
       item: {image: `${thumbnail}/{$.id}`, key: '$.id', kind: '$.kind', duration: '$.duration', group: '$.group'},
+      // the provider's next page as the list nears its end (media.gallery's paging)
+      more: {route: `${route}&cursor={$value}`, cursor: '$.next'},
     }),
-    [items, thumbnail],
+    [thumbnail, route],
   );
-  const scope = useMemo(() => ({data: {}, page: {}, params: {}}), []);
-  const providerSource = useCallback((route: string) => mediaSource(provider.satellite, route), [mediaSource, provider.satellite]);
-  const onNearEnd = useCallback(
-    (listener: () => void) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    [listeners],
-  );
+  const scope = useMemo(() => ({data: data ?? {}, page: data ?? {}, params: {}}), [data]);
+  const providerSource = useCallback((itemRoute: string) => mediaSource(provider.satellite, itemRoute), [mediaSource, provider.satellite]);
+  const load = useCallback((pageRoute: string) => read(provider.satellite, pageRoute), [read, provider.satellite]);
   const picking = useMemo(() => ({multiple, onChange: setChosen}), [multiple]);
   const context: BlockContext = useMemo(
     () => ({
@@ -117,10 +115,10 @@ export function MediaPicker({
       forms: {},
       setEditing: () => {},
       mediaSource: providerSource,
-      onNearEnd,
+      load,
       picking,
     }),
-    [read, providerSource, onNearEnd, picking],
+    [read, providerSource, load, picking],
   );
 
   const cancel = () => resolve(null);
@@ -143,23 +141,15 @@ export function MediaPicker({
             <Icon name="x" size={20} color={palette.text} />
           </Pressable>
         </View>
-        <ScrollView
-          contentContainerStyle={styles.body}
-          scrollEventThrottle={100}
-          onScroll={event => {
-            const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
-            if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 900) {
-              listeners.forEach(listener => listener());
-            }
-          }}>
+        <View style={styles.list}>
           {error ? (
-            <Text style={styles.error}>{error}</Text>
-          ) : items === null ? (
+            <Text style={[styles.error, styles.body]}>{error}</Text>
+          ) : data === null ? (
             <ActivityIndicator color={accent} style={styles.loading} />
           ) : (
-            <MediaGridBlock block={block} scope={scope} context={context} />
+            <VirtualMediaGrid block={block as any} scope={scope} context={context} contentContainerStyle={styles.body} testID="media-picker-list" />
           )}
-        </ScrollView>
+        </View>
         <View style={styles.foot}>
           <Pressable onPress={cancel} accessibilityRole="button" style={({pressed}) => [styles.pill, pressed && styles.pressed]}>
             <Text style={styles.pillLabel}>Cancel</Text>
@@ -194,6 +184,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.control,
   },
   body: {paddingHorizontal: space.lg, paddingBottom: space.xl},
+  list: {flex: 1},
   loading: {marginTop: space.xxl},
   error: {...type.body, color: palette.danger},
   foot: {

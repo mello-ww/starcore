@@ -59,21 +59,27 @@ def gallery_route(request):
         return error_response("only GET is supported here", status=405)
 
     path = tuple(request.path)
-    if path == ():
-        return json_response(gallery.library_view(request.satellite))
-    if path == ("albums",):
-        return json_response(gallery.albums_view(request.satellite))
-    if len(path) == 2 and path[0] == "albums":
-        try:
-            return json_response(gallery.album_view(request.satellite, path[1]))
-        except AlbumNotFound as error:
-            return error_response(str(error), status=404)
-    if path == ("trash",):
-        return json_response(gallery.trash_view(request.satellite))
-    if path == ("search",):
-        return json_response(gallery.search_view(request.satellite, request.query.get("q"), request.query.get("kind")))
-    if path == ("map",):
-        return json_response(gallery.map_view(request.satellite))
+    try:
+        # every list of photos may be paged (limit, cursor); without them it answers everything
+        limit, cursor = gallery.paging(request.query)
+        if path == ():
+            return json_response(gallery.library_view(request.satellite, limit, cursor))
+        if path == ("albums",):
+            return json_response(gallery.albums_view(request.satellite))
+        if len(path) == 2 and path[0] == "albums":
+            return json_response(gallery.album_view(request.satellite, path[1], limit, cursor))
+        if path == ("trash",):
+            return json_response(gallery.trash_view(request.satellite, limit, cursor))
+        if path == ("search",):
+            return json_response(gallery.search_view(request.satellite, request.query.get("q"), request.query.get("kind"),
+                                                     limit, cursor))
+        if path == ("map",):
+            return json_response(gallery.map_view(request.satellite, gallery.viewport(request.query),
+                                                  overview=request.query.get("overview") == "1"))
+    except AlbumNotFound as error:
+        return error_response(str(error), status=404)
+    except (gallery.PagingError, gallery.ViewportError) as error:
+        return error_response(str(error), status=400)
 
     return error_response(f"unknown endpoint 'gallery/{'/'.join(path)}'")
 
@@ -84,7 +90,11 @@ def media_route(request):
     if request.path:
         return error_response(f"unknown endpoint 'media/{'/'.join(request.path)}'")
 
-    return json_response(gallery.media_view(request.satellite, request.query.get("kinds")))
+    try:
+        limit, cursor = gallery.paging(request.query)
+    except gallery.PagingError as error:
+        return error_response(str(error), status=400)
+    return json_response(gallery.media_view(request.satellite, request.query.get("kinds"), limit, cursor))
 
 
 def sync_status(request):

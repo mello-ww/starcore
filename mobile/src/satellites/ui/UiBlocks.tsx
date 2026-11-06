@@ -37,6 +37,9 @@ export interface BlockContext {
   mediaSource?: (route: string) => {uri: string; headers?: Record<string, string>} | null;
   /** Form values survive a data refresh, keyed per form block. */
   forms: Record<string, Record<string, any>>;
+  /** Reads one of the Satellite's own routes with this session (1.2: a grid's next page through
+   * `more`, a map's viewport). Stable across renders. */
+  load?: (route: string) => Promise<any>;
   /** A slider or text field is being used - background refresh holds off. */
   setEditing: (editing: boolean) => void;
   /** 1.1: the page's own values (a choice's selection), and how a choice changes one. */

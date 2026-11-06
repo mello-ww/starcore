@@ -40,7 +40,7 @@ const confirm = (tree: ReturnType<typeof renderer.create>) =>
 describe('the media picker', () => {
   it('lists the accepted kinds from the provider, with its thumbnails', async () => {
     const {tree, read, mediaSource} = await open({kinds: ['image']});
-    expect(read).toHaveBeenCalledWith('Gallery', 'media?kinds=image');
+    expect(read).toHaveBeenCalledWith('Gallery', 'media?kinds=image&limit=200');
     expect(mediaSource).toHaveBeenCalledWith('Gallery', 'thumbs/a');
     expect(tree.root.findAll((node: any) => node.type === Pressable && String(node.props.testID).startsWith('media-tile-'))).toHaveLength(2);
   });
@@ -63,6 +63,37 @@ describe('the media picker', () => {
     act(() => tile(tree, 'c').props.onPress());
     act(() => confirm(tree).props.onPress());
     expect(resolve).toHaveBeenCalledWith([{provider: 'Gallery', capability: 'media.gallery', id: 'c', kind: 'image'}]);
+  });
+
+  it('pages through the provider as the list nears its end, and keeps a choice across pages', async () => {
+    const resolve = jest.fn();
+    const read = jest
+      .fn()
+      .mockResolvedValueOnce({items: [listed.items[0]], next: 'c1'})
+      .mockResolvedValueOnce({items: [listed.items[0], listed.items[2]], next: null});
+    let tree!: ReturnType<typeof renderer.create>;
+    await act(async () => {
+      tree = renderer.create(
+        <MediaPicker
+          request={{provider, capability: 'media.gallery', multiple: true, title: '', resolve}}
+          read={read}
+          mediaSource={(satellite, route) => ({uri: `https://server.test/api/satellites/${satellite}/${route}`})}
+        />,
+      );
+    });
+    act(() => tile(tree, 'a').props.onPress());
+    const list = tree.root.find((node: any) => node.props.testID === 'media-picker-list' && node.props.onEndReached);
+    await act(async () => list.props.onEndReached());
+    expect(read).toHaveBeenLastCalledWith('Gallery', 'media?kinds=image%2Cvideo&limit=200&cursor=c1');
+    // the repeated item is dropped; the new one is there; the end is reached
+    act(() => tile(tree, 'c').props.onPress());
+    await act(async () => list.props.onEndReached());
+    expect(read).toHaveBeenCalledTimes(2);
+    act(() => confirm(tree).props.onPress());
+    expect(resolve).toHaveBeenCalledWith([
+      {provider: 'Gallery', capability: 'media.gallery', id: 'a', kind: 'image'},
+      {provider: 'Gallery', capability: 'media.gallery', id: 'c', kind: 'image'},
+    ]);
   });
 
   it('resolves null on cancel, and confirms nothing while nothing is chosen', async () => {

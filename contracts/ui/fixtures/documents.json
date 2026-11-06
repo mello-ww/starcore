@@ -52,6 +52,17 @@
         }}
     },
     {
+      "name": "paged-grid-and-viewport-map",
+      "_why": "1.2: a media-grid that loads its next page from the provider's cursor, and a map that loads what is on screen (items or the provider's own clusters).",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"state": {"kind": "all"}, "source": {"route": "items?limit=120&kind={$state.kind}"}, "blocks": [
+        {"type": "media-grid", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"},
+         "more": {"route": "items?limit=120&kind={$state.kind}&cursor={$value}", "cursor": "$.next"}},
+        {"type": "map", "items": "$.items", "bounds": "$.bounds",
+         "item": {"lat": "$.lat", "lon": "$.lon", "key": "$.id", "count": "$.count", "bounds": "$.area"},
+         "viewport": {"route": "located?bbox={$value.bbox}&zoom={$value.zoom}"}}
+      ]}}}
+    },
+    {
       "name": "pick-action",
       "_why": "1.2: the client's media picker chooses from whichever Satellite provides media.gallery, then the action's route gets the references as $value.",
       "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.picker"], "capabilities": ["media.gallery"]},
@@ -260,6 +271,30 @@
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "map", "items": [], "item": {"lat": "$.lat", "lon": "$.lon"}, "viewer": {}, "action": {"navigate": "home"}}]}}},
       "error": "not both"
+    },
+    {
+      "name": "more-without-cursor",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": "$.items", "item": {"image": "t"}, "more": {"route": "items?cursor={$value}"}}]}}},
+      "error": "needs 'cursor'"
+    },
+    {
+      "name": "more-outside-its-satellite",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": "$.items", "item": {"image": "t"}, "more": {"route": "../other?cursor={$value}", "cursor": "$.next"}}]}}},
+      "error": "relative to the Satellite"
+    },
+    {
+      "name": "value-path-in-1.1",
+      "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Go", "action": {"route": "go", "body": {"zoom": "$value.zoom"}}}]}}},
+      "error": "needs starcore.ui/1.2"
+    },
+    {
+      "name": "viewport-without-route",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "map", "items": "$.items", "item": {"lat": "$.lat", "lon": "$.lon"}, "viewport": {}}]}}},
+      "error": "needs a route"
     },
     {
       "name": "pick-in-1.1",

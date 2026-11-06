@@ -104,7 +104,7 @@ FIRST_SEGMENT = re.compile(r"^[A-Za-z0-9_-]+$")
 SEGMENT = re.compile(r"^[A-Za-z0-9_.~%-]+$")
 QUERY = re.compile(r"^[A-Za-z0-9_.~%&=+-]*$")
 PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
-BINDING_ROOTS = ("$.", "$page.", "$params.", "$form.", "$state.", "$sources.")
+BINDING_ROOTS = ("$.", "$page.", "$params.", "$form.", "$state.", "$sources.", "$value.")
 BINDING_WORDS = {"$", "$value", "$page", "$params", "$form", "$state", "$sources"}
 
 
@@ -705,6 +705,23 @@ class _Validator:
             self.error(f"{where}.size", f"must be one of {sorted(IMAGE_SIZES)}")
         if "shape" in block and block["shape"] not in IMAGE_SHAPES:
             self.error(f"{where}.shape", f"must be one of {sorted(IMAGE_SHAPES)}")
+        if "more" in block:
+            self.check_more(f"{where}.more", block["more"])
+
+    def check_more(self, where: str, more):
+        """{route, cursor} (1.2): how a media-grid loads its next page. `cursor` binds into the
+        page's data - and into each further page's response, which has the same shape - to the
+        provider's cursor for what comes next (null at the end); `route` gets it as {$value}.
+        The provider owns the cursor: the client only passes it back."""
+        if not isinstance(more, dict):
+            self.error(where, "must be {route, cursor}")
+            return
+        self.unknown_keys(where, more, {"route", "cursor"})
+        self.check_route(f"{where}.route", more.get("route"))
+        if "cursor" not in more:
+            self.error(where, "needs 'cursor'")
+        else:
+            self.check_binding(f"{where}.cursor", more["cursor"])
 
     def check_search(self, where: str, block: dict):
         """{type: search, key} (1.2): a search field that sets the page state `key` as the
@@ -741,8 +758,23 @@ class _Validator:
                     self.check_text(f"{where}.item.{key}", item[key])
             if "kind" in item and item["kind"] not in MEDIA_KINDS:
                 self.check_binding(f"{where}.item.kind", item["kind"], required=True, choices=MEDIA_KINDS)
+            if "count" in item:
+                self.check_number_or_binding(f"{where}.item.count", item["count"])
+            if "bounds" in item:
+                self.check_binding(f"{where}.item.bounds", item["bounds"])
         if "viewer" in block:
             self.check_viewer(f"{where}.viewer", block["viewer"])
+        if "viewport" in block:
+            # what the map shows, loaded for the area on screen: the route gets
+            # {$value.bbox} ("south,west,north,east") and {$value.zoom}
+            viewport = block["viewport"]
+            if not isinstance(viewport, dict):
+                self.error(f"{where}.viewport", "must be {route}")
+            else:
+                self.unknown_keys(f"{where}.viewport", viewport, {"route"})
+                self.check_route(f"{where}.viewport.route", viewport.get("route"))
+        if "bounds" in block:
+            self.check_binding(f"{where}.bounds", block["bounds"])
 
     def check_viewer(self, where: str, viewer):
         """The shared full-screen viewer of a media-grid: the full image (or the tile's own
@@ -971,6 +1003,8 @@ class _Validator:
 
     def check_binding(self, where: str, value, required: bool = False, choices: set = None):
         if is_binding(value) and valid_binding(value):
+            if value.startswith("$value."):
+                self.since(where, "$value. bindings", 2)
             self.check_scope(where, value)
             return
         if required and not is_binding(value):

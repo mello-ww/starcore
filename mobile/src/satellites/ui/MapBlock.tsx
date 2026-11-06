@@ -1,5 +1,5 @@
-import React, {useCallback, useMemo, useState} from 'react';
-import {Image, StyleSheet, Text, useWindowDimensions, View} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {ActivityIndicator, Image, Pressable, StyleSheet, Text, useWindowDimensions, View} from 'react-native';
 import MapView, {Marker, type Region} from 'react-native-maps';
 import Icon from 'react-native-vector-icons/Feather';
 import {tokens, useAccent} from '../../theme';
@@ -23,7 +23,38 @@ export interface MapPoint {
   item: any;
   key: string;
   scope: Scope;
+  /** More than one: a cluster the provider made (a viewport answer), opened by zooming in. */
+  count: number;
+  area: [number, number, number, number] | null;
 }
+
+/** [south, west, north, east] from a binding's value, or null. */
+export function boundsOf(value: unknown): [number, number, number, number] | null {
+  if (!Array.isArray(value) || value.length !== 4) {
+    return null;
+  }
+  const [south, west, north, east] = value.map(Number);
+  if (![south, west, north, east].every(Number.isFinite) || south > north || Math.abs(south) > 90 || Math.abs(north) > 90 ||
+      Math.abs(west) > 180 || Math.abs(east) > 180) {
+    return null;
+  }
+  return [south, west, north, east];
+}
+
+/** What a viewport route gets as $value: the area on screen and the zoom (as the web sends). */
+export function viewportValue(region: Region): {bbox: string; zoom: number} {
+  const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit, value));
+  const round = (value: number) => Math.round(value * 1e5) / 1e5;
+  const south = clamp(round(region.latitude - region.latitudeDelta / 2), 90);
+  const north = clamp(round(region.latitude + region.latitudeDelta / 2), 90);
+  const wide = region.longitudeDelta >= 360;
+  const west = wide ? -180 : clamp(round(region.longitude - region.longitudeDelta / 2), 180);
+  const east = wide ? 180 : clamp(round(region.longitude + region.longitudeDelta / 2), 180);
+  return {bbox: [south, west, north, east].join(','), zoom: Math.max(0, Math.round(zoomFor(region.longitudeDelta)))};
+}
+
+// the map asks for what is on screen this long after it stops moving
+const VIEWPORT_PAUSE = 250;
 
 /** A valid coordinate pair, or null. */
 export function coordinates(lat: unknown, lon: unknown): [number, number] | null {
@@ -87,7 +118,9 @@ export function MapBlock({block, scope, context}: {block: UiBlock; scope: Scope;
   const {height} = useWindowDimensions();
   const {color: accent} = useAccent();
   const item = (block.item ?? {}) as Record<string, any>;
-  const {mediaSource, runAction} = context;
+  const {mediaSource, runAction, load} = context;
+  const viewport = block.viewport as {route?: string} | undefined;
+  const map = useRef<MapView>(null);
 
   const source = useCallback(
     (template: unknown, itemScope: Scope) => {
@@ -100,27 +133,101 @@ export function MapBlock({block, scope, context}: {block: UiBlock; scope: Scope;
     [mediaSource],
   );
 
-  const resolved = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
-  const points: MapPoint[] = useMemo(() => {
-    const out: MapPoint[] = [];
-    (Array.isArray(resolved) ? resolved : []).forEach((value: any, index: number) => {
-      const itemScope = {...scope, data: value};
-      const pair = coordinates(resolve(item.lat, itemScope), resolve(item.lon, itemScope));
-      if (pair) {
-        const key = item.key !== undefined ? resolve(item.key, itemScope) : null;
-        out.push({lat: pair[0], lon: pair[1], item: value, key: present(key) ? String(key) : `#${index}`, scope: itemScope});
-      }
-    });
-    return out;
-  }, [resolved, scope.page, scope.state]);
+  const locate = useCallback(
+    (listed: unknown, listScope: Scope): MapPoint[] => {
+      const out: MapPoint[] = [];
+      (Array.isArray(listed) ? listed : []).forEach((value: any, index: number) => {
+        const itemScope = {...listScope, data: value};
+        const pair = coordinates(resolve(item.lat, itemScope), resolve(item.lon, itemScope));
+        if (pair) {
+          const key = item.key !== undefined ? resolve(item.key, itemScope) : null;
+          const count = item.count !== undefined ? Number(resolve(item.count, itemScope)) : 1;
+          out.push({
+            lat: pair[0],
+            lon: pair[1],
+            item: value,
+            key: present(key) ? String(key) : `#${index}`,
+            scope: itemScope,
+            count: Number.isFinite(count) && count > 1 ? Math.round(count) : 1,
+            area: item.bounds !== undefined ? boundsOf(resolve(item.bounds, itemScope)) : null,
+          });
+        }
+      });
+      return out;
+    },
+    [item.lat, item.lon, item.key, item.count, item.bounds],
+  );
 
-  const initial = useMemo(() => (points.length ? regionFor(points) : null), [points.length === 0]);
+  const resolved = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
+  const pagePoints: MapPoint[] = useMemo(() => locate(resolved, scope), [resolved, scope.page, scope.state, locate]);
+  const bounds = block.bounds !== undefined ? boundsOf(resolve(block.bounds, scope)) : null;
+
+  // a viewport map: what is on screen, loaded as the map settles; a late answer is dropped
+  const [viewportPoints, setViewportPoints] = useState<MapPoint[]>([]);
+  const [status, setStatus] = useState<{loading: boolean; error: string | null}>({loading: false, error: null});
+  const token = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRegion = useRef<Region | null>(null);
+  const loadViewport = useCallback(
+    (region: Region) => {
+      if (!viewport?.route || !load) {
+        return;
+      }
+      lastRegion.current = region;
+      const route = resolveTemplate(viewport.route, {...scope, value: viewportValue(region)});
+      if (!isSafeRoute(route)) {
+        return;
+      }
+      const mine = ++token.current;
+      setStatus({loading: true, error: null});
+      load(route)
+        .then(data => {
+          if (mine === token.current) {
+            setViewportPoints(locate(resolve(block.items, {...scope, data: data ?? {}, page: data ?? {}}), scope));
+            setStatus({loading: false, error: null});
+          }
+        })
+        .catch((err: any) => {
+          if (mine === token.current) {
+            setStatus({loading: false, error: err?.message || 'This area could not be loaded.'});
+          }
+        });
+    },
+    [viewport?.route, load, scope, locate, block.items],
+  );
+  useEffect(
+    () => () => {
+      token.current += 1;
+      if (timer.current) {
+        clearTimeout(timer.current);
+      }
+    },
+    [],
+  );
+
+  const points = viewport ? viewportPoints : pagePoints;
+  const initial = useMemo(
+    () =>
+      bounds
+        ? regionFor([{lat: bounds[0], lon: bounds[1]}, {lat: bounds[2], lon: bounds[3]}])
+        : pagePoints.length
+          ? regionFor(pagePoints)
+          : null,
+    [bounds?.join(','), pagePoints.length === 0],
+  );
+  // the first area, once the map is there; a refresh of the page loads it again
+  useEffect(() => {
+    if (viewport && initial) {
+      loadViewport(lastRegion.current ?? initial);
+    }
+  }, [viewport, initial, scope.page, loadViewport]);
   const [zoom, setZoom] = useState(() => (initial ? zoomFor(initial.longitudeDelta) : 2));
-  const clusters = useMemo(() => clusterPoints(points, zoom), [points, zoom]);
+  const groups = useMemo(() => points.filter(point => point.count > 1), [points]);
+  const clusters = useMemo(() => clusterPoints(points.filter(point => point.count <= 1), zoom), [points, zoom]);
   // the viewer, open on one marker's items: their keys, so it follows the page's fresh data
   const [viewing, setViewing] = useState<{keys: string[]; start: string} | null>(null);
 
-  if (!points.length || !initial) {
+  if (!initial) {
     const empty = block.empty !== undefined ? resolve(block.empty, scope) : null;
     return (
       <View style={styles.notice} testID="map-empty">
@@ -151,9 +258,37 @@ export function MapBlock({block, scope, context}: {block: UiBlock; scope: Scope;
     <View testID="map">
       <MapView
         style={[styles.map, {height: Math.max(320, Math.round(height * 0.6))}]}
+        ref={map}
         initialRegion={initial}
-        onRegionChangeComplete={region => setZoom(zoomFor(region.longitudeDelta))}
+        onRegionChangeComplete={region => {
+          setZoom(zoomFor(region.longitudeDelta));
+          if (viewport) {
+            if (timer.current) {
+              clearTimeout(timer.current);
+            }
+            timer.current = setTimeout(() => loadViewport(region), VIEWPORT_PAUSE);
+          }
+        }}
         toolbarEnabled={false}>
+        {groups.map(group => (
+          <ClusterMarker
+            key={group.key}
+            lat={group.lat}
+            lon={group.lon}
+            count={group.count}
+            title=""
+            thumb={source(item.image, group.scope)}
+            accent={accent}
+            onPress={() =>
+              map.current?.animateToRegion(
+                group.area && (group.area[0] !== group.area[2] || group.area[1] !== group.area[3])
+                  ? regionFor([{lat: group.area[0], lon: group.area[1]}, {lat: group.area[2], lon: group.area[3]}])
+                  : {latitude: group.lat, longitude: group.lon, latitudeDelta: 0.05, longitudeDelta: 0.05},
+                300,
+              )
+            }
+          />
+        ))}
         {clusters.map(cluster => (
           <ClusterMarker
             key={cluster.points.map(point => point.key).join('|')}
@@ -167,6 +302,23 @@ export function MapBlock({block, scope, context}: {block: UiBlock; scope: Scope;
           />
         ))}
       </MapView>
+      {(status.loading || status.error) && (
+        <View style={styles.status} testID={status.error ? 'map-error' : 'map-loading'} accessibilityLiveRegion="polite">
+          {status.error ? (
+            <>
+              <Text style={styles.statusText}>{status.error}</Text>
+              <Pressable
+                onPress={() => lastRegion.current && loadViewport(lastRegion.current)}
+                accessibilityRole="button"
+                style={styles.retry}>
+                <Text style={styles.statusText}>Try again</Text>
+              </Pressable>
+            </>
+          ) : (
+            <ActivityIndicator size="small" color={accent} />
+          )}
+        </View>
+      )}
       {block.viewer && viewing && entries.length > 0 && (
         <MediaViewer
           block={block}
@@ -216,6 +368,20 @@ function ClusterMarker({
 
 const styles = StyleSheet.create({
   map: {width: '100%', borderRadius: radii.card, overflow: 'hidden'},
+  status: {
+    position: 'absolute',
+    top: space.md,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    borderRadius: 999,
+    backgroundColor: palette.card,
+  },
+  statusText: {...type.caption, color: palette.text},
+  retry: {paddingHorizontal: space.md, paddingVertical: 6, borderRadius: 999, backgroundColor: palette.controlStrong},
   notice: {padding: space.xl, borderRadius: radii.card, backgroundColor: palette.card},
   marker: {
     width: 44,

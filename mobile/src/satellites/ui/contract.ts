@@ -197,6 +197,8 @@ function lookup(root: any, path: string[]): any {
 
 const ROOTS: Array<[string, keyof Scope]> = [
   ['$.', 'data'], ['$page.', 'page'], ['$params.', 'params'], ['$form.', 'form'], ['$state.', 'state'], ['$sources.', 'sources'],
+  // 1.2: inside a value that is an object (a map's viewport: $value.bbox, $value.zoom)
+  ['$value.', 'value'],
 ];
 
 function resolveString(expression: string, scope: Scope): any {

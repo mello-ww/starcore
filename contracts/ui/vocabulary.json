@@ -21,9 +21,9 @@
     "code": {"required": ["value"], "optional": ["label", "copy"]},
     "image": {"required": ["src"], "optional": ["alt", "caption", "size", "shape", "fit"]},
     "media-list": {"required": ["items", "item"], "optional": ["empty", "action", "size", "shape"]},
-    "media-grid": {"required": ["items", "item"], "optional": ["empty", "action", "viewer", "selection", "size", "shape"]},
+    "media-grid": {"required": ["items", "item"], "optional": ["empty", "action", "viewer", "selection", "size", "shape", "more"]},
     "search": {"required": ["key"], "optional": ["label", "placeholder"]},
-    "map": {"required": ["items", "item"], "optional": ["empty", "action", "viewer"]}
+    "map": {"required": ["items", "item"], "optional": ["empty", "action", "viewer", "viewport", "bounds"]}
   },
   "since": {
     "_note": "The minor each block, key or format arrived in. A document that declares an older minor may not use them.",
@@ -37,7 +37,8 @@
     "1.2": {
       "blocks": ["image", "media-list", "media-grid", "search", "map"],
       "actions": ["play", "pick"],
-      "keys": ["document.preview"],
+      "keys": ["document.preview", "media-grid.more", "map.viewport", "map.bounds", "map.item.count", "map.item.bounds"],
+      "bindings": ["$value."],
       "icons": ["chevron-left", "chevron-right", "edit-2", "heart", "map-pin", "play", "rotate-ccw", "search", "trash-2", "x"],
       "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library."
     }
@@ -57,7 +58,7 @@
   "media_kinds": ["image", "video"],
   "media_grid_item_keys": ["image", "key", "title", "subtitle", "kind", "duration", "group", "format"],
   "media_viewer_keys": ["image", "video", "title", "subtitle", "fields", "actions"],
-  "map_item_keys": ["lat", "lon", "key", "image", "title", "kind"],
+  "map_item_keys": ["lat", "lon", "key", "image", "title", "kind", "count", "bounds"],
   "column_align": ["start", "end"],
   "page_templates": ["stack", "dashboard"],
   "action_then": ["refresh", "back"],
@@ -91,7 +92,7 @@
     "media.gallery": {
       "versions": [1],
       "operations": {
-        "list": "GET ?kinds=image,video -> {items: [{id, kind: image|video, title, duration, group}]}: what a person may pick, newest first",
+        "list": "GET ?kinds=image,video[&limit=N&cursor=C] -> {items: [{id, kind: image|video, title, duration, group}], next}: what a person may pick, newest first; with limit, a page and the cursor of the next (null at the end)",
         "thumbnail": "GET /<id> -> an image"
       },
       "_note": "Picked through the client's media.picker (the pick action). A pick returns references, never paths: [{provider, capability, id, kind}], where provider is the providing Satellite's name. A provider lists only what the signed-in session may see; private or protected media is never listed."

@@ -14,8 +14,17 @@ GET gallery/trash             what's in the recycle bin
 GET gallery/search?q=&kind=   photos and albums matching a search, for the shared Search page
 GET gallery/map               every photo with a location, for the shared Map page
 GET media?kinds=              the media.gallery capability's list: what a picker may offer
+
+Every list of photos also takes `limit` (1-500) and `cursor`: it then answers one page, with the
+cursor of the next in `next` (null at the end). Without `limit` it answers everything, as it
+always did. The cursor is the position of the page's last photo in a fixed order (newest first,
+then by id), not a page number: a photo added or removed between two pages never makes another
+one appear twice or go missing. The map takes `bbox` and `zoom` instead (see map_view()).
 """
 
+import base64
+import binascii
+import json
 from datetime import datetime
 
 from starcore.ui_contract import format_value
@@ -94,6 +103,69 @@ def item(photo: dict, favorites: set) -> dict:
     }
 
 
+PAGE_LIMIT = 500
+
+
+class PagingError(ValueError):
+    """A `limit` or `cursor` that can't be used: answered with 400."""
+
+
+def paging(query) -> tuple:
+    """(limit or None, cursor or None) from a request's query string."""
+    raw_limit, raw_cursor = query.get("limit"), query.get("cursor")
+    limit = None
+    if raw_limit not in (None, ""):
+        try:
+            limit = int(raw_limit)
+        except ValueError:
+            raise PagingError("'limit' must be a whole number")
+        if not 1 <= limit <= PAGE_LIMIT:
+            raise PagingError(f"'limit' must be between 1 and {PAGE_LIMIT}")
+    cursor = None
+    if raw_cursor not in (None, ""):
+        if limit is None:
+            raise PagingError("a 'cursor' needs a 'limit'")
+        try:
+            cursor = tuple(json.loads(base64.urlsafe_b64decode(raw_cursor + "=" * (-len(raw_cursor) % 4))))
+        except (ValueError, binascii.Error, TypeError):
+            raise PagingError("'cursor' is not one this list gave")
+        if len(cursor) != 2 or not all(isinstance(part, str) for part in cursor):
+            raise PagingError("'cursor' is not one this list gave")
+    return limit, cursor
+
+
+def _cursor(key: tuple) -> str:
+    return base64.urlsafe_b64encode(json.dumps(list(key), separators=(",", ":")).encode("utf-8")).decode("ascii").rstrip("=")
+
+
+def _newest_first(photo: dict) -> tuple:
+    """The fixed order every list pages through: newest first, then by id - so two photos taken
+    at the same moment always come in the same order."""
+    return (photo.get("captured_at") or photo.get("imported_at") or "", photo["id"])
+
+
+def page(photos: list, limit, cursor, key=_newest_first) -> tuple:
+    """(this page of `photos`, the next cursor or None). `photos` is sorted by `key`,
+    descending; the page starts after the cursor's position in that order (keyset paging)."""
+    ordered = sorted(photos, key=key, reverse=True)
+    if limit is None:
+        return ordered, None
+    start = 0
+    if cursor is not None:
+        # the first photo strictly after the cursor: binary search in a descending order
+        low, high = 0, len(ordered)
+        while low < high:
+            middle = (low + high) // 2
+            if key(ordered[middle]) < cursor:
+                high = middle
+            else:
+                low = middle + 1
+        start = low
+    chosen = ordered[start:start + limit]
+    more = start + limit < len(ordered)
+    return chosen, (_cursor(key(chosen[-1])) if more and chosen else None)
+
+
 def _favorites(satellite) -> set:
     album = albums(satellite).get(albums_module.FAVORITES_ID)
     return set(album["photo_ids"]) if album else set()
@@ -104,12 +176,14 @@ def _summary(count: int, size: int) -> str:
     return f"{count} {noun} · {format_value(size, 'bytes')}" if count else "No photos or videos yet"
 
 
-def library_view(satellite) -> dict:
+def library_view(satellite, limit=None, cursor=None) -> dict:
     photo_library = library(satellite)
     favorites = _favorites(satellite)
     photos = photo_library.all()
+    shown, following = page(photos, limit, cursor)
     return {
-        "items": [item(photo, favorites) for photo in photos],
+        "items": [item(photo, favorites) for photo in shown],
+        "next": following,
         "summary": _summary(len(photos), sum(photo.get("size") or 0 for photo in photos)),
     }
 
@@ -133,8 +207,8 @@ def albums_view(satellite) -> dict:
     } for album in listed]}
 
 
-def album_view(satellite, album_id: str) -> dict:
-    """One album's photos; raises AlbumNotFound."""
+def album_view(satellite, album_id: str, limit=None, cursor=None) -> dict:
+    """One album's photos, newest first; raises AlbumNotFound."""
     photo_library = library(satellite)
     favorites = _favorites(satellite)
     if album_id.startswith(albums_module.PHYSICAL_ID_PREFIX):
@@ -149,6 +223,7 @@ def album_view(satellite, album_id: str) -> dict:
         photos = [photo for photo in (photo_library.get(photo_id) for photo_id in album["photo_ids"]) if photo]
         kind = album.get("kind", "virtual")
     custom = kind == "virtual"
+    shown, following = page(photos, limit, cursor)
     return {
         "id": album["id"],
         "name": album["name"],
@@ -161,7 +236,8 @@ def album_view(satellite, album_id: str) -> dict:
             "physical": "A folder on your phone, kept in step by phone sync.",
             "favorites": "Everything you marked as a favourite.",
         }.get(kind),
-        "items": [{**item(photo, favorites), "removable": custom} for photo in photos],
+        "items": [{**item(photo, favorites), "removable": custom} for photo in shown],
+        "next": following,
     }
 
 
@@ -176,51 +252,133 @@ def _matches(photo: dict, query: str) -> bool:
     return query in haystack
 
 
-def search_view(satellite, query=None, kind=None) -> dict:
+def search_view(satellite, query=None, kind=None, limit=None, cursor=None) -> dict:
     """Photos and albums matching `query`, for the shared Search page. Nothing is listed until
     there is something to look for; `kind` (image, video, or all) narrows the photos."""
     text = (query or "").strip().lower()
     if not text:
-        return {"items": [], "albums": [], "prompt": "Type to search your library.", "summary": None}
+        return {"items": [], "next": None, "albums": [], "prompt": "Type to search your library.", "summary": None}
     favorites = _favorites(satellite)
     photos = [photo for photo in library(satellite).all() if _matches(photo, text)]
     if kind in ("image", "video"):
         photos = [photo for photo in photos if ("video" if photo.get("media_type") == "video" else "image") == kind]
-    albums = [album for album in albums_view(satellite)["albums"] if text in album["title"].lower()]
+    # album names are matched on the first page only: they are few, and the later pages are photos
+    albums = [album for album in albums_view(satellite)["albums"] if text in album["title"].lower()] if cursor is None else []
     count = len(photos)
+    shown, following = page(photos, limit, cursor)
     summary = (f"{count} {'result' if count == 1 else 'results'}" if count
                else None if albums else "No photos match your search.")
-    return {"items": [item(photo, favorites) for photo in photos], "albums": albums, "prompt": None,
-            "summary": summary}
+    return {"items": [item(photo, favorites) for photo in shown], "next": following, "albums": albums,
+            "prompt": None, "summary": summary}
 
 
-def map_view(satellite) -> dict:
-    """Every active photo with a location, for the shared Map page - the same photos the Map
-    tabs of Photo's own page and screens plot. A photo without GPS metadata is left out."""
+# a viewport with at most this many photos gets them all; more are grouped into clusters
+VIEWPORT_ITEMS = 300
+# a cluster covers about this many pixels of the map, as the clients cluster on their own
+CLUSTER_PIXELS = 64
+
+
+class ViewportError(ValueError):
+    """A `bbox` or `zoom` that can't be used: answered with 400."""
+
+
+def _located(photo: dict):
+    metadata = photo.get("metadata") or {}
+    lat, lon = metadata.get("gps_latitude"), metadata.get("gps_longitude")
+    if isinstance(lat, bool) or isinstance(lon, bool) or not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+        return None
+    return (lat, lon) if -90 <= lat <= 90 and -180 <= lon <= 180 else None
+
+
+def viewport(query) -> tuple:
+    """(south, west, north, east, zoom) from `bbox` and `zoom`, or None without them."""
+    raw_bbox, raw_zoom = query.get("bbox"), query.get("zoom")
+    if raw_bbox in (None, "") and raw_zoom in (None, ""):
+        return None
+    try:
+        south, west, north, east = (float(part) for part in str(raw_bbox).split(","))
+        zoom = float(raw_zoom)
+    except (TypeError, ValueError):
+        raise ViewportError("'bbox' must be south,west,north,east and 'zoom' a number")
+    if not (-90 <= south <= north <= 90 and -180 <= west <= 180 and -180 <= east <= 180 and 0 <= zoom <= 24):
+        raise ViewportError("'bbox' or 'zoom' is out of range")
+    return south, west, north, east, zoom
+
+
+def map_view(satellite, area=None, overview=False) -> dict:
+    """The located photos, for the shared Map page - the same photos the Map tabs of Photo's own
+    page and screens plot; one without GPS metadata is left out.
+
+    - Without `area` (and not `overview`): every located photo, as before.
+    - `overview`: no photos, only their count and `bounds` ([south, west, north, east]), so a
+      map can fit them before it asks for what is on screen.
+    - With `area` (south, west, north, east, zoom): the photos in that rectangle. Up to
+      VIEWPORT_ITEMS come one by one; beyond that, those that share a cell of a grid about
+      CLUSTER_PIXELS wide at this zoom come as one cluster ({count, bounds, cover}), so a map
+      of any library stays a bounded answer and nothing on screen is left out.
+    """
     favorites = _favorites(satellite)
+    located = [(photo, spot) for photo in library(satellite).all() if (spot := _located(photo))]
+    count = len(located)
+    summary = f"{count} {'item' if count == 1 else 'items'} with a location" if count else None
+    if overview:
+        bounds = None
+        if located:
+            lats = [spot[0] for _, spot in located]
+            lons = [spot[1] for _, spot in located]
+            bounds = [min(lats), min(lons), max(lats), max(lons)]
+        return {"items": [], "bounds": bounds, "count": count, "summary": summary}
+    if area is None:
+        return {"items": [{**item(photo, favorites), "lat": spot[0], "lon": spot[1], "count": 1, "cover": photo["id"]}
+                          for photo, spot in located], "summary": summary}
+
+    south, west, north, east, zoom = area
+
+    def inside(spot):
+        lat, lon = spot
+        across = west <= lon <= east if west <= east else (lon >= west or lon <= east)  # across the antimeridian
+        return south <= lat <= north and across
+
+    shown = [(photo, spot) for photo, spot in located if inside(spot)]
+    single = lambda photo, spot: {**item(photo, favorites), "lat": spot[0], "lon": spot[1], "count": 1, "cover": photo["id"]}
+    if len(shown) <= VIEWPORT_ITEMS:
+        return {"items": [single(photo, spot) for photo, spot in shown], "summary": summary, "visible": len(shown)}
+    cell = (360 / 2 ** zoom) * (CLUSTER_PIXELS / 256)
+    cells = {}
+    for photo, spot in shown:
+        cells.setdefault((int(spot[0] // cell), int(spot[1] // cell)), []).append((photo, spot))
     items = []
-    for photo in library(satellite).all():
-        metadata = photo.get("metadata") or {}
-        lat, lon = metadata.get("gps_latitude"), metadata.get("gps_longitude")
-        if isinstance(lat, (int, float)) and isinstance(lon, (int, float)) and -90 <= lat <= 90 and -180 <= lon <= 180:
-            items.append({**item(photo, favorites), "lat": lat, "lon": lon})
-    count = len(items)
-    return {
-        "items": items,
-        "summary": f"{count} {'item' if count == 1 else 'items'} with a location" if count else None,
-    }
+    for (row, column), members in cells.items():
+        if len(members) == 1:
+            items.append(single(*members[0]))
+            continue
+        lats = [spot[0] for _, spot in members]
+        lons = [spot[1] for _, spot in members]
+        newest = max(members, key=lambda member: _newest_first(member[0]))[0]
+        items.append({
+            "id": f"cluster:{zoom:g}:{row}:{column}",
+            "title": f"{len(members)} items",
+            "lat": sum(lats) / len(lats),
+            "lon": sum(lons) / len(lons),
+            "count": len(members),
+            "bounds": [min(lats), min(lons), max(lats), max(lons)],
+            "cover": newest["id"],
+            "kind": "image",
+        })
+    return {"items": items, "summary": summary, "visible": len(shown)}
 
 
-def media_view(satellite, kinds=None) -> dict:
+def media_view(satellite, kinds=None, limit=None, cursor=None) -> dict:
     """media.gallery v1's `list`: the active library, newest first, as a picker shows it. Only
     the active library - a photo in the recycle bin, or anything the Locked Folder holds, is
     never in it (see library.all() and private_media.py), so a picker can't offer it."""
     wanted = {kind for kind in (kinds or "").split(",") if kind in ("image", "video")} or {"image", "video"}
+    offered = [photo for photo in library(satellite).all()
+               if ("video" if photo.get("media_type") == "video" else "image") in wanted]
+    shown, following = page(offered, limit, cursor)
     items = []
-    for photo in library(satellite).all():
+    for photo in shown:
         kind = "video" if photo.get("media_type") == "video" else "image"
-        if kind not in wanted:
-            continue
         items.append({
             "id": photo["id"],
             "kind": kind,
@@ -228,7 +386,7 @@ def media_view(satellite, kinds=None) -> dict:
             "duration": photo.get("duration") if kind == "video" else None,
             "group": _month(_moment(photo.get("captured_at") or photo.get("imported_at"))),
         })
-    return {"items": items}
+    return {"items": items, "next": following}
 
 
 def picked_ids(satellite, items) -> list:
@@ -252,18 +410,25 @@ def picked_ids(satellite, items) -> list:
     return ids
 
 
-def trash_view(satellite) -> dict:
+def _binned_first(photo: dict) -> tuple:
+    """The recycle bin's order: most recently moved there first, then by id."""
+    return (photo.get("trashed_at") or "", photo["id"])
+
+
+def trash_view(satellite, limit=None, cursor=None) -> dict:
     photo_library = library(satellite)
     retention = configuration.trash_retention_days(satellite)
     photos = photo_library.trashed(retention)
+    shown, following = page(photos, limit, cursor, key=_binned_first)
     items = []
-    for photo in photos:
+    for photo in shown:
         entry = item(photo, set())
         entry["trashed"] = _epoch(_moment(photo.get("trashed_at")))
         items.append(entry)
     days = "day" if retention == 1 else "days"
     return {
         "items": items,
-        "summary": _summary(len(items), sum(photo.get("size") or 0 for photo in photos)),
+        "next": following,
+        "summary": _summary(len(photos), sum(photo.get("size") or 0 for photo in photos)),
         "note": f"Items are deleted for good {retention} {days} after they were moved here.",
     }

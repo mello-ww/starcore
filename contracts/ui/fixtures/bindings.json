@@ -20,6 +20,7 @@
     {"expr": "$.nested.level", "expected": 40},
     {"expr": "$.rows.1.id", "expected": "b"},
     {"expr": "$.missing", "expected": null},
+    {"expr": "$value.missing", "expected": null},
     {"expr": "$.nested.missing.deeper", "expected": null},
     {"expr": "$page.total", "expected": 12},
     {"expr": "$params.id", "expected": "item 7"},

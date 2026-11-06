@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { clusterPoints, coordinates } from "../ui/map.js";
+import { boundsOf, clusterPoints, coordinates, viewportValue } from "../ui/map.js";
 
 test("only a real coordinate pair is placed on the map", () => {
     assert.deepEqual(coordinates(48.8566, 2.3522), [48.8566, 2.3522]);
@@ -37,4 +37,13 @@ test("thousands of items stay a bounded number of markers when zoomed out", () =
     assert.ok(clusterPoints(points, 4).length <= 4);
     assert.ok(clusterPoints(points, 8).length <= 20);
     assert.ok(clusterPoints(points, 16).length > 1000);
+});
+
+test("a viewport is sent as the area on screen and its zoom", () => {
+    assert.deepEqual(viewportValue([47.123456, 0.5, 49, 4.25], 6.4), { bbox: "47.12346,0.5,49,4.25", zoom: 6 });
+    // a map wider than the world asks for all of it
+    assert.equal(viewportValue([-60, -400, 70, 300], 1).bbox, "-60,-180,70,180");
+    assert.deepEqual(boundsOf([1, 2, 3, 4]), [1, 2, 3, 4]);
+    assert.equal(boundsOf([3, 2, 1, 4]), null);
+    assert.equal(boundsOf(null), null);
 });

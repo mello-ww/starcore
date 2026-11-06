@@ -275,8 +275,28 @@ collection: the document says where each picture comes from and what can be done
   at `medium`), so the grid follows the screen. **`shape`**: `square` (default), `wide` (16:9)
   or `round`.
 - **Loading**: tiles are revealed 60 at a time; the next 60 come as the end of the grid comes
-  near (the web watches the grid's end, the app the screen's scroll). Thumbnails load lazily
-  (the web) or downsampled (Android), each with the placeholder and image glyph of `image`.
+  near. Thumbnails load lazily (the web) or downsampled (Android), each with the placeholder and
+  image glyph of `image`.
+- **Paging** (`more`, optional): `{"route": "items?limit=120&cursor={$value}", "cursor": "$.next"}`.
+  The page's data holds the first page and, at `cursor`, the provider's cursor for the next
+  (null at the end). When the grid nears its end, the client calls `route` with that cursor as
+  `$value`; the answer has the same shape as the page data, so `items` and `cursor` read it the
+  same way. The provider owns the cursor - the client only passes it back - so a provider can
+  page by position, by key or however it likes. The client:
+  - loads one page at a time, and drops a page that arrives after the page data changed (a new
+    filter, a refresh), so results never mix;
+  - never shows an item twice, even if a provider's pages overlap;
+  - shows "Loading…" while a page is on its way, and an error with "Try again" when one fails;
+  - after a refresh of the same collection (an action's `then: refresh`), reloads as many pages
+    as were loaded, so the grid, its scroll position and its selection stay where they were;
+  - keeps a selection across pages - an action on the selection runs on every selected item,
+    loaded on whichever page - and the viewer moves into the next page past the last item.
+  A grid without `more` shows what its page data holds, as before.
+- **Many items**: on Android a media-grid that is a page's main content becomes the page's
+  own virtualized list: only rows near the screen are mounted, so memory stays flat however
+  far the person scrolls (blocks above and below it scroll with it). On the web the grid is
+  drawn in chunks of 60 tiles that the browser neither lays out nor paints while off screen;
+  tiles already loaded stay in the page.
 - Images and videos load with the client's own session, as for `image`. A route outside the
   Satellite loads nothing and shows the image glyph.
 
@@ -317,6 +337,14 @@ focus, text and caret while the results reload, on both clients.
   thumbnails in a popup; on Android it opens the viewer on its items.
 - The map fits its items when they change, and never asks for the device's location.
 - With no located items it shows `empty`.
+- **Viewport** (`viewport`, optional): `{"route": "located?bbox={$value.bbox}&zoom={$value.zoom}"}`
+  makes the map load what is on screen, a moment after it stops moving: `$value.bbox` is
+  `south,west,north,east` and `$value.zoom` the zoom level. The answer has the page data's shape;
+  its items may be the provider's own clusters, with `item.count` above 1 and `item.bounds`
+  (`[south, west, north, east]`): a cluster shows its count and a tap zooms into its bounds. The
+  page data then needs no items, only `bounds` (the block's `bounds` binding) for the map to fit
+  first, so a map of any number of items stays a bounded answer. A late answer is dropped, and a
+  failed one keeps what is shown with "Try again".
 - Each client draws with the map it already had: Mission Control with Leaflet and
   OpenStreetMap tiles (loaded only when a map is shown), the Android app with
   react-native-maps, which needs a Google Maps key in `android/gradle.properties` to draw
@@ -332,7 +360,8 @@ Any text, value or action body can be a binding instead of a literal:
 | `$` | the current data itself |
 | `$page.a` | the page's data, also from inside a list row |
 | `$params.id` | a page param |
-| `$value` | a control's new value (toggle, slider, file browser) |
+| `$value` | a control's new value (toggle, slider, file browser); a grid's cursor in `more.route` |
+| `$value.a` | 1.2: `a` inside a value that is an object - a map's `$value.bbox` and `$value.zoom` |
 | `$form.key` | a form field, inside its submit action |
 | `$state.key` | 1.1: the page's own state (see `state` above) |
 | `$sources.name.a` | 1.1: `a` in a named source's data |
@@ -490,7 +519,7 @@ says so in place, and a document that `requires` it is not opened.
 |---|---|---|---|
 | `files.browse` | 1 | `list`: `GET ?path=` → `{path, parent, entries: [{name, type: dir\|file, size, modified}]}`; at the roots (`path` empty) each entry's name is itself an absolute path | `file-browser` |
 | `audio.library` | 1 | `search`, `track`, `resolve`, `artwork`; optional `lyrics` - see [Audio playback](media-audio.md) | none yet; the `media.audio` client capability will play it |
-| `media.gallery` | 1 | `list`: `GET ?kinds=image,video` -> `{items: [{id, kind, title, duration, group}]}`; `thumbnail`: `GET /<id>` -> an image | the client's media picker (the `pick` action) |
+| `media.gallery` | 1 | `list`: `GET ?kinds=image,video[&limit=N&cursor=C]` -> `{items: [{id, kind, title, duration, group}], next}` (with `limit`, one page and the next cursor; without it, everything); `thumbnail`: `GET /<id>` -> an image | the client's media picker (the `pick` action), which pages through a provider that pages |
 | `audio.session` | 1 | `queue`; optional `history`, `radio`, `preferences`, `favorites`, `stream`, `connect` - see [Audio playback](media-audio.md) | none; the audio host uses it beside the same Satellite's `audio.library` |
 
 A capability's operations are required unless the vocabulary lists them under

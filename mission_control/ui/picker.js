@@ -31,15 +31,20 @@ export function references(provider, capability, items) {
     }));
 }
 
-/** The provider's `list` route for these kinds, or null when it isn't a safe route. */
-export function listRoute(provider, kinds) {
+// what the picker asks a provider for at a time (media.gallery's optional paging)
+export const PICK_PAGE = 200;
+
+/** The provider's `list` route for these kinds, or null when it isn't a safe route. With
+ * `paged`, it asks for PICK_PAGE at a time; a provider without paging answers everything. */
+export function listRoute(provider, kinds, paged = false) {
     const route = provider && provider.operations && provider.operations.list;
     if (!isSafeRoute(route)) {
         return null;
     }
     const wanted = (Array.isArray(kinds) && kinds.length ? kinds : ["image", "video"]).filter((kind) => kind === "image" || kind === "video");
     // the comma is encoded: a route stays within the contract's URL-safe characters
-    return `${route}${route.includes("?") ? "&" : "?"}kinds=${wanted.join("%2C")}`;
+    const listed = `${route}${route.includes("?") ? "&" : "?"}kinds=${wanted.join("%2C")}`;
+    return paged ? `${listed}&limit=${PICK_PAGE}` : listed;
 }
 
 /**
@@ -86,8 +91,17 @@ export function pickMedia({ provider, capability, kinds, multiple = false, title
         document.body.appendChild(overlay);
         document.body.classList.add("ui-viewer-open");
 
+        const load = (route) => fetch(`${base}/${route}`, { headers: { Accept: "application/json" } })
+            .then(async (response) => {
+                const payload = await response.json().catch(() => null);
+                if (!response.ok) {
+                    throw new Error((payload && payload.error) || `Request failed with status ${response.status}`);
+                }
+                return payload;
+            });
         const gallery = createGallery({
             satelliteBase: base,
+            load,
             runAction: async () => false,
             setNotice: () => {},
             afterSelection: () => {},
@@ -136,35 +150,31 @@ export function pickMedia({ provider, capability, kinds, multiple = false, title
         document.addEventListener("keydown", onKey, true);
         close.focus();
 
-        const route = listRoute(provider, kinds);
+        const route = listRoute(provider, kinds, true);
         if (!route || !isSafeRoute(thumbnail)) {
             body.replaceChildren(el("p", "ui-unsupported", `${provider.satellite} doesn't offer anything to choose from.`));
             return;
         }
-        fetch(`${base}/${route}`, { headers: { Accept: "application/json" } })
-            .then(async (response) => {
-                const payload = await response.json().catch(() => null);
-                if (!response.ok) {
-                    throw new Error((payload && payload.error) || `Request failed with status ${response.status}`);
-                }
-                return payload;
-            })
+        load(route)
             .then((payload) => {
                 if (!document.contains(overlay)) {
                     return;
                 }
                 // a provider answers for the kinds asked; the picker never offers another kind
-                const items = (Array.isArray(payload && payload.items) ? payload.items : [])
+                const only = (list) => (Array.isArray(list) ? list : [])
                     .filter((item) => item && item.id !== undefined && accepted.has(mediaKind(item.kind)));
+                const data = { ...(payload || {}), items: only(payload && payload.items) };
                 const block = {
                     type: "media-grid",
-                    items,
+                    items: "$.items",
                     size: "medium",
                     empty: "There is nothing to choose from yet.",
                     item: { image: `${thumbnail}/{$.id}`, key: "$.id", kind: "$.kind", duration: "$.duration", group: "$.group" },
                     selection: { actions: [] },
+                    // the provider's next page, as the grid scrolls (media.gallery's paging)
+                    more: { route: `${route}&cursor={$value}`, cursor: "$.next" },
                 };
-                body.replaceChildren(gallery.render(block, { data: {}, page: {}, params: {}, state: {}, sources: {} }));
+                body.replaceChildren(gallery.render(block, { data, page: data, params: {}, state: {}, sources: {} }));
             })
             .catch((error) => {
                 if (document.contains(overlay)) {

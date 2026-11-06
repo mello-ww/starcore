@@ -12,13 +12,14 @@
   ],
   "pages": {
     "library": {
-      "source": {"route": "gallery"},
+      "source": {"route": "gallery?limit=120"},
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary"},
         {
           "type": "media-grid",
           "id": "library",
           "items": "$.items",
+          "more": {"route": "gallery?limit=120&cursor={$value}", "cursor": "$.next"},
           "size": "medium",
           "empty": "No photos yet. Import some, or turn on phone sync, from Photo's own page.",
           "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration", "group": "$.month"},
@@ -63,7 +64,7 @@
     },
     "search": {
       "state": {"q": "", "kind": "all"},
-      "source": {"route": "gallery/search?q={$state.q}&kind={$state.kind}"},
+      "source": {"route": "gallery/search?q={$state.q}&kind={$state.kind}&limit=120"},
       "blocks": [
         {"type": "search", "key": "q", "label": "Search", "placeholder": "Search filenames, camera, date…"},
         {"type": "choice", "key": "kind", "label": "Show",
@@ -78,6 +79,7 @@
           "id": "search-results",
           "visible": "$.items",
           "items": "$.items",
+          "more": {"route": "gallery/search?q={$state.q}&kind={$state.kind}&limit=120&cursor={$value}", "cursor": "$.next"},
           "size": "medium",
           "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration"},
           "viewer": {
@@ -112,15 +114,18 @@
       ]
     },
     "map": {
-      "source": {"route": "gallery/map"},
+      "source": {"route": "gallery/map?overview=1"},
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary", "visible": "$.summary"},
         {
           "type": "map",
           "id": "places",
           "items": "$.items",
+          "bounds": "$.bounds",
+          "viewport": {"route": "gallery/map?bbox={$value.bbox}&zoom={$value.zoom}"},
           "empty": "No photos have location data yet. Photos with GPS metadata will appear here automatically.",
-          "item": {"lat": "$.lat", "lon": "$.lon", "key": "$.id", "image": "thumbnails/{$.id}", "title": "$.title", "kind": "$.kind"},
+          "item": {"lat": "$.lat", "lon": "$.lon", "key": "$.id", "image": "thumbnails/{$.cover}", "title": "$.title", "kind": "$.kind",
+                   "count": "$.count", "bounds": "$.bounds"},
           "viewer": {
             "image": "originals/{$.id}",
             "video": "originals/{$.id}",
@@ -180,7 +185,7 @@
     "album": {
       "title": "$.name",
       "params": ["id"],
-      "source": {"route": "gallery/albums/{$params.id}"},
+      "source": {"route": "gallery/albums/{$params.id}?limit=120"},
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary"},
         {"type": "text", "style": "caption", "text": "$.description", "visible": "$.description"},
@@ -191,6 +196,7 @@
           "type": "media-grid",
           "id": "album",
           "items": "$.items",
+          "more": {"route": "gallery/albums/{$params.id}?limit=120&cursor={$value}", "cursor": "$.next"},
           "size": "medium",
           "empty": "This album is empty.",
           "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration", "group": "$.month"},
@@ -243,13 +249,14 @@
     },
     "trash": {
       "title": "Recycle bin",
-      "source": {"route": "gallery/trash"},
+      "source": {"route": "gallery/trash?limit=120"},
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.note"},
         {
           "type": "media-grid",
           "id": "trash",
           "items": "$.items",
+          "more": {"route": "gallery/trash?limit=120&cursor={$value}", "cursor": "$.next"},
           "size": "medium",
           "empty": "The recycle bin is empty.",
           "item": {"image": "trash/{$.id}/thumbnail", "key": "$.id", "kind": "$.kind", "duration": "$.duration"},

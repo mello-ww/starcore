@@ -120,6 +120,8 @@ function resolveString(expression, context) {
     }
     const roots = {
         "$.": "data", "$page.": "page", "$params.": "params", "$form.": "form", "$state.": "state", "$sources.": "sources",
+        // 1.2: inside a value that is an object (a map's viewport: $value.bbox, $value.zoom)
+        "$value.": "value",
     };
     for (const [prefix, key] of Object.entries(roots)) {
         if (expression.startsWith(prefix)) {

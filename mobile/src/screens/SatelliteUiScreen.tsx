@@ -9,10 +9,11 @@ import {useAppActive} from '../hooks/useAppActive';
 import {useServers} from '../servers/ServersContext';
 import {UiApi} from '../satellites/ui/api';
 import {
-  ICONS, findProvider, formatValue, missingRequirements, resolve, resolveTemplate,
+  ICONS, findProvider, formatValue, isVisible, missingRequirements, resolve, resolveTemplate,
   type Providers, type Scope, type UiAction, type UiDocument, type UiSource,
 } from '../satellites/ui/contract';
 import {MediaPicker, type MediaReference, type PickRequest} from '../satellites/ui/MediaPicker';
+import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
 import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
@@ -394,6 +395,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   );
   // the picker reads the provider's routes, and loads its thumbnails, with this session
   const readProvider = useCallback((satellite: string, providerRoute: string) => api.read(satellite, providerRoute), [api]);
+  // a grid's next page, a map's viewport: this Satellite's own routes, with this session
+  const loadOwn = useCallback((ownRoute: string) => api.read(name, ownRoute), [api, name]);
   const providerSource = useCallback(
     (satellite: string, providerRoute: string) => ({
       uri: `${baseUrl}/api/satellites/${encodeURIComponent(satellite)}/${providerRoute}`,
@@ -421,6 +424,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     runAction,
     readCapability: (satellite, capabilityRoute) => api.read(satellite, capabilityRoute),
     mediaSource,
+    load: loadOwn,
     onNearEnd,
     setOverlay,
     confirm: confirmAction,
@@ -466,28 +470,30 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const stale = Boolean(data !== null && dataError);
   const ago = updatedAt ? formatValue(Math.round(updatedAt / 1000), 'relative', undefined, {now: now / 1000}) : null;
   const template = page.template ?? 'stack';
-  return (
-    <View style={styles.screen}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={100}
-        onScroll={event => {
-          const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
-          if (nearEndListeners.size && layoutMeasurement.height + contentOffset.y >= contentSize.height - 900) {
-            nearEndListeners.forEach(listener => listener());
-          }
-        }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={accent}
-            colors={[accent]}
-            progressBackgroundColor={palette.card}
-          />
-        }>
-        {headerBlocks && (
+  const refreshControl = (
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      tintColor={accent}
+      colors={[accent]}
+      progressBackgroundColor={palette.card}
+    />
+  );
+  // 1.2: a page whose main content is a media-grid is drawn as that grid's virtualized list,
+  // so only the rows near the screen are mounted however large the collection
+  const blocks = page.blocks ?? [];
+  const gridIndex =
+    template === 'stack' && data !== null
+      ? blocks.findIndex(
+          block =>
+            block?.type === 'media-grid' &&
+            !(block.developer && !developer) &&
+            (!('visible' in block) || isVisible(resolve(block.visible, scope))),
+        )
+      : -1;
+  const top = (
+    <>
+      {headerBlocks && (
           <View style={styles.header} testID="ui-header">
             <UiBlocks blocks={headerBlocks} scope={{data: header, page: header, params: {}}} context={{...context, inline: true}} />
           </View>
@@ -520,6 +526,44 @@ export function SatelliteUiScreen({route, navigation}: Props) {
             <Text style={type.caption}>{`Showing what StarCore said${ago ? ` ${ago}` : ' earlier'}. ${dataError}`}</Text>
           </View>
         )}
+    </>
+  );
+  return (
+    <View style={styles.screen}>
+      {gridIndex >= 0 ? (
+        <VirtualMediaGrid
+          key={`${pageId}:${paramsKey}`}
+          block={blocks[gridIndex]}
+          scope={scope}
+          context={context}
+          refreshControl={refreshControl}
+          contentContainerStyle={styles.content}
+          header={
+            <View style={[styles.virtualTop, stale && styles.stalePage]}>
+              {top}
+              <UiPageBlocks blocks={blocks.slice(0, gridIndex)} scope={scope} context={context} template={template} />
+            </View>
+          }
+          footer={
+            <View style={styles.page}>
+              <UiPageBlocks blocks={blocks.slice(gridIndex + 1)} scope={scope} context={context} template={template} />
+              <FloatingPlayerSpacer />
+            </View>
+          }
+        />
+      ) : (
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={100}
+        onScroll={event => {
+          const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
+          if (nearEndListeners.size && layoutMeasurement.height + contentOffset.y >= contentSize.height - 900) {
+            nearEndListeners.forEach(listener => listener());
+          }
+        }}
+        refreshControl={refreshControl}>
+        {top}
         {data === null && dataError ? (
           <View style={styles.failure} testID="ui-failure">
             <Text style={type.title}>{`${document.title || name} is unavailable`}</Text>
@@ -545,6 +589,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         )}
         <FloatingPlayerSpacer />
       </ScrollView>
+      )}
       {pickRequest && <MediaPicker request={pickRequest} read={readProvider} mediaSource={providerSource} />}
       {overlay && (
         <View style={[styles.overlay, {bottom: space.lg + playerInset}]} pointerEvents="box-none">
@@ -591,6 +636,7 @@ const styles = StyleSheet.create({
   },
   offlineTitle: {color: palette.warn},
   page: {gap: space.md},
+  virtualTop: {gap: space.md},
   stalePage: {opacity: 0.6},
   loading: {gap: space.md},
   skeleton: {height: 120, borderRadius: radii.card, backgroundColor: palette.card},

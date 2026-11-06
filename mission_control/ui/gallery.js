@@ -10,6 +10,8 @@ import { icon } from "./icons.js";
 
 // tiles revealed at a time: enough for a first screen, little enough to paint at once
 export const GRID_PAGE = 60;
+// tiles per chunk of the grid: the browser skips laying out and painting a chunk off screen
+export const CHUNK = 60;
 
 function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -47,7 +49,8 @@ export function clock(seconds) {
 }
 
 /**
- * host: {satelliteBase, runAction(action, scope), afterSelection(then), setNotice(text, kind)},
+ * host: {satelliteBase, runAction(action, scope), afterSelection(then), setNotice(text, kind),
+ * load(route) -> Promise<data> (a page of a grid's `more`, from the Satellite's own route)},
  * and for the media picker `picking: {multiple, onChange(selectedItems)}`: every tile then
  * selects (one at a time unless `multiple`), and the picker draws its own bar.
  * Returns {render(block, scope), afterRender(), reset(), dispose()}.
@@ -62,7 +65,14 @@ export function createGallery(host) {
     function gridState(block) {
         let entry = grids.get(block);
         if (!entry) {
-            entry = { shown: GRID_PAGE, selected: new Set(), selecting: Boolean(picking), items: [], keys: [], scope: null, tiles: new Map(), bar: null };
+            entry = {
+                shown: GRID_PAGE, selected: new Set(), chosen: new Map(), selecting: Boolean(picking), items: [], keys: [],
+                scope: null, tiles: new Map(), bar: null,
+                // paging (`more`): the page data's own items, the pages loaded after them, the
+                // provider's cursor for the next, and a token that retires stale requests
+                base: null, collection: null, extra: [], cursor: null, loading: null, error: null, token: 0, depth: 0,
+                dom: null,
+            };
             grids.set(block, entry);
         }
         return entry;
@@ -101,20 +111,176 @@ export function createGallery(host) {
 
     // ---------- the grid ----------
 
-    function render(block, scope) {
-        const resolved = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
-        const items = Array.isArray(resolved) ? resolved : [];
-        const grid = gridState(block);
-        grid.items = items;
-        grid.scope = scope;
-        grid.keys = items.map((item, index) => itemKey(block, item, index, scope));
-        grid.tiles = new Map();
+    /** The page data changed (first load, a refresh, another filter): what the grid holds
+     * starts again from it. A refresh of the same collection reloads as many pages as were
+     * loaded, so the grid, its scroll position and its selection stay where they were. */
+    function adopt(block, grid, base, scope) {
+        const collection = block.more ? resolveTemplate(block.more.route, { ...scope, value: "" }) : null;
+        const same = collection === grid.collection && grid.base !== null;
+        grid.depth = same ? grid.extra.length : 0;
+        grid.base = base;
+        grid.collection = collection;
+        grid.extra = [];
+        grid.token += 1;  // any page still on its way belongs to the old data
+        grid.loading = null;
+        grid.error = null;
+        grid.cursor = block.more ? resolve(block.more.cursor, scope) : null;
+        if (!same) {
+            grid.shown = GRID_PAGE;
+            grid.selected.clear();
+            grid.chosen.clear();
+            if (!picking) {
+                grid.selecting = false;
+            }
+        }
+    }
+
+    /** A selection keeps what is still there once everything that was loaded is loaded again. */
+    function pruneSelection(grid) {
+        if (grid.depth > grid.extra.length && grid.cursor) {
+            return;
+        }
         const present = new Set(grid.keys);
         for (const key of [...grid.selected]) {
             if (!present.has(key)) {
                 grid.selected.delete(key);
+                grid.chosen.delete(key);
             }
         }
+    }
+
+    function collect(block, grid) {
+        grid.items = grid.base.concat(grid.extra);
+        grid.keys = grid.items.map((item, index) => itemKey(block, item, index, grid.scope));
+        grid.items.forEach((item, index) => {
+            if (grid.chosen.has(grid.keys[index])) {
+                grid.chosen.set(grid.keys[index], item);  // the selection follows fresh data
+            }
+        });
+    }
+
+    /** Loads the next page through the block's `more`, once at a time; a page that arrives
+     * after the data changed is dropped. Resolves when it is in (or failed). */
+    function loadMore(block, grid) {
+        if (!block.more || !grid.cursor || !host.load) {
+            return Promise.resolve(false);
+        }
+        if (grid.loading) {
+            return grid.loading;
+        }
+        const token = grid.token;
+        const route = resolveTemplate(block.more.route, { ...grid.scope, value: grid.cursor });
+        grid.error = null;
+        drawFooter(block, grid);
+        grid.loading = (isSafeRoute(route) ? host.load(route) : Promise.reject(new Error("That page points outside its Satellite.")))
+            .then((data) => {
+                if (token !== grid.token) {
+                    return false;
+                }
+                const pageScope = { ...grid.scope, data: data || {}, page: data || {} };
+                const resolved = resolve(block.items, pageScope);
+                const known = new Set(grid.keys);
+                // a provider's cursor never repeats an item; this keeps a broken one from doing so
+                const fresh = (Array.isArray(resolved) ? resolved : []).filter((item, index) => {
+                    const key = itemKey(block, item, grid.items.length + index, grid.scope);
+                    return key.startsWith("#") || !known.has(key);
+                });
+                const next = resolve(block.more.cursor, pageScope);
+                grid.cursor = next === null || next === undefined || next === "" || next === grid.cursor ? null : next;
+                const from = grid.items.length;
+                grid.extra = grid.extra.concat(fresh);
+                collect(block, grid);
+                grid.loading = null;
+                pruneSelection(grid);
+                reveal(block, grid, from, grid.items.length);
+                if (grid.depth > grid.extra.length && grid.cursor) {
+                    return loadMore(block, grid);  // back to where a refresh found the grid
+                }
+                if (viewer && viewer.block === block) {
+                    drawViewer();
+                }
+                return true;
+            })
+            .catch((error) => {
+                if (token === grid.token) {
+                    grid.loading = null;
+                    grid.error = error.message || "The next items could not be loaded.";
+                    drawFooter(block, grid);
+                }
+                return false;
+            });
+        drawFooter(block, grid);
+        return grid.loading;
+    }
+
+    /** Appends tiles [from, to) to the grid on screen, and moves its "more" sentinel. */
+    function reveal(block, grid, from, to) {
+        const dom = grid.dom;
+        if (!dom) {
+            return;
+        }
+        const end = Math.min(to, grid.items.length);
+        for (let index = from; index < end; index += 1) {
+            appendTile(block, grid, index, dom.body, dom.groups);
+        }
+        grid.shown = Math.max(grid.shown, end);
+        drawFooter(block, grid);
+        rearm(grid);
+    }
+
+    /** An observer reports only changes: when the end is still near after new tiles came in,
+     * observing it again reports that, and the next tiles (or page) follow. */
+    function rearm(grid) {
+        const dom = grid.dom;
+        if (dom && dom.observer && (grid.shown < grid.items.length || grid.cursor)) {
+            dom.observer.unobserve(dom.sentinel);
+            dom.observer.observe(dom.sentinel);
+        }
+    }
+
+    /** What sits under the grid: nothing, a sentinel that loads more as it comes near, a
+     * quiet "Loading…", or the error with a way to try again. */
+    function drawFooter(block, grid) {
+        const dom = grid.dom;
+        if (!dom) {
+            return;
+        }
+        dom.footer.replaceChildren();
+        const pending = grid.shown < grid.items.length || Boolean(grid.cursor);
+        dom.footer.hidden = !pending && !grid.error;
+        if (grid.error) {
+            dom.footer.appendChild(el("p", "ui-text ui-text-caption", grid.error));
+            const retry = el("button", "ui-pill", "Try again");
+            retry.type = "button";
+            retry.addEventListener("click", () => loadMore(block, grid));
+            dom.footer.appendChild(retry);
+        } else if (grid.loading) {
+            const note = el("p", "ui-text ui-text-caption ui-media-grid-loading", "Loading…");
+            note.setAttribute("role", "status");
+            dom.footer.appendChild(note);
+        }
+    }
+
+    function more(block, grid) {
+        if (grid.shown < grid.items.length) {
+            reveal(block, grid, grid.shown, grid.shown + GRID_PAGE);
+        } else if (grid.cursor && !grid.error) {
+            loadMore(block, grid);
+        }
+    }
+
+    function render(block, scope) {
+        const resolved = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
+        const base = Array.isArray(resolved) ? resolved : [];
+        const grid = gridState(block);
+        grid.scope = scope;
+        if (grid.base !== base) {
+            adopt(block, grid, base, scope);
+        }
+        collect(block, grid);
+        grid.tiles = new Map();
+        pruneSelection(grid);
+        const items = grid.items;
 
         const size = block.size || "medium";
         const wrapper = el("section", `ui-media-grid ui-media-grid-${size} ui-shape-${block.shape || "square"}`);
@@ -132,45 +298,31 @@ export function createGallery(host) {
         wrapper.classList.toggle("is-selecting", grid.selecting);
         const body = el("div", "ui-media-grid-body");
         wrapper.appendChild(body);
-
-        const groups = { label: undefined, cells: null };
-        const reveal = (from, to) => {
-            for (let index = from; index < to; index += 1) {
-                appendTile(block, grid, index, body, groups);
-            }
-        };
-        const shown = Math.min(grid.shown, items.length);
-        reveal(0, shown);
-        if (shown < items.length) {
-            // the next page arrives as the end of the grid comes near
-            const sentinel = el("div", "ui-media-grid-more");
-            sentinel.setAttribute("aria-hidden", "true");
-            wrapper.appendChild(sentinel);
-            const more = () => {
-                const from = Math.min(grid.shown, grid.items.length);
-                grid.shown = from + GRID_PAGE;
-                const to = Math.min(grid.shown, grid.items.length);
-                reveal(from, to);
-                if (to >= grid.items.length) {
-                    observer?.disconnect();
-                    sentinel.remove();
+        // the next tiles (and the next page) arrive as the end of the grid comes near
+        const sentinel = el("div", "ui-media-grid-more");
+        sentinel.setAttribute("aria-hidden", "true");
+        const footer = el("div", "ui-media-grid-footer");
+        wrapper.append(sentinel, footer);
+        grid.dom?.observer?.disconnect();
+        const observer = typeof IntersectionObserver === "function"
+            ? new IntersectionObserver((entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    more(block, grid);
                 }
-            };
-            const observer = typeof IntersectionObserver === "function"
-                ? new IntersectionObserver((entries) => {
-                    if (entries.some((entry) => entry.isIntersecting)) {
-                        more();
-                    }
-                }, { rootMargin: "800px 0px" })
-                : null;
-            if (observer) {
-                observer.observe(sentinel);
-            } else {
-                const button = el("button", "sc-button ui-button", "Show more");
-                button.type = "button";
-                button.addEventListener("click", more);
-                sentinel.appendChild(button);
-            }
+            }, { rootMargin: "800px 0px" })
+            : null;
+        grid.dom = { body, groups: { label: undefined, cells: null, count: 0 }, footer, observer, sentinel };
+        reveal(block, grid, 0, Math.min(grid.shown, items.length));
+        if (observer) {
+            observer.observe(sentinel);
+        } else {
+            const button = el("button", "sc-button ui-button", "Show more");
+            button.type = "button";
+            button.addEventListener("click", () => more(block, grid));
+            sentinel.appendChild(button);
+        }
+        if (grid.depth > grid.extra.length && grid.cursor && !grid.loading) {
+            loadMore(block, grid);  // a refresh: back to as many pages as were loaded
         }
         return wrapper;
     }
@@ -187,13 +339,16 @@ export function createGallery(host) {
                 if (label) {
                     body.appendChild(el("h3", "ui-media-group", label));
                 }
-                groups.cells = el("div", "ui-media-cells");
-                body.appendChild(groups.cells);
+                groups.cells = null;
             }
-        } else if (!groups.cells) {
+        }
+        if (!groups.cells || groups.count >= CHUNK) {
+            // tiles go in chunks, which the browser skips while they are off screen
             groups.cells = el("div", "ui-media-cells");
+            groups.count = 0;
             body.appendChild(groups.cells);
         }
+        groups.count += 1;
 
         const key = grid.keys[index];
         const kind = mediaKind(block.item.kind !== undefined ? resolve(block.item.kind, itemScope) : "image");
@@ -268,6 +423,7 @@ export function createGallery(host) {
     function toggleSelected(block, grid, key) {
         if (grid.selected.has(key)) {
             grid.selected.delete(key);
+            grid.chosen.delete(key);
         } else {
             if (picking && !picking.multiple) {
                 // one at a time: choosing another replaces the choice
@@ -277,8 +433,10 @@ export function createGallery(host) {
                     tile?.setAttribute("aria-pressed", "false");
                 }
                 grid.selected.clear();
+                grid.chosen.clear();
             }
             grid.selected.add(key);
+            grid.chosen.set(key, grid.items[grid.keys.indexOf(key)]);
         }
         grid.selecting = grid.selected.size > 0 || grid.selecting;
         const tile = grid.tiles.get(key);
@@ -289,7 +447,7 @@ export function createGallery(host) {
         }
         renderSelectionBar(block, grid);
         if (picking) {
-            picking.onChange(grid.items.filter((item, index) => grid.selected.has(grid.keys[index])));
+            picking.onChange([...grid.chosen.values()]);
         }
     }
 
@@ -340,7 +498,8 @@ export function createGallery(host) {
     }
 
     async function runOnSelection(block, grid, entry, button) {
-        const chosen = grid.items.filter((item, index) => grid.selected.has(grid.keys[index]));
+        // everything selected, on whichever loaded page it is
+        const chosen = [...grid.chosen.values()].filter((item) => item !== undefined);
         const action = entry.action;
         if (!chosen.length || !action) {
             return;
@@ -418,12 +577,20 @@ export function createGallery(host) {
         returnFocus = null;
     }
 
-    function step(delta) {
+    async function step(delta) {
         if (!viewer) {
             return;
         }
         const grid = gridState(viewer.block);
         const index = viewer.index + delta;
+        if (index >= grid.items.length && grid.cursor) {
+            // past the last item loaded: the next page first, then on
+            const block = viewer.block;
+            await loadMore(block, grid);
+            if (!viewer || viewer.block !== block || index >= grid.items.length) {
+                return;
+            }
+        }
         if (index < 0 || index >= grid.items.length) {
             return;
         }
@@ -532,7 +699,7 @@ export function createGallery(host) {
         if (title !== null && title !== undefined && title !== "") {
             heading.appendChild(el("p", "ui-viewer-title", String(title)));
         }
-        const position = `${viewer.index + 1} of ${grid.items.length}`;
+        const position = `${viewer.index + 1} of ${grid.items.length}${grid.cursor ? "+" : ""}`;
         heading.appendChild(el("p", "ui-viewer-subtitle",
             subtitle !== null && subtitle !== undefined && subtitle !== ""
                 ? `${subtitle} · ${position}` : position));
@@ -550,7 +717,7 @@ export function createGallery(host) {
         const previous = iconButton("chevron-left", "Previous", "ui-viewer-previous", () => step(-1));
         previous.disabled = viewer.index === 0;
         const next = iconButton("chevron-right", "Next", "ui-viewer-next", () => step(1));
-        next.disabled = viewer.index >= grid.items.length - 1;
+        next.disabled = viewer.index >= grid.items.length - 1 && !grid.cursor;
         chrome.append(previous, next);
 
         if (viewer.info) {
