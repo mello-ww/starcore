@@ -150,6 +150,24 @@ export function mount(context) {
     // the media-grid block and its viewer (1.2), which keep their own state across renders
     const gallery = createGallery({
         satelliteBase,
+        // what the person chooses here (a grid's size), remembered for this Satellite in this
+        // browser - this server's own Mission Control, so per server as well
+        preferences: {
+            get: (key) => {
+                try {
+                    return localStorage.getItem(`starcore.ui.${satelliteName}.${key}`);
+                } catch {
+                    return null;
+                }
+            },
+            set: (key, value) => {
+                try {
+                    localStorage.setItem(`starcore.ui.${satelliteName}.${key}`, value);
+                } catch {
+                    // without storage the choice lasts until the page is left
+                }
+            },
+        },
         // a grid's next page (`more`), from the Satellite's own route, with this session
         load: (route) => requestJson(`${satelliteBase}/${route}`),
         runAction: (...args) => runAction(...args),

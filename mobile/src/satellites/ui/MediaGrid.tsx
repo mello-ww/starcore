@@ -1,10 +1,13 @@
-import React, {memo, useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react';
+import React, {memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState} from 'react';
 import {
   AccessibilityInfo, ActivityIndicator, Animated, FlatList, Image, Modal, Pressable, ScrollView, StatusBar, StyleSheet,
   Text, useWindowDimensions, View,
 } from 'react-native';
+import {GestureDetector, GestureHandlerRootView, type GestureType} from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/Feather';
 import Video from 'react-native-video';
+import {usePinchColumnsGesture} from '../../components/pinchColumns';
+import {ZoomableImage} from '../../components/ZoomableImage';
 import {tokens, useAccent} from '../../theme';
 import {formatValue, isSafeRoute, isVisible, resolve, resolveTemplate, type Scope, type UiAction, type UiBlock} from './contract';
 import type {BlockContext} from './UiBlocks';
@@ -38,6 +41,50 @@ export function clock(seconds: unknown): string {
   const minutes = Math.floor((total % 3600) / 60);
   const rest = String(total % 60).padStart(2, '0');
   return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${rest}` : `${minutes}:${rest}`;
+}
+
+/** The narrowest a tile gets when the person pinches in. */
+const MIN_TILE = 48;
+
+/** The fewest and most columns a person can pinch a grid of `width` to. */
+export function columnRange(width: number): [number, number] {
+  return [2, Math.min(12, Math.max(4, Math.floor((width + GAP) / (MIN_TILE + GAP))))];
+}
+
+/** Where a person's choice of a grid's size is kept (per server and Satellite, by the screen). */
+export function gridPreferenceKey(block: UiBlock): string {
+  return `media-grid:${typeof block.id === 'string' && block.id ? block.id : 'grid'}:columns`;
+}
+
+/** The row a scroll offset `y` falls in, from a list's [offset, length] layout. */
+export function rowAt(layout: Array<[number, number]>, y: number): number {
+  let low = 0;
+  let high = layout.length - 1;
+  while (low < high) {
+    const middle = (low + high + 1) >> 1;
+    if (layout[middle][0] <= y) {
+      low = middle;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return Math.max(0, low);
+}
+
+/** The first item at or after `row` (a heading row looks at the tiles below it), or -1. */
+export function firstEntryFrom(rows: Row[], row: number): number {
+  for (let at = row; at < rows.length; at += 1) {
+    const candidate = rows[at];
+    if (candidate.kind === 'tiles') {
+      return candidate.entries[0].index;
+    }
+  }
+  return -1;
+}
+
+/** The row holding item `index`, or -1. */
+export function rowOfEntry(rows: Row[], index: number): number {
+  return rows.findIndex(row => row.kind === 'tiles' && row.entries.some(entry => entry.index === index));
 }
 
 /** How many columns a grid of `width` shows at `size`. */
@@ -77,7 +124,7 @@ interface Entry {
   thumb: Source | null;
 }
 
-type Row = {kind: 'group'; label: string; id: string} | {kind: 'tiles'; entries: Entry[]; id: string};
+export type Row = {kind: 'group'; label: string; id: string} | {kind: 'tiles'; entries: Entry[]; id: string};
 
 /** What a grid holds: its page data's items, the pages loaded after them through `more`, and
  * the provider's cursor for the next. Kept in a ref so a page arriving late can be dropped. */
@@ -103,6 +150,8 @@ export interface MediaGridModel {
   /** [offset, length] of each row, for a FlatList's getItemLayout. */
   layout: Array<[number, number]>;
   columns: number;
+  /** Pinching the grid changes its columns (null where it can't: the picker, a `full` grid). */
+  pinch: GestureType | null;
   cursor: string | null;
   loading: boolean;
   error: string | null;
@@ -367,7 +416,39 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
   const size = typeof block.size === 'string' ? block.size : 'medium';
   const shape = typeof block.shape === 'string' ? block.shape : 'square';
   const available = Math.min(windowWidth - space.lg * 2, 1200);
-  const columns = gridColumns(available, size);
+  // the person's own choice of size (a pinch), remembered per server, Satellite and grid; the
+  // document's `size` until they make one
+  const {preferences} = context;
+  const preferenceKey = picking || size === 'full' || !preferences ? null : gridPreferenceKey(block);
+  const [chosen, setChosen] = useState<number | null>(() => {
+    const known = preferenceKey ? preferences?.peek(preferenceKey) : null;
+    return known ? Number(known) || null : null;
+  });
+  useEffect(() => {
+    if (!preferenceKey || !preferences) {
+      return;
+    }
+    let current = true;
+    preferences
+      .get(preferenceKey)
+      .then(value => current && setChosen(value ? Number(value) || null : null))
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [preferenceKey, preferences]);
+  const [fewest, most] = columnRange(available);
+  const columns = chosen ? Math.min(most, Math.max(fewest, chosen)) : gridColumns(available, size);
+  const choose = useCallback(
+    (next: number) => {
+      setChosen(next);
+      if (preferenceKey) {
+        preferences?.set(preferenceKey, String(next));
+      }
+    },
+    [preferenceKey, preferences],
+  );
+  const pinchGesture = usePinchColumnsGesture(columns, fewest, most, choose);
   const cell = Math.floor((available - GAP * (columns - 1)) / columns);
   const aspect = shape === 'wide' ? 16 / 9 : 1;
   const hasText = item.title !== undefined || item.subtitle !== undefined;
@@ -505,6 +586,7 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
     rows,
     layout,
     columns,
+    pinch: preferenceKey ? pinchGesture : null,
     cursor: pg.cursor,
     loading: pg.loading,
     error: pg.error,
@@ -545,14 +627,15 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
   if (model.empty !== null) {
     return <Text style={type.caption}>{model.empty}</Text>;
   }
-  return (
-    <View style={styles.grid} testID="media-grid">
+  const grid = (
+    <View style={styles.grid} testID="media-grid" collapsable={false}>
       {model.head}
       {model.rows.map(model.renderRow)}
       {model.foot}
       {model.viewer}
     </View>
   );
+  return model.pinch ? <GestureDetector gesture={model.pinch}>{grid}</GestureDetector> : grid;
 }
 
 /**
@@ -579,46 +662,92 @@ export function VirtualMediaGrid({
     (_: unknown, index: number) => ({length: layout[index]?.[1] ?? 0, offset: layout[index]?.[0] ?? 0, index}),
     [layout],
   );
+  // a new size (a pinch) keeps the item at the top of the screen where it was
+  const list = useRef<FlatList<Row>>(null);
+  const scrolled = useRef(0);
+  const headHeight = useRef(0);
+  const before = useRef({columns: model.columns, rows: model.rows, layout});
+  // where to scroll once the list has its new height: scrolling before that would be cut short
+  // at the old, shorter content (fewer columns make the list taller)
+  const pending = useRef<number | null>(null);
+  const viewport = useRef(0);
+  const latest = useRef(model);
+  latest.current = model;
+  const settle = useCallback((_width?: number, height?: number) => {
+    if (pending.current !== null) {
+      list.current?.scrollToOffset({offset: pending.current, animated: false});
+      pending.current = null;
+      return;
+    }
+    // a page that arrived while the list was already at its end: the next is due now, not
+    // only at the person's next scroll
+    if (height !== undefined && viewport.current && height - (scrolled.current + viewport.current) < viewport.current * 1.5) {
+      latest.current.loadMore();
+    }
+  }, []);
+  useLayoutEffect(() => {
+    const previous = before.current;
+    before.current = {columns: model.columns, rows: model.rows, layout};
+    const y = scrolled.current - headHeight.current;
+    if (previous.columns === model.columns || y <= 0 || !previous.layout.length) {
+      return;
+    }
+    const anchor = firstEntryFrom(previous.rows, rowAt(previous.layout, y));
+    const row = anchor >= 0 ? rowOfEntry(model.rows, anchor) : -1;
+    if (row >= 0 && layout[row]) {
+      pending.current = layout[row][0] + headHeight.current;
+      // onContentSizeChange scrolls once the new height is laid out; this, if it never changes
+      const timer = setTimeout(() => settle(), 150);
+      return () => clearTimeout(timer);
+    }
+  }, [model.columns, model.rows, layout, settle]);
+  const content = (
+    <FlatList
+      ref={list}
+      testID={testID ?? 'media-grid-list'}
+      data={model.rows}
+      keyExtractor={row => row.id}
+      renderItem={({item: row}) => model.renderRow(row)}
+      getItemLayout={getItemLayout}
+      initialNumToRender={8}
+      maxToRenderPerBatch={6}
+      updateCellsBatchingPeriod={40}
+      windowSize={7}
+      removeClippedSubviews
+      onEndReachedThreshold={1.5}
+      onEndReached={() => model.loadMore()}
+      // FlatList reports its end once per content length: after new page data of the same
+      // length (a reload), the scroll position itself says when the next page is due
+      scrollEventThrottle={100}
+      onScroll={event => {
+        const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
+        scrolled.current = contentOffset.y;
+        viewport.current = layoutMeasurement.height;
+        if (contentSize.height - (contentOffset.y + layoutMeasurement.height) < layoutMeasurement.height * 1.5) {
+          model.loadMore();
+        }
+      }}
+      keyboardShouldPersistTaps="handled"
+      onContentSizeChange={settle}
+      refreshControl={refreshControl}
+      contentContainerStyle={contentContainerStyle}
+      ListHeaderComponent={
+        <View style={styles.virtualHead} onLayout={event => (headHeight.current = event.nativeEvent.layout.height)}>
+          {header}
+          {model.empty !== null ? <Text style={type.caption}>{model.empty}</Text> : model.head}
+        </View>
+      }
+      ListFooterComponent={
+        <View style={styles.virtualFoot}>
+          {model.foot}
+          {footer}
+        </View>
+      }
+    />
+  );
   return (
     <>
-      <FlatList
-        testID={testID ?? 'media-grid-list'}
-        data={model.rows}
-        keyExtractor={row => row.id}
-        renderItem={({item: row}) => model.renderRow(row)}
-        getItemLayout={getItemLayout}
-        initialNumToRender={8}
-        maxToRenderPerBatch={6}
-        updateCellsBatchingPeriod={40}
-        windowSize={7}
-        removeClippedSubviews
-        onEndReachedThreshold={1.5}
-        onEndReached={() => model.loadMore()}
-        // FlatList reports its end once per content length: after new page data of the same
-        // length (a reload), the scroll position itself says when the next page is due
-        scrollEventThrottle={100}
-        onScroll={event => {
-          const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
-          if (contentSize.height - (contentOffset.y + layoutMeasurement.height) < layoutMeasurement.height * 1.5) {
-            model.loadMore();
-          }
-        }}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={refreshControl}
-        contentContainerStyle={contentContainerStyle}
-        ListHeaderComponent={
-          <View style={styles.virtualHead}>
-            {header}
-            {model.empty !== null ? <Text style={type.caption}>{model.empty}</Text> : model.head}
-          </View>
-        }
-        ListFooterComponent={
-          <View style={styles.virtualFoot}>
-            {model.foot}
-            {footer}
-          </View>
-        }
-      />
+      {model.pinch ? <GestureDetector gesture={model.pinch}>{content}</GestureDetector> : content}
       {model.viewer}
     </>
   );
@@ -761,6 +890,8 @@ export function MediaViewer({
   const [key, setKey] = useState(startKey);
   const [info, setInfo] = useState(false);
   const [busy, setBusy] = useState(false);
+  // a zoomed image pans with one finger: the pager's own swipe waits until it is back to size
+  const [zoomed, setZoomed] = useState(false);
   const list = useRef<FlatList<Entry>>(null);
   const found = entries.findIndex(entry => entry.key === key);
   const lastIndex = useRef(Math.max(0, found));
@@ -799,12 +930,14 @@ export function MediaViewer({
   return (
     <Modal visible animationType={reduced ? 'none' : 'fade'} onRequestClose={onClose} statusBarTranslucent>
       <StatusBar barStyle="light-content" />
-      <View style={styles.viewer} testID="media-viewer">
+      {/* a Modal is a window of its own: gestures inside it need their own root */}
+      <GestureHandlerRootView style={styles.viewer} testID="media-viewer">
         <FlatList
           ref={list}
           data={entries}
           horizontal
           pagingEnabled
+          scrollEnabled={!zoomed}
           initialScrollIndex={index}
           getItemLayout={(_, at) => ({length: width, offset: width * at, index: at})}
           keyExtractor={entry => entry.key}
@@ -828,6 +961,7 @@ export function MediaViewer({
               height={height}
               image={source(spec.image !== undefined ? spec.image : block.item?.image, entry.scope)}
               video={entry.kind === 'video' ? source(spec.video, entry.scope) : null}
+              onZoomChange={setZoomed}
             />
           )}
         />
@@ -879,14 +1013,17 @@ export function MediaViewer({
             </ScrollView>
           )}
         </View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
 
 function ViewerPage({
-  entry, active, width, height, image, video,
-}: {entry: Entry; active: boolean; width: number; height: number; image: Source | null; video: Source | null}) {
+  entry, active, width, height, image, video, onZoomChange,
+}: {
+  entry: Entry; active: boolean; width: number; height: number; image: Source | null; video: Source | null;
+  onZoomChange: (zoomed: boolean) => void;
+}) {
   const [failed, setFailed] = useState(false);
   if (video && active) {
     return (
@@ -902,7 +1039,10 @@ function ViewerPage({
   const still = video ? entry.thumb : image;
   return (
     <View style={[styles.page, {width, height}]}>
-      {still && !failed ? (
+      {still && !failed && !video ? (
+        // pinch to zoom, then pan with one finger; double tap zooms in or back out
+        <ZoomableImage source={still} active={active} onZoomChange={onZoomChange} onError={() => setFailed(true)} />
+      ) : still && !failed ? (
         <Image source={still} style={styles.media} resizeMode="contain" onError={() => setFailed(true)} accessibilityIgnoresInvertColors />
       ) : (
         <Icon name="image" size={28} color={palette.text3} />

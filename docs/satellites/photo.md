@@ -272,7 +272,8 @@ What it covers:
 | | Photo's own page and screens | Shared interface |
 | --- | --- | --- |
 | Library grid, newest first, by month; video badge and duration | yes | yes |
-| Viewer: full image, video playback, previous and next, details | yes | yes (no pinch-to-zoom on Android, no OpenStreetMap link) |
+| Viewer: full image, video playback, previous and next, details | yes | yes (no OpenStreetMap link) |
+| Viewer: pinch to zoom an image (Android) | yes, two fingers to pan | yes, one finger to pan while zoomed, double tap to zoom |
 | Favourite and unfavourite; move to the recycle bin | yes | yes, from the viewer and from a selection |
 | Albums: physical, Favorites, custom, with covers; open an album | yes | yes |
 | Create, rename, delete a custom album; remove a photo from it | yes | yes |
@@ -280,7 +281,8 @@ What it covers:
 | Recycle bin: restore, delete for good, retention | yes | yes, from the viewer and from a selection |
 | Recycle bin: days each item has left | yes | yes, under each tile and in the viewer |
 | Album order: the order photos were added (a folder's own order) | yes | yes |
-| Grouping by camera, pinch to change columns (Android) | yes | no |
+| Grouping by camera | web only | no |
+| Thumbnail size | Android: pinch, not remembered | Android: pinch; web: small, medium, large; remembered per grid |
 | Search: file name, camera, lens, date; matching albums | Android only | yes, both clients, with a Photos/Videos filter |
 | Map: located photos, opening the viewer | yes | yes (see below) |
 | Map clustering | web only, by rounded coordinates | both clients, a grid about 64 px wide on screen |

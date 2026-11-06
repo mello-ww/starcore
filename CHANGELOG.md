@@ -115,6 +115,14 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Changed
 
+- **The shared media viewer zooms, and media-grids take the person's own size.** On Android an
+  image in the viewer pinches to zoom and, zoomed, pans with one finger or zooms back on a
+  double tap, without taking the swipe between items; it is Photo's own zoomable image, now
+  shared (Photo's viewer keeps its two-finger pan). A media-grid's thumbnail size changes with a
+  pinch on Android (Photo's own pinch, now shared) and a small, medium and large pill on the
+  web, remembered per server, Satellite and grid, keeping the scroll position, selection and
+  paging. No contract change. On Android a grid that reaches its end while a page is arriving
+  now asks for the next one at once, instead of waiting for the next scroll.
 - **UI contract 1.2: the `own` action** opens a Satellite's own interface (its `page.js`, its
   native screens) at a section it names, from the shared interface - the bridge to what stays
   native during a migration. It reaches no route; a client without an own interface hides it,

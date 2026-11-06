@@ -1914,3 +1914,42 @@ body.ui-viewer-open {
     width: 100%;
     justify-content: center;
 }
+
+/* a media-grid's thumbnail size (small, medium, large): one pill of segments beside Select */
+.ui-pill-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-height: 36px;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--sc-control);
+}
+
+.ui-pill-segment {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--sc-text-2);
+    cursor: pointer;
+}
+
+.ui-pill-segment:hover {
+    color: var(--sc-text);
+}
+
+.ui-pill-segment[aria-pressed="true"] {
+    background: var(--sc-accent);
+    color: var(--sc-on-accent);
+}
+
+.ui-pill-segment:focus-visible {
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 1px;
+}

@@ -15,6 +15,7 @@ import {
 import {MediaPicker, type MediaReference, type PickRequest} from '../satellites/ui/MediaPicker';
 import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
 import {DEDICATED_SCREENS} from './HomeScreen';
+import {uiPreferences} from '../satellites/ui/preferences';
 import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
@@ -62,6 +63,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const appActive = useAppActive();
   const live = focused && appActive;
   const api = useMemo(() => new UiApi(client, activeServer?.id ?? 'default'), [client, activeServer?.id]);
+  // what the person chooses here (a grid's size), remembered for this server and Satellite
+  const preferences = useMemo(() => uiPreferences(activeServer?.id ?? 'default', name), [activeServer?.id, name]);
   // the app's shared audio host: what a document's play action plays through (media.audio)
   const audio = useOptionalAudioHost();
   // notices sit above the floating player while it shows, not behind it
@@ -445,6 +448,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     confirm: confirmAction,
     afterSelection,
     hasOwnScreens: Boolean(DEDICATED_SCREENS[name]),
+    preferences,
     forms,
     setEditing: value => {
       editing.current = value;

@@ -265,7 +265,11 @@ collection: the document says where each picture comes from and what can be done
   format, unit}`, shown under Details, empty ones left out) and up to 6 `actions`
   (`{label, action, icon, style, visible}`) on the item shown. Left and right (arrow keys on
   the web, a swipe on Android) move between items; Escape or Back closes it. After an action's
-  `refresh`, the viewer stays on its item, or shows the next one when the item is gone.
+  `refresh`, the viewer stays on its item, or shows the next one when the item is gone. On
+  Android an image pinches to zoom (up to 5x) and, zoomed, pans with one finger; a double tap
+  zooms in or back out. The swipe between items waits from the moment a second finger touches
+  the image (so a sideways pinch is never taken for a swipe) and while it is zoomed, and an item
+  is back to its own size when it leaves the screen. Videos keep their player.
 - **`selection`**: up to 4 `actions`. "Select" (or a long press on Android, or Shift-click on
   the web) starts a selection; the bar shows the count and the actions. An action runs once
   per selected item with that item as `$.`; its `confirm` is asked once, its `then` applies
@@ -274,6 +278,12 @@ collection: the document says where each picture comes from and what can be done
   a tile aims for. Each client fits as many columns as that width allows (3 on a typical phone
   at `medium`), so the grid follows the screen. **`shape`**: `square` (default), `wide` (16:9)
   or `round`.
+- **The person's own size**: `size` is where a grid starts. The person can change it - a pinch
+  on Android (two columns up to as many as fit at 48 dp, at most 12), a small, medium and large
+  pill beside "Select" on the web - and the client remembers it per server, Satellite and grid
+  (its `id`). Only the tiles' width changes: what is loaded, the selection and paging stay, and
+  the item at the top of the screen stays there. A `full` grid and the media picker keep their
+  size. Nothing reaches the Satellite, and a document needs nothing new for it.
 - **Loading**: tiles are revealed 60 at a time; the next 60 come as the end of the grid comes
   near. Thumbnails load lazily (the web) or downsampled (Android), each with the placeholder and
   image glyph of `image`.

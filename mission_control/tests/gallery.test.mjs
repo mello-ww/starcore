@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { clock, GRID_PAGE, itemKey, mediaKind } from "../ui/gallery.js";
+import { clock, GRID_PAGE, GRID_SIZES, gridSize, gridSizeKey, itemKey, mediaKind } from "../ui/gallery.js";
 
 test("a tile is a video only when its kind says so", () => {
     assert.equal(mediaKind("video"), "video");
@@ -28,4 +28,18 @@ test("a video's badge reads like a player's clock", () => {
 
 test("a page of tiles matches the app's", () => {
     assert.equal(GRID_PAGE, 60);
+});
+
+test("a person's choice of thumbnail size wins over the document's, when it is one of the sizes", () => {
+    assert.deepEqual(GRID_SIZES, ["small", "medium", "large"]);
+    assert.equal(gridSize({ size: "large" }, "small"), "small");
+    assert.equal(gridSize({ size: "large" }, null), "large");
+    assert.equal(gridSize({}, null), "medium");
+    assert.equal(gridSize({ size: "small" }, "huge"), "small");  // a stored value from elsewhere
+});
+
+test("each grid remembers its own size", () => {
+    assert.equal(gridSizeKey({ id: "library" }), "media-grid:library:size");
+    assert.equal(gridSizeKey({}), "media-grid:grid:size");
+    assert.notEqual(gridSizeKey({ id: "library" }), gridSizeKey({ id: "trash" }));
 });

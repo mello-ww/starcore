@@ -13,10 +13,9 @@ import {
   Text,
   View,
 } from 'react-native';
-import {Gesture, GestureDetector} from 'react-native-gesture-handler';
-import Animated, {useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
 import Video from 'react-native-video';
 import {PrimaryButton} from '../components/PrimaryButton';
+import {ZoomableImage} from '../components/ZoomableImage';
 import {LockedFolderUnlock} from '../lockedFolder/LockedFolderUnlock';
 import {useLockedFolder} from '../lockedFolder/useLockedFolder';
 import {privacy} from '../platform/privacy';
@@ -311,96 +310,11 @@ function ViewerPage({item, active}: {item: MediaItem; active: boolean}) {
     );
   }
 
-  return (
-    <ZoomableImage source={imageSource(item.id, 'original')} onLoadEnd={() => setLoading(false)} loading={loading} />
-  );
-}
-
-/** The photo page's own pinch-to-zoom - "swipe is here but pinch-to-zoom
- * isn't wired up here yet" from this screen's old docstring, now that
- * react-native-gesture-handler + react-native-reanimated are both approved
- * dependencies (see PhotoLibraryTab's usePinchColumns for the other use of
- * that same pair). Pinching zooms in around the gesture's own focal point;
- * releasing below the original size springs back to it rather than leaving
- * the image stuck smaller than the frame. This never touches horizontal
- * swiping between photos - the pinch gesture and the FlatList's own paging
- * gesture are independent, since a two-finger pinch never triggers a
- * single-finger horizontal pan. */
-function ZoomableImage({
-  source,
-  onLoadEnd,
-  loading,
-}: {
-  source: {uri: string; headers?: Record<string, string>};
-  onLoadEnd: () => void;
-  loading: boolean;
-}) {
-  const accentStyle = useAccentStyles();
-  const scale = useSharedValue(1);
-  const savedScale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const savedTranslateX = useSharedValue(0);
-  const savedTranslateY = useSharedValue(0);
-
-  const reset = () => {
-    'worklet';
-    scale.value = withTiming(1);
-    translateX.value = withTiming(0);
-    translateY.value = withTiming(0);
-    savedScale.value = 1;
-    savedTranslateX.value = 0;
-    savedTranslateY.value = 0;
-  };
-
-  const pinch = Gesture.Pinch()
-    .onUpdate(event => {
-      scale.value = Math.max(1, savedScale.value * event.scale);
-    })
-    .onEnd(() => {
-      savedScale.value = scale.value;
-      if (scale.value <= 1) {
-        reset();
-      }
-    });
-
-  // two fingers only (matching the pinch above) - a single-finger drag is
-  // deliberately left entirely to the FlatList's own native horizontal
-  // paging (swipe between photos), so zooming in never steals that gesture
-  const pan = Gesture.Pan()
-    .minPointers(2)
-    .onUpdate(event => {
-      if (scale.value <= 1) {
-        return;
-      }
-      translateX.value = savedTranslateX.value + event.translationX;
-      translateY.value = savedTranslateY.value + event.translationY;
-    })
-    .onEnd(() => {
-      savedTranslateX.value = translateX.value;
-      savedTranslateY.value = translateY.value;
-    });
-
-  const gesture = Gesture.Simultaneous(pinch, pan);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      {translateX: translateX.value},
-      {translateY: translateY.value},
-      {scale: scale.value},
-    ],
-  }));
-
+  // the shared zoomable image (src/components/): pinch to zoom, two fingers to pan, so one
+  // finger always swipes to the next photo; back to its own size when it leaves the screen
   return (
     <View style={styles.page}>
-      <GestureDetector gesture={gesture}>
-        <Animated.Image
-          source={source}
-          style={[styles.image, animatedStyle]}
-          resizeMode="contain"
-          onLoadEnd={onLoadEnd}
-        />
-      </GestureDetector>
+      <ZoomableImage source={imageSource(item.id, 'original')} active={active} onLoadEnd={() => setLoading(false)} />
       {loading && <ActivityIndicator color={accentStyle.color} style={StyleSheet.absoluteFill} />}
     </View>
   );

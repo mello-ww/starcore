@@ -13,6 +13,7 @@ import {
   BLOCK_TYPES, findProvider, formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate, toneOf,
   type Providers, type Scope, type UiAction, type UiBlock,
 } from './contract';
+import type {UiPreferences} from './preferences';
 
 const {palette, space, type, radii} = tokens;
 
@@ -65,6 +66,8 @@ export interface BlockContext {
   /** 1.2's own action: whether this app has the Satellite's own native screens to open. A
    * button that opens them is hidden without. */
   hasOwnScreens?: boolean;
+  /** What the person chose here before (a media-grid's size), kept per server and Satellite. */
+  preferences?: UiPreferences;
 }
 
 const asText = (value: unknown) => (value === null || value === undefined ? '' : String(value));

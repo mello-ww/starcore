@@ -64,3 +64,9 @@ jest.mock('react-native-video', () => {
   });
   return {__esModule: true, default: Video, Video};
 });
+
+// Gestures and animations (the shared zoomable image, a media-grid's pinch): both libraries'
+// own Jest mocks, so a screen that uses them renders under Node. A test that needs more (the
+// startup order tests) still mocks react-native-gesture-handler itself.
+require('react-native-gesture-handler/jestSetup');
+jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));

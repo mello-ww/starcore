@@ -12,6 +12,31 @@ import { icon } from "./icons.js";
 export const GRID_PAGE = 60;
 // tiles per chunk of the grid: the browser skips laying out and painting a chunk off screen
 export const CHUNK = 60;
+/** The thumbnail sizes a person can choose between; the document's `size` is the default. */
+export const GRID_SIZES = ["small", "medium", "large"];
+
+/** Where a person's choice of a grid's size is kept (per Satellite, by the renderer; per server
+ * by being this server's own Mission Control). */
+export function gridSizeKey(block) {
+    return `media-grid:${typeof block.id === "string" && block.id ? block.id : "grid"}:size`;
+}
+
+/** The size a grid shows at: the person's choice when it is one of GRID_SIZES, else the
+ * document's own. */
+export function gridSize(block, chosen) {
+    return GRID_SIZES.includes(chosen) ? chosen : (block.size || "medium");
+}
+
+/** The element whose scrolling moves `node`: its nearest scrolling ancestor, or the page. */
+function scrollerOf(node) {
+    for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+        const overflow = getComputedStyle(parent).overflowY;
+        if ((overflow === "auto" || overflow === "scroll") && parent.scrollHeight > parent.clientHeight) {
+            return parent;
+        }
+    }
+    return document.scrollingElement || document.documentElement;
+}
 
 function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -282,7 +307,13 @@ export function createGallery(host) {
         pruneSelection(grid);
         const items = grid.items;
 
-        const size = block.size || "medium";
+        // the person's own choice of size, remembered per Satellite and grid (not in the picker,
+        // nor for a `full` grid of one column)
+        const resizable = !picking && block.size !== "full";
+        if (resizable && grid.size === undefined) {
+            grid.size = host.preferences ? host.preferences.get(gridSizeKey(block)) : null;
+        }
+        const size = resizable ? gridSize(block, grid.size) : (block.size || "medium");
         const wrapper = el("section", `ui-media-grid ui-media-grid-${size} ui-shape-${block.shape || "square"}`);
         if (items.length === 0) {
             const empty = block.empty !== undefined ? resolve(block.empty, scope) : null;
@@ -290,10 +321,16 @@ export function createGallery(host) {
                 empty === null || empty === undefined || empty === "" ? "Nothing here." : String(empty)));
             return wrapper;
         }
+        grid.resizable = resizable;
+        grid.wrapper = wrapper;
         if (block.selection && !picking) {
             grid.bar = el("div", "ui-media-selection");
             wrapper.appendChild(grid.bar);
             renderSelectionBar(block, grid);
+        } else if (resizable) {
+            const row = el("div", "ui-media-selection");
+            row.appendChild(sizeControl(block, grid));
+            wrapper.appendChild(row);
         }
         wrapper.classList.toggle("is-selecting", grid.selecting);
         const body = el("div", "ui-media-grid-body");
@@ -461,6 +498,54 @@ export function createGallery(host) {
         renderSelectionBar(block, grid);
     }
 
+    // ---------- size ----------
+
+    /** Small, medium and large thumbnails, as one pill. */
+    function sizeControl(block, grid) {
+        const group = el("div", "ui-pill-group ui-media-size");
+        group.setAttribute("role", "group");
+        group.setAttribute("aria-label", "Thumbnail size");
+        const current = gridSize(block, grid.size);
+        GRID_SIZES.forEach((size, at) => {
+            const button = el("button", "ui-pill-segment");
+            button.type = "button";
+            button.dataset.size = size;
+            button.title = `${size[0].toUpperCase()}${size.slice(1)} thumbnails`;
+            button.setAttribute("aria-label", button.title);
+            button.setAttribute("aria-pressed", String(size === current));
+            button.appendChild(glyph("grid", 12 + at * 3));
+            button.addEventListener("click", () => setSize(block, grid, size));
+            group.appendChild(button);
+        });
+        return group;
+    }
+
+    /** A new size for one grid: only its tiles' width changes (a class), so what is loaded, the
+     * selection and paging stay as they are, and the tile at the top of the screen stays there. */
+    function setSize(block, grid, size) {
+        const wrapper = grid.wrapper;
+        if (!wrapper || !GRID_SIZES.includes(size)) {
+            return;
+        }
+        const anchor = [...wrapper.querySelectorAll(".ui-media-tile")].find((tile) => tile.getBoundingClientRect().bottom > 0);
+        const before = anchor ? anchor.getBoundingClientRect().top : 0;
+        for (const name of [...GRID_SIZES, block.size || "medium"]) {
+            wrapper.classList.remove(`ui-media-grid-${name}`);
+        }
+        wrapper.classList.add(`ui-media-grid-${size}`);
+        grid.size = size;
+        host.preferences?.set(gridSizeKey(block), size);
+        for (const button of wrapper.querySelectorAll(".ui-media-size .ui-pill-segment")) {
+            button.setAttribute("aria-pressed", String(button.dataset.size === size));
+        }
+        if (anchor) {
+            const moved = anchor.getBoundingClientRect().top - before;
+            if (moved) {
+                scrollerOf(wrapper).scrollTop += moved;
+            }
+        }
+    }
+
     function renderSelectionBar(block, grid) {
         const bar = grid.bar;
         if (!bar) {
@@ -469,6 +554,9 @@ export function createGallery(host) {
         bar.replaceChildren();
         bar.closest(".ui-media-grid")?.classList.toggle("is-selecting", grid.selecting);
         if (!grid.selecting) {
+            if (grid.resizable) {
+                bar.appendChild(sizeControl(block, grid));
+            }
             const start = el("button", "ui-pill ui-media-select", "Select");
             start.type = "button";
             start.addEventListener("click", () => {
@@ -484,6 +572,9 @@ export function createGallery(host) {
         summary.setAttribute("role", "status");
         bar.appendChild(summary);
         const actions = el("div", "ui-media-selection-actions");
+        if (grid.resizable) {
+            actions.appendChild(sizeControl(block, grid));  // a new size keeps the selection
+        }
         for (const entry of block.selection.actions || []) {
             const button = actionButton(entry, grid.scope);
             button.disabled = count === 0;
