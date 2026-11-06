@@ -60,7 +60,7 @@ describe('the offline store', () => {
     expect(await AsyncStorage.getItem(key)).toBeNull();
 
     await store.write('albums', entry([{id: 'a1'}]));
-    const huge = entry([{id: 'x', blob: 'x'.repeat(MAX_BYTES)}]);
+    const huge = entry([{id: 'x', title: 'x'.repeat(MAX_BYTES)}]);
     expect(await store.write('albums', huge)).toBe(false);
     expect(await store.read('albums')).toBeNull();
   });
@@ -110,5 +110,63 @@ describe('the offline store', () => {
     expect(keptPages(pages, cursors)).toEqual({pages: pages.slice(0, MAX_GRID_PAGES), cursor: `c${MAX_GRID_PAGES - 1}`});
     expect(keptPages([[{id: 1}]], [null])).toEqual({pages: [[{id: 1}]], cursor: null});
     expect(keptPages([], [])).toEqual({pages: [], cursor: null});
+  });
+  it('stores only allowlisted display fields, including grid pages', async () => {
+    const store = new OfflineStore('srv-1', 'aaaa', 'Generic', clock);
+    await store.write('library', {savedAt: now, data: {items: [{id: '1', title: 'One', folder: 'C:\\private',
+      location: 'secret GPS', token: 'credential', image: 'https://example.test/private'}], summary: 'Ready',
+      secret: 'hidden'}, grids: {library: {pages: [[{id: '2', title: 'Two', folder: '/private'}]], cursor: 'next'}}});
+    const raw = (await AsyncStorage.getItem((await allKeys()).find(key => key.endsWith(':library'))!))!;
+    expect(raw).not.toMatch(/private|secret|credential|https?:\/\/|folder|location|token/);
+    expect((await store.read('library'))?.data).toEqual({items: [{id: '1', title: 'One'}], summary: 'Ready'});
+    expect((await store.read('library'))?.grids.library.pages).toEqual([[{id: '2', title: 'Two'}]]);
+  });
+
+  it('removes sensitive values recursively from nested objects and arrays', async () => {
+    const store = new OfflineStore('srv-1', 'aaaa', 'Generic', clock);
+    const nested = {credentials: {token: 'nested-secret'}, paths: ['/private/file'],
+      metadata: [{url: 'https://example.test/secret'}]};
+    await store.write('library', {
+      savedAt: now,
+      data: {items: [
+        {id: 'safe', title: nested, metadata: nested, group: [nested]},
+        {id: ['secret-id'], title: 'Visible', camera: {model: 'secret-camera'}},
+        [nested],
+      ], summary: nested, albums: [{id: 'album', title: 'Album', metadata: [nested]}]},
+      grids: {library: {pages: [[{id: 'grid', title: nested, metadata: [nested]}]], cursor: 'next'}},
+    });
+    const key = (await allKeys()).find(name => name.endsWith(':library'))!;
+    const raw = (await AsyncStorage.getItem(key))!;
+    expect(raw).not.toMatch(/nested-secret|private|example\.test|secret-id|secret-camera|credentials|metadata|paths/);
+    expect((await store.read('library'))?.data).toEqual({
+      items: [{id: 'safe'}, {title: 'Visible'}, {}], albums: [{id: 'album', title: 'Album'}],
+    });
+    expect((await store.read('library'))?.grids.library.pages).toEqual([[{id: 'grid'}]]);
+  });
+
+  it('refuses and removes an unindexed entry before it can be shown', async () => {
+    const key = `${OFFLINE_PREFIX}:srv-1:aaaa:Photo:orphan`;
+    await AsyncStorage.setItem(key, JSON.stringify(entry([{id: 'stale'}])));
+    expect(await new OfflineStore('srv-1', 'aaaa', 'Photo', clock).read('orphan')).toBeNull();
+    expect(await AsyncStorage.getItem(key)).toBeNull();
+  });
+
+  it('orders pending writes before server and Satellite invalidation', async () => {
+    const store = new OfflineStore('srv-1', 'aaaa', 'Photo', clock);
+    const first = store.write('library', entry([{id: 'old'}]));
+    const action = store.forgetSatellite();
+    await Promise.all([first, action]);
+    expect(await store.read('library')).toBeNull();
+    const second = store.write('library', entry([{id: 'old'}]));
+    const logout = forgetOfflineServer('srv-1');
+    await Promise.all([second, logout]);
+    expect(await store.read('library')).toBeNull();
+  });
+
+  it('removes legacy raw entries during startup cleanup', async () => {
+    const old = 'starcore_ui_offline:v1:srv-1:aaaa:Photo:library';
+    await AsyncStorage.setItem(old, JSON.stringify(entry([{folder: '/private'}])));
+    await tidyOffline('srv-1', 'aaaa', now);
+    expect(await AsyncStorage.getItem(old)).toBeNull();
   });
 });

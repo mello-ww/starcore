@@ -603,9 +603,10 @@ A page with `"offline": true` is kept by the Android app, so a person who loses 
 can still browse what they saw. Mission Control keeps nothing: a browser tab without StarCore
 has nowhere to load from.
 
-- **What is kept**: the page's data exactly as the Satellite answered it (its order and fields),
-  and for each `media-grid` the first 4 pages it loaded after that through `more`, with the
-  cursor after the last. Never a token, a resolved URL or an image: images come from the
+- **What is kept**: an explicit generic allowlist of display fields from the page and, for each
+  `media-grid`, the first 4 pages loaded through `more` with the cursor after the last. Paths,
+  location metadata, credentials and URLs are excluded. New display fields need a privacy review
+  before being added to the cache allowlist. Images come from the
   platform's own cache when it still has them, and show the placeholder otherwise.
 - **Scope**: per server, per session (a one-way fingerprint of the session token), per
   Satellite, and per collection (a page and its `params`). A page that depends on `$state`
@@ -629,7 +630,7 @@ has nowhere to load from.
 - **Limits**: 12 collections per server (the least recently used go first) and 512 KB each; a
   collection too large to keep is not kept at all (an older copy is forgotten with it).
 - **Storage**: AsyncStorage, one entry per collection
-  (`starcore_ui_offline:v1:<server>:<session>:<satellite>:<collection>`) and an index per server.
+  (`starcore_ui_offline:v2:<server>:<session>:<satellite>:<collection>`) and an index per server.
   The entry is written before the index lists it; an entry the index doesn't list (an
   interrupted write), from another session or past its age is removed, and one that can't be
   read is removed and treated as never kept.
