@@ -89,6 +89,8 @@ def gallery_route(request):
 def media_route(request):
     if request.method != "GET":
         return error_response("only GET is supported here", status=405)
+    if len(request.path) == 2 and request.path[0] == "resolve":
+        return resolve_media(request, request.path[1])
     if request.path:
         return error_response(f"unknown endpoint 'media/{'/'.join(request.path)}'")
 
@@ -97,6 +99,17 @@ def media_route(request):
     except gallery.PagingError as error:
         return error_response(str(error), status=400)
     return json_response(gallery.media_view(request.satellite, request.query.get("kinds"), limit, cursor))
+
+
+def resolve_media(request, photo_id: str):
+    """media.gallery's resolve operation: GET media/resolve/<id> -> {id, kind}, for an item of
+    the active library only - never one in the recycle bin, and never one moved into the Locked
+    Folder (it has left the library). What the Engine asks before another Satellite acts on a
+    reference a client sent (starcore.capabilities.resolve_references)."""
+    photo = library(request.satellite).get(photo_id) if 0 < len(photo_id) <= 128 else None
+    if photo is None:
+        return error_response("no such photo in the library", status=404)
+    return json_response({"id": photo["id"], "kind": "video" if photo.get("media_type") == "video" else "image"})
 
 
 def sync_status(request):

@@ -123,6 +123,15 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   on sign-in, sign-out and server removal. Photos' shared Library, Albums and album pages use
   it; Photo's own screens forget it when they delete a photo or move one to the Locked Folder.
   Mission Control keeps nothing.
+- **Moving into the Locked Folder without opening it (server).** An unlock can ask for a
+  single-use grant for one move instead (`for: {operation: "move_in", items}`): bound to the
+  session, the exact items and 60 seconds, used up by the first `move_in` whatever its outcome,
+  and never an unlock, so the vault stays locked and nothing needs locking again. `move_in`
+  takes references (`{provider, capability, id}`), which the Engine resolves through the
+  `media.gallery` provider it knows (`starcore/capabilities.py`) and checks again at the moment
+  of each move. Photo's `media.gallery` gains an optional `resolve` operation, and the Locked
+  Folder provides `media.vault`, with no operation that lists or reads the vault. Photo's library
+  now refuses to remove a binned photo for a move, under one lock with binning and restoring.
 - **Offline pages keep only what they show.** The app keeps only the fields a page's blocks
   bind, and never a field the page names in `"offline": {"omit": [...]}`, at any depth. Photo
   omits each item's GPS location and its folder on the server, which the first version kept in

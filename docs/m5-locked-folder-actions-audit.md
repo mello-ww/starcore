@@ -182,8 +182,10 @@ only say what the client thinks the item is.
   never from the reference.
   - The reference's `provider` must equal that provider's registered name, and its
     `capability` must be `media.gallery`. Anything else is refused.
-  - The provider confirms the id through a new required operation, `resolve` (an id to
-    `{id, kind}` or "unknown"), added to `media.gallery` as version 1.1 (additive).
+  - The provider confirms the id through a new operation, `resolve` (an id to `{id, kind}` or
+    "unknown"). *As built:* capability versions are whole numbers, so `resolve` is an
+    optional operation of `media.gallery` version 1 (additive), and the Engine refuses to
+    resolve references for a provider that doesn't offer it.
   - Only active library items resolve: never the bin, and never an item already in the vault.
 - **The Locked Folder** resolves every reference before it moves anything.
   - If any reference fails, it refuses the whole request (`400`, listing the bad

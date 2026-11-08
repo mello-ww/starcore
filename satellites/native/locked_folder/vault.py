@@ -20,12 +20,15 @@ import os
 import secrets
 import threading
 
+from starcore import capabilities
+
 from . import encryption
 from .keys import META_DIR
 from .media import MEDIA_TYPES  # noqa: F401 - part of this module's interface
 
 PHOTO_SATELLITE = "Photo"
 MOVED_IN_FOLDER = "Photos"     # where photos moved in from the Photo library land
+GALLERY = "media.gallery"      # the capability references to movable media name
 MAX_ITEMS = 20000
 READ_SIZE = 1024 * 1024
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024
@@ -181,9 +184,29 @@ def photo_library(engine):
     return library(satellite)
 
 
-def move_in(engine, live, root: Path, photo_ids) -> dict:
+def resolve_movable(engine, references, token: str) -> tuple:
+    """(resolved, refused) for references a client sent (move_in's `items`): each one resolved
+    by the Engine through the media.gallery provider it knows, never trusted as sent. Only the
+    Photo library's items can be moved in, so a provider other than Photo refuses them all.
+    Raises capabilities.ReferenceProblem when the list can't be used at all."""
+    resolved, refused = capabilities.resolve_references(engine, GALLERY, references, token)
+    if any(item["provider"] != PHOTO_SATELLITE for item in resolved):
+        raise capabilities.ReferenceProblem("only photos from the Photo library can be moved in")
+    return resolved, refused
+
+
+def still_movable(engine, token: str):
+    """The check made again for each photo at the moment it is moved: does the media.gallery
+    provider still answer for it, in the active library?"""
+    return lambda photo_id: capabilities.still_resolves(
+        engine, GALLERY, {"provider": PHOTO_SATELLITE, "id": photo_id}, token)
+
+
+def move_in(engine, live, root: Path, photo_ids, still_valid=None) -> dict:
     """Moves photos out of the Photo library into the vault's Photos folder -
-    encrypted, once the vault is."""
+    encrypted, once the vault is. With `still_valid`, each photo is checked again
+    with it just before its copy, under the move lock; one that no longer passes
+    is reported in `failed` and left alone."""
     library = photo_library(engine)
     if library is None:
         raise VaultError("the Photo satellite is not available", status=503)
@@ -194,6 +217,9 @@ def move_in(engine, live, root: Path, photo_ids) -> dict:
     moved, failed = [], []
     with _move_lock:
         for photo_id in dict.fromkeys(photo_ids):
+            if still_valid is not None and not still_valid(photo_id):
+                failed.append({"id": photo_id, "reason": "it is no longer in the library"})
+                continue
             try:
                 if store is not None:
                     moved.append(_move_one_in_encrypted(live, library, store, photo_id))

@@ -238,6 +238,45 @@ checks the library's copy against the original's SHA-256, and only then deletes 
 file. A file Photo can't read (a document, say) stays in the vault and is reported in
 `failed`. A photo that was sitting in Photo's recycle bin comes back out of it.
 
+### Moves from a shared interface: grants and references
+
+The Locked Folder provides the `media.vault` capability: `status`, `unlock`, `lock`, `move_in`
+and, optionally, `biometric`. It has no operation that lists or reads the vault; viewing it
+stays in its own screens.
+
+```
+POST /api/satellites/LockedFolder/unlock   { "pin", "for": { "operation": "move_in", "items": [reference] } }
+                                           -> { "unlocked": false, "grant", "expires_at" }
+POST /api/satellites/LockedFolder/move_in  { "items": [reference], "grant"? } -> { "moved": [...], "failed": [...] }
+```
+
+- **A reference** is `{"provider", "capability": "media.gallery", "id"}`. It is resolved by
+  the Engine through the `media.gallery` provider it knows (see the UI contract's "Shared
+  blocks and Satellite capabilities"), never trusted as sent, and only Photo's items can be
+  moved in. One reference that doesn't resolve refuses the whole request (`400`, with
+  `refused` listing which), so nothing is moved. At most 500 at once.
+- **A grant** is what an unlock with `for` returns instead of an unlock. The PIN (or a biometric
+  signature, with the same `for`) is checked exactly as for an unlock, with the same attempt
+  counting and lockout. A malformed `for` or a bad reference is refused before the attempt is
+  counted. The grant:
+  - is bound to this session, to `move_in`, and to exactly the resolved items;
+  - lasts 60 seconds, in memory only;
+  - is used up by the first `move_in` that presents it, whatever its outcome. Taking it out and
+    checking it are one step under a lock, so of two requests only one finds it, and a replay
+    finds nothing;
+  - is dropped, with every other grant and unlock, by a PIN change, a new location, a recovery
+    or a restart;
+  - **is not an unlock**: `status` still says locked, and `media`, `media/file`, `upload`,
+    `delete`, `move_out` and `encryption` still refuse the session. So a client that dies
+    after the PIN leaves nothing open, and has nothing to lock again.
+- **`move_in` with `items`** runs under this session's unlock (which it leaves as it was) or a
+  matching grant. `photo_ids` keeps working for the dedicated screens, under an unlock.
+- **Checked again at the moment of the move.** Under the move lock, each photo is resolved
+  again just before its copy; the original's SHA-256 must match its content-addressed id; and
+  the library removes it only if it is still active, under the lock every bin, restore, erase
+  and purge takes. A photo binned, erased or moved since the request was checked is reported
+  in `failed` and left where it is, with any vault copy undone.
+
 ### Keeping private media out of Photos
 
 Photo asks the Locked Folder two questions (`satellites/native/photo/private_media.py`),
@@ -661,6 +700,20 @@ losing anything) in isolation, plus `StarCore.__init__`'s own wiring of it for t
 authentication store specifically. `engine/tests/test_gitignore.py` verifies, against a real
 disposable git repository, that the runtime-data and secret paths above are actually ignored
 and that ordinary tracked source/configuration files are not.
+
+`engine/tests/test_locked_folder_security.py` also covers moves from a shared interface:
+- a grant moving exactly its items once, without unlocking the vault;
+- a grant used up by a mismatched, refused or replayed request;
+- a grant bound to its session, expiring, dropped by a PIN or location change, and needing the
+  right PIN with attempts counted;
+- six concurrent requests with one grant moving at most once;
+- forged references (another provider or capability, an unknown, binned or malformed id, an
+  extra key) refused before any attempt is counted, and a mixed request moving nothing;
+- a photo binned just before its copy left in the bin;
+- the library refusing to remove a binned photo for a move;
+- Photo resolving only active library items, and no reference resolving without an enabled
+  provider;
+- a biometric unlock asking for a grant.
 
 `satellites/native/photo/tests/lockedMove.test.mjs` (`node --test`) covers moving a photo in
 from Photo's own web page: locking again after a successful and after a failed move, an

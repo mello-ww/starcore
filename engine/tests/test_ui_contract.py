@@ -246,7 +246,9 @@ class ShippedManifestsTest(unittest.TestCase):
             routes = module.routes()
             for name, entry in provides.items():
                 for operation, route in entry["operations"].items():
-                    self.assertIn(route, routes, f"{path.parent.name}: {name}.{operation}")
+                    # an operation may name a path beneath a route (media/resolve): the route
+                    # is its first segment, as the Engine dispatches it
+                    self.assertIn(route.split("/")[0], routes, f"{path.parent.name}: {name}.{operation}")
 
 
 class UiApiTest(unittest.TestCase):

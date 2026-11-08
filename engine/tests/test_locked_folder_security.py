@@ -601,6 +601,204 @@ class LockedFolderSecurityTest(unittest.TestCase):
         self.assertEqual(described["LockedFolder"]["section_of"], "Photo")
         self.assertIsNone(described["Photo"]["section_of"])
 
+    # ---------- single-use grants for one move, and references (M5) ----------
+
+    def ref(self, photo_id, **changes):
+        return {"provider": "Photo", "capability": "media.gallery", "id": photo_id, **changes}
+
+    def grant_for(self, photo_ids, pin="2468", token=None):
+        return self.lf("unlock", {"pin": pin, "for": {"operation": "move_in", "items": [self.ref(i) for i in photo_ids]}},
+                       token=token)
+
+    def move(self, photo_ids, grant=None, token=None):
+        body = {"items": [self.ref(i) for i in photo_ids]}
+        if grant is not None:
+            body["grant"] = grant
+        return self.lf("move_in", body, token=token)
+
+    def test_a_grant_moves_exactly_its_items_once_without_unlocking_the_vault(self):
+        self.setup_vault()
+        first, second, _third = self.import_photos()
+        status, payload = self.grant_for([first])
+        self.assertEqual(status, 200)
+        self.assertFalse(payload["unlocked"])
+        self.assertTrue(payload["grant"] and payload["expires_at"])
+        # not an unlock: the vault still refuses this session everything else
+        self.assertFalse(self.lf("status")[1]["unlocked"])
+        for route, body in (("media", None), ("media/file?path=Photos/x.png", None), ("move_out", {"paths": ["x"]}),
+                            ("delete", {"paths": ["x"]}), ("encryption", None)):
+            self.assertEqual(self.lf(route, body)[0], 403, route)
+
+        status, payload = self.move([first], payload["grant"])
+        self.assertEqual(status, 200, payload)
+        self.assertEqual([item["id"] for item in payload["moved"]], [first])
+        self.assertIsNone(self.library().get(first))
+        self.assertFalse(self.lf("status")[1]["unlocked"], "nothing to lock again afterwards")
+
+    def test_a_grant_is_used_up_by_the_first_request_whatever_it_asks(self):
+        self.setup_vault()
+        first, second, _third = self.import_photos()
+        grant = self.grant_for([first])[1]["grant"]
+        # another item than the granted one: refused, and the grant is gone
+        self.assertEqual(self.move([second], grant)[0], 403)
+        self.assertEqual(self.move([first], grant)[0], 403)
+        # a superset is refused too
+        grant = self.grant_for([first])[1]["grant"]
+        self.assertEqual(self.move([first, second], grant)[0], 403)
+        self.assertEqual(self.move([first], grant)[0], 403)
+        # a request refused for its references uses it up as well
+        grant = self.grant_for([first])[1]["grant"]
+        self.assertEqual(self.lf("move_in", {"items": [self.ref(first, provider="Elsewhere")], "grant": grant})[0], 400)
+        self.assertEqual(self.move([first], grant)[0], 403)
+        # replayed after a successful move: nothing left to use
+        grant = self.grant_for([first])[1]["grant"]
+        self.assertEqual(self.move([first], grant)[0], 200)
+        self.assertEqual(self.move([first], grant)[0], 400, "already moved, so no longer a reference")
+        self.assertIsNotNone(self.library().get(second))
+
+    def test_a_grant_belongs_to_the_session_that_asked(self):
+        self.setup_vault()
+        first, *_ = self.import_photos()
+        grant = self.grant_for([first])[1]["grant"]
+        other = self.engine.auth.create_session("admin")
+        self.assertEqual(self.move([first], grant, token=other)[0], 403)
+        self.assertEqual(self.move([first], grant)[0], 403, "presented once, by anyone, it is gone")
+        self.assertIsNotNone(self.library().get(first))
+
+    def test_concurrent_requests_with_one_grant_move_at_most_once(self):
+        self.setup_vault()
+        photos = self.import_photos(3)
+        grant = self.grant_for(photos[:1])[1]["grant"]
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            statuses = list(pool.map(lambda _: self.move(photos[:1], grant)[0], range(6)))
+        self.assertEqual(statuses.count(200), 1, statuses)
+        self.assertTrue(all(status in (200, 400, 403) for status in statuses), statuses)
+
+    def test_an_expired_grant_moves_nothing(self):
+        self.setup_vault()
+        first, *_ = self.import_photos()
+        grant = self.grant_for([first])[1]["grant"]
+        runtime_module = module("locked_folder.runtime")
+        later = runtime_module.time.time() + runtime_module.GRANT_SECONDS + 1
+        with mock.patch.object(runtime_module.time, "time", return_value=later):
+            self.assertEqual(self.move([first], grant)[0], 403)
+        self.assertIsNotNone(self.library().get(first))
+
+    def test_a_changed_pin_or_location_drops_every_grant(self):
+        self.setup_vault()
+        first, *_ = self.import_photos()
+        grant = self.grant_for([first])[1]["grant"]
+        self.runtime().forget_all_unlocks()  # what a PIN change and a new location do
+        self.assertEqual(self.move([first], grant)[0], 403)
+
+    def test_a_grant_needs_the_right_pin_and_counts_attempts(self):
+        self.setup_vault()
+        first, *_ = self.import_photos()
+        status, payload = self.grant_for([first], pin="0000")
+        self.assertEqual(status, 401)
+        self.assertNotIn("grant", payload)
+        for _ in range(4):
+            self.grant_for([first], pin="0000")
+        self.assertEqual(self.grant_for([first])[0], 429, "locked out like any unlock")
+
+    def test_references_are_resolved_on_the_server_never_trusted(self):
+        self.setup_vault()
+        first, second, binned = self.import_photos()
+        self.assertEqual(self.call(f"/api/satellites/Photo/trash/{binned}", "POST")[0], 200)
+        forged = [
+            self.ref(first, provider="Elsewhere"),       # a provider other than the one the Engine knows
+            self.ref(first, capability="media.vault"),   # another capability
+            self.ref("0" * 64),                          # no such photo
+            self.ref(binned),                            # in the recycle bin
+            self.ref("../../etc"),                       # not an item id
+            {**self.ref(first), "path": "/srv/x"},       # not a reference
+        ]
+        for reference in forged:
+            body = {"pin": "2468", "for": {"operation": "move_in", "items": [self.ref(second), reference]}}
+            status, payload = self.lf("unlock", body)
+            self.assertEqual(status, 400, reference)
+            self.assertNotIn("grant", payload)
+        self.assertEqual(self.lf("unlock", {"pin": "2468", "for": {"operation": "move_out", "items": [self.ref(first)]}})[0], 400)
+        # none of that cost a PIN attempt
+        self.assertEqual(self.grant_for([first])[0], 200)
+
+        # with the vault unlocked, a forged reference still moves nothing - not even the valid one
+        self.assertEqual(self.unlock()[0], 200)
+        status, payload = self.lf("move_in", {"items": [self.ref(second), self.ref(binned)]})
+        self.assertEqual(status, 400)
+        self.assertEqual([item["index"] for item in payload["refused"]], [1])
+        self.assertIsNotNone(self.library().get(second))
+        self.assertIsNotNone(self.library().get_any(binned))
+
+    def test_an_unlocked_session_moves_references_without_a_grant_and_stays_unlocked(self):
+        self.setup_vault()
+        first, *_ = self.import_photos()
+        self.assertEqual(self.move([first])[0], 403, "locked, and no grant")
+        self.assertEqual(self.unlock()[0], 200)
+        self.assertEqual(self.move([first])[0], 200)
+        self.assertTrue(self.lf("status")[1]["unlocked"])
+
+    def test_a_photo_binned_after_the_check_is_left_alone(self):
+        self.setup_vault()
+        first, second, _third = self.import_photos()
+        grant = self.grant_for([first, second])[1]["grant"]
+        vault = module("locked_folder.vault")
+        real = vault.still_movable
+
+        def binned_meanwhile(engine, token):
+            check = real(engine, token)
+
+            def still(photo_id):
+                if photo_id == first:
+                    self.library().trash(first)  # someone bins it just before its copy
+                return check(photo_id)
+            return still
+
+        with mock.patch.object(vault, "still_movable", binned_meanwhile):
+            status, payload = self.move([first, second], grant)
+        self.assertEqual(status, 200)
+        self.assertEqual([item["id"] for item in payload["moved"]], [second])
+        self.assertEqual([item["id"] for item in payload["failed"]], [first])
+        self.assertIsNotNone(self.library().get_any(first), "still in the recycle bin")
+        self.assertEqual(len(list((self.vault / "Photos").iterdir())), 1)
+
+    def test_the_library_refuses_to_remove_a_binned_photo_for_a_move(self):
+        first, *_ = self.import_photos()
+        library = self.library()
+        library.trash(first)
+        with self.assertRaises(module("photo.library").PhotoNotFound):
+            library.remove_moved(first)
+        self.assertIsNotNone(library.get_any(first))
+
+    def test_photo_resolves_only_active_library_items(self):
+        first, binned, _third = self.import_photos()
+        self.call(f"/api/satellites/Photo/trash/{binned}", "POST")
+        status, payload = self.call(f"/api/satellites/Photo/media/resolve/{first}")
+        self.assertEqual((status, payload), (200, {"id": first, "kind": "image"}))
+        self.assertEqual(self.call(f"/api/satellites/Photo/media/resolve/{binned}")[0], 404)
+        self.assertEqual(self.call(f"/api/satellites/Photo/media/resolve/{'f' * 64}")[0], 404)
+
+    def test_no_reference_resolves_without_an_enabled_provider(self):
+        capabilities = import_module("starcore.capabilities")
+        first, *_ = self.import_photos()
+        with mock.patch.object(type(self.photo), "enabled", new_callable=mock.PropertyMock, return_value=False):
+            with self.assertRaises(capabilities.ReferenceProblem):
+                capabilities.resolve_references(self.engine, "media.gallery", [self.ref(first)], self.token)
+
+    def test_a_biometric_unlock_can_ask_for_a_grant(self):
+        self.setup_vault()
+        first, *_ = self.import_photos()
+        key_id = self.enroll()[1]["key_id"]
+        _, payload = self.lf("biometric/challenge", {"key_id": key_id})
+        body = {"key_id": key_id, "challenge": payload["challenge"],
+                "signature": b64(test_key().sign(payload["challenge"].encode())),
+                "for": {"operation": "move_in", "items": [self.ref(first)]}}
+        status, payload = self.lf("biometric/unlock", body)
+        self.assertEqual(status, 200)
+        self.assertFalse(payload["unlocked"])
+        self.assertFalse(self.lf("status")[1]["unlocked"])
+        self.assertEqual(self.move([first], payload["grant"])[0], 200)
+
 
 class SignatureTest(unittest.TestCase):
     def test_verify_accepts_only_the_exact_signature(self):

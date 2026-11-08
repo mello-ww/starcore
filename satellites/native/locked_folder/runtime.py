@@ -38,6 +38,8 @@ from starcore.auth import hash_secret
 from . import signatures, thumbnails
 
 PIN_MIN_LENGTH = 4
+# how long a single-use grant for one move lasts (see issue_grant)
+GRANT_SECONDS = 60
 PIN_MAX_LENGTH = 12
 
 # Account-wide backstop on top of the per-session limit: per-session counters
@@ -152,6 +154,9 @@ class LockedFolderRuntime:
         self._lock = threading.RLock()
         self._pin = self._load_pin()
         self._unlocked = {}   # session token -> expires (epoch seconds)
+        # single-use grants for one move, kept apart from unlocks: grant id ->
+        # {"token", "operation", "items" (frozenset of (provider, id)), "expires"}
+        self._grants = {}
         # video poster frames, memory only - emptied once no session has the vault open
         self.thumbnails = thumbnails.Cache()
         self._attempts, self._global, self._recovery = self._load_attempts()
@@ -192,7 +197,9 @@ class LockedFolderRuntime:
         """Called whenever the protected root or the PIN changes - either
         one means every existing unlock was granted under a configuration
         that no longer applies, so none of them should silently carry over."""
-        self._unlocked.clear()
+        with self._lock:
+            self._unlocked.clear()
+            self._grants.clear()
         self.thumbnails.clear()
 
     def reset_attempts(self):
@@ -343,6 +350,43 @@ class LockedFolderRuntime:
         self._unlocked.pop(token, None)
         if not self._unlocked:
             self.thumbnails.clear()
+
+    # ---------- single-use grants (memory only) ----------
+
+    def issue_grant(self, token: str, operation: str, items) -> tuple:
+        """A grant for `token` to run `operation` once on exactly `items` ((provider, id)
+        pairs), within GRANT_SECONDS: (grant id, ISO expiry). It is not an unlock -
+        is_unlocked() stays as it was, and nothing but that operation accepts it."""
+        grant_id = secrets.token_urlsafe(16)  # 128 random bits
+        expires = time.time() + GRANT_SECONDS
+        with self._lock:
+            self._drop_expired_grants()
+            self._grants[grant_id] = {"token": token, "operation": operation,
+                                      "items": frozenset(items), "expires": expires}
+        return grant_id, datetime.fromtimestamp(expires, tz=timezone.utc).isoformat(timespec="seconds")
+
+    def take_grant(self, grant_id, token: str, operation: str, items) -> bool:
+        """Uses up a grant: it is taken out of the table and checked in one step under the lock,
+        so of two requests presenting it only one finds it, and a replay finds nothing. True
+        only when it exists, hasn't expired, belongs to `token`, is for `operation` and covers
+        exactly `items`; whatever the answer, the grant is gone."""
+        if not isinstance(grant_id, str) or not grant_id:
+            return False
+        with self._lock:
+            grant = self._grants.pop(grant_id, None)
+            self._drop_expired_grants()
+        return bool(
+            grant is not None
+            and grant["expires"] >= time.time()
+            and token and secrets.compare_digest(grant["token"], token)
+            and grant["operation"] == operation
+            and grant["items"] == frozenset(items)
+        )
+
+    def _drop_expired_grants(self):
+        now = time.time()
+        for grant_id in [grant_id for grant_id, grant in self._grants.items() if grant["expires"] < now]:
+            del self._grants[grant_id]
 
     def expires_at(self, token: str):
         """An ISO timestamp for when this session's unlock expires, or None

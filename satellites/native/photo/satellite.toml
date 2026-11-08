@@ -10,4 +10,4 @@ icon_name = "camera"
 # docs/ui-contract.md): the active library only - never the recycle bin or the Locked Folder
 [provides."media.gallery"]
 version = 1
-operations = { list = "media", thumbnail = "thumbnails" }
+operations = { list = "media", thumbnail = "thumbnails", resolve = "media/resolve" }

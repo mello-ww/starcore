@@ -21,6 +21,7 @@ import binascii
 import threading
 
 from starcore.api.response import error_response, file_response, json_response, stream_response
+from starcore.capabilities import ReferenceProblem
 
 from . import configuration, crypto, encryption, thumbnails, vault
 from .runtime import SecurityStateError, runtime, validate_pin
@@ -106,6 +107,12 @@ def _require_unlocked(request, live):
         return error_response("no Locked Folder location is configured yet", status=400)
     if not live.is_unlocked(request.token):
         return error_response("the Locked Folder is locked - unlock it first", status=403)
+    return None
+
+
+def _require_configured(live):
+    if live.configured_root is None:
+        return error_response("no Locked Folder location is configured yet", status=400)
     return None
 
 
@@ -232,6 +239,9 @@ def unlock(request):
     pin_value = body.get("pin")
     if not isinstance(pin_value, str) or not pin_value:
         return error_response("'pin' must be a non-empty string", status=400)
+    wanted, problem = _wanted_grant(request, body)
+    if problem is not None:
+        return problem
 
     refused = _begin(request, live)
     if refused is not None:
@@ -240,11 +250,38 @@ def unlock(request):
     if not live.verify_pin(pin_value):
         return error_response("incorrect PIN", status=401)
 
-    return _grant_unlock(request, live)
+    return _grant_unlock(request, live, wanted)
 
 
-def _grant_unlock(request, live):
+def _wanted_grant(request, body):
+    """An unlock's optional `for: {operation: "move_in", items: [references]}`: (None, None)
+    for a plain unlock, (items, None) for a single-use grant covering exactly those resolved
+    items, or (None, error) when it can't be granted. Checked before the attempt is counted, so a
+    malformed request never costs a PIN attempt, and again when the grant is used."""
+    if "for" not in body:
+        return None, None
+    wanted = body["for"]
+    if not isinstance(wanted, dict) or set(wanted) - {"operation", "items"} or wanted.get("operation") != "move_in":
+        return None, error_response("'for' must be {operation: \"move_in\", items: [references]}", status=400)
+    try:
+        resolved, refused = vault.resolve_movable(request.engine, wanted.get("items"), request.token)
+    except ReferenceProblem as error:
+        return None, error_response(str(error), status=400)
+    if refused:
+        return None, json_response({"error": "some of these items can't be moved", "refused": refused}, status=400)
+    return _keys(resolved), None
+
+
+def _keys(resolved) -> list:
+    return [(item["provider"], item["id"]) for item in resolved]
+
+
+def _grant_unlock(request, live, wanted=None):
     live.record_success(request.token)
+    if wanted is not None:
+        # a grant for this one move only: the vault itself stays locked for this session
+        grant, expires = live.issue_grant(request.token, "move_in", wanted)
+        return json_response({"unlocked": False, "grant": grant, "expires_at": expires})
     timeout = int(request.satellite.config.get("session_timeout_seconds", 900))
     live.unlock(request.token, timeout)
     return json_response({"unlocked": True, "expires_at": live.expires_at(request.token)})
@@ -394,11 +431,14 @@ def _suffix(name: str) -> str:
     return name[dot:].lower() if dot > 0 else ""
 
 
-def _vault_action(request, action):
-    """Runs a vault-changing action for an unlocked session, translating every
-    failure into a response."""
+def _vault_action(request, action, authorized=False):
+    """Runs a vault-changing action for an unlocked session (or, with `authorized`, one the
+    caller has already authorized by a grant), translating every failure into a response."""
     live = runtime(request.satellite)
-    refused = _require_unlocked(request, live) or _require_idle(live)
+    if authorized:
+        refused = _require_configured(live) or _require_idle(live)
+    else:
+        refused = _require_unlocked(request, live) or _require_idle(live)
     if refused is not None:
         return refused
     if not live.configured_root.is_dir():
@@ -434,13 +474,56 @@ def delete(request):
 
 
 def move_in(request):
+    """POST move_in {photo_ids: [...]}            - this session unlocked (the dedicated screens)
+    POST move_in {items: [references], grant?}   - unlocked, or with a single-use grant
+
+    References are resolved by the Engine through the media.gallery provider it knows (never
+    as sent), and every photo is checked again at the moment it is moved. A grant is used up by
+    this request whatever happens, and must cover exactly these items."""
     if request.method != "POST":
         return error_response("only POST is supported here", status=405)
+    body = request.body or {}
+    if "items" not in body:
+        def action(live, root):
+            return _moved(vault.move_in(request.engine, live, root, body.get("photo_ids")))
+        return _vault_action(request, action)
+
+    if not request.token:
+        return error_response("authentication required", status=401)
+    live = runtime(request.satellite)
+    grant = body.get("grant")
+    if "photo_ids" in body or set(body) - {"items", "grant"}:
+        _use_up(live, request, grant)
+        return error_response("send either 'photo_ids' or 'items' (with an optional 'grant')", status=400)
+    try:
+        resolved, refused = vault.resolve_movable(request.engine, body.get("items"), request.token)
+    except ReferenceProblem as error:
+        _use_up(live, request, grant)
+        return error_response(str(error), status=400)
+    if refused:
+        _use_up(live, request, grant)
+        return json_response({"error": "some of these items can't be moved", "refused": refused}, status=400)
+
+    unlocked = live.is_unlocked(request.token)
+    granted = grant is not None and live.take_grant(grant, request.token, "move_in", _keys(resolved))
+    if not unlocked and not granted:
+        return error_response("the Locked Folder is locked - unlock it first", status=403)
 
     def action(live, root):
-        result = vault.move_in(request.engine, live, root, (request.body or {}).get("photo_ids"))
-        return json_response(result, status=200 if result["moved"] or not result["failed"] else 409)
-    return _vault_action(request, action)
+        result = vault.move_in(request.engine, live, root, [item["id"] for item in resolved],
+                               still_valid=vault.still_movable(request.engine, request.token))
+        return _moved(result)
+    return _vault_action(request, action, authorized=True)
+
+
+def _use_up(live, request, grant):
+    """A grant presented with a request that can't go ahead is used up all the same."""
+    if grant is not None:
+        live.take_grant(grant, request.token, "move_in", ())
+
+
+def _moved(result):
+    return json_response(result, status=200 if result["moved"] or not result["failed"] else 409)
 
 
 def move_out(request):
@@ -654,12 +737,15 @@ def biometric(request):
         signature = _decode(body.get("signature"))
     except ValueError:
         return error_response("'signature' must be base64", status=400)
+    wanted, problem = _wanted_grant(request, body)
+    if problem is not None:
+        return problem
     refused = _begin(request, live)
     if refused is not None:
         return refused
     if not live.verify_signature(request.token, key_id, body.get("challenge", ""), signature):
         return error_response("biometric unlock failed - use the PIN", status=401)
-    return _grant_unlock(request, live)
+    return _grant_unlock(request, live, wanted)
 
 
 def _decode(value) -> bytes:

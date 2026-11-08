@@ -197,6 +197,7 @@ GET  /api/satellites/photo/gallery/albums/<id>   one album's photos in the album
 GET  /api/satellites/photo/gallery/trash      the recycle bin, with the days each item has left ("left")
 GET  /api/satellites/photo/gallery/import     the default import folder and the formats an import takes in
 GET  /api/satellites/photo/media?kinds=       media.gallery's list: what a media picker may offer
+GET  /api/satellites/photo/media/resolve/<id>  media.gallery's resolve: {id, kind} for a photo of the active library, 404 otherwise
 GET  /api/satellites/photo/gallery/search?q=&kind=   photos and albums matching a search, for the shared Search page
 GET  /api/satellites/photo/gallery/map        every photo with a location, for the shared Map page;
                                                ?overview=1 its count and bounds only; ?bbox=&zoom= what is in an area

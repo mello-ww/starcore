@@ -6,3 +6,9 @@ icon = "icon.svg"
 # from the shared icon set every client can draw (contracts/ui/vocabulary.json)
 icon_name = "lock"
 section_of = "Photo" # opened as a tab of Photo, not from its own navigation entry
+
+# a protected store media can be moved into from a shared interface (the secure action) -
+# deliberately no operation that lists or reads the vault: that stays in its own screens
+[provides."media.vault"]
+version = 1
+operations = { status = "status", unlock = "unlock", lock = "lock", move_in = "move_in", biometric = "biometric" }

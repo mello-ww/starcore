@@ -95,6 +95,9 @@
         "list": "GET ?kinds=image,video[&limit=N&cursor=C] -> {items: [{id, kind: image|video, title, duration, group}], next}: what a person may pick, newest first; with limit, a page and the cursor of the next (null at the end)",
         "thumbnail": "GET /<id> -> an image"
       },
+      "optional_operations": {
+        "resolve": "GET /<id> -> {id, kind}: an item the person may act on now (in the active library); 404 otherwise. What the Engine asks before another Satellite acts on a reference a client sent."
+      },
       "_note": "Picked through the client's media.picker (the pick action). A pick returns references, never paths: [{provider, capability, id, kind}], where provider is the providing Satellite's name. A provider lists only what the signed-in session may see; private or protected media is never listed."
     },
     "audio.session": {
@@ -111,6 +114,19 @@
         "connect": "StarCore Connect under this route: POST register, state, command, transfer; GET devices, events"
       },
       "_note": "A provider's playback session beside its audio.library, from the same Satellite. QueueState: {tracks: [id], order, position, shuffle, repeat, seconds, context}. See docs/media-audio.md."
+    },
+    "media.vault": {
+      "versions": [1],
+      "operations": {
+        "status": "GET -> {configured, pin_set, unlocked, expires_at, session_timeout_seconds, ...}: whether this session could move media in now, or must unlock first",
+        "unlock": "POST {pin, for?: {operation: \"move_in\", items: [reference]}} -> with for: {grant, expires_at}, a single-use grant for exactly that move, without unlocking the vault; without: {unlocked, expires_at}. Attempts are counted and locked out as for any unlock",
+        "lock": "POST -> {locked}: ends this session's unlock",
+        "move_in": "POST {items: [reference], grant?} -> {moved, failed}: moves media.gallery items into the vault, under this session's unlock or a matching grant; every reference is resolved on the server, again at the moment of the move"
+      },
+      "optional_operations": {
+        "biometric": "POST challenge {key_id} -> {challenge}; POST unlock {key_id, challenge, signature, for?} -> as unlock"
+      },
+      "_note": "A protected store media can be moved into, by the client's own unlock prompt (the secure action). It offers no way to list or read what it holds: that stays in the providing Satellite's own interface. A reference is {provider, capability: \"media.gallery\", id}, and is only a claim: the server resolves it through the media.gallery provider it knows."
     }
   },
   "client_capabilities": {

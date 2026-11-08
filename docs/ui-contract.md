@@ -549,8 +549,9 @@ says so in place, and a document that `requires` it is not opened.
 |---|---|---|---|
 | `files.browse` | 1 | `list`: `GET ?path=` → `{path, parent, entries: [{name, type: dir\|file, size, modified}]}`; at the roots (`path` empty) each entry's name is itself an absolute path | `file-browser` |
 | `audio.library` | 1 | `search`, `track`, `resolve`, `artwork`; optional `lyrics` - see [Audio playback](media-audio.md) | none yet; the `media.audio` client capability will play it |
-| `media.gallery` | 1 | `list`: `GET ?kinds=image,video[&limit=N&cursor=C]` -> `{items: [{id, kind, title, duration, group}], next}` (with `limit`, one page and the next cursor; without it, everything); `thumbnail`: `GET /<id>` -> an image | the client's media picker (the `pick` action), which pages through a provider that pages |
+| `media.gallery` | 1 | `list`: `GET ?kinds=image,video[&limit=N&cursor=C]` -> `{items: [{id, kind, title, duration, group}], next}` (with `limit`, one page and the next cursor; without it, everything); `thumbnail`: `GET /<id>` -> an image; optional `resolve`: `GET /<id>` -> `{id, kind}` for an item that may be acted on now, `404` otherwise | the client's media picker (the `pick` action), which pages through a provider that pages |
 | `audio.session` | 1 | `queue`; optional `history`, `radio`, `preferences`, `favorites`, `stream`, `connect` - see [Audio playback](media-audio.md) | none; the audio host uses it beside the same Satellite's `audio.library` |
+| `media.vault` | 1 | `status`, `unlock` (`for` asks for a single-use grant for one move), `lock`, `move_in` (`{items: [reference], grant?}`); optional `biometric` - see "Moves from a shared interface" in [the Locked Folder](satellites/locked_folder.md) | none yet; the `secure` action will use it. It has no operation that lists or reads what it holds |
 
 A capability's operations are required unless the vocabulary lists them under
 `optional_operations`. An operation the version doesn't define is a problem too, so a typo
@@ -558,8 +559,19 @@ never registers a provider that only half works.
 
 File Explorer provides `files.browse`; Music provides `audio.library` and `audio.session`; Photo
 provides `media.gallery` - its active library only: never the recycle bin, and never anything
-in the Locked Folder, which provides no capability at all. Mission Control's folder picker for `"path"`-typed
+in the Locked Folder. The Locked Folder provides `media.vault` only: somewhere to move media
+into, with no way to list or read it. Mission Control's folder picker for `"path"`-typed
 settings also uses it, so no generic code names File Explorer any more.
+
+**References are claims.** A reference a client sends (`{provider, capability, id}`, as a pick
+returns) is never trusted as sent. A Satellite about to act on one asks the Engine
+(`starcore/capabilities.py`, `resolve_references`), which:
+- finds the capability's provider in its own registry, never from the reference;
+- refuses a reference naming any other provider or capability;
+- asks that provider's `resolve` operation, with the caller's own session, whether the id is an
+  item that may be acted on now.
+
+A provider without `resolve` can't have its references acted on.
 
 A capability is a long-term protocol. It is designed from what an existing Satellite already
 does, not speculatively, and a new version is added beside the old one.

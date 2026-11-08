@@ -83,6 +83,9 @@ class PhotoLibrary:
         self.index_path = self.root / "library.json"
         self.thumbnail_size = int(thumbnail_size)
         self._photos = {}
+        # held for every change of a photo's state (bin, restore, erase, purge, a move out of the
+        # library), so a photo can't be binned between the last check and its removal
+        self._changing = threading.RLock()
         # videos ffmpeg couldn't render a frame for, by content-addressed id,
         # with the binary tried and when - so the grid doesn't re-run it on
         # every load, yet retries once ffmpeg is installed or a while has passed
@@ -364,22 +367,24 @@ class PhotoLibrary:
         """Soft-deletes an active photo: it disappears from the library (all(),
         get(), albums) but its file is untouched until it is either restored
         or its retention period runs out - see docs/photo.md."""
-        photo = self._photos.get(photo_id)
-        if photo is None or photo.get("trashed_at"):
-            raise PhotoNotFound(f"unknown photo '{photo_id}'")
+        with self._changing:
+            photo = self._photos.get(photo_id)
+            if photo is None or photo.get("trashed_at"):
+                raise PhotoNotFound(f"unknown photo '{photo_id}'")
 
-        photo["trashed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        self._save()
-        return photo
+            photo["trashed_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            self._save()
+            return photo
 
     def restore(self, photo_id: str) -> dict:
-        photo = self._photos.get(photo_id)
-        if photo is None or not photo.get("trashed_at"):
-            raise PhotoNotFound(f"'{photo_id}' is not in the recycle bin")
+        with self._changing:
+            photo = self._photos.get(photo_id)
+            if photo is None or not photo.get("trashed_at"):
+                raise PhotoNotFound(f"'{photo_id}' is not in the recycle bin")
 
-        photo["trashed_at"] = None
-        self._save()
-        return photo
+            photo["trashed_at"] = None
+            self._save()
+            return photo
 
     def erase(self, photo_id: str) -> None:
         """Permanently removes a photo that is already in the recycle bin -
@@ -387,27 +392,29 @@ class PhotoLibrary:
         index entirely. Only ever reachable from the recycle bin, never
         directly from an active photo, so a permanent delete always has to
         go through trash() first."""
-        photo = self._photos.get(photo_id)
-        if photo is None or not photo.get("trashed_at"):
-            raise PhotoNotFound(f"'{photo_id}' is not in the recycle bin")
+        with self._changing:
+            photo = self._photos.get(photo_id)
+            if photo is None or not photo.get("trashed_at"):
+                raise PhotoNotFound(f"'{photo_id}' is not in the recycle bin")
 
-        self._delete_stored_files(photo)
-        del self._photos[photo_id]
-        self._save()
+            self._delete_stored_files(photo)
+            del self._photos[photo_id]
+            self._save()
 
     def _purge_expired(self, retention_days: int) -> None:
         cutoff = datetime.now(timezone.utc).timestamp() - retention_days * 86400
-        expired = [
-            photo_id for photo_id, photo in self._photos.items()
-            if photo.get("trashed_at") and _iso_timestamp(photo["trashed_at"]) <= cutoff
-        ]
+        with self._changing:
+            expired = [
+                photo_id for photo_id, photo in self._photos.items()
+                if photo.get("trashed_at") and _iso_timestamp(photo["trashed_at"]) <= cutoff
+            ]
 
-        for photo_id in expired:
-            self._delete_stored_files(self._photos[photo_id])
-            del self._photos[photo_id]
+            for photo_id in expired:
+                self._delete_stored_files(self._photos[photo_id])
+                del self._photos[photo_id]
 
-        if expired:
-            self._save()
+            if expired:
+                self._save()
 
     def _delete_stored_files(self, photo: dict) -> None:
         self.original_path(photo).unlink(missing_ok=True)
@@ -418,17 +425,21 @@ class PhotoLibrary:
         now lives elsewhere (the Locked Folder) - unlike erase(), without
         going through the recycle bin, which would leave a second, visible
         copy behind. The index is saved first; if deleting the stored file
-        then fails, it is merely an orphan no listing can reach."""
-        photo = self._photos.get(photo_id)
-        if photo is None:
-            raise PhotoNotFound(f"unknown photo '{photo_id}'")
+        then fails, it is merely an orphan no listing can reach.
 
-        del self._photos[photo_id]
-        try:
-            self._save()
-        except Exception:
-            self._photos[photo_id] = photo
-            raise
+        Checked again here, under the lock every state change takes: a photo binned, erased or
+        moved since the caller looked is refused (PhotoNotFound), so the caller undoes its copy."""
+        with self._changing:
+            photo = self._photos.get(photo_id)
+            if photo is None or photo.get("trashed_at"):
+                raise PhotoNotFound(f"'{photo_id}' is no longer in the library")
+
+            del self._photos[photo_id]
+            try:
+                self._save()
+            except Exception:
+                self._photos[photo_id] = photo
+                raise
 
         try:
             self._delete_stored_files(photo)
