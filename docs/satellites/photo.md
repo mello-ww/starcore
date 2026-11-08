@@ -290,7 +290,7 @@ What it covers:
 | Import from a folder on the server: check, then import | web only | yes, both clients ("Import from a folder" on Library) |
 | Phone sync, settings | yes | opens Photo's own: "Settings and phone sync" on Albums (the web's Configuration tab, the app's Photo configuration) |
 | Locked Folder | yes | opens Photo's own: "Locked Folder" on Albums, with its PIN or biometrics, locked again on leaving; its security-sensitive behaviour isn't migrated |
-| Move a photo into the Locked Folder | yes, from the viewer | no - Photo's own viewer |
+| Move a photo into the Locked Folder | yes, from the viewer | yes: the viewer (Library, Search, Map, an album) and a selection (Library, an album), through the secure action - see below |
 | Offline cache of the library (Android) | yes, the whole list (metadata only) | yes: Library, Albums and an album, with up to 600 items each (`offline` pages, see the UI contract's "Offline pages"), only the fields they show, and never an item's GPS location or its folder on the server; never the recycle bin, Search or Map |
 
 Search looks in the same fields as the app's own Search tab, on the server
@@ -312,6 +312,22 @@ or biometrics as before, locks again on leaving, blocks screenshots on Android, 
 document never reaches its routes or media. A server without a Locked Folder says so on that
 screen. `#/satellite/Photo/LockedFolder` keeps opening Photo's own page on the web, also while
 Developer Mode shows the shared interface.
+
+**Move to Locked Folder** is the contract's `secure` action (`media.vault` / `move_in`), on the
+viewer and on a selection. The document names neither the Locked Folder nor a route.
+1. The client asks the provider whether this session has the vault open.
+2. If it hasn't, the client's own prompt asks for the PIN: Mission Control's dialog, or on
+   Android the Locked Folder's own unlock screen, biometrics included. The PIN buys a
+   single-use grant for exactly these photos, never an unlock, so the Locked Folder stays
+   locked and nothing needs locking again.
+3. The Locked Folder resolves each reference through Photo's `media.gallery` `resolve`,
+   checks it again at the moment of the move, and moves it as it always has (verified copy,
+   seal, removal from the library and albums).
+
+A selection is one prompt and one request. A partial move says so. The moved photos leave
+the page, every offline copy on the phone, and its image cache. A server without an enabled
+Locked Folder shows no such control. See "Moves from a shared interface" in
+[the Locked Folder](locked_folder.md).
 
 It binds to read-only routes, `gallery`, `gallery/albums`, `gallery/albums/<id>`,
 `gallery/trash`, `gallery/search` and `gallery/map` (`gallery.py`), which shape the same library, albums and recycle bin for

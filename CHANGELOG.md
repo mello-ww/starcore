@@ -136,7 +136,9 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   The Android app draws it too (`mobile/src/satellites/ui/secure.ts`): the composition root
   registers the Locked Folder's own unlock screen as the prompt for `media.vault`, so the PIN and
   fingerprint unlock ask for a grant instead of opening the vault; what moved is forgotten from
-  every session's offline copies and evicted from the image cache.
+  every session's offline copies and evicted from the image cache. Photos' shared interface
+  offers "Move to Locked Folder" in the viewer (Library, Search, Map, an album) and on a
+  selection (Library, an album).
 - **Moving into the Locked Folder without opening it (server).** An unlock can ask for a
   single-use grant for one move instead (`for: {operation: "move_in", items}`): bound to the
   session, the exact items and 60 seconds, used up by the first `move_in` whatever its outcome,

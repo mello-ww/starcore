@@ -109,6 +109,28 @@ class PhotoUiDocumentTest(unittest.TestCase):
         for template in routes_in(self.document["pages"]):
             self.assertNotIn("lock", template.lower(), template)
 
+    def test_photos_move_into_the_locked_folder_only_through_the_secure_action(self):
+        # wherever an active photo is shown, its viewer (and a selection, where there is one)
+        # moves it through the client's own prompt - never a route, a form or a PIN field; the
+        # recycle bin, whose items no longer resolve, offers none
+        move = {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id"}
+
+        def moves(actions):
+            return [entry for entry in actions or [] if "secure" in entry["action"]]
+
+        found = {}
+        for name, page in self.document["pages"].items():
+            for block in page["blocks"]:
+                if block["type"] in ("media-grid", "map"):
+                    viewer = moves((block.get("viewer") or {}).get("actions"))
+                    selection = moves((block.get("selection") or {}).get("actions"))
+                    found[name] = (len(viewer), len(selection))
+                    for entry in viewer + selection:
+                        self.assertEqual({key: entry["action"][key] for key in move}, move)
+                        self.assertEqual(set(entry["action"]) - {"secure", "item", "confirm", "then"}, set())
+        self.assertEqual(found, {"library": (1, 1), "search": (1, 0), "map": (1, 0), "albums": (0, 0),
+                                 "album": (1, 1), "trash": (0, 0)})
+
     def test_settings_sync_and_the_locked_folder_open_photos_own_screens(self):
         blocks = self.document["pages"]["albums"]["blocks"]
         opened = {block["label"]: block["action"]["own"] for block in blocks
