@@ -36,11 +36,11 @@
     },
     "1.2": {
       "blocks": ["image", "media-list", "media-grid", "search", "map"],
-      "actions": ["play", "pick", "own"],
+      "actions": ["play", "pick", "own", "secure"],
       "keys": ["document.preview", "media-grid.more", "map.viewport", "map.bounds", "map.item.count", "map.item.bounds", "page.offline"],
       "bindings": ["$value."],
       "icons": ["chevron-left", "chevron-right", "edit-2", "heart", "map-pin", "play", "rotate-ccw", "search", "trash-2", "x"],
-      "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library. {own: section}: the client opens the Satellite's own interface (page.js, native screens) at a section that interface names; a client without one hides the control."
+      "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library. {own: section}: the client opens the Satellite's own interface (page.js, native screens) at a section that interface names; a client without one hides the control. {secure: {capability, operation}, item, confirm?, then?}: in a media viewer's or selection's actions, the client runs one of secure_operations on the items, behind its own unlock prompt (never a document form) - see secure_operations."
     }
   },
   "common_block_keys": ["type", "id", "visible", "required", "developer"],
@@ -57,6 +57,10 @@
   "image_fits": ["cover", "contain"],
   "media_kinds": ["image", "video"],
   "media_grid_item_keys": ["image", "key", "title", "subtitle", "kind", "duration", "group", "format"],
+  "secure_operations": {
+    "_note": "What the secure action (1.2) may run: a capability, and the operations of it a document may ask for. The client resolves the provider from the catalog, asks for the unlock in its own prompt (a single-use grant for exactly these items), and sends references to the document Satellite's own media.gallery items, built from `item` (a binding to each item's id). Only a Satellite that provides media.gallery may use it, on its own items.",
+    "media.vault": ["move_in"]
+  },
   "media_viewer_keys": ["image", "video", "title", "subtitle", "fields", "actions"],
   "map_item_keys": ["lat", "lon", "key", "image", "title", "kind", "count", "bounds"],
   "column_align": ["start", "end"],

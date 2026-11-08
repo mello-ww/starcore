@@ -459,6 +459,36 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
   - On the web, a section that is another Satellite hosted by this one (`section_of`, such as
     `#/satellite/Photo/LockedFolder`) always opens the own page, which hosts it, whichever
     interface Developer Mode has chosen.
+- **`secure`** (1.2), in a media viewer's or selection's `actions` only: runs one protected
+  operation on the items shown or selected, behind the **client's own** unlock prompt.
+
+  ```json
+  {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id",
+   "confirm": "Move to the Locked Folder? It disappears from Photos.", "then": "refresh"}
+  ```
+
+  - **What it may run:** only what the vocabulary's `secure_operations` lists. So far that is
+    `media.vault` / `move_in`: never an operation that lists, reads or takes anything out.
+  - **Whose items:** `item` binds each item's id. The client sends references to the
+    document Satellite's **own** `media.gallery` items, built from the catalog, never from
+    document data. The Engine refuses the action in a document whose Satellite doesn't provide
+    `media.gallery`, and the receiving Satellite resolves every reference itself (see
+    "References are claims" below).
+  - **One request for a selection:** the action runs once for all selected items, with one
+    prompt, not once per item.
+  - **The unlock is the client's:**
+    1. The client asks the provider's `status` whether the session is unlocked.
+    2. If it isn't, the client shows its own PIN prompt (and biometrics where it has them),
+       asking `unlock` for a single-use grant for exactly these items.
+    3. It runs the operation with that grant.
+
+    A grant isn't an unlock, so there is nothing to lock again afterwards; the Locked Folder
+    explains it under "Moves from a shared interface". The document supplies no prompt, no
+    PIN field and no route, and a form can never be where the PIN is typed.
+  - **`confirm` and `then`** (`refresh` or `back`) work as for any action. The answer's
+    `failed` items are reported, and partial success is never shown as complete.
+  - **A client** without a provider for the capability, or without a prompt for it, hides the
+    control.
 
 A response may carry `{"message": "..."}`, shown as a short notice; an error response's
 `error` is shown the same way. Either way, the page then shows what is actually true again.

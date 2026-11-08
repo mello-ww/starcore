@@ -117,6 +117,24 @@ class DocumentFixturesTest(unittest.TestCase):
                 self.assertTrue(errors, "accepted")
                 self.assertIn(case["error"].lower(), " ".join(errors).lower())
 
+    def test_a_secure_action_acts_only_on_the_satellites_own_gallery_items(self):
+        # known only at load, from the Satellite's manifest: a document whose Satellite doesn't
+        # provide media.gallery has no items of its own for the action to move
+        document = next(case["document"] for case in fixture("documents.json")["valid"] if case["name"] == "secure-action")
+        gallery = {"media.gallery": {"version": 1, "operations": {"list": "media", "thumbnail": "thumbnails"}}}
+        self.assertEqual(ui_contract.validate(document, gallery), [])
+        errors = ui_contract.validate(document, {"files.browse": {"version": 1, "operations": {"list": "entries"}}})
+        self.assertTrue(any("media.gallery" in error for error in errors), errors)
+        self.assertTrue(ui_contract.validate(document, {}))
+
+    def test_the_vault_offers_every_operation_a_secure_action_may_ask_for(self):
+        import tomllib
+        manifest = tomllib.loads((REPO / "satellites/native/locked_folder/satellite.toml").read_text(encoding="utf-8"))
+        provides, problems = ui_contract.normalise_provides(manifest["provides"])
+        self.assertEqual(problems, [])
+        for capability, operations in ui_contract.SECURE_OPERATIONS.items():
+            self.assertLessEqual(operations, set(provides[capability]["operations"]), capability)
+
     def test_route_safety(self):
         routes = fixture("routes.json")
         for route in routes["safe"]:

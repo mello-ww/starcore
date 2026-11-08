@@ -59,6 +59,10 @@ export interface UiAction {
   pick?: {capability: string; kinds?: string[]; multiple?: boolean; title?: Json};
   /** 1.2: open the Satellite's own native screens at a section they name ("settings"). */
   own?: string;
+  /** 1.2: run one secure operation (media.vault move_in) on the items shown or selected, behind
+   * the app's own unlock prompt; `item` binds each item's id. */
+  secure?: {capability: string; operation: string};
+  item?: string;
 }
 
 /** One block. Deliberately loose: a document is network data, so every

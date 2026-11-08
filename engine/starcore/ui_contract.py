@@ -81,6 +81,11 @@ MEDIA_VIEWER_KEYS = set(VOCABULARY["media_viewer_keys"])
 MAP_ITEM_KEYS = set(VOCABULARY["map_item_keys"])
 # capabilities the client's media picker can choose from (the pick action)
 PICKABLE = {"media.gallery"}
+# what the secure action may run (1.2): {capability: {operations}}, and the capability whose
+# items it acts on - the document's own Satellite must provide it
+SECURE_OPERATIONS = {name: set(operations) for name, operations in VOCABULARY["secure_operations"].items()
+                     if not name.startswith("_")}
+SECURE_ITEMS = "media.gallery"
 # a section of a Satellite's own interface, for the own action (1.2)
 OWN_SECTION = re.compile(r"[a-z][a-z0-9-]{0,31}")
 FORMATS_1_1 = set(SINCE_1_1["formats"])
@@ -164,8 +169,9 @@ def revision(document) -> str:
     return sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
-def load(path: Path) -> dict:
-    """Reads and validates one ui.json. Raises UiDocumentError."""
+def load(path: Path, provides=None) -> dict:
+    """Reads and validates one ui.json (with the Satellite's declared capabilities, when
+    known). Raises UiDocumentError."""
     try:
         raw = path.read_bytes()
     except OSError as error:
@@ -176,21 +182,25 @@ def load(path: Path) -> dict:
         document = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise UiDocumentError(f"is not valid JSON ({error})")
-    errors = validate(document)
+    errors = validate(document, provides)
     if errors:
         more = f" (and {len(errors) - 1} more)" if len(errors) > 1 else ""
         raise UiDocumentError(f"is invalid: {errors[0]}{more}")
     return document
 
 
-def validate(document) -> list:
-    """Every problem with a document, as "where: what" strings; [] if valid."""
-    return _Validator(document).run()
+def validate(document, provides=None) -> list:
+    """Every problem with a document, as "where: what" strings; [] if valid. `provides` is the
+    Satellite's declared capabilities when known (at load), for the rules that depend on them."""
+    return _Validator(document, provides).run()
 
 
 class _Validator:
-    def __init__(self, document):
+    def __init__(self, document, provides=None):
         self.document = document
+        # the capabilities the document's Satellite declares, or None when not known
+        self.provides = None if provides is None else set(provides)
+        self.in_media_actions = False
         self.errors = []
         self.lenient = False  # a newer minor: unknown blocks and keys are skipped by clients
         self.minor = MINOR
@@ -887,7 +897,11 @@ class _Validator:
             if "action" not in entry:
                 self.error(at, "needs an 'action'")
             else:
-                self.check_action(f"{at}.action", entry["action"])
+                self.in_media_actions = True  # where a secure action may be
+                try:
+                    self.check_action(f"{at}.action", entry["action"])
+                finally:
+                    self.in_media_actions = False
             if "icon" in entry and entry["icon"] not in ICONS:
                 self.error(f"{at}.icon", f"unknown icon {entry['icon']!r}")
             if "style" in entry and entry["style"] not in BUTTON_STYLES:
@@ -943,6 +957,9 @@ class _Validator:
         if "own" in action:
             self.check_own(where, action)
             return
+        if "secure" in action:
+            self.check_secure(where, action)
+            return
         known = {"route", "method", "body", "confirm", "then"}
         if "pick" in action:
             self.check_pick(where, action["pick"])
@@ -994,6 +1011,35 @@ class _Validator:
         section = action["own"]
         if not isinstance(section, str) or not OWN_SECTION.fullmatch(section):
             self.error(f"{where}.own", "must be a section name: lowercase letters, digits and '-', up to 32")
+
+    def check_secure(self, where: str, action: dict):
+        """{secure: {capability, operation}, item, confirm, then} (1.2): in a media viewer's or
+        selection's actions, the client runs one operation the vocabulary allows
+        (secure_operations: media.vault move_in) on the items shown or selected - once, for all
+        of them - behind its own unlock prompt. `item` binds each item's id; the client sends
+        references to the document Satellite's own media.gallery items, which the server
+        resolves itself. The document supplies no prompt, no PIN field and no route."""
+        self.since(f"{where}.secure", "the secure action", 2)
+        self.unknown_keys(where, action, {"secure", "item", "confirm", "then"})
+        if not self.in_media_actions:
+            self.error(f"{where}.secure", "is only for a media viewer's or selection's actions")
+        secure = action["secure"]
+        if not isinstance(secure, dict) or set(secure) != {"capability", "operation"}:
+            self.error(f"{where}.secure", "must be {capability, operation}")
+        elif (not isinstance(secure["capability"], str) or not isinstance(secure["operation"], str)
+              or secure["operation"] not in SECURE_OPERATIONS.get(secure["capability"], ())):
+            allowed = sorted(f"{name} {operation}" for name, operations in SECURE_OPERATIONS.items()
+                             for operation in operations)
+            self.error(f"{where}.secure", f"must be one of {allowed}")
+        item = action.get("item")
+        if not (isinstance(item, str) and item.startswith("$.") and valid_binding(item)):
+            self.error(f"{where}.item", "must bind each item's id ($.id)")
+        if "confirm" in action:
+            self.check_text(f"{where}.confirm", action["confirm"])
+        if action.get("then", "refresh") not in ("refresh", "back"):
+            self.error(f"{where}.then", "must be 'refresh' or 'back'")
+        if self.provides is not None and SECURE_ITEMS not in self.provides:
+            self.error(f"{where}.secure", f"acts on the Satellite's own {SECURE_ITEMS} items, and it provides none")
 
     def check_pick(self, where: str, pick):
         """{pick: {capability, kinds, multiple, title}, route, body, then} (1.2): the client's
@@ -1160,14 +1206,15 @@ class UiDefinition:
         return described
 
 
-def load_definition(satellite_dir: Path, satellite_name: str):
+def load_definition(satellite_dir: Path, satellite_name: str, provides=None):
     """The UiDefinition for a Satellite directory, or None when it has no
-    ui.json. Only reads and validates a JSON file - never imports code."""
+    ui.json. Only reads and validates a JSON file - never imports code.
+    `provides` is the Satellite's normalised [provides] table."""
     path = satellite_dir / UI_FILENAME
     if not path.is_file():
         return None
     try:
-        return UiDefinition(load(path))
+        return UiDefinition(load(path, provides))
     except UiDocumentError as error:
         message = f"{UI_FILENAME} {error}"
         print(f"[WARNING]: {message} (satellite '{satellite_name}'). Its interface is not offered to clients.")

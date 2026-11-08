@@ -59,7 +59,7 @@ class SatelliteLoader:
         does, without importing any of the Satellite's code - what
         StarCore.rediscover() refreshes. Raises SatelliteLoadError."""
         manifest = self.read_manifest(satellite_dir)
-        return manifest, ui_contract.load_definition(satellite_dir, manifest.name)
+        return manifest, ui_contract.load_definition(satellite_dir, manifest.name, manifest.provides)
 
     def read_manifest(self, satellite_dir: Path) -> SatelliteManifest:
         manifest_path = satellite_dir / "satellite.toml"
@@ -121,7 +121,7 @@ class SatelliteLoader:
         routes = self._load_routes(satellite_dir, package, manifest.name)
         page = self._load_page(satellite_dir)
         lifecycle = self._load_lifecycle(satellite_dir, package, manifest.name)
-        ui = ui_contract.load_definition(satellite_dir, manifest.name)
+        ui = ui_contract.load_definition(satellite_dir, manifest.name, manifest.provides)
         return Satellite(manifest, config, satellite_type, satellite_dir, state_provider, routes, page, lifecycle, ui)
 
     def _load_state_provider(self, satellite_dir: Path, package: str, satellite_name: str):

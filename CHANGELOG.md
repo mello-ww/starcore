@@ -123,6 +123,14 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   on sign-in, sign-out and server removal. Photos' shared Library, Albums and album pages use
   it; Photo's own screens forget it when they delete a photo or move one to the Locked Folder.
   Mission Control keeps nothing.
+- **UI contract 1.2: the `secure` action.** In a media viewer's or selection's actions,
+  `{"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id"}` runs one
+  protected operation on the items, behind the client's own unlock prompt, as one request for a
+  whole selection. Only the operations the vocabulary's `secure_operations` lists are allowed
+  (so far `media.vault` / `move_in`), only on the document Satellite's own `media.gallery`
+  items (the Engine now validates a document against its Satellite's `[provides]`), and with no
+  route, prompt or PIN field of the document's own. Contract fixtures cover each rule; the
+  clients draw it from the next milestones on.
 - **Moving into the Locked Folder without opening it (server).** An unlock can ask for a
   single-use grant for one move instead (`for: {operation: "move_in", items}`): bound to the
   session, the exact items and 60 seconds, used up by the first `move_in` whatever its outcome,
