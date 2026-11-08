@@ -8,8 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * - Scope: per server, per session (a fingerprint of the session's token, never the token),
  *   per Satellite and per collection (a page and its parameters). A new sign-in never reads what
  *   an earlier session kept; sign-out, removing a server, and a 401/403 forget a server's all.
- * - Contents: allowlisted display fields from the page and its grid pages, with their cursors.
- *   No token, resolved URL or image: thumbnails stay in the platform's
+ * - Contents: the page data exactly as the server sent it, and the grid pages loaded after it
+ *   with their cursors. No token, no resolved URL, no image: thumbnails stay in the platform's
  *   own image cache, as they do for every screen.
  * - Use: only when StarCore can't be reached - never for an answer that refused the request,
  *   never shown before a live answer has had its chance.
@@ -21,8 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  *   lists it, so an interrupted write leaves either the previous copy or an entry the index
  *   doesn't know, which the next tidy-up removes. An entry that can't be read is removed.
  */
-export const OFFLINE_PREFIX = 'starcore_ui_offline:v2';
-const LEGACY_PREFIX = 'starcore_ui_offline:v1:';
+export const OFFLINE_PREFIX = 'starcore_ui_offline:v1';
 export const MAX_AGE = 7 * 24 * 3600 * 1000;
 export const MAX_ENTRIES = 12;
 export const MAX_BYTES = 512 * 1024;
@@ -45,56 +44,6 @@ export interface OfflineEntry {
 interface IndexRow {
   key: string;
   usedAt: number;
-}
-
-// Offline pages opt in through the contract. Within them, only these generic gallery display
-// fields can reach persistent storage. New fields require an explicit privacy review here.
-const PAGE_FIELDS = new Set(['items', 'albums', 'next', 'summary', 'id', 'name', 'kind', 'editable', 'description']);
-const ITEM_FIELDS = new Set([
-  'id', 'title', 'subtitle', 'kind', 'duration', 'month', 'date', 'taken', 'imported',
-  'size', 'dimensions', 'megapixels', 'format', 'camera', 'lens', 'favorite',
-  'can_favorite', 'removable', 'group', 'cover',
-]);
-const safeValue = (value: unknown): boolean =>
-  value === null || typeof value === 'boolean' || typeof value === 'number' && Number.isFinite(value) ||
-  typeof value === 'string' && !/https?:\/\/|file:\/\/|[\\/]|(?:bearer|token|password|secret|credential)/i.test(value);
-
-function displayObject(value: any, fields: Set<string>): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) { return {}; }
-  const result: Record<string, unknown> = {};
-  for (const field of fields) {
-    if (field === 'items' || field === 'albums') {
-      if (Array.isArray(value[field])) { result[field] = value[field].map((item: any) => displayObject(item, ITEM_FIELDS)); }
-    } else if (safeValue(value[field])) {
-      result[field] = value[field];
-    }
-  }
-  return result;
-}
-
-export function sanitizeOfflineEntry(entry: OfflineEntry): OfflineEntry {
-  const grids: Record<string, GridPages> = {};
-  for (const [name, grid] of Object.entries(entry.grids ?? {})) {
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(name) ||
-      ['__proto__', 'constructor', 'prototype'].includes(name) || !Array.isArray(grid?.pages)) { continue; }
-    grids[name] = {
-      pages: grid.pages.slice(0, MAX_GRID_PAGES).map(page =>
-        Array.isArray(page) ? page.map(item => displayObject(item, ITEM_FIELDS)) : []),
-      cursor: typeof grid.cursor === 'string' && safeValue(grid.cursor) ? grid.cursor : null,
-    };
-  }
-  return {savedAt: Number.isFinite(entry.savedAt) ? entry.savedAt : 0,
-    data: displayObject(entry.data, PAGE_FIELDS), grids};
-}
-
-// AsyncStorage operations for a server must remain ordered, including invalidation.
-const serverQueues = new Map<string, Promise<unknown>>();
-function onServer<T>(serverId: string, work: () => Promise<T>): Promise<T> {
-  const previous = serverQueues.get(serverId) ?? Promise.resolve();
-  const next = previous.catch(() => {}).then(work);
-  serverQueues.set(serverId, next);
-  void next.finally(() => { if (serverQueues.get(serverId) === next) { serverQueues.delete(serverId); } }).catch(() => {});
-  return next;
 }
 
 /** A short, one-way fingerprint of a session token (FNV-1a): enough to keep two sessions apart. */
@@ -151,15 +100,7 @@ export class OfflineStore {
 
   /** What was kept for `collection`, or null (never kept, too old, unreadable). */
   async read(collection: string): Promise<OfflineEntry | null> {
-    return onServer(this.serverId, () => this.readQueued(collection));
-  }
-
-  private async readQueued(collection: string): Promise<OfflineEntry | null> {
     const key = this.key(collection);
-    if (!(await readIndex(this.serverId)).some(row => row.key === key)) {
-      try { await AsyncStorage.removeItem(key); } catch { /* storage unavailable */ }
-      return null;
-    }
     let parsed: any = null;
     try {
       const raw = await AsyncStorage.getItem(key);
@@ -181,12 +122,6 @@ export class OfflineStore {
   /** Keeps `entry` for `collection`, replacing what was there. False when it is too large to keep
    * (what was there is then forgotten too, so an older copy is never shown instead). */
   async write(collection: string, entry: OfflineEntry): Promise<boolean> {
-    // Snapshot before queuing: the caller may append grid pages while this write waits.
-    const safe = sanitizeOfflineEntry(entry);
-    return onServer(this.serverId, () => this.writeQueued(collection, safe));
-  }
-
-  private async writeQueued(collection: string, entry: OfflineEntry): Promise<boolean> {
     const key = this.key(collection);
     let text: string;
     try {
@@ -209,10 +144,6 @@ export class OfflineStore {
 
   /** Forgets every collection of this Satellite, for this session. */
   async forgetSatellite(): Promise<void> {
-    return onServer(this.serverId, () => this.forgetSatelliteQueued());
-  }
-
-  private async forgetSatelliteQueued(): Promise<void> {
     const prefix = this.satellitePrefix();
     try {
       const keys = (await AsyncStorage.getAllKeys()).filter(key => key.startsWith(prefix));
@@ -258,13 +189,7 @@ export class OfflineStore {
  * what the index doesn't list (an interrupted write), and what is past MAX_AGE.
  */
 export async function tidyOffline(serverId: string, session: string, now: number = Date.now()): Promise<void> {
-  return onServer(serverId, () => tidyQueued(serverId, session, now));
-}
-
-async function tidyQueued(serverId: string, session: string, now: number): Promise<void> {
   try {
-    const legacy = (await AsyncStorage.getAllKeys()).filter(key => key.startsWith(LEGACY_PREFIX));
-    if (legacy.length) { await AsyncStorage.multiRemove(legacy); }
     const prefix = serverPrefix(serverId);
     const keys = (await AsyncStorage.getAllKeys()).filter(key => key.startsWith(prefix));
     const rows = await readIndex(serverId);
@@ -284,14 +209,9 @@ async function tidyQueued(serverId: string, session: string, now: number): Promi
 
 /** Forgets everything kept for a server: sign-out, a removed server, a refused session. */
 export async function forgetOfflineServer(serverId: string): Promise<void> {
-  return onServer(serverId, () => forgetServerQueued(serverId));
-}
-
-async function forgetServerQueued(serverId: string): Promise<void> {
   try {
     const keys = (await AsyncStorage.getAllKeys()).filter(
-      key => key.startsWith(serverPrefix(serverId)) || key === indexKey(serverId) ||
-        key.startsWith(`${LEGACY_PREFIX}${serverId}:`) || key === `${LEGACY_PREFIX}index:${serverId}`,
+      key => key.startsWith(serverPrefix(serverId)) || key === indexKey(serverId),
     );
     if (keys.length) {
       await AsyncStorage.multiRemove(keys);
@@ -304,10 +224,6 @@ async function forgetServerQueued(serverId: string): Promise<void> {
 /** Forgets one Satellite's collections on a server, for every session - for a Satellite's own
  * screens when an item leaves (deleted, moved somewhere private), whatever session kept them. */
 export async function forgetOfflineSatellite(serverId: string, satellite: string): Promise<void> {
-  return onServer(serverId, () => forgetSatelliteQueued(serverId, satellite));
-}
-
-async function forgetSatelliteQueued(serverId: string, satellite: string): Promise<void> {
   try {
     const marker = `:${encodeURIComponent(satellite)}:`;
     const keys = (await AsyncStorage.getAllKeys()).filter(
