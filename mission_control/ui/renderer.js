@@ -17,6 +17,7 @@ import { createGallery } from "./gallery.js";
 import { icon } from "./icons.js";
 import { createMaps } from "./map.js";
 import { pickMedia } from "./picker.js";
+import { promptPin, runSecure, secureProvider } from "./secure.js";
 
 const STYLESHEET = "/ui/ui.css";
 const TONE_LEVEL = { warn: "warning", danger: "critical" };
@@ -47,6 +48,7 @@ async function requestJson(url, options = {}) {
     if (!response.ok) {
         const error = new Error((payload && payload.error) || `Request failed with status ${response.status}`);
         error.status = response.status;
+        error.payload = payload;  // e.g. a lockout's retry_after
         throw error;
     }
     return payload;
@@ -171,6 +173,10 @@ export function mount(context) {
         // a grid's next page (`more`), from the Satellite's own route, with this session
         load: (route) => requestJson(`${satelliteBase}/${route}`),
         runAction: (...args) => runAction(...args),
+        // the secure action (1.2): once for a whole selection, and hidden where it can't run
+        runSecure: (action, items, scope) => runSecureAction(action, items, scope),
+        canRun: (action) => !action || !action.secure
+            || Boolean(secureProvider(action, state.catalog && state.catalog.capabilities, satelliteName)),
         setNotice: (...args) => setNotice(...args),
         afterSelection: (then) => {
             if (then === "back") {
@@ -429,6 +435,10 @@ export function mount(context) {
             navigate(action.navigate, resolve(action.params || {}, bindings));
             return true;
         }
+        if (action.secure) {
+            // 1.2: one protected operation on this item, behind Mission Control's own prompt
+            return runSecureAction(action, [scope.data], scope);
+        }
         if (action.own !== undefined) {
             // 1.2: the Satellite's own page, at a section it names - nothing runs here
             if (!own) {
@@ -506,6 +516,42 @@ export function mount(context) {
             loadData({ background: false });
         }
         return true;
+    }
+
+    /** The secure action (1.2) on `items` - one request and one prompt for all of them. True once
+     * something was done. A partial result is reported as partial, never as done. */
+    async function runSecureAction(action, items, scope) {
+        const provider = secureProvider(action, state.catalog && state.catalog.capabilities, satelliteName);
+        if (!provider) {
+            setNotice("That isn't available on this server.", "error");
+            return false;
+        }
+        const first = { ...scope, data: items[0], value: items.length };
+        if (action.confirm && !window.confirm(String(resolve(action.confirm, first)))) {
+            return false;
+        }
+        const base = `/api/satellites/${encodeURIComponent(provider.satellite)}`;
+        const ids = items.map((item) => resolve(action.item, { ...scope, data: item }));
+        const result = await runSecure({
+            action, ids, satellite: satelliteName, provider, prompt: promptPin,
+            request: (route, body) => requestJson(`${base}/${route}`, body === undefined ? {} : {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            }),
+        });
+        if (result.outcome === "cancelled") {
+            return false;
+        }
+        setNotice(result.text, result.outcome === "done" ? "info" : "error");
+        if (result.moved.length) {
+            if (action.then === "back") {
+                goBack();
+            } else {
+                loadData({ background: false });  // what left the page is gone from it
+            }
+        }
+        return result.moved.length > 0;
     }
 
     // ---------- blocks ----------

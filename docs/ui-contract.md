@@ -488,7 +488,7 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
   - **`confirm` and `then`** (`refresh` or `back`) work as for any action. The answer's
     `failed` items are reported, and partial success is never shown as complete.
   - **A client** without a provider for the capability, or without a prompt for it, hides the
-    control.
+    control. Mission Control's runner and prompt are `mission_control/ui/secure.js`.
 
 A response may carry `{"message": "..."}`, shown as a short notice; an error response's
 `error` is shown the same way. Either way, the page then shows what is actually true again.

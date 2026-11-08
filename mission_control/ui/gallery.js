@@ -576,7 +576,7 @@ export function createGallery(host) {
         if (grid.resizable) {
             actions.appendChild(sizeControl(block, grid));  // a new size keeps the selection
         }
-        for (const entry of block.selection.actions || []) {
+        for (const entry of (block.selection.actions || []).filter((item) => host.canRun(item.action))) {
             const button = actionButton(entry, grid.scope);
             button.disabled = count === 0;
             button.addEventListener("click", () => runOnSelection(block, grid, entry, button));
@@ -599,6 +599,16 @@ export function createGallery(host) {
         if (action.navigate || action.play) {
             // nothing to do item by item: it acts on the first one
             host.runAction(action, { ...grid.scope, data: chosen[0] });
+            return;
+        }
+        if (action.secure) {
+            // one request and one prompt for the whole selection (it confirms and refreshes itself)
+            button.disabled = true;
+            const done = await host.runSecure(action, chosen, grid.scope);
+            button.disabled = false;
+            if (done) {
+                clearSelection(block, grid);
+            }
             return;
         }
         const first = { ...grid.scope, data: chosen[0], value: chosen.length };
@@ -826,7 +836,8 @@ export function createGallery(host) {
             chrome.appendChild(panel);
         }
 
-        const actions = (spec.actions || []).filter((entry) => entry.visible === undefined || isVisible(resolve(entry.visible, scope)));
+        const actions = (spec.actions || []).filter((entry) => host.canRun(entry.action)
+            && (entry.visible === undefined || isVisible(resolve(entry.visible, scope))));
         if (actions.length) {
             const bar = el("div", "ui-viewer-actions");
             for (const entry of actions) {

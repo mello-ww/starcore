@@ -1953,3 +1953,61 @@ body.ui-viewer-open {
     outline: 2px solid var(--sc-accent);
     outline-offset: 1px;
 }
+
+/* ---------- the unlock prompt (1.2's secure action) ---------- */
+
+.ui-unlock {
+    position: fixed;
+    inset: 0;
+    z-index: 70; /* above the viewer it is asked from */
+    display: grid;
+    place-items: center;
+    padding: var(--sc-space-5);
+    background: rgba(8, 9, 11, 0.72);
+    animation: ui-viewer-in 160ms ease;
+}
+
+.ui-unlock-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-3);
+    width: min(380px, 100%);
+    padding: var(--sc-space-5);
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+.ui-unlock-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sc-space-2);
+    color: var(--sc-text);
+}
+
+.ui-unlock-title {
+    margin: 0;
+    font: 700 18px/1.2 var(--sc-font-display);
+}
+
+.ui-unlock-pin {
+    letter-spacing: 0.3em;
+    text-align: center;
+    font-size: 20px;
+}
+
+.ui-unlock-error {
+    margin: 0;
+    color: var(--sc-danger, #ff6b6b);
+    font: 400 13px/1.3 var(--sc-font-sans);
+}
+
+.ui-unlock-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--sc-space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-unlock { animation: none; }
+}

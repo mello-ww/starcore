@@ -35,7 +35,7 @@ export const ICONS = new Set([
 export const CLIENT_CAPABILITIES = new Set(["media.audio", "media.picker"]);
 // Satellite capabilities this client has a shared block for, and the
 // protocol versions it speaks
-export const CAPABILITY_VERSIONS = { "files.browse": [1], "audio.library": [1], "media.gallery": [1] };
+export const CAPABILITY_VERSIONS = { "files.browse": [1], "audio.library": [1], "media.gallery": [1], "media.vault": [1] };
 
 const RESERVED_SEGMENTS = new Set(["assets", "enable", "disable", "reload", "ui"]);
 const FIRST_SEGMENT = /^[A-Za-z0-9_-]+$/;

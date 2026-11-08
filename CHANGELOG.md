@@ -129,8 +129,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   whole selection. Only the operations the vocabulary's `secure_operations` lists are allowed
   (so far `media.vault` / `move_in`), only on the document Satellite's own `media.gallery`
   items (the Engine now validates a document against its Satellite's `[provides]`), and with no
-  route, prompt or PIN field of the document's own. Contract fixtures cover each rule; the
-  clients draw it from the next milestones on.
+  route, prompt or PIN field of the document's own. Contract fixtures cover each rule.
+  Mission Control draws it (`mission_control/ui/secure.js`): its own PIN prompt asks for a
+  single-use grant for exactly the items, one prompt and one request for a whole selection,
+  partial results reported as partial, and the control hidden when no provider can run it.
 - **Moving into the Locked Folder without opening it (server).** An unlock can ask for a
   single-use grant for one move instead (`for: {operation: "move_in", items}`): bound to the
   session, the exact items and 60 seconds, used up by the first `move_in` whatever its outcome,
@@ -182,7 +184,6 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 - **A media-grid selection on the web no longer acts on items from a cancelled selection.**
   Cancelling kept the cancelled items in the selection's memory, so the next selection's action
   (Move to bin, say) also ran on them. A selection's action now acts only on what is selected.
-
 - **The Locked Folder locks again after a failed move from Photos on the web.** A move that
   failed after the PIN (encryption running, a full disk) left that browser session unlocked
   until the time limit; it now locks again whatever the outcome, and a lock that can't be sent
