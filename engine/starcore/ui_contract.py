@@ -102,6 +102,9 @@ RESERVED_SEGMENTS = {"assets", "enable", "disable", "reload", "ui"}
 CONTRACT_PATTERN = re.compile(r"^starcore\.ui/(\d+)\.(\d+)$")
 PAGE_ID = re.compile(r"^[a-z][a-z0-9_-]{0,47}$")
 IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,47}$")
+# an offline page's omit list (1.2), and the {binding} placeholders of a template
+OFFLINE_OMIT_LIMIT = 32
+TEMPLATE_PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
 FIRST_SEGMENT = re.compile(r"^[A-Za-z0-9_-]+$")
 SEGMENT = re.compile(r"^[A-Za-z0-9_.~%-]+$")
 QUERY = re.compile(r"^[A-Za-z0-9_.~%&=+-]*$")
@@ -361,6 +364,35 @@ class _Validator:
             if not isinstance(values, list) or not all(isinstance(value, str) and value for value in values):
                 self.error(f"requires.{key}", "must be a list of names")
 
+    def check_offline_omit(self, where: str, offline: dict, blocks):
+        """{omit: [field names]} (1.2): names left out of what the client keeps, wherever they
+        appear. A name an item is keyed by or addressed with ({$.id} in an image or a route)
+        can't be left out: the kept page would have nothing to show its items by."""
+        self.unknown_keys(where, offline, {"omit"})
+        omit = offline.get("omit")
+        if (not isinstance(omit, list) or not omit or len(omit) > OFFLINE_OMIT_LIMIT
+                or not all(isinstance(name, str) and IDENTIFIER.match(name) for name in omit)):
+            self.error(f"{where}.omit", f"must be a list of 1 to {OFFLINE_OMIT_LIMIT} field names")
+            return
+        needed = set()
+
+        def visit(value, key=None):
+            if isinstance(value, dict):
+                for name, item in value.items():
+                    visit(item, name)
+            elif isinstance(value, list):
+                for item in value:
+                    visit(item, key)
+            elif isinstance(value, str):
+                if key == "key" and value.startswith("$."):
+                    needed.update(value[2:].split("."))
+                for expression in TEMPLATE_PLACEHOLDER.findall(value):
+                    if expression.startswith("$."):
+                        needed.update(expression[2:].split("."))
+        visit(blocks)
+        for name in sorted(set(omit) & needed):
+            self.error(f"{where}.omit", f"can't leave out {name!r}: items are keyed by it or reached with it")
+
     def check_page(self, where: str, page):
         if not isinstance(page, dict):
             self.error(where, "must be an object")
@@ -370,12 +402,19 @@ class _Validator:
             # 1.2: the client may keep this page's data (and a grid's loaded pages) to show while
             # StarCore can't be reached; a page whose source depends on what the person types or
             # chooses ($state) is never kept, so it can't be offered for one
+            # The client keeps only the fields the page's blocks bind, and never a field named in
+            # `omit` (at any depth) - {"omit": [...]} is how a Satellite keeps what it wouldn't want
+            # in a phone's unencrypted app storage (a location, a path on the server) out of it.
             self.since(f"{where}.offline", "offline pages", 2)
-            if not isinstance(page["offline"], bool):
-                self.error(f"{where}.offline", "must be true or false")
-            elif page["offline"] and not isinstance(page.get("source"), dict):
+            offline = page["offline"]
+            if isinstance(offline, dict):
+                self.check_offline_omit(f"{where}.offline", offline, page.get("blocks"))
+            elif not isinstance(offline, bool):
+                self.error(f"{where}.offline", "must be true, false or {omit: [field names]}")
+                offline = False
+            if offline and not isinstance(page.get("source"), dict):
                 self.error(f"{where}.offline", "needs the page's own source")
-            elif page["offline"] and "$state." in str(page["source"].get("route", "")):
+            elif offline and "$state." in str(page["source"].get("route", "")):
                 self.error(f"{where}.offline", "can't keep a source that depends on $state")
         self.state_keys, self.source_names = set(), set()
         if "state" in page:

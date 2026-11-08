@@ -9,6 +9,7 @@ import {configureBackgroundFetch, triggerForegroundSync} from './photo/backgroun
 import {RootNavigator} from './navigation/RootNavigator';
 import {ConnectScreen} from './screens/ConnectScreen';
 import {ServerListScreen} from './screens/ServerListScreen';
+import {purgeLegacyOffline} from './satellites/ui/offline';
 import {ServersProvider, useServers} from './servers/ServersContext';
 import {AccentProvider, colors} from './theme';
 
@@ -38,6 +39,9 @@ export default function App() {
     // ServersProvider/ServersGate rather than inside either.
     configureBackgroundFetch();
     triggerForegroundSync();
+    // what the first offline store kept may hold fields pages now omit: removed at every start
+    // until that succeeds, whichever server or screen is used next
+    purgeLegacyOffline();
   }, []);
 
   return (

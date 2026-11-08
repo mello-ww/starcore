@@ -87,8 +87,9 @@ export interface UiPage {
   state?: Record<string, Json>;
   /** 1.1: 'stack' (the default) or 'dashboard' */
   template?: string;
-  /** 1.2: this page may be kept to show while StarCore can't be reached (satellites/ui/offline.ts) */
-  offline?: boolean;
+  /** 1.2: this page may be kept to show while StarCore can't be reached - only the fields its
+   * blocks bind, and never one named in `omit`, at any depth (satellites/ui/offline.ts) */
+  offline?: boolean | {omit?: string[]};
   blocks: UiBlock[];
 }
 

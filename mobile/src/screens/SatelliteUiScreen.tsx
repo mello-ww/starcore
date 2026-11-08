@@ -17,7 +17,7 @@ import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
 import {DEDICATED_SCREENS} from './HomeScreen';
 import {uiPreferences} from '../satellites/ui/preferences';
 import {
-  collectionKey, forgetOfflineServer, OfflineStore, sessionScope, tidyOffline, type GridPages, type OfflineEntry,
+  collectionKey, forgetOfflineServer, offlinePlan, OfflineStore, sessionScope, tidyOffline, type GridPages, type OfflineEntry,
 } from '../satellites/ui/offline';
 import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
@@ -199,7 +199,13 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const stateKey = JSON.stringify(pageState);
   const bindings = useMemo(() => ({params, state: pageState}), [paramsKey, stateKey]);
 
-  const offlinePage = Boolean(page?.offline === true && page.source && !String(page.source.route).includes('$state.'));
+  const offlinePage = Boolean(
+    (page?.offline === true || (page?.offline && typeof page.offline === 'object')) &&
+      page.source &&
+      !String(page.source.route).includes('$state.'),
+  );
+  // what this page may keep: only the fields its blocks bind, never one it omits
+  const plan = useMemo(() => offlinePlan(page), [page]);
   const collection = pageId ? collectionKey(pageId, params) : '';
 
   const loadData = useCallback(async () => {
@@ -220,7 +226,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           // a live answer replaces what was kept; its grids add their pages as they load them
           const entry: OfflineEntry = {savedAt: Date.now(), data: fresh, grids: {}};
           kept.current = {collection, entry, fromCache: false};
-          store.write(collection, entry);
+          store.write(collection, entry, plan);
         }
         shownData.current = fresh;
         setData(fresh);
@@ -256,7 +262,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         setLoading(false);
       }
     }
-  }, [api, name, page, bindings, offlinePage, collection, store, serverId]);
+  }, [api, name, page, bindings, offlinePage, collection, store, serverId, plan]);
 
   // a grid on an offline page: its pages are kept with the page data (never with kept data
   // shown, which must not be written back as if it were live), and given back with it
@@ -272,10 +278,10 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           return;
         }
         current.entry.grids = {...current.entry.grids, [grid]: pages};
-        store.write(collection, current.entry);
+        store.write(collection, current.entry, plan);
       },
     }),
-    [offlinePage, collection, store],
+    [offlinePage, collection, store, plan],
   );
 
   const loadSource = useCallback(

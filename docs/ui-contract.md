@@ -599,14 +599,33 @@ A client that sees the same revision knows its cached copy is current.
 
 ### Offline pages
 
-A page with `"offline": true` is kept by the Android app, so a person who loses the connection
-can still browse what they saw. Mission Control keeps nothing: a browser tab without StarCore
-has nowhere to load from.
+A page with `"offline": true`, or `"offline": {"omit": ["location", "folder"]}`, is kept by the
+Android app, so a person who loses the connection can still browse what they saw. Mission
+Control keeps nothing: a browser tab without StarCore has nowhere to load from.
 
-- **What is kept**: the page's data exactly as the Satellite answered it (its order and fields),
-  and for each `media-grid` the first 4 pages it loaded after that through `more`, with the
-  cursor after the last. Never a token, a resolved URL or an image: images come from the
-  platform's own cache when it still has them, and show the placeholder otherwise.
+- **What is kept**: only what the page's blocks bind, worked out from the document:
+  - every `$.` and `$page.` binding in the page's title and blocks, including inside
+    `{placeholders}`;
+  - inside a block with `items` (or `rows`), its bindings applied to each item;
+  - for each `media-grid`, the same fields of the first 4 pages it loaded after that through
+    `more`, with the cursor after the last.
+
+  A path keeps only itself (`$.place.city` keeps `place.city`, not the rest of `place`); a
+  field bound as a whole keeps its whole value. Everything else the Satellite answered is
+  dropped.
+- **What is never kept**:
+  - a field named in `omit`, wherever it appears (in the page data, in every item, in every
+    grid page, at any depth), even where the page binds it. Offline, a viewer field bound to it
+    is simply not shown.
+  - a token, a resolved URL or an image. Images come from the platform's own cache when it
+    still has them, and show the placeholder otherwise.
+
+  The kept copy is unencrypted app storage, and a phone backup may include it, so **a
+  Satellite omits what it wouldn't want on the phone that way**: Photo omits each item's GPS
+  `location` and its `folder` on the server.
+- **`omit`**: 1 to 32 plain field names. A name an item is keyed by (`key`) or reached with (a
+  `{$.id}` in an image or a route) can't be omitted: the Engine refuses the document, since the
+  kept page would have nothing to show its items by.
 - **Scope**: per server, per session (a one-way fingerprint of the session token), per
   Satellite, and per collection (a page and its `params`). A page that depends on `$state`
   (a search) is never kept.
@@ -629,10 +648,13 @@ has nowhere to load from.
 - **Limits**: 12 collections per server (the least recently used go first) and 512 KB each; a
   collection too large to keep is not kept at all (an older copy is forgotten with it).
 - **Storage**: AsyncStorage, one entry per collection
-  (`starcore_ui_offline:v1:<server>:<session>:<satellite>:<collection>`) and an index per server.
-  The entry is written before the index lists it; an entry the index doesn't list (an
-  interrupted write), from another session or past its age is removed, and one that can't be
-  read is removed and treated as never kept.
+  (`starcore_ui_offline:v2:<server>:<session>:<satellite>:<collection>`) and an index per server.
+  The entry is written before the index lists it. An entry is removed when it can't be read
+  (and treated as never kept), when the index doesn't list it (an interrupted write), when it
+  comes from another session, or when it is past its age.
+- **The first store** (`starcore_ui_offline:v1`, which kept whole page data) is removed when the
+  app starts, for every server and session, whether an index lists an entry or not, and tried
+  again at the next start if storage refused. The current store never reads it.
 - **What it can't do**: a change made elsewhere while this phone is offline (a photo deleted
   from the web, moved into the Locked Folder from another device) is only known once StarCore
   answers again. Until then, for at most 7 days and only in a session that was signed in, the

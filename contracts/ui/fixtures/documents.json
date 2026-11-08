@@ -91,6 +91,14 @@
                    ]}}}
     },
     {
+      "name": "offline-page-omitting-fields",
+      "_why": "1.2: the client keeps only what the page binds, and never a field named in omit, at any depth.",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"offline": {"omit": ["location", "folder"]}, "source": {"route": "items"}, "blocks": [
+                     {"type": "media-grid", "id": "items", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id", "title": "$.name"},
+                      "viewer": {"image": "full/{$.id}", "fields": [{"label": "Place", "value": "$.location"}, {"label": "Folder", "value": "$.folder"}]}}
+                   ]}}}
+    },
+    {
       "name": "play-action",
       "_why": "1.2: a button asks the client to play what the audio.library provider finds; it needs the media.audio client capability and an audio.library provider.",
       "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.audio"], "capabilities": ["audio.library"]},
@@ -345,6 +353,28 @@
       "name": "offline-without-a-source",
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"offline": true, "blocks": []}}},
       "error": "offline"
+    },
+    {
+      "name": "offline-omit-not-a-list",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"offline": {"omit": "location"}, "source": {"route": "items"}, "blocks": []}}},
+      "error": "omit"
+    },
+    {
+      "name": "offline-omit-not-a-field-name",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"offline": {"omit": ["place.lat"]}, "source": {"route": "items"}, "blocks": []}}},
+      "error": "omit"
+    },
+    {
+      "name": "offline-omit-an-item-key",
+      "_why": "a kept grid needs the field its items are keyed by and their thumbnails are reached with",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"offline": {"omit": ["id"]}, "source": {"route": "items"}, "blocks": [
+        {"type": "media-grid", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"}}]}}},
+      "error": "omit"
+    },
+    {
+      "name": "offline-unknown-key",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"offline": {"keep": ["title"]}, "source": {"route": "items"}, "blocks": []}}},
+      "error": "keep"
     },
     {
       "name": "own-in-1.1",

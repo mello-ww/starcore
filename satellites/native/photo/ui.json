@@ -12,7 +12,7 @@
   ],
   "pages": {
     "library": {
-      "offline": true,
+      "offline": {"omit": ["location", "folder"]},
       "source": {"route": "gallery?limit=120"},
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary"},
@@ -160,7 +160,7 @@
       ]
     },
     "albums": {
-      "offline": true,
+      "offline": {"omit": ["location", "folder"]},
       "source": {"route": "gallery/albums"},
       "blocks": [
         {
@@ -190,7 +190,7 @@
     "album": {
       "title": "$.name",
       "params": ["id"],
-      "offline": true,
+      "offline": {"omit": ["location", "folder"]},
       "source": {"route": "gallery/albums/{$params.id}?limit=120"},
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary"},

@@ -123,6 +123,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   on sign-in, sign-out and server removal. Photos' shared Library, Albums and album pages use
   it; Photo's own screens forget it when they delete a photo or move one to the Locked Folder.
   Mission Control keeps nothing.
+- **Offline pages keep only what they show.** The app keeps only the fields a page's blocks
+  bind, and never a field the page names in `"offline": {"omit": [...]}`, at any depth. Photo
+  omits each item's GPS location and its folder on the server, which the first version kept in
+  the phone's unencrypted app storage. That store (`starcore_ui_offline:v1`) is removed when the
+  app starts, for every server; the new one is `v2`.
 - **The shared media viewer zooms, and media-grids take the person's own size.** On Android an
   image in the viewer pinches to zoom and, zoomed, pans with one finger or zooms back on a
   double tap, without taking the swipe between items; it is Photo's own zoomable image, now

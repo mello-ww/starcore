@@ -93,6 +93,16 @@ class PhotoUiDocumentTest(unittest.TestCase):
         kept = sorted(name for name, page in self.document["pages"].items() if page.get("offline"))
         self.assertEqual(kept, ["album", "albums", "library"])  # never the bin, Search or Map
 
+    def test_a_kept_page_never_keeps_a_location_or_a_path_on_the_server(self):
+        # gallery items carry GPS coordinates (location) and the file's folder on the server;
+        # neither may reach a phone's unencrypted offline copy
+        for name in ("album", "albums", "library"):
+            omit = self.document["pages"][name]["offline"]["omit"]
+            self.assertTrue({"location", "folder"} <= set(omit), name)
+        from satellites.native.photo import gallery
+        item = gallery.item({"id": "p1", "metadata": {"gps_coordinates": "49.1, 6.2"}, "physical_path": "/srv/p"}, set())
+        self.assertTrue({"location", "folder"} <= set(item))  # the fields the omissions name
+
     def test_it_never_reaches_the_locked_folder_itself(self):
         # no route or media of the document goes near it: it only opens Photo's own screens,
         # which ask for the PIN as they always did

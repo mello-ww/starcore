@@ -131,6 +131,29 @@ describe('an offline page', () => {
     expect(await kept()).toHaveLength(0); // so an item that left can't come back offline
   });
 
+  it('keeps only the fields the page binds, and never one it omits', async () => {
+    __mocks.document.mockResolvedValue({
+      document: {...DOCUMENT, pages: {...DOCUMENT.pages, library: {...DOCUMENT.pages.library, offline: {omit: ['location']},
+        blocks: [{...grid('library'), viewer: {...grid('library').viewer, fields: [{label: 'Place', value: '$.location'}]}}]}}},
+      revision: 'r', offline: false,
+    });
+    __mocks.read.mockImplementation(async (_s: string, route: string) =>
+      route === 'items?limit=2'
+        ? {items: [{id: 'p1', name: 'One', location: '49.1, 6.2', path: '/srv/a.jpg'}], next: null, owner: 'x'}
+        : {note: 'hi'});
+    const live = await mount();
+    await settle();
+    expect(tiles(live)).toBe(1);
+    const stored = (await AsyncStorage.getItem((await kept())[0]))!;
+    expect(JSON.parse(stored).data).toEqual({items: [{id: 'p1', name: 'One'}], next: null});
+
+    act(() => mounted.splice(0).forEach(tree => tree.unmount()));
+    __mocks.read.mockImplementation(offline);
+    const away = await mount();
+    await settle();
+    expect(tiles(away)).toBe(1); // still shown offline, by what was kept
+  });
+
   it('keeps nothing for a page that doesn’t ask for it', async () => {
     await mount('elsewhere');
     await settle();
