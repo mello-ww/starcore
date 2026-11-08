@@ -179,6 +179,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Fixed
 
+- **A media-grid selection on the web no longer acts on items from a cancelled selection.**
+  Cancelling kept the cancelled items in the selection's memory, so the next selection's action
+  (Move to bin, say) also ran on them. A selection's action now acts only on what is selected.
+
 - **The Locked Folder locks again after a failed move from Photos on the web.** A move that
   failed after the PIN (encryption running, a full disk) left that browser session unlocked
   until the time limit; it now locks again whatever the outcome, and a lock that can't be sent

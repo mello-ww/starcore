@@ -490,6 +490,7 @@ export function createGallery(host) {
 
     function clearSelection(block, grid) {
         grid.selected.clear();
+        grid.chosen.clear();  // or the next selection's action would also act on these items
         grid.selecting = false;
         for (const tile of grid.tiles.values()) {
             tile.classList.remove("is-selected");
@@ -589,8 +590,8 @@ export function createGallery(host) {
     }
 
     async function runOnSelection(block, grid, entry, button) {
-        // everything selected, on whichever loaded page it is
-        const chosen = [...grid.chosen.values()].filter((item) => item !== undefined);
+        // everything selected, on whichever loaded page it is - only what is selected now
+        const chosen = [...grid.selected].map((key) => grid.chosen.get(key)).filter((item) => item !== undefined);
         const action = entry.action;
         if (!chosen.length || !action) {
             return;
@@ -614,6 +615,7 @@ export function createGallery(host) {
             }
         }
         grid.selected.clear();
+        grid.chosen.clear();
         grid.selecting = false;
         if (failed) {
             host.setNotice(`${failed} of ${chosen.length} could not be done.`, "error");
