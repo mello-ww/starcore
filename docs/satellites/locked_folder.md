@@ -269,6 +269,10 @@ POST /api/satellites/LockedFolder/move_in  { "items": [reference], "grant"? } ->
   - **is not an unlock**: `status` still says locked, and `media`, `media/file`, `upload`,
     `delete`, `move_out` and `encryption` still refuse the session. So a client that dies
     after the PIN leaves nothing open, and has nothing to lock again.
+- **Clients:** Mission Control asks with its own PIN prompt. The Android app uses this
+  Satellite's own unlock screen (`mobile/src/lockedFolder/VaultGrantPrompt.tsx`), with
+  biometric unlock asking `biometric/unlock` for the same grant. Either way the moved items are
+  then dropped from the shared screen, the app's offline copies and its image cache.
 - **`move_in` with `items`** runs under this session's unlock (which it leaves as it was) or a
   matching grant. `photo_ids` keeps working for the dedicated screens, under an unlock.
 - **Checked again at the moment of the move.** Under the move lock, each photo is resolved

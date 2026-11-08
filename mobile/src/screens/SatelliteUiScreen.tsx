@@ -17,8 +17,12 @@ import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
 import {DEDICATED_SCREENS} from './HomeScreen';
 import {uiPreferences} from '../satellites/ui/preferences';
 import {
-  collectionKey, forgetOfflineServer, offlinePlan, OfflineStore, sessionScope, tidyOffline, type GridPages, type OfflineEntry,
+  collectionKey, forgetOfflineSatellite, forgetOfflineServer, offlinePlan, OfflineStore, sessionScope, tidyOffline,
+  type GridPages, type OfflineEntry,
 } from '../satellites/ui/offline';
+import {BUILTIN_SECURE_PROMPTS} from '../satellites/builtins';
+import {runSecure, secureRunner, type GrantRequest, type SecurePromptProps} from '../satellites/ui/secure';
+import {privacy} from '../platform/privacy';
 import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
@@ -96,6 +100,12 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const [overlay, setOverlay] = useState<React.ReactNode>(null);
   // 1.2's pick action: the media picker open over the screen, until the person chooses or cancels
   const [pickRequest, setPickRequest] = useState<PickRequest | null>(null);
+  // the secure action's prompt (1.2), while it asks: the app's own screen for the capability
+  const [grantRequest, setGrantRequest] = useState<{
+    component: React.ComponentType<SecurePromptProps>;
+    wanted: GrantRequest;
+    resolve: (grant: string | null) => void;
+  } | null>(null);
   const nearEndListeners = useRef(new Set<() => void>()).current;
   const onNearEnd = useCallback(
     (listener: () => void) => {
@@ -401,6 +411,10 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         go(action.navigate, resolve(action.params ?? {}, scoped));
         return true;
       }
+      if (action.secure) {
+        // 1.2: one protected operation on this item, behind the app's own prompt
+        return runSecureRef.current(action, [scope]);
+      }
       if (action.own !== undefined) {
         // 1.2: the Satellite's own native screens, at a section they name - pushed over this
         // one, so Back returns here; they keep their own rules (a PIN, a permission)
@@ -487,6 +501,68 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     [api, name, go, loadData, navigation, showToast, audio, providers, store],
   );
 
+  /** The secure action (1.2) on these items: one request, and one prompt when the session
+   * hasn't unlocked the provider - for a single-use grant, never an unlock. What moved is
+   * forgotten from every session's offline copies and from the image cache. */
+  const runSecureAction = useCallback(
+    async (action: UiAction, items: Scope[], imagesOf?: (item: Scope) => string[]): Promise<boolean> => {
+      const runner = secureRunner(action, providers, name, BUILTIN_SECURE_PROMPTS);
+      if (!runner || !items.length) {
+        showToast("That isn't available on this server.", true);
+        return false;
+      }
+      if (action.confirm && !(await confirmAction(String(resolve(action.confirm, {...items[0], value: items.length}))))) {
+        return false;
+      }
+      const {provider, prompt} = runner;
+      const ids = items.map(item => resolve(action.item, item));
+      const result = await runSecure({
+        action, ids, satellite: name, provider,
+        read: route => api.read(provider.satellite, route),
+        post: (route, body) => api.act(provider.satellite, route, 'POST', body),
+        grant: wanted =>
+          new Promise<string | null>(done =>
+            setGrantRequest({
+              component: prompt.component,
+              wanted,
+              resolve: grant => {
+                setGrantRequest(null);
+                done(grant);
+              },
+            }),
+          ),
+      });
+      if (result.outcome === 'cancelled') {
+        return false;
+      }
+      if (result.moved.length) {
+        // gone from here for good: never shown offline again, by any session, nor from the cache
+        kept.current = null;
+        await forgetOfflineSatellite(serverId, name);
+        const movedIds = new Set(result.moved.map(item => String(item?.id)));
+        privacy.evictImages(
+          items.filter((item, at) => movedIds.has(String(ids[at]))).flatMap(item => imagesOf?.(item) ?? []),
+        );
+      }
+      showToast(result.text, result.outcome !== 'done');
+      if (result.moved.length) {
+        if (action.then === 'back') {
+          navigation.goBack();
+        } else {
+          loadData();
+        }
+      }
+      return result.moved.length > 0;
+    },
+    [providers, name, api, serverId, showToast, navigation, loadData],
+  );
+  const runSecureRef = useRef(runSecureAction);
+  runSecureRef.current = runSecureAction;
+  const canRun = useCallback(
+    (action: UiAction | undefined) => !action?.secure || Boolean(secureRunner(action, providers, name, BUILTIN_SECURE_PROMPTS)),
+    [providers, name],
+  );
+
   // images (1.2) load from this Satellite's own routes, with the signed-in session
   const baseUrl = activeServer?.baseUrl ?? '';
   const mediaSource = useCallback(
@@ -533,6 +609,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     confirm: confirmAction,
     afterSelection,
     hasOwnScreens: Boolean(DEDICATED_SCREENS[name]),
+    canRun,
+    runSecure: runSecureAction,
     preferences,
     offlineGrids,
     forms,
@@ -697,6 +775,14 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       </ScrollView>
       )}
       {pickRequest && <MediaPicker request={pickRequest} read={readProvider} mediaSource={providerSource} />}
+      {grantRequest && (
+        <grantRequest.component
+          count={grantRequest.wanted.items.length}
+          wanted={grantRequest.wanted}
+          onGrant={grant => grantRequest.resolve(grant)}
+          onCancel={() => grantRequest.resolve(null)}
+        />
+      )}
       {overlay && (
         <View style={[styles.overlay, {bottom: space.lg + playerInset}]} pointerEvents="box-none">
           {overlay}

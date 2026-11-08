@@ -1,6 +1,7 @@
 import {LockedFolderError} from '../src/lockedFolder/api';
 import type {LockedFolderApi} from '../src/lockedFolder/api';
-import {disable, enroll, isEnrolled, unlockWithBiometrics} from '../src/lockedFolder/biometricUnlock';
+import {LockedFolderApi as RealLockedFolderApi} from '../src/lockedFolder/api';
+import {disable, enroll, grantWithBiometrics, isEnrolled, unlockWithBiometrics} from '../src/lockedFolder/biometricUnlock';
 import type {BiometricSigner, SignResult} from '../src/platform/types';
 import {FakeSecureStore} from './fakes';
 
@@ -161,5 +162,36 @@ describe('Locked Folder biometric unlock', () => {
     await disable(deps);
     expect(api.revokeBiometrics).toHaveBeenCalledWith('key-1');
     expect(await isEnrolled(deps)).toBe(false);
+  });
+
+  describe('for a single-use grant (the secure action)', () => {
+    const wanted = {operation: 'move_in', items: [{provider: 'Gallery', capability: 'media.gallery', id: 'p1'}]};
+
+    it('signs the server challenge and hands back the grant, asking with `for`', async () => {
+      const {api, signer, deps} = setup();
+      await enroll(deps, '2468', 'Pixel');
+      signer.exists = true;
+      api.biometricUnlock.mockResolvedValueOnce('g-1' as any);
+      await expect(grantWithBiometrics(deps, 'Move', wanted)).resolves.toEqual({result: 'unlocked', grant: 'g-1'});
+      expect(api.biometricUnlock).toHaveBeenCalledWith('key-1', 'CHALLENGE', 'SIGNED', wanted);
+    });
+
+    it('never takes an answer without a grant as one', async () => {
+      const {signer, deps} = setup();
+      await enroll(deps, '2468', 'Pixel');
+      signer.exists = true; // the fake server unlocks instead of granting: no grant comes back
+      await expect(grantWithBiometrics(deps, 'Move', wanted)).resolves.toEqual({result: 'failed', grant: null});
+    });
+
+    it('asks the server for a grant with the PIN, never an unlock', async () => {
+      const post = jest.fn(async () => ({status: 200, body: {unlocked: false, grant: 'g-2', expires_at: 'soon'}}));
+      const api = new RealLockedFolderApi({post} as any);
+      await expect(api.grant('2468', wanted)).resolves.toBe('g-2');
+      expect(post).toHaveBeenCalledWith('/api/satellites/LockedFolder/unlock', {pin: '2468', for: wanted});
+      post.mockResolvedValueOnce({status: 200, body: {unlocked: true, expires_at: 'later'}} as any);
+      await expect(api.grant('2468', wanted)).rejects.toBeTruthy(); // an unlock is not a grant
+      post.mockResolvedValueOnce({status: 401, body: {error: 'incorrect PIN'}} as any);
+      await expect(api.grant('0000', wanted)).rejects.toMatchObject({status: 401});
+    });
   });
 });

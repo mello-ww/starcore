@@ -1,5 +1,5 @@
 import type {BiometricSigner, SecureStore} from '../platform/types';
-import type {LockedFolderApi} from './api';
+import type {GrantRequest, LockedFolderApi} from './api';
 
 /**
  * Optional biometric unlock for the Locked Folder - separate from, and
@@ -79,47 +79,72 @@ export async function enroll(deps: BiometricDeps, pin: string, deviceName: strin
 /** Tries to unlock with biometrics. Throws only for a lockout (the error
  * carries `retryAfter`) or a network failure. */
 export async function unlockWithBiometrics(deps: BiometricDeps, promptMessage: string): Promise<BiometricUnlockResult> {
+  return (await signedUnlock(deps, promptMessage)).result;
+}
+
+/** Like unlockWithBiometrics, but asks for a single-use grant for `wanted` instead of an unlock:
+ * the vault stays locked. `grant` is set when the result is 'unlocked'. */
+export async function grantWithBiometrics(
+  deps: BiometricDeps,
+  promptMessage: string,
+  wanted: GrantRequest,
+): Promise<{result: BiometricUnlockResult; grant: string | null}> {
+  return signedUnlock(deps, promptMessage, wanted);
+}
+
+async function signedUnlock(
+  deps: BiometricDeps,
+  promptMessage: string,
+  wanted?: GrantRequest,
+): Promise<{result: BiometricUnlockResult; grant: string | null}> {
+  const done = (result: BiometricUnlockResult, grant: string | null = null) => ({result, grant});
   const {api, signer, store, serverId} = deps;
   const keyId = await store.getItem(keyIdKey(serverId));
   if (!keyId) {
-    return 'not-enrolled';
+    return done('not-enrolled');
   }
   if (!(await signer.isAvailable()).available) {
-    return 'unavailable';
+    return done('unavailable');
   }
   if (!(await signer.keyExists())) {
     await forget(deps, keyId);
-    return 'reenroll';
+    return done('reenroll');
   }
 
   const challenge = await api.biometricChallenge(keyId);
   if (challenge === null) {
     // the server dropped this device (PIN changed, or it was removed)
     await store.removeItem(keyIdKey(serverId));
-    return 'reenroll';
+    return done('reenroll');
   }
 
   const signed = await signer.sign(promptMessage, challenge);
   if (signed.status === 'cancelled') {
-    return 'cancelled';
+    return done('cancelled');
   }
   if (signed.status === 'key-invalid') {
     // usually new fingerprints/faces: Android invalidated the key on purpose
     await signer.deleteKey();
     await store.removeItem(PUBLIC_KEY);
     await forget(deps, keyId);
-    return 'reenroll';
+    return done('reenroll');
   }
 
+  let grant: string | null;
   try {
-    await api.biometricUnlock(keyId, challenge, signed.signature);
+    grant = wanted
+      ? await api.biometricUnlock(keyId, challenge, signed.signature, wanted)
+      : await api.biometricUnlock(keyId, challenge, signed.signature);
   } catch (error: any) {
     if (error?.status === 401) {
-      return 'failed';
+      return done('failed');
     }
     throw error;
   }
-  return 'unlocked';
+  if (wanted && !grant) {
+    return done('failed'); // a server that unlocked instead of granting: never treated as a grant
+  }
+  return done('unlocked', grant);
 }
 
 /** Turns biometric unlock off for this server, on the phone and the server. */

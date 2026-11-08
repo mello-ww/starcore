@@ -4,7 +4,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {colors, spacing, tokens, typography, useAccentStyles} from '../theme';
 import {isEnrolled, unlockWithBiometrics} from './biometricUnlock';
-import type {BiometricDeps} from './biometricUnlock';
+import type {BiometricDeps, BiometricUnlockResult} from './biometricUnlock';
 import type {LockedFolderApi} from './api';
 
 /**
@@ -17,16 +17,25 @@ export function LockedFolderUnlock({
   biometricDeps,
   onUnlocked,
   intro = 'Enter your PIN to see what’s inside.',
+  title = 'Locked Folder is locked',
   autoBiometrics = true,
   forgotHelp,
+  withPin,
+  withBiometrics,
 }: {
   api: LockedFolderApi;
   biometricDeps: BiometricDeps;
   onUnlocked: () => void;
   intro?: string;
+  title?: string;
   autoBiometrics?: boolean;
   /** What to do about a forgotten PIN, behind a "Forgot your PIN?" link. */
   forgotHelp?: string;
+  /** Instead of unlocking the vault (a single-use grant, say): what the PIN does. Throws as
+   * api.unlock() does. */
+  withPin?: (pin: string) => Promise<void>;
+  /** ...and what a biometric match does. */
+  withBiometrics?: () => Promise<BiometricUnlockResult>;
 }) {
   const accentStyle = useAccentStyles();
   const [pin, setPin] = useState('');
@@ -58,7 +67,9 @@ export function LockedFolderUnlock({
     setBusy(true);
     setMessage(null);
     try {
-      const result = await unlockWithBiometrics(biometricDeps, 'Unlock the Locked Folder');
+      const result = withBiometrics
+        ? await withBiometrics()
+        : await unlockWithBiometrics(biometricDeps, 'Unlock the Locked Folder');
       if (result === 'unlocked') {
         onUnlocked();
         return;
@@ -78,7 +89,7 @@ export function LockedFolderUnlock({
     } finally {
       setBusy(false);
     }
-  }, [biometricDeps, onUnlocked]);
+  }, [biometricDeps, onUnlocked, withBiometrics]);
 
   useEffect(() => {
     isEnrolled(biometricDeps).then(value => {
@@ -97,7 +108,7 @@ export function LockedFolderUnlock({
     setBusy(true);
     setMessage(null);
     try {
-      await api.unlock(pin);
+      await (withPin ? withPin(pin) : api.unlock(pin));
       setPin('');
       onUnlocked();
     } catch (error: any) {
@@ -113,7 +124,7 @@ export function LockedFolderUnlock({
   return (
     <View style={styles.card}>
       <Icon name="lock" size={36} color={accentStyle.color} />
-      <Text style={typography.heading}>Locked Folder is locked</Text>
+      <Text style={typography.heading}>{title}</Text>
       <Text style={[typography.caption, styles.center]}>{intro}</Text>
       <TextInput
         value={pin}

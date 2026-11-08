@@ -1,11 +1,13 @@
 /**
  * The app's composition root for Satellites that still have native code of their own
- * (`src/music/`): the one shared file allowed to import a Satellite's folder, so navigation,
+ * (`src/music/`, and the Locked Folder's unlock prompt): the one shared file allowed to import a
+ * Satellite's folder, so navigation,
  * layout and the AudioHost never do. Each entry goes once its Satellite moves to its ui.json
  * (docs/ui-contract.md, "Migration"); engine/tests/test_client_modularity.py checks that no
  * other shared file imports a Satellite folder.
  */
 import React from 'react';
+import {VAULT_GRANT_PROMPT} from '../lockedFolder/VaultGrantPrompt';
 import type {AudioHostExtensions} from '../media/AudioHost';
 import type {AudioProvider} from '../media/library';
 import {MUSIC_AUDIO_EXTENSIONS, MUSIC_LEGACY_PROVIDER} from '../music/MusicProvider';
@@ -18,6 +20,7 @@ import {MusicSettingsScreen} from '../music/screens/MusicSettingsScreen';
 import {PlaylistScreen} from '../music/screens/PlaylistScreen';
 import {TrackListScreen} from '../music/screens/TrackListScreen';
 import type {TrackListKind} from '../music/ui/navigation';
+import type {SecurePrompt} from './ui/secure';
 
 /** Route params of the native screens below, merged into the Satellites stack's own. */
 export type BuiltinScreenParams = {
@@ -55,3 +58,7 @@ export const BUILTIN_AUDIO: {extensions: AudioHostExtensions; fallbackProvider: 
   extensions: MUSIC_AUDIO_EXTENSIONS,
   fallbackProvider: MUSIC_LEGACY_PROVIDER,
 };
+
+/** The app's own unlock prompts for the secure action (UI contract 1.2), by capability and
+ * provider: the Locked Folder's PIN and biometric screen, asking for a single-use grant. */
+export const BUILTIN_SECURE_PROMPTS: SecurePrompt[] = [VAULT_GRANT_PROMPT];

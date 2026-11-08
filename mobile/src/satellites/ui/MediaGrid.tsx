@@ -196,6 +196,8 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
     [mediaSource],
   );
 
+  const imagesOf = useMemo(() => imageUrls(block, source), [block, source]);
+
   // ---------- paging ----------
   const more = block.more as {route?: string; cursor?: string} | undefined;
   const resolved = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
@@ -381,6 +383,16 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
         runAction(action, chosen[0]);
         return;
       }
+      if (action.secure) {
+        // one request and one prompt for the whole selection (it confirms and refreshes itself)
+        setBusy(true);
+        const done = (await context.runSecure?.(action, chosen, imagesOf)) ?? false;
+        setBusy(false);
+        if (done) {
+          clearSelection();
+        }
+        return;
+      }
       const first = {...chosen[0], value: chosen.length};
       if (action.confirm && context.confirm && !(await context.confirm(asText(resolve(action.confirm, first))))) {
         return;
@@ -397,16 +409,24 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
       clearSelection();
       context.afterSelection?.(action.then, failed, chosen.length);
     },
-    [selected, scope, context, runAction, clearSelection],
+    [selected, scope, context, runAction, clearSelection, imagesOf],
   );
 
   // the selection bar floats over the screen's bottom edge, above the player. It is rebuilt
   // only when the selection changes; what it runs is read from the latest render.
-  const latest = useRef({scope, runOnSelection});
-  latest.current = {scope, runOnSelection};
+  // which secure actions can run changes only with the catalog: the bar is rebuilt then, never on
+  // every render (the context is a new object each time, and the bar is the screen's overlay)
+  const offered = (block.selection as {actions?: any[]} | undefined)?.actions;
+  const canRunHere = (Array.isArray(offered) ? offered : [])
+    .map((entry: any) => (canRun(context, entry?.action) ? '1' : '0'))
+    .join('');
+  const latest = useRef({scope, runOnSelection, context});
+  latest.current = {scope, runOnSelection, context};
   const selection = block.selection as {actions?: any[]} | undefined;
   const selectionBar = useMemo(() => {
-    const selectionActions: any[] = Array.isArray(selection?.actions) ? selection!.actions! : [];
+    const selectionActions: any[] = (Array.isArray(selection?.actions) ? selection!.actions! : []).filter(entry =>
+      canRun(latest.current.context, entry?.action),
+    );
     if (!block.selection || !selecting || picking) {
       return null;
     }
@@ -429,7 +449,7 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
         </ScrollView>
       </View>
     );
-  }, [block.selection, selection, selecting, selected, busy, clearSelection, picking]);
+  }, [block.selection, selection, selecting, selected, busy, clearSelection, picking, canRunHere]);
   useEffect(() => {
     setOverlay?.(selectionBar);
   }, [setOverlay, selectionBar]);
@@ -899,6 +919,22 @@ function ActionPill({
 
 /** The shared full-screen viewer: swipe between items, a video plays in place (only on the
  * page shown, so swiping away stops it), facts and actions come from the document. */
+/** Whether an action's control is drawn: a secure action only where it can run (1.2). */
+function canRun(context: BlockContext, action: any): boolean {
+  return !action?.secure || Boolean(context.canRun?.(action));
+}
+
+/** An item's image URLs as the grid and the viewer load them: what leaves the image cache when
+ * the item leaves (moved somewhere protected). */
+function imageUrls(block: UiBlock, source: (template: unknown, scope: Scope) => Source | null) {
+  const viewer = (block.viewer ?? {}) as Record<string, any>;
+  const item = (block.item ?? {}) as Record<string, any>;
+  return (scope: Scope): string[] =>
+    [item.image, viewer.image, viewer.video]
+      .map(template => source(template, scope)?.uri)
+      .filter((uri): uri is string => typeof uri === 'string' && uri.length > 0);
+}
+
 export function MediaViewer({
   block, entries, startKey, context, source, reduced, onClose, more = false, onEnd,
 }: {
@@ -947,7 +983,7 @@ export function MediaViewer({
   const position = `${index + 1} of ${entries.length}${more ? '+' : ''}`;
   const fields: any[] = (Array.isArray(spec.fields) ? spec.fields : []).filter((field: any) => present(resolve(field.value, scope)));
   const actions: any[] = (Array.isArray(spec.actions) ? spec.actions : []).filter(
-    (entry: any) => entry.visible === undefined || isVisible(resolve(entry.visible, scope)),
+    (entry: any) => canRun(context, entry?.action) && (entry.visible === undefined || isVisible(resolve(entry.visible, scope))),
   );
 
   return (
@@ -1028,7 +1064,11 @@ export function MediaViewer({
                   disabled={busy}
                   onPress={async () => {
                     setBusy(true);
-                    await context.runAction(entry.action, scope);
+                    if (entry.action?.secure) {
+                      await context.runSecure?.(entry.action, [scope], imageUrls(block, source));
+                    } else {
+                      await context.runAction(entry.action, scope);
+                    }
                     setBusy(false);
                   }}
                 />

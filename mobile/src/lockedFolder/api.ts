@@ -1,7 +1,16 @@
 import {StarCoreClient} from '../api/client';
 import {ApiError} from '../api/types';
 
-const BASE = '/api/satellites/LockedFolder';
+/** The Satellite these screens belong to - the provider of media.vault they can unlock for. */
+export const LOCKED_FOLDER = 'LockedFolder';
+const BASE = `/api/satellites/${LOCKED_FOLDER}`;
+
+/** What a single-use grant is for (media.vault's unlock `for`): one operation, on exactly these
+ * references. The server resolves the references itself. */
+export interface GrantRequest {
+  operation: string;
+  items: {provider: string; capability: string; id: string}[];
+}
 
 export interface LockedFolderStatus {
   configured: boolean;
@@ -93,6 +102,16 @@ export class LockedFolderApi {
     }
   }
 
+  /** A single-use grant for one operation on exactly these items, with the PIN - not an unlock:
+   * the vault stays locked for this session. Throws like unlock(). */
+  async grant(pin: string, wanted: GrantRequest): Promise<string> {
+    const {status, body} = await this.client.post(`${BASE}/unlock`, {pin, for: wanted});
+    if (status !== 200 || typeof body?.grant !== 'string') {
+      throw failure(body, status, 'Could not unlock for this.');
+    }
+    return body.grant;
+  }
+
   async lock(): Promise<void> {
     await this.client.post(`${BASE}/lock`, {});
   }
@@ -176,15 +195,18 @@ export class LockedFolderApi {
     return body.challenge;
   }
 
-  async biometricUnlock(keyId: string, challenge: string, signature: string): Promise<void> {
+  /** With `wanted`, a single-use grant instead of an unlock: resolves the grant. */
+  async biometricUnlock(keyId: string, challenge: string, signature: string, wanted?: GrantRequest): Promise<string | null> {
     const {status, body} = await this.client.post(`${BASE}/biometric/unlock`, {
       key_id: keyId,
       challenge,
       signature,
+      ...(wanted ? {for: wanted} : {}),
     });
     if (status !== 200) {
       throw failure(body, status, 'Biometric unlock failed.');
     }
+    return typeof body?.grant === 'string' ? body.grant : null;
   }
 
   async revokeBiometrics(keyId: string): Promise<void> {

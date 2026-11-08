@@ -488,7 +488,10 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
   - **`confirm` and `then`** (`refresh` or `back`) work as for any action. The answer's
     `failed` items are reported, and partial success is never shown as complete.
   - **A client** without a provider for the capability, or without a prompt for it, hides the
-    control. Mission Control's runner and prompt are `mission_control/ui/secure.js`.
+    control. Mission Control's runner and prompt are `mission_control/ui/secure.js`. The
+    app's runner is `mobile/src/satellites/ui/secure.ts`; its prompt for a capability is a
+    native screen the composition root (`src/satellites/builtins.tsx`) registers for one
+    provider, and the shared screen never sees the PIN, only the grant it hands back.
 
 A response may carry `{"message": "..."}`, shown as a short notice; an error response's
 `error` is shown the same way. Either way, the page then shows what is actually true again.

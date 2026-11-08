@@ -67,6 +67,11 @@ export interface BlockContext {
   /** 1.2's own action: whether this app has the Satellite's own native screens to open. A
    * button that opens them is hidden without. */
   hasOwnScreens?: boolean;
+  /** 1.2's secure action: whether it can run here (a control that can't is hidden), and running
+   * it once on items (one prompt for a whole selection). `imagesOf` names each item's image URLs,
+   * dropped from the image cache once the item has left. True once something was done. */
+  canRun?: (action: UiAction | undefined) => boolean;
+  runSecure?: (action: UiAction, items: Scope[], imagesOf?: (item: Scope) => string[]) => Promise<boolean>;
   /** What the person chose here before (a media-grid's size), kept per server and Satellite. */
   preferences?: UiPreferences;
   /** An offline page (1.2): a media-grid hands over the pages it loaded, to keep, and gets them
