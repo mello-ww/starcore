@@ -510,7 +510,11 @@ problem, with the recovery form when it can help), and unlocked (a grid of photo
 other files listed below, a viewer with "Move to Photos" and "Delete", upload, and settings
 for changing the PIN, encryption, the recovery key, backups and delinking). A
 photo's viewer in Photos has a lock button that moves it in, asking for the PIN first when
-needed and locking again straight after. The tab locks again when you switch tabs, leave
+needed and locking again straight after, whether the move worked or not. If that lock can't be
+sent (the connection dropped), the notice says so and when the server's time limit locks the
+vault by itself - never a plain "Moved" - and the lock is tried again when the browser is back
+online or with a `sendBeacon` as the page goes away
+(`satellites/native/photo/mission_control/lockedMove.js`). The tab locks again when you switch tabs, leave
 Photos, or close or reload the page (a `sendBeacon` to `/lock`), and when the server's time
 limit runs out.
 
@@ -657,3 +661,9 @@ losing anything) in isolation, plus `StarCore.__init__`'s own wiring of it for t
 authentication store specifically. `engine/tests/test_gitignore.py` verifies, against a real
 disposable git repository, that the runtime-data and secret paths above are actually ignored
 and that ordinary tracked source/configuration files are not.
+
+`satellites/native/photo/tests/lockedMove.test.mjs` (`node --test`) covers moving a photo in
+from Photo's own web page: locking again after a successful and after a failed move, an
+already unlocked session moving without a prompt, cancelling or a missing PIN moving nothing,
+and a lock that can't be sent being reported with when the vault locks by itself, then tried
+again once when back online or as the page goes away.

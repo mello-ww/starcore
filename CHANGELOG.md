@@ -162,6 +162,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Fixed
 
+- **The Locked Folder locks again after a failed move from Photos on the web.** A move that
+  failed after the PIN (encryption running, a full disk) left that browser session unlocked
+  until the time limit; it now locks again whatever the outcome, and a lock that can't be sent
+  says when the vault locks by itself instead of reporting success.
 - On Android, a Satellite screen's notices now appear above the floating player instead of
   behind it.
 - Mission Control's "Sleep timer: end of this track" now stops playback when the track ends,

@@ -1,3 +1,5 @@
+import { moveIntoLockedFolder, moveNotice, retryLockLater } from "./lockedMove.js";
+
 const SKELETONS = 12;
 // "trash" is deliberately not a tab of its own - the Recycle bin is one of
 // the four kinds shown inside "albums" (see renderAlbums()); "config" is
@@ -293,27 +295,27 @@ export function mount(context) {
         }
         viewer.lockButton.disabled = true;
         try {
-            const state = await lockedApi.get("/status");
-            if (!state.configured || !state.pin_set) {
+            // locks again after the move whatever happened (lockedMove.js)
+            const result = await moveIntoLockedFolder(lockedApi, [photo.id], {
+                requestUnlock: async () => (await loadLockedModule()).requestUnlock(lockedApi),
+            });
+            if (result.outcome === "setup") {
                 closeViewer();
                 setTab("locked");
                 return;
             }
-            if (!state.unlocked) {
-                const module = await loadLockedModule();
-                if (!(await module.requestUnlock(lockedApi))) {
-                    return;
-                }
+            if (result.locked === false) {
+                retryLockLater(lockedApi);
             }
-            const result = await lockedApi.post("/move_in", { photo_ids: [photo.id] });
-            if (result.failed && result.failed.length) {
-                throw new Error(result.failed[0].reason);
+            if (result.outcome === "moved") {
+                await forgetPhoto(photo);
             }
-            // the unlock was only needed for the move - lock again straight away
-            await lockedApi.post("/lock", {}).catch(() => {});
-            await forgetPhoto(photo);
-            showNotice("Moved to the Locked Folder.", false);
+            const message = moveNotice(result);
+            if (message) {
+                showNotice(message.text, message.isError);
+            }
         } catch (error) {
+            // the status couldn't be read: nothing was unlocked or moved
             showNotice(`The photo could not be moved: ${error.message}`, true);
         } finally {
             if (viewer) {
