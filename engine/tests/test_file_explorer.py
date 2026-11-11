@@ -267,10 +267,15 @@ class FileExplorerApiTest(unittest.TestCase):
 
     def test_listing_a_location_outside_any_satellite_storage_works(self):
         # the whole point of this milestone: nothing confines File Explorer to
-        # its own satellite directory, or to the StarCore checkout at all
-        status, payload = self.json_request(self.with_path("entries", self.directory.parent))
+        # its own satellite directory, or to the StarCore checkout at all. The
+        # test's own folder is outside both; it doesn't list the system's temp
+        # folder itself, which other programs fill (thousands of entries) and
+        # which could take longer to list than the request may wait
+        (self.directory / "elsewhere").mkdir()
+        status, payload = self.json_request(self.with_path("entries", self.directory))
         self.assertEqual(status, 200)
-        self.assertIn(self.directory.name, [entry["name"] for entry in payload["entries"]])
+        self.assertIn("elsewhere", [entry["name"] for entry in payload["entries"]])
+        self.assertNotIn(str(Path(__file__).resolve().parents[2]), payload["path"])
 
     # ---------- path safety ----------
 
