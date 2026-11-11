@@ -453,6 +453,45 @@ class PhotoGalleryApiTest(unittest.TestCase):
         record = library(self.satellite).get(photo_id)
         record["metadata"].update({"gps_latitude": lat, "gps_longitude": lon, **metadata})
 
+    def test_the_library_groups_by_month_by_camera_or_not_at_all(self):
+        photos = self.import_photos("a.png", "b.png", "c.png", "d.png", "e.png")
+        ids = {name: photo["id"] for name, photo in photos.items()}
+        dates = {"a.png": "2026-03-01T10:00:00", "b.png": "2026-05-02T10:00:00", "c.png": "2026-05-03T10:00:00",
+                 "d.png": "2026-01-04T10:00:00", "e.png": "2026-04-05T10:00:00"}
+        cameras = {"a.png": ("Zeta", "One"), "b.png": ("Canon", "Canon EOS R5"), "c.png": ("Zeta", "One"),
+                   "d.png": (None, None), "e.png": ("Canon", "Canon EOS R5")}
+        from satellites.native.photo.library import library
+        for name, photo_id in ids.items():
+            record = library(self.satellite).get(photo_id)
+            record["captured_at"] = dates[name]
+            make, model = cameras[name]
+            record["metadata"].update({"camera_make": make, "camera_model": model})
+
+        by_month = self.json_request("/api/satellites/photo/gallery")[1]["items"]
+        self.assertEqual([item["group"] for item in by_month], [item["month"] for item in by_month])
+        self.assertEqual(by_month[0]["id"], ids["c.png"])  # newest first, as before
+
+        # cameras in alphabetical order, an unknown one last, each newest first - across pages too
+        expected = [("Canon EOS R5", ids["b.png"]), ("Canon EOS R5", ids["e.png"]), ("Zeta One", ids["c.png"]),
+                    ("Zeta One", ids["a.png"]), ("Unknown camera", ids["d.png"])]
+        whole = self.json_request("/api/satellites/photo/gallery?group=camera")[1]["items"]
+        self.assertEqual([(item["group"], item["id"]) for item in whole], expected)
+        first = self.json_request("/api/satellites/photo/gallery?group=camera&limit=2")[1]
+        second = self.json_request(f"/api/satellites/photo/gallery?group=camera&limit=2&cursor={first['next']}")[1]
+        third = self.json_request(f"/api/satellites/photo/gallery?group=camera&limit=2&cursor={second['next']}")[1]
+        self.assertIsNone(third["next"])
+        paged = first["items"] + second["items"] + third["items"]
+        self.assertEqual([(item["group"], item["id"]) for item in paged], expected)
+
+        # all: newest first, no headings
+        flat = self.json_request("/api/satellites/photo/gallery?group=all")[1]["items"]
+        self.assertEqual([item["id"] for item in flat], [item["id"] for item in by_month])
+        self.assertTrue(all(item["group"] is None for item in flat))
+
+        status, payload = self.json_request("/api/satellites/photo/gallery?group=lens")
+        self.assertEqual(status, 400)
+        self.assertIn("group", payload["error"])
+
     def test_search_waits_for_text_and_matches_the_same_fields_as_the_app(self):
         photos = self.import_photos("beach.png", "city.png")
         self.locate(photos["city.png"]["id"], None, None, camera_make="Fixture", camera_model="Zoom 9", lens_model="Wide 24")

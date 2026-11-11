@@ -118,6 +118,17 @@ BINDING_ROOTS = ("$.", "$page.", "$params.", "$form.", "$state.", "$sources.", "
 BINDING_WORDS = {"$", "$value", "$page", "$params", "$form", "$state", "$sources"}
 
 
+def choice_keys(blocks) -> set:
+    """The state keys a page's `choice` blocks set, also inside a card."""
+    keys = set()
+    for block in blocks or []:
+        if isinstance(block, dict):
+            if block.get("type") == "choice" and isinstance(block.get("key"), str):
+                keys.add(block["key"])
+            keys |= choice_keys(block.get("blocks"))
+    return keys
+
+
 class UiDocumentError(ValueError):
     """A ui.json that can't be served - unreadable, invalid JSON, or invalid."""
 
@@ -425,8 +436,14 @@ class _Validator:
                 offline = False
             if offline and not isinstance(page.get("source"), dict):
                 self.error(f"{where}.offline", "needs the page's own source")
-            elif offline and "$state." in str(page["source"].get("route", "")):
-                self.error(f"{where}.offline", "can't keep a source that depends on $state")
+            elif offline:
+                # a source may depend on a choice's state - a handful of fixed values, one kept
+                # collection each - but never on any other (a search's free text)
+                used = set(re.findall(r"\$state\.([A-Za-z0-9_]+)", str(page["source"].get("route", ""))))
+                chosen = choice_keys(page.get("blocks"))
+                if used - chosen:
+                    self.error(f"{where}.offline", "can keep a source that depends on $state only on a choice's state "
+                               f"({', '.join(sorted(used - chosen))} isn't one)")
         self.state_keys, self.source_names = set(), set()
         if "state" in page:
             self.since(f"{where}.state", "page state")

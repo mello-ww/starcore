@@ -212,13 +212,42 @@ export function sessionScope(token: string | null | undefined): string {
   return token ? hash.toString(16).padStart(8, '0') : 'none';
 }
 
-/** A collection's name: its page and parameters, the same whatever order they come in. */
-export function collectionKey(page: string, params: Record<string, unknown> = {}): string {
-  const query = Object.keys(params)
-    .sort()
-    .map(name => `${encodeURIComponent(name)}=${encodeURIComponent(String(params[name] ?? ''))}`)
-    .join('&');
+/** A collection's name: its page, parameters and the state values its source depends on (a
+ * choice's), the same whatever order they come in. */
+export function collectionKey(
+  page: string,
+  params: Record<string, unknown> = {},
+  state: Record<string, unknown> = {},
+): string {
+  const pairs = (values: Record<string, unknown>, prefix: string) =>
+    Object.keys(values)
+      .sort()
+      .map(name => `${prefix}${encodeURIComponent(name)}=${encodeURIComponent(String(values[name] ?? ''))}`);
+  const query = [...pairs(params, ''), ...pairs(state, '$')].join('&');
   return query ? `${page}?${query}` : page;
+}
+
+/** The state keys an offline page's source depends on - [] for none - or null when one isn't a
+ * choice's: a search's free text would make a collection per thing typed, so it's never kept. */
+export function offlineStateKeys(page: {source?: {route?: unknown}; blocks?: unknown}): string[] | null {
+  const used = new Set<string>();
+  for (const match of String(page.source?.route ?? '').matchAll(/\$state\.([A-Za-z0-9_]+)/g)) {
+    used.add(match[1]);
+  }
+  const chosen = new Set<string>();
+  const walk = (blocks: unknown) => {
+    for (const block of Array.isArray(blocks) ? blocks : []) {
+      if (block && typeof block === 'object') {
+        if ((block as any).type === 'choice' && typeof (block as any).key === 'string') {
+          chosen.add((block as any).key);
+        }
+        walk((block as any).blocks);
+      }
+    }
+  };
+  walk(page.blocks);
+  const keys = [...used].sort();
+  return keys.every(key => chosen.has(key)) ? keys : null;
 }
 
 const serverPrefix = (serverId: string) => `${OFFLINE_PREFIX}:${serverId}:`;

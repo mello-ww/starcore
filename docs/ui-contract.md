@@ -126,8 +126,9 @@ A **page** has `blocks` and optionally:
   `$state.<key>`. Route templates may use them, so a choice can change what the page loads;
 - `template` (1.1): `stack` (the default) or `dashboard`;
 - `offline` (1.2): `true` lets the client keep the page's data - and the pages a `media-grid`
-  on it loaded after that - to show while StarCore can't be reached. A page whose `source`
-  depends on `$state` can't ask for it. See [Offline pages](#offline-pages).
+  on it loaded after that - to show while StarCore can't be reached. Its `source` may depend on
+  `$state` only where a `choice` on the page sets it (a few fixed values, one kept collection
+  each), never on a search's text. See [Offline pages](#offline-pages).
 
 While a page is visible, its sources refresh on their own; a hidden browser tab or an app in
 the background polls nothing. When a refresh fails, the page keeps what it last showed,
@@ -708,8 +709,9 @@ Control keeps nothing: a browser tab without StarCore has nowhere to load from.
   `{$.id}` in an image or a route) can't be omitted: the Engine refuses the document, since the
   kept page would have nothing to show its items by.
 - **Scope**: per server, per session (a one-way fingerprint of the session token), per
-  Satellite, and per collection (a page and its `params`). A page that depends on `$state`
-  (a search) is never kept.
+  Satellite, and per collection (a page, its `params`, and the value of each `choice` its source
+  depends on - Photos' Library keeps one copy per grouping). A page whose source depends on any
+  other state (a search's text) is never kept, and the Engine refuses to mark it offline.
 - **When it is shown**: only when StarCore can't be reached - never in place of an answer that
   refused the request, and never before a live answer has had its chance. The page shows the
   usual "Offline - showing what StarCore said ..." notice with the age of what is shown, tries

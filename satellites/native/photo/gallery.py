@@ -113,7 +113,7 @@ PAGE_LIMIT = 500
 
 
 class PagingError(ValueError):
-    """A `limit` or `cursor` that can't be used: answered with 400."""
+    """A `limit`, `cursor` or `group` that can't be used: answered with 400."""
 
 
 def paging(query) -> tuple:
@@ -202,13 +202,31 @@ def _summary(count: int, size: int) -> str:
     return f"{count} {noun} · {format_value(size, 'bytes')}" if count else "No photos or videos yet"
 
 
-def library_view(satellite, limit=None, cursor=None) -> dict:
+# how the Library groups its photos, as Photo's own page did: by month (newest first), by
+# camera (alphabetical, an unknown one last, each newest first), or not at all
+GROUPINGS = ("month", "camera", "all")
+UNKNOWN_CAMERA = "Unknown camera"
+
+
+def library_view(satellite, limit=None, cursor=None, group="month") -> dict:
+    if group not in GROUPINGS:
+        raise PagingError("'group' must be month, camera or all")
     photo_library = library(satellite)
     favorites = _favorites(satellite)
     photos = photo_library.all()
-    shown, following = page(photos, limit, cursor)
+    if group == "camera":
+        # newest first within each camera; paged by position, since the order is no longer by date
+        newest = sorted(photos, key=_newest_first, reverse=True)
+        label = lambda photo: _camera(photo.get("metadata") or {})
+        ordered = sorted(newest, key=lambda photo: (label(photo) is None, (label(photo) or "").lower()))
+        shown, following = page_in_order(ordered, limit, cursor)
+    else:
+        shown, following = page(photos, limit, cursor)
+    items = [item(photo, favorites) for photo in shown]
+    for entry in items:
+        entry["group"] = entry["month"] if group == "month" else (entry["camera"] or UNKNOWN_CAMERA) if group == "camera" else None
     return {
-        "items": [item(photo, favorites) for photo in shown],
+        "items": items,
         "next": following,
         "summary": _summary(len(photos), sum(photo.get("size") or 0 for photo in photos)),
     }

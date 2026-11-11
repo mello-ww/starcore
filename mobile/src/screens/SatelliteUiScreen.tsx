@@ -17,7 +17,8 @@ import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
 import {DEDICATED_SCREENS} from './HomeScreen';
 import {uiPreferences} from '../satellites/ui/preferences';
 import {
-  collectionKey, forgetOfflineSatellite, forgetOfflineServer, offlinePlan, OfflineStore, sessionScope, tidyOffline,
+  collectionKey, forgetOfflineSatellite, forgetOfflineServer, offlinePlan, offlineStateKeys, OfflineStore, sessionScope,
+  tidyOffline,
   type GridPages, type OfflineEntry,
 } from '../satellites/ui/offline';
 import {BUILTIN_SECURE_PROMPTS} from '../satellites/builtins';
@@ -210,14 +211,18 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const stateKey = JSON.stringify(pageState);
   const bindings = useMemo(() => ({params, state: pageState}), [paramsKey, stateKey]);
 
+  // the state a kept page's source depends on: only a choice's (one collection per value), never
+  // a search's free text - such a page isn't kept at all
+  const keptStateKeys = useMemo(() => (page ? offlineStateKeys(page) : null), [page]);
   const offlinePage = Boolean(
     (page?.offline === true || (page?.offline && typeof page.offline === 'object')) &&
       page.source &&
-      !String(page.source.route).includes('$state.'),
+      keptStateKeys !== null,
   );
   // what this page may keep: only the fields its blocks bind, never one it omits
   const plan = useMemo(() => offlinePlan(page), [page]);
-  const collection = pageId ? collectionKey(pageId, params) : '';
+  const keptState = Object.fromEntries((keptStateKeys ?? []).map(key => [key, (pageState as any)?.[key]]));
+  const collection = pageId ? collectionKey(pageId, params, keptState) : '';
 
   const loadData = useCallback(async () => {
     if (!page) {

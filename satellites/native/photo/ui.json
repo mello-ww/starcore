@@ -12,18 +12,21 @@
   "pages": {
     "library": {
       "offline": {"omit": ["location", "folder"]},
-      "source": {"route": "gallery?limit=120"},
+      "state": {"group": "month"},
+      "source": {"route": "gallery?limit=120&group={$state.group}"},
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary"},
         {"type": "button", "label": "Import from a folder", "style": "secondary", "action": {"navigate": "import"}},
+        {"type": "choice", "key": "group", "label": "Group by",
+         "options": [{"value": "month", "label": "Month"}, {"value": "camera", "label": "Camera"}, {"value": "all", "label": "All"}]},
         {
           "type": "media-grid",
           "id": "library",
           "items": "$.items",
-          "more": {"route": "gallery?limit=120&cursor={$value}", "cursor": "$.next"},
+          "more": {"route": "gallery?limit=120&group={$state.group}&cursor={$value}", "cursor": "$.next"},
           "size": "medium",
           "empty": "No photos yet. Import a folder, or turn on phone sync in Photo's settings.",
-          "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration", "group": "$.month"},
+          "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration", "group": "$.group"},
           "quick": [
             {"label": "Favorite", "icon": "heart", "visible": "$.can_favorite",
              "action": {"route": "albums/favorites/photos", "body": {"photo_id": "$.id"}, "then": "refresh"}},

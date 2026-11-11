@@ -7,6 +7,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Group Photos' Library by camera, or not at all**, on both clients, as Photo's own web page
+  did: a "Group by" choice (Month, Camera, All) above the grid. Only Photo changed (its
+  `gallery?group=` and `ui.json`). **UI contract 1.2's offline pages** may now depend on a
+  choice's state - the app keeps one copy per value, so the Library stays available offline in
+  every grouping - but still never on a search's text.
 - **Swipe between photos in the shared web viewer** on a touch screen (a phone's or a tablet's
   browser), as Photo's own page did: a deliberate one-finger sideways swipe; a tap, a scroll or
   a pinch moves nothing, and a swipe on a video stays the player's.

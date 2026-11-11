@@ -134,6 +134,16 @@
     },
     {"name": "secure-action", "_why": "1.2: a viewer's and a selection's action moving the items into whichever Satellite provides media.vault, behind the client's own unlock prompt; the document names no route, prompt or PIN field.", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"source": {"route": "items"}, "blocks": [{"type": "media-grid", "id": "items", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"}, "viewer": {"image": "full/{$.id}", "actions": [{"label": "Move to Locked Folder", "icon": "lock", "action": {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id", "confirm": "Move to the Locked Folder?", "then": "refresh"}}]}}, {"type": "media-grid", "id": "items", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"}, "selection": {"actions": [{"label": "Move to Locked Folder", "icon": "lock", "action": {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id", "confirm": "Move the selected items?", "then": "refresh"}}]}}]}}}},
     {
+      "name": "offline-page-with-a-choice",
+      "_why": "1.2: an offline page whose source depends on a choice's state: a handful of fixed values, so the client keeps one collection per value (a search's free text is still never kept).",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"offline": true, "state": {"group": "month"},
+                     "source": {"route": "items?limit=120&group={$state.group}"}, "blocks": [
+                     {"type": "choice", "key": "group", "label": "Group by", "options": [{"value": "month", "label": "Month"}, {"value": "all", "label": "All"}]},
+                     {"type": "media-grid", "id": "items", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id", "group": "$.group"},
+                      "more": {"route": "items?limit=120&group={$state.group}&cursor={$value}", "cursor": "$.next"}}
+                   ]}}}
+    },
+    {
       "name": "offline-page-omitting-fields",
       "_why": "1.2: the client keeps only what the page binds, and never a field named in omit, at any depth.",
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"offline": {"omit": ["location", "folder"]}, "source": {"route": "items"}, "blocks": [
@@ -491,8 +501,8 @@
     {
       "name": "offline-on-a-state-source",
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"offline": true, "state": {"q": ""},
-        "source": {"route": "search?q={$state.q}"}, "blocks": []}}},
-      "error": "offline"
+        "source": {"route": "search?q={$state.q}"}, "blocks": [{"type": "search", "key": "q"}]}}},
+      "error": "only on a choice's state"
     },
     {
       "name": "offline-without-a-source",

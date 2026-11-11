@@ -22,7 +22,7 @@ Legend:
 | # | Feature | DW | DA | SW | SA | Gap / difference | Fix | Pri | Size |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Library timeline by month | ✅ | ✅ | ✅ | ✅ | None. The shared view pages and virtualizes; the dedicated views load everything. | – | – | – |
-| 2 | Group by camera, flat "All" view | ✅ | ✗ | ✗ | ✗ | Only the dedicated web page has it. | J+S: a `choice` state for grouping, plus `gallery?group=` returning `group` and its sort | P1 | M |
+| 2 | Group by camera, flat "All" view | ✅ | ✗ | ✅ fixed in M14 | ✅ fixed in M14 | Only the dedicated web page has it. | J+S: a `choice` state for grouping, plus `gallery?group=` returning `group` and its sort | P1 | M |
 | 3 | Filter by kind (photo/video) | ✗ | ✗ | ✅ (Search) | ✅ (Search) | The shared interface is ahead. | – | – | – |
 | 4 | Thumbnail size / density | ✗ | ✅ pinch, 3–6 columns | ✗ fixed `size` | ✗ fixed `size` | Android users lose pinch density. | C: user-adjustable grid density (pinch on Android, size control on web) | P0 (Android) | M |
 | 5 | Summary (counts, size, Pillow/FFmpeg missing, sync state) | ✅ | ✗ | ◐ caption | ◐ caption | The "tools missing" note is lost. | S+J: a text or status block from `gallery` | P2 | S |
@@ -77,7 +77,7 @@ Issues in the new shared interface:
 ## Roadmap: shortest safe path to making the shared interface the default
 
 **Status (2026-11-11):** M1 to M6 are done; Photos opens in its shared interface by default on
-both clients, and M7 to M13 are done. M14 is next; #33 to #38 came from
+both clients, and M7 to M14 are done; #33 to #38 came from
 the owner's review of the shared interface on 2026-11-11.
 
 **The goal these milestones serve:** at a stable release, a new Satellite needs no change to
@@ -116,7 +116,7 @@ Each milestone is small and testable on its own. The order runs from cheapest to
 - **M11. Favorite heart on tiles** (C + J, M): #21. Done: `quick` tile actions in the contract (Engine validation, fixtures, both renderers) and the heart toggle on Photos' Library, Search and album grids. Tested with fixtures, renderer tests on both clients, engine tests, and on the local demo (web and emulator).
 - **M12. Download and share** (C + native + J, L): #27. Done: `download` and `share` actions in the contract (Engine validation, fixtures), Mission Control's `ui/files.js`, the app's `src/files/` and its Kotlin `StarCoreFilesModule` (MediaStore Downloads, a FileProvider for the share sheet), and both actions in every Photos viewer. Photo's own Android viewer shares the file too. Tested with fixtures, unit tests on both clients, engine tests, and on the local demo (web and emulator).
 - **M13. Web viewer touch swipe** (C renderer, S): #17. Done: the shared web viewer moves on a deliberate one-finger sideways swipe, the same rule as Photo's own page, and leaves a swipe that starts on a video to its player. Tested with a unit test for the rule and simulated touches in a mobile-sized browser.
-- M14. Camera grouping and the "All" view (#2).
+- **M14. Camera grouping and the "All" view** (J+S, plus a contract relaxation, M): #2. Done: `gallery?group=month|camera|all` and a "Group by" choice in the Library. The Library is an offline page, so offline pages may now depend on a choice's state (Engine rule, and the app keeps one collection per value). Tested with engine tests (order, paging, groups), fixtures, the app's offline tests, and on the local demo (web and emulator).
 
 **Before Photo's own page and screens are retired**
 - The Locked Folder in the shared interface (#37), so the way in no longer leads to the own screens.

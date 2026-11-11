@@ -63,7 +63,8 @@ def gallery_route(request):
         # every list of photos may be paged (limit, cursor); without them it answers everything
         limit, cursor = gallery.paging(request.query)
         if path == ():
-            return json_response(gallery.library_view(request.satellite, limit, cursor))
+            group = request.query.get("group") or "month"
+            return json_response(gallery.library_view(request.satellite, limit, cursor, group))
         if path == ("albums",):
             return json_response(gallery.albums_view(request.satellite, request.engine))
         if len(path) == 2 and path[0] == "albums":

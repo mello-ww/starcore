@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   collectionKey, forgetOfflineSatellite, forgetOfflineServer, keptPages, MAX_AGE, MAX_BYTES, MAX_ENTRIES, MAX_GRID_PAGES,
-  keptEntry, OFFLINE_PREFIX, offlinePlan, OfflineStore, purgeLegacyOffline, resetLegacyPurgeForTests, sessionScope,
+  keptEntry, OFFLINE_PREFIX, offlinePlan, offlineStateKeys, OfflineStore, purgeLegacyOffline, resetLegacyPurgeForTests, sessionScope,
   tidyOffline,
 } from '../src/satellites/ui/offline';
 
@@ -36,6 +36,20 @@ describe('the offline store', () => {
     expect(await new OfflineStore('srv-1', 'aaaa', 'Other', clock).read('library')).toBeNull();
     expect(await new OfflineStore('srv-1', 'aaaa', 'Photo', clock).read(collectionKey('album', {id: '7'}))).toBeNull();
     expect(collectionKey('album', {b: 2, a: 1})).toBe(collectionKey('album', {a: 1, b: 2}));
+  });
+
+  it('keeps one collection per value of a choice the page depends on, and never a free-text state', () => {
+    const choice = {type: 'choice', key: 'group', options: [{value: 'month', label: 'Month'}]};
+    const grouped = {source: {route: 'gallery?group={$state.group}'}, blocks: [choice]};
+    expect(offlineStateKeys(grouped as any)).toEqual(['group']);
+    expect(offlineStateKeys({source: {route: 'gallery'}, blocks: []} as any)).toEqual([]);
+    // a search's text, or a choice tucked in a card
+    expect(offlineStateKeys({source: {route: 's?q={$state.q}'}, blocks: [{type: 'search', key: 'q'}]} as any)).toBeNull();
+    expect(offlineStateKeys({source: {route: 'g?group={$state.group}'}, blocks: [{type: 'card', blocks: [choice]}]} as any)).toEqual(['group']);
+    // one collection per value, and the plain page as it always was
+    expect(collectionKey('library', {}, {group: 'camera'})).not.toBe(collectionKey('library', {}, {group: 'month'}));
+    expect(collectionKey('library', {}, {})).toBe('library');
+    expect(collectionKey('album', {id: '7'}, {group: 'all'})).toBe(collectionKey('album', {id: '7'}, {group: 'all'}));
   });
 
   it('names a session by a fingerprint, never by its token', () => {

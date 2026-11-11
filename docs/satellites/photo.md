@@ -191,7 +191,8 @@ POST /api/satellites/photo/albums/<id>        rename a custom album  {"name": ..
 POST /api/satellites/photo/albums/<id>/delete    delete a custom album (rejected for Favorites/physical)
 POST /api/satellites/photo/albums/<id>/photos           add a photo   {"photo_id": ...}, or picked media {"items": [references]}
 POST /api/satellites/photo/albums/<id>/photos/remove    remove a photo {"photo_id": ...}
-GET  /api/satellites/photo/gallery            the library shaped for ui.json's shared gallery (read-only)
+GET  /api/satellites/photo/gallery            the library shaped for ui.json's shared gallery (read-only); ?group=month
+                                              (the default), camera (alphabetical, unknown last, each newest first) or all
 GET  /api/satellites/photo/gallery/albums     every album as a tile with its cover: Favorites pinned first, then the
                                               Locked Folder while a media.vault provider is there (a lock, nothing about
                                               what it holds), the phone's folders (together under "Folders"), then
@@ -277,6 +278,7 @@ What it covers:
 | | Photo's own page and screens | Shared interface |
 | --- | --- | --- |
 | Library grid, newest first, by month; video badge and duration | yes | yes |
+| Group the Library by camera, or not at all ("All") | web only | yes, both clients (Group by: Month, Camera, All) |
 | Viewer: full image, video playback, previous and next, details | yes | yes (no OpenStreetMap link) |
 | Viewer: pinch to zoom an image (Android) | yes, two fingers to pan | yes, one finger to pan while zoomed, double tap to zoom |
 | Favourite and unfavourite; move to the recycle bin | yes | yes, from the viewer and from a selection; favourite also from the heart on each tile (Library, Search, an album) |
