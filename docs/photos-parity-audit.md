@@ -53,6 +53,12 @@ Legend:
 | 30 | Offline cache (Android) | n/a | ✅ cached list, "Showing cached photos - offline" | n/a | ✗ (only the document is cached; the notice says "Offline" for any failure) | **Lost.** | C: opt-in per-server page-data cache, forgotten on a Locked Folder move (as `forgetCachedPhoto`) | P0 (Android) | M |
 | 31 | Deep link `#/satellite/Photo/LockedFolder` (web) | ✅ | n/a | ✗ | n/a | Breaks if the shared interface becomes the default. | Client wiring with #25 | P0 | S |
 | 32 | Large libraries | ◐ every tile in the DOM | ✗ 50k never loaded | ✅ paged | ✅ virtualized | Shared is far ahead. Picker add of N items saves the album file N times. | S (optional): one album save | P2 | S |
+| 33 | Viewer shows the whole photo | ✅ | ✅ | ✗ **bug** | ✅ | A portrait photo on a landscape screen is cropped: the frame is a grid with no sized row, so the image keeps its own height and overflows (a 1080×1920 image is drawn 1538 px tall in a 608 px frame). | C (renderer CSS): give the image the frame's size (`grid-template: 100% / 100%`, or an absolutely placed image) | P0 | S |
+| 34 | Page uses the screen's width | ✅ | n/a | ✗ **bug** | n/a | Every shared page except a `dashboard` is capped at 880 px, so Photos fills half of a 16:9 screen. | C: an additive width hint, or full width for a page holding a media grid or map; 1.0/1.1 documents unchanged | P0 | S |
+| 35 | Favorites pinned at the top of Folders | ◐ | ◐ | ✗ own "Favorites" group | ✗ | Favorites should sit in Folders, always first, not in a group of its own. | S: `gallery.py` lists Favorites first under the Folders group (clients group consecutive items as sent) | P1 | S |
+| 36 | Locked Folder as a folder tile with a lock | ◐ own tab | ◐ own tab | ✗ button below Albums | ✗ | It should be a tile among the folders, with the shared `lock` icon as its thumbnail. | C: a media-grid tile `icon` drawn when there is no `image`, and a per-item action (`own` for this tile, `navigate` for the others); then J+S | P1 | M |
+| 37 | Locked Folder in the shared interface | ✅ | ✅ | ✗ opens the own screens | ✗ | Opening it leaves the shared interface for Photo's own page and screens. Retiring those screens would cut the way in. | C + Locked Folder capability: browse, view and move out through the shared viewer while unlocked, the PIN and biometric prompts reused from M5, never a listing without a grant | P0 before retiring the own screens | L |
+| 38 | Icons shipped by the Satellite | ◐ `icon.svg`, web only | ✗ shared set only | ✗ shared set only | ✗ | `ui.json` may only name the 34 shared icons, and Android draws no SVG. | C: a declared `icons/` folder, validated by the Engine (no script or external reference, single colour, tinted by the client's tokens), served with a revision, named in the document with a shared icon as fallback; Android adds an SVG renderer once | P2 | M–L |
 
 ## Regressions from the gallery, picker, search, map and paging milestones
 
@@ -71,7 +77,14 @@ Issues in the new shared interface:
 ## Roadmap: shortest safe path to making the shared interface the default
 
 **Status (2026-11-11):** M1 to M6 are done; Photos opens in its shared interface by default on
-both clients. M7 to M10 are next.
+both clients. M7 to M14 are next, starting with the two bugs (M7, M8); #33 to #38 came from
+the owner's review of the shared interface on 2026-11-11.
+
+**The goal these milestones serve:** at a stable release, a new Satellite needs no change to
+the Engine, Mission Control or the Android app. Everything it needs on both clients lives in
+the Satellite: its `ui.json`, its routes and capabilities, and its own assets. The clients keep
+improving until then, but only through generic, reusable features; no component other than
+the Satellite itself names a Satellite.
 
 Each milestone is small and testable on its own. The order runs from cheapest to riskiest.
 
@@ -93,17 +106,31 @@ Each milestone is small and testable on its own. The order runs from cheapest to
 - **M5. "Unlock first" actions** (C + Locked Folder capability, L): #24. Contract, Engine validation, both clients' PIN and biometric prompts, then the "Move to Locked Folder" viewer action in `ui.json`. Test: contract fixtures, a security review, and an end-to-end check with a test PIN on the local demo.
 - **M6. Switch the default** (client + docs, S). Shared by default, dedicated in Developer Mode (the reverse of today). Keep the dedicated screens until validated.
 
-**Should follow soon (they don't block the switch)**
-- M7. Favorite heart on tiles (#21).
-- M8. Download / share action, which fixes Android Share (#27).
-- M9. Web viewer touch swipe (#17).
-- M10. Camera grouping and the "All" view (#2).
+**Bugs found after the switch (next)**
+- **M7. The viewer shows the whole photo on the web** (C renderer, S): #33. Test: a renderer test with a portrait image in a landscape viewport, and a check in a browser.
+- **M8. Shared pages use the screen's width on the web** (C, S): #34. Additive, so 1.0 and 1.1 documents keep their layout. Test: contract fixtures, renderer tests, and a check at 1440 and 1920 px.
 
-**Can stay native or Satellite-specific**
-- The Locked Folder internals: PIN, biometrics, encryption, recovery, move-out (#25).
-- Phone sync and its background task (#28).
+**Should follow soon**
+- **M9. Favorites pinned at the top of Folders** (S, S): #35. Test: engine test for the order and group of `gallery/albums`.
+- **M10. The Locked Folder as a folder tile** (C + J+S, M): #36. A tile `icon` and per-item actions in the contract, then the tile in Albums, opening the Locked Folder. Test: contract fixtures on both clients, and the Locked Folder still locks when you leave it.
+- M11. Favorite heart on tiles (#21).
+- M12. Download / share action, which fixes Android Share (#27).
+- M13. Web viewer touch swipe (#17).
+- M14. Camera grouping and the "All" view (#2).
+
+**Before Photo's own page and screens are retired**
+- The Locked Folder in the shared interface (#37), so the way in no longer leads to the own screens.
+
+**Native for now**
+These still need client code written for Photo or the Locked Folder. To reach the goal above,
+each must move to the contract or to a generic capability before the stable release:
+- The Locked Folder internals: PIN, biometrics, encryption, recovery, move-out (#25, then #37).
+- Phone sync and its background task (#28): a generic device-sync capability.
 - The `source_paths` mappings editor (#29), until repeatable form rows exist.
 - The dedicated web's sync listener log (Developer Mode).
+
+**Towards the stable release**
+- Icons shipped by the Satellite (#38).
 
 **Optional (don't block the switch)**
 - Summary and tools note (#5).
