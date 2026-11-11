@@ -16,7 +16,7 @@ import shutil
 
 from starcore.api.response import error_response, file_response, json_response
 
-from . import locked_folder_guard, paths
+from . import locked_folder_guard, paths, views
 
 # a deliberately small, generic guess at content type for inline viewing -
 # anything not listed here still downloads fine, just without a preview
@@ -42,6 +42,8 @@ def routes() -> dict:
         "mkdir": mkdir,
         "rename": rename,
         "delete": delete,
+        # read-only: what ui.json shows (views.py)
+        "view": view,
     }
 
 
@@ -69,20 +71,53 @@ def entries(request):
     if raw_path == "":
         return json_response(_roots_listing())
 
+    target, items, failure = _read_directory(request, raw_path)
+    if failure is not None:
+        return failure
+    return json_response({
+        "path": str(target),
+        "parent": paths.parent_of(target),
+        "entries": items,
+        "storage": _disk_usage(target),
+    })
+
+
+def view(request):
+    """The interface's own read-only routes, shaped for ui.json (see views.py):
+    `view/locations` and `view/folder?path=`. Every action there goes to the
+    routes below, unchanged."""
+    if request.method != "GET":
+        return error_response("only GET is supported here", status=405)
+
+    where = tuple(request.path)
+    if where == ("locations",):
+        return json_response(views.locations_view(_roots_listing()))
+    if where == ("folder",):
+        target, items, failure = _read_directory(request, request.query.get("path", ""))
+        if failure is not None:
+            return failure
+        return json_response(views.folder_view(target, paths.parent_of(target), items, _disk_usage(target)))
+    return error_response(f"unknown endpoint 'view/{'/'.join(where)}'")
+
+
+def _read_directory(request, raw_path):
+    """One directory's entries, folders first: (target, items, None), or
+    (None, None, an error response) when the path is malformed, protected,
+    missing, not a directory or unreadable."""
     try:
         target = paths.resolve_path(raw_path)
     except paths.PathError as error:
-        return error_response(str(error), status=400)
+        return None, None, error_response(str(error), status=400)
 
     blocked = locked_folder_guard.guard(request, target)
     if blocked is not None:
-        return blocked
+        return None, None, blocked
 
     status, failure = _stat(target)
     if failure is not None:
-        return failure
+        return None, None, failure
     if not S_ISDIR(status.st_mode):
-        return error_response("that path is a file, not a directory", status=400)
+        return None, None, error_response("that path is a file, not a directory", status=400)
 
     # os.scandir rather than Path.iterdir: each entry comes with its type (and,
     # on Windows, its stat) from the directory read itself, so a folder of
@@ -92,9 +127,9 @@ def entries(request):
         with os.scandir(target) as found:
             listing = list(found)
     except PermissionError:
-        return error_response(f"permission denied: {target}", status=403)
+        return None, None, error_response(f"permission denied: {target}", status=403)
     except OSError as error:
-        return error_response(f"the directory could not be read ({error})", status=500)
+        return None, None, error_response(f"the directory could not be read ({error})", status=500)
 
     rows = []
     for entry in listing:
@@ -121,13 +156,7 @@ def entries(request):
         "modified": datetime.fromtimestamp(info.st_mtime, tz=timezone.utc).isoformat(timespec="seconds"),
         "locked": protects(target / name),
     } for is_dir, name, info in rows]
-
-    return json_response({
-        "path": str(target),
-        "parent": paths.parent_of(target),
-        "entries": items,
-        "storage": _disk_usage(target),
-    })
+    return target, items, None
 
 
 def _disk_usage(path: Path):

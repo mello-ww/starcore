@@ -7,6 +7,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **File Explorer on Android**, read-only for now: the locations with their free space and the
+  machine's total, then each folder's folders and files, with Up and back. It is File Explorer's
+  first shared interface (`ui.json`, UI contract 1.2), drawn by the app's shared screen with no
+  app change. Mission Control keeps File Explorer's own page by default and offers the shared one
+  in Developer Mode while it catches up (`docs/file-explorer-migration.md`, F1).
 - **Group Photos' Library by camera, or not at all**, on both clients, as Photo's own web page
   did: a "Group by" choice (Month, Camera, All) above the grid. Only Photo changed (its
   `gallery?group=` and `ui.json`). **UI contract 1.2's offline pages** may now depend on a

@@ -1,0 +1,42 @@
+{
+  "_about": "File Explorer's shared interface (UI contract 1.2), a preview while it reaches parity with the web page (docs/file-explorer-migration.md): Mission Control keeps page.js by default and offers this in Developer Mode; the Android app, which has no File Explorer screen of its own, opens it. F1 browses read-only: the locations with their storage, and each folder's folders and files. It binds to the read-only view routes (views.py).",
+  "contract": "starcore.ui/1.2",
+  "title": "Files",
+  "preview": true,
+  "entry": "locations",
+  "pages": {
+    "locations": {
+      "title": "Locations",
+      "source": {"route": "view/locations"},
+      "blocks": [
+        {"type": "card", "title": "This machine", "visible": "$.machine", "blocks": [
+          {"type": "metric", "label": "Used", "value": "$.machine.used", "max": "$.machine.total", "format": "bytes"},
+          {"type": "text", "style": "caption", "text": "$.machine_summary"}
+        ]},
+        {"type": "list", "items": "$.drives", "empty": "No location can be browsed.",
+         "item": {"title": "$.title", "subtitle": "$.summary", "value": "$.used_percent", "format": {"value": "percent"}, "icon": "hard-drive"},
+         "action": {"navigate": "folder", "params": {"path": "$.path"}}}
+      ]
+    },
+    "folder": {
+      "title": "$.name",
+      "params": ["path"],
+      "source": {"route": "view/folder?path={$params.path}"},
+      "blocks": [
+        {"type": "text", "style": "mono", "text": "$.path"},
+        {"type": "text", "style": "caption", "text": "$.summary"},
+        {"type": "button", "label": "Up", "style": "secondary", "visible": "$.parent",
+         "action": {"navigate": "folder", "params": {"path": "$.parent"}}},
+        {"type": "button", "label": "All locations", "style": "secondary", "visible": "$.at_drive_root",
+         "action": {"navigate": "locations"}},
+        {"type": "text", "style": "caption", "text": "This folder is empty.", "visible": "$.empty"},
+        {"type": "list", "id": "folders", "visible": "$.has_folders", "items": "$.folders",
+         "item": {"title": "$.name", "subtitle": "$.subtitle", "format": {"subtitle": "datetime"}, "icon": "$.icon"},
+         "action": {"navigate": "folder", "params": {"path": "$.path"}}},
+        {"type": "list", "id": "files", "visible": "$.has_files", "items": "$.files",
+         "item": {"title": "$.name", "subtitle": "$.modified", "value": "$.size", "format": {"subtitle": "datetime", "value": "bytes"}, "icon": "$.icon"}},
+        {"type": "text", "style": "caption", "text": "$.storage", "visible": "$.storage"}
+      ]
+    }
+  }
+}

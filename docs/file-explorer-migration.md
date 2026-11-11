@@ -22,12 +22,12 @@ Legend: as in `photos-parity-audit.md`.
 
 | # | Feature (dedicated web) | DW | SW / SA today | Fix | Milestone | Size |
 |---|---|---|---|---|---|---|
-| 1 | Locations: roots and drives | ✅ | ✗ | J+S: `locations` page, a `list` from a display route | F1 | S |
-| 2 | Storage dashboard: machine total and per-drive usage | ✅ 4 themes | ✗ | J+S: `metric` blocks with `max` (bars) on both clients | F1 | S |
+| 1 | Locations: roots and drives | ✅ | ✗ | ✅ fixed in F1: `locations` page, a `list` from `view/locations` | F1 | S |
+| 2 | Storage dashboard: machine total and per-drive usage | ✅ 4 themes | ✗ | ◐ F1: the machine total as a `metric` bar, each drive's free space and percentage in its row | F1 | S |
 | 3 | Storage themes (classic, bar, donut, orbital; per-browser preference) | ✅ | ✗ | Decision pending; recommended: replaced by the shared `metric` bars, retired with `page.js` | F7 | – |
-| 4 | Folder listing: icon, name, size, date | ✅ | ✗ | J+S: `folder` page with a `path` param; `ui/folder?path=` returns display-ready rows | F1 | M |
-| 5 | Breadcrumb and Up | ✅ | ✗ | J+S: breadcrumb segments in the route's answer, each a `navigate` | F1 | S |
-| 6 | Locked Folder entry shown with a lock | ✅ badge | ✗ | J+S: row `icon: lock` and a subtitle; the server guard stays what protects it | F1 | S |
+| 4 | Folder listing: icon, name, size, date | ✅ | ✗ | ✅ fixed in F1: `folder` page with a `path` param; `view/folder?path=` returns display-ready rows, folders then files | F1 | M |
+| 5 | Breadcrumb and Up | ✅ | ✗ | ◐ F1: the full path and an Up button (All locations at a drive's root); clickable segments would need a horizontal list (C, later) | F1 | S |
+| 6 | Locked Folder entry shown with a lock | ✅ badge | ✗ | ✅ fixed in F1: a lock icon and "Locked" in place of the date; the server guard stays what protects it | F1 | S |
 | 7 | Large folders (thousands of entries) | ◐ every row in the DOM | ✗ | C: `more` paging on `list` (same shape as `media-grid`); S: `limit`/`cursor` | F2 | M |
 | 8 | File details | ✗ | ✗ | J: `file` page: size, date, type, `image` preview for pictures | F3 | S |
 | 9 | Download | ✅ | ✅ action exists (M12) | J | F3 | S |
@@ -72,10 +72,11 @@ the existing actions.
 - **F0 - This plan.**
 - **F1 - Read-only browsing.** `ui.json` with `preview: true` (the web keeps `page.js` by
   default; Android opens the document). Pages `locations` (entry) and `folder` (`path` param).
-  Server: `ui/locations` and `ui/folder` display routes, reusing `os.scandir` and the guard.
+  Server: `view/locations` and `view/folder` display routes (`views.py`; `ui` is a Core
+  segment), sharing `entries`' directory read and the guard. **Done.**
   Tests: Engine route tests, document validation.
 - **F2 - List paging.** Contract `more` on `list` in the three validators, fixtures, both
-  renderers; `ui/folder` gains `limit` and `cursor`. Tests on a folder of 10,000 entries.
+  renderers; `view/folder` gains `limit` and `cursor`. Tests on a folder of 10,000 entries.
 - **F3 - File page.** Details, picture preview, Download, Share, Open (`download` + `open`).
   Kotlin `open` in `StarCoreFilesModule.kt`; web new tab.
 - **F4 - Management.** New folder, rename, delete through forms and confirms; the guard
@@ -90,7 +91,8 @@ the existing actions.
 File Explorer's own code already lives in its folder: its web page is under the Satellite, and
 the app has no screen of its own for it. This migration gives Android the feature and adds
 only generic contract features; it removes no entry from `engine/tests/test_client_modularity.py`.
-What still names a Satellite outside its folder afterwards:
+What still names a Satellite outside its folder afterwards (planned in
+[`legacy-ui-retirement.md`](legacy-ui-retirement.md)):
 
 | Where | What | Way out |
 |---|---|---|
