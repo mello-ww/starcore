@@ -424,3 +424,68 @@ Each step is its own commit, reviewed before it is committed.
   - `v1` keys for two servers and an unlisted orphan all deleted at start;
   - nothing in the new entry contains a value of `location` or `folder` from a Photo-like
     fixture (in the tests only, never in shared code).
+
+## 10. As built: security review of M5 (2026-11-09)
+
+I reviewed every change since the recovery point (`9df0543..HEAD`) against sections 4, 7 and
+9.
+
+**Commits:**
+
+| Commit | What |
+| --- | --- |
+| `f73155e` | Offline copies keep only bound fields, never omitted ones; `v1` purge |
+| `a4b70f7` | F1: the dedicated web move always locks again |
+| `96397d5` | Grants, server-resolved references, `media.vault`, checks again at move time |
+| `91db080` | The `secure` action in the contract |
+| `c7dc2f2` | Web selection fix: never acts on cancelled items |
+| `295f335` | Web runner and prompt |
+| `c594169` | Android runner, with the Locked Folder's own prompt |
+| `5746c52` | Photo's `ui.json` |
+
+**Confirmed by tests:**
+- R1, unlocking: only `unlock` and `biometric/unlock` grant, with the same attempt counting
+  and lockout.
+- R2, the PIN:
+  - it is typed only in a client-owned prompt, and the PIN field is emptied on close;
+  - the Engine refuses a body, route or form on a `secure` action;
+  - on Android, shared code receives only the grant.
+- R3, references:
+  - resolved through the registry's `media.gallery` provider;
+  - forged provider, capability or id refused, and a mixed request moves nothing;
+  - only the document Satellite's own items.
+- R4, the server alone decides: a locked session without a grant gets `403`.
+- R5, locking: grants open nothing, so the shared flows have nothing to lock again; the
+  dedicated web flow locks in `finally` (F1).
+- R6, no reading: `media.vault` has no read operation, and a grant is refused by every
+  reading route.
+- R7, after a move: offline copies forgotten for every session, images evicted on Android,
+  partial results reported as partial.
+- R8, nothing to run on: no provider or no prompt means no control.
+- R9, compatibility: additive to 1.2, and the dedicated screens and `photo_ids` are unchanged.
+- 9.1 to 9.3: the grant is atomic and single-use, bound to the session, the exact items and
+  60 seconds; it is checked again at move time; Photo's library refuses to remove a binned
+  photo under its state lock.
+
+**Found and fixed during the review:**
+- **Locking and grants:** a session locking now also drops its own pending grants.
+  Previously they lived out their 60 seconds.
+- **Web selection (`c7dc2f2`):** an action could run on items from a cancelled selection.
+- **Android, caught by tests before the device:**
+  - the prompt cancelled itself on any re-render;
+  - the selection bar rebuilt itself in a loop.
+
+**Accepted, and why:**
+- **Security state at move time:** a grant-based move doesn't re-check `security_problem()`.
+  This is the same as an unlocked session's moves today, and the window is at most 60 seconds.
+- **Sign-out:** it doesn't drop grants or unlocks in memory, but authentication refuses the
+  revoked token before any Locked Folder route runs.
+- **Resolution before the attempt is counted:** `for` references are resolved first, so a bad
+  request costs no PIN attempt. Resolution needs a valid session and tells it no more than
+  Photo's own listing already does.
+
+**Not verified on a device:**
+- biometric grants (unit tests only: the emulator has no enrolled fingerprint, and its system
+  settings are not changed from here);
+- the web prompt's look at full size (the browser pane is narrow).
+

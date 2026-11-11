@@ -691,6 +691,16 @@ class LockedFolderSecurityTest(unittest.TestCase):
         self.runtime().forget_all_unlocks()  # what a PIN change and a new location do
         self.assertEqual(self.move([first], grant)[0], 403)
 
+    def test_locking_drops_the_sessions_grants_too(self):
+        self.setup_vault()
+        first, *_ = self.import_photos()
+        grant = self.grant_for([first])[1]["grant"]
+        other = self.engine.auth.create_session("admin")
+        kept = self.lf("unlock", {"pin": "2468", "for": {"operation": "move_in", "items": [self.ref(first)]}}, token=other)[1]["grant"]
+        self.assertEqual(self.lf("lock", {})[0], 200)
+        self.assertEqual(self.move([first], grant)[0], 403)
+        self.assertEqual(self.move([first], kept, token=other)[0], 200, "another session's grant is its own")
+
     def test_a_grant_needs_the_right_pin_and_counts_attempts(self):
         self.setup_vault()
         first, *_ = self.import_photos()

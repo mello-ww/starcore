@@ -265,7 +265,7 @@ POST /api/satellites/LockedFolder/move_in  { "items": [reference], "grant"? } ->
     checking it are one step under a lock, so of two requests only one finds it, and a replay
     finds nothing;
   - is dropped, with every other grant and unlock, by a PIN change, a new location, a recovery
-    or a restart;
+    or a restart, and with this session's own grants when the session locks;
   - **is not an unlock**: `status` still says locked, and `media`, `media/file`, `upload`,
     `delete`, `move_out` and `encryption` still refuse the session. So a client that dies
     after the PIN leaves nothing open, and has nothing to lock again.

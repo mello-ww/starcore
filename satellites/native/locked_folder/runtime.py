@@ -347,6 +347,10 @@ class LockedFolderRuntime:
         self._attempts.pop(token, None)
 
     def lock(self, token: str):
+        with self._lock:
+            # a lock ends everything this session holds: its unlock, and any grant not used yet
+            for grant_id in [grant_id for grant_id, grant in self._grants.items() if grant["token"] == token]:
+                del self._grants[grant_id]
         self._unlocked.pop(token, None)
         if not self._unlocked:
             self.thumbnails.clear()
