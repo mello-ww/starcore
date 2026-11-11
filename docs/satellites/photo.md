@@ -193,7 +193,9 @@ POST /api/satellites/photo/albums/<id>/photos           add a photo   {"photo_id
 POST /api/satellites/photo/albums/<id>/photos/remove    remove a photo {"photo_id": ...}
 GET  /api/satellites/photo/gallery            the library shaped for ui.json's shared gallery (read-only)
 GET  /api/satellites/photo/gallery/albums     every album as a tile with its cover: Favorites pinned first, then the
-                                              phone's folders (together under "Folders"), then custom albums ("Albums")
+                                              Locked Folder while a media.vault provider is there (a lock, nothing about
+                                              what it holds), the phone's folders (together under "Folders"), then
+                                              custom albums ("Albums")
 GET  /api/satellites/photo/gallery/albums/<id>   one album's photos in the album's own order, for the shared gallery
 GET  /api/satellites/photo/gallery/trash      the recycle bin, with the days each item has left ("left")
 GET  /api/satellites/photo/gallery/import     the default import folder and the formats an import takes in
@@ -291,7 +293,7 @@ What it covers:
 | Map clustering | web only, by rounded coordinates | both clients, a grid about 64 px wide on screen |
 | Import from a folder on the server: check, then import | web only | yes, both clients ("Import from a folder" on Library) |
 | Phone sync, settings | yes | opens Photo's own: "Settings and phone sync" on Albums (the web's Configuration tab, the app's Photo configuration) |
-| Locked Folder | yes | opens Photo's own: "Locked Folder" on Albums, with its PIN or biometrics, locked again on leaving; its security-sensitive behaviour isn't migrated |
+| Locked Folder | yes | opens Photo's own: the Locked Folder's tile among the folders on Albums (a lock for its cover, shown while a `media.vault` provider is there), with its PIN or biometrics, locked again on leaving; its security-sensitive behaviour isn't migrated |
 | Move a photo into the Locked Folder | yes, from the viewer | yes: the viewer (Library, Search, Map, an album) and a selection (Library, an album), through the secure action - see below |
 | Offline cache of the library (Android) | yes, the whole list (metadata only) | yes: Library, Albums and an album, with up to 600 items each (`offline` pages, see the UI contract's "Offline pages"), only the fields they show, and never an item's GPS location or its folder on the server; never the recycle bin, Search or Map |
 

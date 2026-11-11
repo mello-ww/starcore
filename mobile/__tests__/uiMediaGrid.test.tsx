@@ -2,7 +2,7 @@ import React from 'react';
 import {Image, Modal, Pressable, Text} from 'react-native';
 import renderer, {act} from 'react-test-renderer';
 import {UiBlocks, type BlockContext} from '../src/satellites/ui/UiBlocks';
-import {clock, gridColumns, GRID_PAGE} from '../src/satellites/ui/MediaGrid';
+import {clock, gridColumns, GRID_PAGE, tileAction, tileIcon} from '../src/satellites/ui/MediaGrid';
 import type {UiBlock} from '../src/satellites/ui/contract';
 
 // the media-grid block and its viewer (UI contract 1.2), with a context like the screen's:
@@ -130,6 +130,26 @@ describe('the media-grid block', () => {
     expect(tree.root.findAllByType(Text).map((node: any) => node.props.children)).toContain('Album');
   });
 
+  it('runs the first open entry that holds for each tile, and draws an item’s icon without an image', () => {
+    const own = {own: 'locked'};
+    const navigate = {navigate: 'album', params: {id: '$.id'}};
+    const block: UiBlock = {type: 'media-grid', items: '$.albums', item: {image: 'covers/{$.cover}', key: '$.id', icon: '$.icon'},
+      open: [{visible: '$.locked', action: own}, {action: navigate}]} as any;
+    const albums = [{id: 'locked', cover: '', icon: 'lock', locked: true}, {id: 'a', cover: 'p1'}];
+    const ctx = context({hasOwnScreens: true});
+    const tree = render([block], {albums}, ctx);
+    const icons = tree.root.findAll((node: any) => node.props.name === 'lock' && typeof node.type !== 'string');
+    expect(icons.length).toBeGreaterThan(0);
+    act(() => tiles(tree)[0].props.onPress());
+    expect(ctx.runAction).toHaveBeenLastCalledWith(own, expect.objectContaining({data: albums[0]}));
+    act(() => tiles(tree)[1].props.onPress());
+    expect(ctx.runAction).toHaveBeenLastCalledWith(navigate, expect.objectContaining({data: albums[1]}));
+
+    // without the Satellite's own screens, the own entry is skipped: that tile opens nothing
+    const bare = render([{...block, open: [{visible: '$.locked', action: own}]} as any], {albums}, context({hasOwnScreens: false}));
+    expect(tiles(bare)).toHaveLength(0);
+  });
+
   it('shows the placeholder, and loads nothing, for a route outside the Satellite', () => {
     const block: UiBlock = {type: 'media-grid', items: [{id: 'x'}], item: {image: '../other/{$.id}'}};
     const tree = render([block], {}, context());
@@ -138,6 +158,24 @@ describe('the media-grid block', () => {
 });
 
 describe('media-grid helpers', () => {
+  it('chooses a tile’s action and icon as Mission Control does', () => {
+    const all = () => true;
+    const noOwn = (action: any) => action.own === undefined;
+    const navigate = {navigate: 'album', params: {id: '$.id'}};
+    const own = {own: 'locked'};
+    expect(tileAction({action: navigate} as any, {data: {}} as any, all)).toBe(navigate);
+    const block = {open: [{visible: '$.locked', action: own}, {action: navigate}]} as any;
+    expect(tileAction(block, {data: {locked: true}} as any, all)).toBe(own);
+    expect(tileAction(block, {data: {locked: false}} as any, all)).toBe(navigate);
+    expect(tileAction(block, {data: {locked: true}} as any, noOwn)).toBe(navigate);
+    expect(tileAction({open: [{visible: '$.locked', action: own}]} as any, {data: {locked: true}} as any, noOwn)).toBeNull();
+    expect(tileAction({viewer: {}} as any, {data: {}} as any, all)).toBeNull();
+    expect(tileIcon({item: {icon: '$.icon'}} as any, {data: {icon: 'lock'}} as any)).toBe('lock');
+    expect(tileIcon({item: {icon: 'folder'}} as any, {data: {}} as any)).toBe('folder');
+    expect(tileIcon({item: {icon: '$.icon'}} as any, {data: {icon: '<svg>'}} as any)).toBeNull();
+    expect(tileIcon({item: {}} as any, {data: {}} as any)).toBeNull();
+  });
+
   it('fits columns to the width and formats durations', () => {
     expect(gridColumns(360, 'medium')).toBe(3);
     expect(gridColumns(360, 'small')).toBe(4);

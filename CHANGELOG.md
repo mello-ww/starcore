@@ -7,6 +7,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **The Locked Folder is a folder in Photos' Albums**, with a lock for its cover, right after
+  Favorites, on both clients; it replaces the button below the albums and still opens the
+  Locked Folder's own screens behind its PIN. Photo adds the tile only while a `media.vault`
+  provider is there, and says nothing about what it holds.
+- **UI contract 1.2: tile icons and per-item tile actions.** A media-grid item's `icon` (from
+  the shared set) is drawn when it has no image, and `open` gives a tile the first of up to 4
+  `{action, visible}` entries that holds for its item, skipping one the client can't run there.
 - **UI contract 1.0** (`docs/ui-contract.md`). A Satellite can describe its interface in a
   `ui.json`, using pages, navigation and 11 blocks bound to its own routes' data, and get a
   page in Mission Control and a screen in the Android app with no client code of its own.

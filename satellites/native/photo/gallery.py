@@ -30,6 +30,7 @@ import json
 import math
 from datetime import datetime, timezone
 
+from starcore import capabilities
 from starcore.ui_contract import format_value
 
 from . import albums as albums_module
@@ -213,10 +214,17 @@ def library_view(satellite, limit=None, cursor=None) -> dict:
     }
 
 
-def albums_view(satellite) -> dict:
-    """Every album as a tile: Favorites pinned first, then the phone's own folders - together
-    under "Folders" - then the custom albums. A client groups consecutive tiles, so Favorites
-    always heads the Folders group."""
+# the Locked Folder as a folder among the others, while a media.vault provider is there: a lock
+# instead of a cover, and nothing about what it holds - it is never listed here. ui.json opens
+# it through Photo's own interface ("locked"), which asks for its PIN
+VAULT_TILE = {"id": "locked", "title": "Locked Folder", "subtitle": "Behind your PIN",
+              "group": "Folders", "cover": "", "icon": "lock", "locked": True}
+
+
+def albums_view(satellite, engine=None) -> dict:
+    """Every album as a tile: Favorites pinned first, then the Locked Folder (while there is
+    one), then the phone's own folders - together under "Folders" - then the custom albums. A
+    client groups consecutive tiles, so Favorites always heads the Folders group."""
     photo_library = library(satellite)
     store = albums(satellite)
     listed = albums_module.physical_albums(satellite, photo_library)
@@ -225,13 +233,17 @@ def albums_view(satellite) -> dict:
         listed.append({"id": album["id"], "name": album["name"], "kind": album.get("kind", "virtual"),
                        "photo_count": len(present), "cover_photo_id": present[0]["id"] if present else None})
     listed.sort(key=lambda album: {"favorites": 0, "physical": 1}.get(album.get("kind"), 2))  # stable: keeps each kind's order
-    return {"albums": [{
+    tiles = [{
         "id": album["id"],
         "title": album["name"],
         "subtitle": f"{album['photo_count']} {'item' if album['photo_count'] == 1 else 'items'}",
         "group": GROUPS.get(album.get("kind"), "Albums"),
         "cover": album.get("cover_photo_id") or "",
-    } for album in listed]}
+    } for album in listed]
+    if engine is not None and capabilities.provider(engine, "media.vault")[0] is not None:
+        pinned = sum(1 for album in listed if album.get("kind") == "favorites")
+        tiles.insert(pinned, dict(VAULT_TILE))
+    return {"albums": tiles}
 
 
 def album_view(satellite, album_id: str, limit=None, cursor=None) -> dict:

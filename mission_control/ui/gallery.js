@@ -5,7 +5,7 @@
 // full-screen viewer with the document's facts and actions on the item shown. It knows the
 // contract, never a Satellite: everything it shows and does comes from the block.
 
-import { formatValue, isSafeRoute, isVisible, resolve, resolveTemplate } from "./contract.js";
+import { formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate } from "./contract.js";
 import { icon } from "./icons.js";
 
 // tiles revealed at a time: enough for a first screen, little enough to paint at once
@@ -59,6 +59,27 @@ export function holdsCollection(page) {
     const holds = (blocks) => (blocks || []).some((block) => block
         && (block.type === "media-grid" || block.type === "map" || (block.type === "card" && holds(block.blocks))));
     return Boolean(page) && holds(page.blocks);
+}
+
+/** The action a tile runs: the grid's `action`, else the first `open` entry whose `visible`
+ * holds and that `canRun` here (an own action needs an own interface) - or null. */
+export function tileAction(block, scope, canRun) {
+    if (block.action) {
+        return block.action;
+    }
+    for (const entry of Array.isArray(block.open) ? block.open : []) {
+        const shown = entry.visible === undefined || isVisible(resolve(entry.visible, scope));
+        if (shown && entry.action && canRun(entry.action)) {
+            return entry.action;
+        }
+    }
+    return null;
+}
+
+/** The shared icon an item without an image shows (`item.icon`), or null. */
+export function tileIcon(block, scope) {
+    const name = block.item && block.item.icon !== undefined ? resolve(block.item.icon, scope) : null;
+    return typeof name === "string" && ICONS.has(name) ? name : null;
 }
 
 /** What a tile's `kind` resolves to: "video", or "image" for anything else. */
@@ -119,12 +140,13 @@ export function createGallery(host) {
         return route && isSafeRoute(route) ? `${host.satelliteBase}/${route}` : null;
     }
 
-    function frame(url, className, alt) {
+    // `placeholder`: the shared icon shown without an image (an item's `icon`), else the image glyph
+    function frame(url, className, alt, placeholder = "image") {
         const holder = el("div", `${className} ui-media-frame is-loading`);
         const failed = () => {
             holder.classList.remove("is-loading");
             holder.classList.add("is-empty");
-            holder.replaceChildren(glyph("image"));
+            holder.replaceChildren(glyph(placeholder, placeholder === "image" ? 18 : 28));
         };
         if (!url) {
             failed();
@@ -400,7 +422,9 @@ export function createGallery(host) {
         const title = block.item.title !== undefined ? resolve(block.item.title, itemScope) : null;
         const subtitle = block.item.subtitle !== undefined ? resolve(block.item.subtitle, itemScope) : null;
         const label = title === null || title === undefined || title === "" ? null : String(title);
-        const opens = Boolean(picking || block.viewer || block.action || block.selection);
+        // a tile without the viewer runs the grid's action, or the first `open` entry for this item
+        const action = picking || block.viewer ? null : tileAction(block, itemScope, (entry) => !host.canRun || host.canRun(entry));
+        const opens = Boolean(picking || block.viewer || action || block.selection);
 
         const tile = el(opens ? "button" : "div", "ui-media-tile");
         if (opens) {
@@ -408,7 +432,7 @@ export function createGallery(host) {
         }
         tile.dataset.key = key;
         tile.setAttribute("aria-label", [label || (kind === "video" ? "Video" : "Image"), index + 1].join(", "));
-        const thumb = frame(source(block.item.image, itemScope), "ui-media-tile-frame", "");
+        const thumb = frame(source(block.item.image, itemScope), "ui-media-tile-frame", "", tileIcon(block, itemScope) || "image");
         if (kind === "video") {
             const badge = el("span", "ui-media-badge");
             badge.appendChild(glyph("play", 12));
@@ -452,8 +476,8 @@ export function createGallery(host) {
                     toggleSelected(block, grid, key);
                 } else if (block.viewer) {
                     openViewer(block, key, tile);
-                } else if (block.action) {
-                    host.runAction(block.action, itemScope);
+                } else if (action) {
+                    host.runAction(action, itemScope);
                 } else if (block.selection) {
                     toggleSelected(block, grid, key);
                 }

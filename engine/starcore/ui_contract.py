@@ -726,10 +726,14 @@ class _Validator:
         """{type: media-grid, items, item} (1.2): a grid of images and videos from the
         Satellite's own routes, in groups, revealed page by page as it scrolls. A tile opens
         the shared viewer (`viewer`) or runs `action`; `selection` offers actions over the
-        selected tiles. Nothing in it is specific to one kind of collection."""
+        selected tiles. A tile runs the first entry of `open` whose `visible` holds instead, when
+        the action depends on the item (a folder that opens elsewhere), and an item's `icon` is
+        drawn when it has no image. Nothing in it is specific to one kind of collection."""
         self.check_items(f"{where}.items", block.get("items"))
         if "viewer" in block and "action" in block:
             self.error(where, "a media-grid's tiles open the viewer or run an action, not both")
+        if "open" in block:
+            self.check_tile_actions(f"{where}.open", block)
         item = block.get("item")
         if not isinstance(item, dict):
             self.error(f"{where}.item", "must be an object")
@@ -746,6 +750,8 @@ class _Validator:
                 self.check_binding(f"{where}.item.kind", item["kind"], required=True, choices=MEDIA_KINDS)
             if "duration" in item:
                 self.check_number_or_binding(f"{where}.item.duration", item["duration"])
+            if "icon" in item and item["icon"] not in ICONS:
+                self.check_binding(f"{where}.item.icon", item["icon"], required=True, choices=ICONS)
             formats = item.get("format", {})
             if not isinstance(formats, dict) or not set(formats) <= {"subtitle", "group"} or any(
                     value not in FORMATS for value in formats.values()):
@@ -769,6 +775,30 @@ class _Validator:
             self.error(f"{where}.shape", f"must be one of {sorted(IMAGE_SHAPES)}")
         if "more" in block:
             self.check_more(f"{where}.more", block["more"])
+
+    def check_tile_actions(self, where: str, block: dict):
+        """[{action, visible}] (1.2): a tile runs the first entry whose `visible` holds (an entry
+        without one always does) - the action chosen per item. In place of `viewer` and `action`."""
+        if "viewer" in block or "action" in block:
+            self.error(where, "a media-grid's tiles run one of viewer, action or open")
+        entries = block["open"]
+        if not isinstance(entries, list) or not entries:
+            self.error(where, "must be a non-empty list of {action, visible}")
+            return
+        if len(entries) > LIMITS["tile_actions"]:
+            self.error(where, f"at most {LIMITS['tile_actions']} entries")
+        for index, entry in enumerate(entries):
+            at = f"{where}[{index}]"
+            if not isinstance(entry, dict):
+                self.error(at, "must be an object")
+                continue
+            self.unknown_keys(at, entry, {"action", "visible"})
+            if "action" not in entry:
+                self.error(at, "needs an 'action'")
+            else:
+                self.check_action(f"{at}.action", entry["action"])
+            if "visible" in entry and not isinstance(entry["visible"], bool):
+                self.check_text(f"{at}.visible", entry["visible"])
 
     def check_more(self, where: str, more):
         """{route, cursor} (1.2): how a media-grid loads its next page. `cursor` binds into the

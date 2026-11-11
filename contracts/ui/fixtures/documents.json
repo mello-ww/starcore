@@ -14,6 +14,21 @@
       ]}}}
     },
     {
+      "name": "media-grid-tiles",
+      "_why": "1.2: folder tiles - an item's icon drawn when it has no image, and a tile action chosen per item: the first `open` entry whose `visible` holds (one tile opens the Satellite's own interface, the others a page).",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {
+        "home": {"source": {"route": "folders"}, "blocks": [
+          {"type": "media-grid", "items": "$.folders", "size": "large",
+           "item": {"image": "thumbs/{$.cover}", "key": "$.id", "title": "$.name", "group": "$.group", "icon": "$.icon"},
+           "open": [{"visible": "$.private", "action": {"own": "private"}},
+                    {"action": {"navigate": "folder", "params": {"id": "$.id"}}}]},
+          {"type": "media-grid", "items": [{"id": "a"}], "item": {"image": "thumbs/{$.id}", "icon": "folder"},
+           "open": [{"action": {"navigate": "folder", "params": {"id": "$.id"}}}]}
+        ]},
+        "folder": {"params": ["id"], "blocks": []}
+      }}
+    },
+    {
       "name": "media-grid",
       "_why": "1.2: a gallery of images and videos from the Satellite's own routes, grouped, with the shared viewer and selection; a preview document, so a client with the Satellite's own interface keeps it.",
       "document": {"contract": "starcore.ui/1.2", "preview": true, "entry": "home", "pages": {
@@ -243,6 +258,54 @@
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "media-grid", "items": [], "item": {"image": "t"}, "viewer": {}, "action": {"navigate": "home"}}]}}},
       "error": "not both"
+    },
+    {
+      "name": "media-grid-open-and-viewer",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "viewer": {}, "open": [{"action": {"navigate": "home"}}]}]}}},
+      "error": "one of"
+    },
+    {
+      "name": "media-grid-open-and-action",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "action": {"navigate": "home"}, "open": [{"action": {"navigate": "home"}}]}]}}},
+      "error": "one of"
+    },
+    {
+      "name": "media-grid-open-empty",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "open": []}]}}},
+      "error": "list of {action"
+    },
+    {
+      "name": "media-grid-open-without-action",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "open": [{"visible": "$.ok"}]}]}}},
+      "error": "needs an 'action'"
+    },
+    {
+      "name": "media-grid-open-unknown-key",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "open": [{"action": {"navigate": "home"}, "label": "Open"}]}]}}},
+      "error": "unknown key"
+    },
+    {
+      "name": "media-grid-open-too-many",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "open": [{"action": {"navigate": "home"}}, {"action": {"navigate": "home"}}, {"action": {"navigate": "home"}}, {"action": {"navigate": "home"}}, {"action": {"navigate": "home"}}]}]}}},
+      "error": "at most 4"
+    },
+    {
+      "name": "media-grid-open-secure",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "open": [{"action": {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id"}}]}]}}},
+      "error": "only for a media viewer"
+    },
+    {
+      "name": "media-grid-unknown-tile-icon",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t", "icon": "padlock"}}]}}},
+      "error": "item.icon"
     },
     {
       "name": "media-grid-unknown-kind",

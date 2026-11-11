@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { clock, GRID_PAGE, GRID_SIZES, gridSize, gridSizeKey, holdsCollection, itemKey, mediaKind } from "../ui/gallery.js";
+import { clock, GRID_PAGE, GRID_SIZES, gridSize, gridSizeKey, holdsCollection, itemKey, mediaKind, tileAction, tileIcon } from "../ui/gallery.js";
 
 test("a tile is a video only when its kind says so", () => {
     assert.equal(mediaKind("video"), "video");
@@ -52,4 +52,26 @@ test("a page holding a media grid or a map uses the page's width, any other keep
     assert.equal(holdsCollection({ blocks: [{ type: "card", blocks: [{ type: "form" }] }, { type: "list" }] }), false);
     assert.equal(holdsCollection({}), false);
     assert.equal(holdsCollection(null), false);
+});
+
+test("a tile runs the grid's action, or the first open entry that is visible and can run here", () => {
+    const all = () => true;
+    const noOwn = (action) => action.own === undefined;
+    const navigate = { navigate: "album", params: { id: "$.id" } };
+    const own = { own: "locked" };
+    assert.equal(tileAction({ action: navigate }, { data: {} }, all), navigate);
+    const block = { open: [{ visible: "$.locked", action: own }, { action: navigate }] };
+    assert.equal(tileAction(block, { data: { locked: true } }, all), own);
+    assert.equal(tileAction(block, { data: { locked: false } }, all), navigate);
+    // without an own interface the entry is skipped, so the tile opens what follows - or nothing
+    assert.equal(tileAction(block, { data: { locked: true } }, noOwn), navigate);
+    assert.equal(tileAction({ open: [{ visible: "$.locked", action: own }] }, { data: { locked: true } }, noOwn), null);
+    assert.equal(tileAction({ viewer: {} }, { data: {} }, all), null);
+});
+
+test("an item's icon is a shared icon, or none", () => {
+    assert.equal(tileIcon({ item: { icon: "$.icon" } }, { data: { icon: "lock" } }), "lock");
+    assert.equal(tileIcon({ item: { icon: "folder" } }, { data: {} }), "folder");
+    assert.equal(tileIcon({ item: { icon: "$.icon" } }, { data: { icon: "<svg>" } }), null);
+    assert.equal(tileIcon({ item: {} }, { data: {} }), null);
 });

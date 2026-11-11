@@ -175,8 +175,9 @@ export function mount(context) {
         runAction: (...args) => runAction(...args),
         // the secure action (1.2): once for a whole selection, and hidden where it can't run
         runSecure: (action, items, scope) => runSecureAction(action, items, scope),
-        canRun: (action) => !action || !action.secure
-            || Boolean(secureProvider(action, state.catalog && state.catalog.capabilities, satelliteName)),
+        // and an own action only where this Satellite has an own interface here
+        canRun: (action) => !action || ((action.own === undefined || Boolean(own)) && (!action.secure
+            || Boolean(secureProvider(action, state.catalog && state.catalog.capabilities, satelliteName)))),
         setNotice: (...args) => setNotice(...args),
         afterSelection: (then) => {
             if (then === "back") {

@@ -10,7 +10,7 @@ import {usePinchColumnsGesture} from '../../components/pinchColumns';
 import {ZoomableImage} from '../../components/ZoomableImage';
 import {keptPages} from './offline';
 import {tokens, useAccent} from '../../theme';
-import {formatValue, isSafeRoute, isVisible, resolve, resolveTemplate, type Scope, type UiAction, type UiBlock} from './contract';
+import {formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate, type Scope, type UiAction, type UiBlock} from './contract';
 import type {BlockContext} from './UiBlocks';
 
 const {palette, space, type, radii} = tokens;
@@ -30,6 +30,28 @@ const TILE_TARGETS: Record<string, number> = {small: 84, medium: 112, large: 168
 const GAP = 3;
 
 type Source = {uri: string; headers?: Record<string, string>};
+
+/** The action a tile runs: the grid's `action`, else the first `open` entry whose `visible`
+ * holds and that `canRun` here (an own action needs the Satellite's own screens) - or null. */
+export function tileAction(block: UiBlock, scope: Scope, canRunHere: (action: UiAction) => boolean): UiAction | null {
+  if (block.action) {
+    return block.action as UiAction;
+  }
+  for (const entry of Array.isArray((block as any).open) ? (block as any).open : []) {
+    const shown = entry?.visible === undefined || isVisible(resolve(entry.visible, scope));
+    if (shown && entry.action && canRunHere(entry.action)) {
+      return entry.action;
+    }
+  }
+  return null;
+}
+
+/** The shared icon an item without an image shows (`item.icon`), or null. */
+export function tileIcon(block: UiBlock, scope: Scope): string | null {
+  const icon = (block.item as any)?.icon;
+  const name = icon !== undefined ? resolve(icon, scope) : null;
+  return typeof name === 'string' && ICONS.has(name) ? name : null;
+}
 
 export function mediaKind(value: unknown): 'image' | 'video' {
   return value === 'video' ? 'video' : 'image';
@@ -538,20 +560,26 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
     });
   }, [rows, cell, aspect, hasText]);
 
-  const opens = Boolean(picking || block.viewer || block.action || block.selection);
+  // a tile without the viewer runs the grid's action, or the first `open` entry for its item
+  const actionOf = useCallback(
+    (entry: Entry) => (picking || block.viewer ? null : tileAction(block, entry.scope, action => canRun(context, action))),
+    [picking, block, context],
+  );
+  const opens = (entry: Entry) => Boolean(picking || block.viewer || block.selection || actionOf(entry));
   const onPress = useCallback(
     (entry: Entry) => {
+      const action = actionOf(entry);
       if (picking || (block.selection && selecting)) {
         toggle(entry.key);
       } else if (block.viewer) {
         setViewerKey(entry.key);
-      } else if (block.action) {
-        runAction(block.action, entry.scope);
+      } else if (action) {
+        runAction(action, entry.scope);
       } else if (block.selection) {
         toggle(entry.key);
       }
     },
-    [picking, block.selection, block.viewer, block.action, selecting, toggle, runAction],
+    [picking, block.selection, block.viewer, actionOf, selecting, toggle, runAction],
   );
 
   const renderRow = (row: Row) =>
@@ -579,7 +607,8 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
             accent={accent}
             onAccent={onColor}
             reduced={reduced}
-            onPress={opens ? onPress : undefined}
+            icon={tileIcon(block, entry.scope)}
+            onPress={opens(entry) ? onPress : undefined}
             onLongPress={block.selection || picking ? toggle : undefined}
           />
         ))}
@@ -798,11 +827,13 @@ export function VirtualMediaGrid({
 
 const Tile = memo(function Tile({
   entry, size, textHeight = 0, aspect, round, title, subtitle, subtitleFormat, duration, selectable, selecting, selected,
-  accent, onAccent, reduced, onPress, onLongPress,
+  accent, onAccent, reduced, onPress, onLongPress, icon,
 }: {
   entry: Entry; size: number; aspect: number; round: boolean; title: string; subtitle: unknown; subtitleFormat?: string;
   duration: unknown; selectable: boolean; selecting: boolean; selected: boolean; accent: string; onAccent: string;
   reduced: boolean; onPress?: (entry: Entry) => void; onLongPress?: (key: string) => void;
+  /** The shared icon drawn without an image (`item.icon`), in place of the image glyph. */
+  icon?: string | null;
   /** A fixed height for the text under the tile, so every row of a grid is as tall. */
   textHeight?: number;
 }) {
@@ -838,7 +869,7 @@ const Tile = memo(function Tile({
             />
           </Animated.View>
         ) : (
-          <Icon name="image" size={18} color={palette.text3} />
+          <Icon name={icon || 'image'} size={icon ? 28 : 18} color={palette.text3} />
         )}
         {entry.kind === 'video' && (
           <View style={styles.badge} pointerEvents="none">
@@ -921,6 +952,9 @@ function ActionPill({
  * page shown, so swiping away stops it), facts and actions come from the document. */
 /** Whether an action's control is drawn: a secure action only where it can run (1.2). */
 function canRun(context: BlockContext, action: any): boolean {
+  if (action?.own !== undefined && !context.hasOwnScreens) {
+    return false;  // an own action only where the app has the Satellite's own screens
+  }
   return !action?.secure || Boolean(context.canRun?.(action));
 }
 

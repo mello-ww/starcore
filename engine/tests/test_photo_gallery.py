@@ -136,7 +136,12 @@ class PhotoUiDocumentTest(unittest.TestCase):
         blocks = self.document["pages"]["albums"]["blocks"]
         opened = {block["label"]: block["action"]["own"] for block in blocks
                   if block["type"] == "button" and "own" in block.get("action", {})}
-        self.assertEqual(opened, {"Locked Folder": "locked", "Settings and phone sync": "settings"})
+        self.assertEqual(opened, {"Settings and phone sync": "settings"})
+        # the Locked Folder is a tile among the albums: the one tile that opens Photo's own screens
+        grid = next(block for block in blocks if block["type"] == "media-grid")
+        self.assertEqual(grid["open"], [{"visible": "$.locked", "action": {"own": "locked"}},
+                                        {"action": {"navigate": "album", "params": {"id": "$.id"}}}])
+        self.assertEqual(grid["item"]["icon"], "$.icon")
         # Photo's own web page knows both sections, and the Locked Folder's link as well
         page = (PHOTO_DIR / "mission_control" / "page.js").read_text(encoding="utf-8")
         self.assertIn('section === "settings" ? "config"', page)
@@ -248,8 +253,30 @@ class PhotoGalleryApiTest(unittest.TestCase):
         self.json_request("/api/satellites/photo/albums", "POST", {"name": "Holidays"})
 
         tiles = [(tile["title"], tile["group"]) for tile in self.json_request("/api/satellites/photo/gallery/albums")[1]["albums"]]
-        # the client groups consecutive tiles, so Favorites heads the Folders group, before the phone's folders
-        self.assertEqual(tiles, [("Favorites", "Folders"), ("Camera", "Folders"), ("Holidays", "Albums")])
+        # the client groups consecutive tiles, so Favorites heads the Folders group, before the
+        # Locked Folder and the phone's folders
+        self.assertEqual(tiles, [("Favorites", "Folders"), ("Locked Folder", "Folders"), ("Camera", "Folders"),
+                                 ("Holidays", "Albums")])
+
+    def test_the_locked_folder_is_a_folder_tile_while_a_vault_is_there(self):
+        from starcore import capabilities
+        tile = next(tile for tile in self.json_request("/api/satellites/photo/gallery/albums")[1]["albums"]
+                    if tile["id"] == "locked")
+        # a lock instead of a cover, and the flag the document opens the Locked Folder on;
+        # nothing about what it holds (no count, no cover): it is never listed here
+        self.assertEqual(tile, {"id": "locked", "title": "Locked Folder", "subtitle": "Behind your PIN",
+                                "group": "Folders", "cover": "", "icon": "lock", "locked": True})
+
+        vault, _ = capabilities.provider(self.engine, "media.vault")
+        self.assertIsNotNone(vault)
+        before = dict(vault.config.data)
+        vault.config.data["enabled"] = False
+        try:
+            ids = [tile["id"] for tile in self.json_request("/api/satellites/photo/gallery/albums")[1]["albums"]]
+        finally:
+            vault.config.data.clear()
+            vault.config.data.update(before)
+        self.assertNotIn("locked", ids)
 
     def test_an_album_keeps_the_order_photos_were_added_in(self):
         photos = self.import_photos("a.png", "b.png", "c.png", "d.png")

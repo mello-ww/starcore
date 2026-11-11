@@ -56,7 +56,7 @@ Legend:
 | 33 | Viewer shows the whole photo | ✅ | ✅ | ✅ fixed in M7 | ✅ | A portrait photo on a landscape screen is cropped: the frame is a grid with no sized row, so the image keeps its own height and overflows (a 1080×1920 image is drawn 1538 px tall in a 608 px frame). | C (renderer CSS): give the image the frame's size (`grid-template: 100% / 100%`, or an absolutely placed image) | P0 | S |
 | 34 | Page uses the screen's width | ✅ | n/a | ✅ fixed in M8 | n/a | Every shared page except a `dashboard` is capped at 880 px, so Photos fills half of a 16:9 screen. | C: an additive width hint, or full width for a page holding a media grid or map; 1.0/1.1 documents unchanged | P0 | S |
 | 35 | Favorites pinned at the top of Folders | ◐ | ◐ | ✅ fixed in M9 | ✅ fixed in M9 | Favorites should sit in Folders, always first, not in a group of its own. | S: `gallery.py` lists Favorites first under the Folders group (clients group consecutive items as sent) | P1 | S |
-| 36 | Locked Folder as a folder tile with a lock | ◐ own tab | ◐ own tab | ✗ button below Albums | ✗ | It should be a tile among the folders, with the shared `lock` icon as its thumbnail. | C: a media-grid tile `icon` drawn when there is no `image`, and a per-item action (`own` for this tile, `navigate` for the others); then J+S | P1 | M |
+| 36 | Locked Folder as a folder tile with a lock | ◐ own tab | ◐ own tab | ✅ fixed in M10 | ✅ fixed in M10 | It should be a tile among the folders, with the shared `lock` icon as its thumbnail. | C: a media-grid tile `icon` drawn when there is no `image`, and a per-item action (`own` for this tile, `navigate` for the others); then J+S | P1 | M |
 | 37 | Locked Folder in the shared interface | ✅ | ✅ | ✗ opens the own screens | ✗ | Opening it leaves the shared interface for Photo's own page and screens. Retiring those screens would cut the way in. | C + Locked Folder capability: browse, view and move out through the shared viewer while unlocked, the PIN and biometric prompts reused from M5, never a listing without a grant | P0 before retiring the own screens | L |
 | 38 | Icons shipped by the Satellite | ◐ `icon.svg`, web only | ✗ shared set only | ✗ shared set only | ✗ | `ui.json` may only name the 34 shared icons, and Android draws no SVG. | C: a declared `icons/` folder, validated by the Engine (no script or external reference, single colour, tinted by the client's tokens), served with a revision, named in the document with a shared icon as fallback; Android adds an SVG renderer once | P2 | M–L |
 
@@ -77,7 +77,7 @@ Issues in the new shared interface:
 ## Roadmap: shortest safe path to making the shared interface the default
 
 **Status (2026-11-11):** M1 to M6 are done; Photos opens in its shared interface by default on
-both clients, and M7 to M9 are done. M10 to M14 are next; #33 to #38 came from
+both clients, and M7 to M10 are done. M11 to M14 are next; #33 to #38 came from
 the owner's review of the shared interface on 2026-11-11.
 
 **The goal these milestones serve:** at a stable release, a new Satellite needs no change to
@@ -112,7 +112,7 @@ Each milestone is small and testable on its own. The order runs from cheapest to
 
 **Should follow soon**
 - **M9. Favorites pinned at the top of Folders** (S, S): #35. Done: `gallery/albums` lists Favorites first under Folders; an engine test checks the order and groups, and the web was checked on the local demo.
-- **M10. The Locked Folder as a folder tile** (C + J+S, M): #36. A tile `icon` and per-item actions in the contract, then the tile in Albums, opening the Locked Folder. Test: contract fixtures on both clients, and the Locked Folder still locks when you leave it.
+- **M10. The Locked Folder as a folder tile** (C + J+S, M): #36. Done: `item.icon` and `open` in the contract (Engine validation, fixtures, both renderers), and the tile in Albums, right after Favorites, opening the Locked Folder. Tested with contract fixtures, renderer tests on both clients, engine tests, and on the local demo (web and emulator).
 - M11. Favorite heart on tiles (#21).
 - M12. Download / share action, which fixes Android Share (#27).
 - M13. Web viewer touch swipe (#17).

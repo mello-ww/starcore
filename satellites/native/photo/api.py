@@ -65,7 +65,7 @@ def gallery_route(request):
         if path == ():
             return json_response(gallery.library_view(request.satellite, limit, cursor))
         if path == ("albums",):
-            return json_response(gallery.albums_view(request.satellite))
+            return json_response(gallery.albums_view(request.satellite, request.engine))
         if len(path) == 2 and path[0] == "albums":
             return json_response(gallery.album_view(request.satellite, path[1], limit, cursor))
         if path == ("trash",):

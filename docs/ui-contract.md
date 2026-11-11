@@ -261,7 +261,21 @@ collection: the document says where each picture comes from and what can be done
   `image` or `video` (or a binding to one): a video's tile carries a play badge and its
   `duration` (seconds). Consecutive items with the same `group` (text, or a value formatted by
   `format.group`) sit under one heading. `title` and `subtitle` show under the tile when given.
+  `icon` (a name from the shared set, or a binding to one) is drawn in place of the image glyph
+  when the item has no image - a folder that holds nothing to show, a lock.
 - **Tiles open the `viewer`, or run `action`** (any action, the tile as `$.`), not both.
+  When the action depends on the item, **`open`** replaces `action`: up to 4
+  `{action, visible}` entries, and a tile runs the first whose `visible` holds (an entry
+  without one always does). An entry a client can't run there is skipped - an `own` action
+  without the Satellite's own interface - and a tile left with none doesn't open. Photos uses it
+  for its albums: the Locked Folder's tile opens Photo's own screens, every other tile its album.
+
+  ```json
+  {"type": "media-grid", "items": "$.albums",
+   "item": {"image": "thumbnails/{$.cover}", "key": "$.id", "title": "$.title", "icon": "$.icon"},
+   "open": [{"visible": "$.locked", "action": {"own": "locked"}},
+            {"action": {"navigate": "album", "params": {"id": "$.id"}}}]}
+  ```
 - **`viewer`**: full screen, over everything. It shows `image` (the tile's own when absent), or
   plays `video` in place for a video, with the client's own player controls; on Android only
   the item on screen has a player. `title`, `subtitle`, up to 12 `fields` (`{label, value,
