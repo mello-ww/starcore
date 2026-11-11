@@ -132,6 +132,20 @@ class PhotoUiDocumentTest(unittest.TestCase):
         self.assertEqual(found, {"library": (1, 1), "search": (1, 0), "map": (1, 0), "albums": (0, 0),
                                  "album": (1, 1), "trash": (0, 0)})
 
+    def test_every_photo_viewer_downloads_and_shares_the_original(self):
+        found = {}
+        for name, page in self.document["pages"].items():
+            for block in page["blocks"]:
+                files = [entry["action"] for entry in (block.get("viewer") or {}).get("actions", [])
+                         if "download" in entry["action"] or "share" in entry["action"]]
+                if block.get("viewer"):
+                    found[name] = files
+        original = {"name": "$.title"}
+        self.assertEqual(found["library"], [{"download": "originals/{$.id}", **original}, {"share": "originals/{$.id}", **original}])
+        for name in ("search", "map", "album"):
+            self.assertEqual(found[name], found["library"], name)
+        self.assertEqual(found["trash"], [])  # a binned photo is only restored or erased
+
     def test_photo_grids_carry_the_favorite_heart_on_their_tiles(self):
         hearts = {}
         for name, page in self.document["pages"].items():

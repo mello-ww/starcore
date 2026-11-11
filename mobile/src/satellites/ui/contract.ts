@@ -29,7 +29,8 @@ export const ICONS = new Set([
   'folder', 'grid', 'hard-drive', 'home', 'image', 'info', 'layers', 'list', 'lock',
   'music', 'plus', 'settings', 'sliders', 'star', 'zap',
   // 1.2
-  'chevron-left', 'chevron-right', 'edit-2', 'heart', 'map-pin', 'play', 'rotate-ccw', 'search', 'trash-2', 'x',
+  'chevron-left', 'chevron-right', 'download', 'edit-2', 'heart', 'map-pin', 'play', 'rotate-ccw', 'search',
+  'share-2', 'trash-2', 'x',
 ]);
 /** Device features this app offers a document beyond its blocks: the shared audio host
  * (src/media/), which the play action plays through. */
@@ -59,6 +60,11 @@ export interface UiAction {
   pick?: {capability: string; kinds?: string[]; multiple?: boolean; title?: Json};
   /** 1.2: open the Satellite's own native screens at a section they name ("settings"). */
   own?: string;
+  /** 1.2: a file from one of the Satellite's own routes, saved to Downloads (download) or handed
+   * to the system share sheet (share), named `name`. */
+  download?: string;
+  share?: string;
+  name?: Json;
   /** 1.2: run one secure operation (media.vault move_in) on the items shown or selected, behind
    * the app's own unlock prompt; `item` binds each item's id. */
   secure?: {capability: string; operation: string};

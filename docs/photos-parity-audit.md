@@ -47,7 +47,7 @@ Legend:
 | 24 | Move to Locked Folder (viewer) | ✅ PIN prompt | ✅ PIN / biometric modal | ✗ | ✗ | **Lost.** An action can't ask for an unlock first. | C: an "unlock first" step for an action, provided by a capability (a vault capability from the Locked Folder, the client's own PIN and biometric UI), similar to `pick` | P0 | L |
 | 25 | Locked Folder itself (PIN, biometrics, encryption, recovery, move-out) | ✅ (LF page module) | ✅ LockedFolderTab | ✗ | ✗ | Stays native by design; it only needs a way in from the shared interface. | N + client wiring: an entry point to the Locked Folder on both clients | P0 | S–M |
 | 26 | Import from a server folder (scan / import) | ✅ | ✗ (empty text wrongly says "Import some from your Albums tab") | ✗ | ✗ | Lost on web. | J: a form with `source` and Scan / Import → existing `scan`/`import` routes. S: add a `message` to their answers. Optional: `file-browser` | P0 | S |
-| 27 | Upload, download, share, export | ✗ upload, ✗ download | ◐ Share sends a bare authenticated URL (the recipient can't open it) | ✗ | ✗ | Nothing works well anywhere today. | C: `download`/`share` action (web: authenticated fetch → save; Android: download → share the file) | P1 | M |
+| 27 | Upload, download, share, export (download and share fixed in M12; upload and export not) | ✗ upload, ✗ download | ◐ Share sends a bare authenticated URL (the recipient can't open it) | ✅ download, ◐ share where the browser can | ✅ (share; download on Android 10+) | Nothing worked well anywhere before M12. | C: `download`/`share` action (web: authenticated fetch → save; Android: download → share the file) | P1 | M |
 | 28 | Phone sync (background, Wi-Fi only, Sync now, permission) | status only (Dev Mode log) | ✅ | ✗ | ✗ | Device-side; registered in `App.tsx`, so it doesn't depend on the Photos screen. | N: reach `PhotoConfigurationScreen` from the shared interface | P0 | S |
 | 29 | Settings (source_paths mappings, default sync folder, retention, default import directory) | ✅ tab | ✅ screen | ✗ | ✗ | `source_paths` is a list of objects; the contract's form has no repeatable rows. | N for now (entry point, as #28). C later: repeatable form rows | P0 entry / P2 C | S / M |
 | 30 | Offline cache (Android) | n/a | ✅ cached list, "Showing cached photos - offline" | n/a | ✗ (only the document is cached; the notice says "Offline" for any failure) | **Lost.** | C: opt-in per-server page-data cache, forgotten on a Locked Folder move (as `forgetCachedPhoto`) | P0 (Android) | M |
@@ -77,7 +77,7 @@ Issues in the new shared interface:
 ## Roadmap: shortest safe path to making the shared interface the default
 
 **Status (2026-11-11):** M1 to M6 are done; Photos opens in its shared interface by default on
-both clients, and M7 to M11 are done. M12 to M14 are next; #33 to #38 came from
+both clients, and M7 to M12 are done. M13 and M14 are next; #33 to #38 came from
 the owner's review of the shared interface on 2026-11-11.
 
 **The goal these milestones serve:** at a stable release, a new Satellite needs no change to
@@ -114,7 +114,7 @@ Each milestone is small and testable on its own. The order runs from cheapest to
 - **M9. Favorites pinned at the top of Folders** (S, S): #35. Done: `gallery/albums` lists Favorites first under Folders; an engine test checks the order and groups, and the web was checked on the local demo.
 - **M10. The Locked Folder as a folder tile** (C + J+S, M): #36. Done: `item.icon` and `open` in the contract (Engine validation, fixtures, both renderers), and the tile in Albums, right after Favorites, opening the Locked Folder. Tested with contract fixtures, renderer tests on both clients, engine tests, and on the local demo (web and emulator).
 - **M11. Favorite heart on tiles** (C + J, M): #21. Done: `quick` tile actions in the contract (Engine validation, fixtures, both renderers) and the heart toggle on Photos' Library, Search and album grids. Tested with fixtures, renderer tests on both clients, engine tests, and on the local demo (web and emulator).
-- M12. Download / share action, which fixes Android Share (#27).
+- **M12. Download and share** (C + native + J, L): #27. Done: `download` and `share` actions in the contract (Engine validation, fixtures), Mission Control's `ui/files.js`, the app's `src/files/` and its Kotlin `StarCoreFilesModule` (MediaStore Downloads, a FileProvider for the share sheet), and both actions in every Photos viewer. Photo's own Android viewer shares the file too. Tested with fixtures, unit tests on both clients, engine tests, and on the local demo (web and emulator).
 - M13. Web viewer touch swipe (#17).
 - M14. Camera grouping and the "All" view (#2).
 

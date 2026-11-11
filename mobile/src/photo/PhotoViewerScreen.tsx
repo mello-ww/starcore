@@ -8,11 +8,11 @@ import {
   Image,
   Modal,
   Pressable,
-  Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {canShareFiles, fileName, shareFile} from '../files';
 import Video from 'react-native-video';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {ZoomableImage} from '../components/ZoomableImage';
@@ -174,11 +174,17 @@ export function PhotoViewerScreen({route, navigation}: Props) {
     }
   };
 
-  const onShare = async (photoId: string) => {
+  // the photo itself, through the app's shared file module (src/files/) - a bare link was no use
+  // to whoever received it, who has no session on this server
+  const onShare = async (photo: {id: string; filename?: string}) => {
+    if (!canShareFiles()) {
+      Alert.alert('Could not share', 'Sharing files is not available here.');
+      return;
+    }
     try {
-      await Share.share({message: imageSource(photoId, 'original').uri});
-    } catch {
-      // the user cancelled the share sheet - nothing to report
+      await shareFile(imageSource(photo.id, 'original'), fileName(photo.filename, photo.id));
+    } catch (err: any) {
+      Alert.alert('Could not share', err?.message || 'Please try again.');
     }
   };
 
@@ -224,7 +230,7 @@ export function PhotoViewerScreen({route, navigation}: Props) {
           label={favoriteIds.has(current.id) ? '♥ Favorited' : '♡ Favorite'}
           onPress={() => onToggleFavorite(current.id)}
         />
-        <ViewerAction label="Share" onPress={() => onShare(current.id)} />
+        <ViewerAction label="Share" onPress={() => onShare(current)} />
         <ViewerAction label="Details" onPress={toggleDetails} />
         <ViewerAction label="Lock" accessibilityLabel="Move to Locked Folder" onPress={() => onMoveToLocked(current)} />
         <ViewerAction label="Delete" onPress={onDelete} destructive />

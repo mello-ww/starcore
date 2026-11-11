@@ -279,7 +279,7 @@ collection: the document says where each picture comes from and what can be done
 - **`viewer`**: full screen, over everything. It shows `image` (the tile's own when absent), or
   plays `video` in place for a video, with the client's own player controls; on Android only
   the item on screen has a player. `title`, `subtitle`, up to 12 `fields` (`{label, value,
-  format, unit}`, shown under Details, empty ones left out) and up to 6 `actions`
+  format, unit}`, shown under Details, empty ones left out) and up to 8 `actions`
   (`{label, action, icon, style, visible}`) on the item shown. Left and right (arrow keys on
   the web, a swipe on Android) move between items; Escape or Back closes it. After an action's
   `refresh`, the viewer stays on its item, or shows the next one when the item is gone. On
@@ -479,6 +479,15 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
   - On the web, a section that is another Satellite hosted by this one (`section_of`, such as
     `#/satellite/Photo/LockedFolder`) always opens the own page, which hosts it, whichever
     interface Developer Mode has chosen.
+- **`download`** and **`share`** (1.2): `{"download": "originals/{$.id}", "name": "$.title"}`
+  fetches one of the Satellite's own routes with the client's own session, then saves the file
+  (download) or hands it to the system share sheet (share), named `name` (else the route's last
+  segment), with no path separator, reserved character or leading dot. Mission Control saves
+  through the browser's own download, and shares through the Web Share API where the browser
+  can share files; the app fetches the file in its own module, then saves it to Downloads
+  (Android 10 and later) or opens the share sheet with the file itself. A client that can't do
+  one hides its control. Nothing reaches the Satellite but that GET. One file at a time: not in
+  a selection or a tile's `quick` actions.
 - **`secure`** (1.2), in a media viewer's or selection's `actions` only: runs one protected
   operation on the items shown or selected, behind the **client's own** unlock prompt.
 

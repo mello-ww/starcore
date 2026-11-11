@@ -9,7 +9,7 @@ import {useAppActive} from '../hooks/useAppActive';
 import {useServers} from '../servers/ServersContext';
 import {UiApi} from '../satellites/ui/api';
 import {
-  ICONS, findProvider, formatValue, isVisible, missingRequirements, resolve, resolveTemplate,
+  ICONS, findProvider, formatValue, isSafeRoute, isVisible, missingRequirements, resolve, resolveTemplate,
   type Providers, type Scope, type UiAction, type UiDocument, type UiSource,
 } from '../satellites/ui/contract';
 import {MediaPicker, type MediaReference, type PickRequest} from '../satellites/ui/MediaPicker';
@@ -23,6 +23,7 @@ import {
 import {BUILTIN_SECURE_PROMPTS} from '../satellites/builtins';
 import {runSecure, secureRunner, type GrantRequest, type SecurePromptProps} from '../satellites/ui/secure';
 import {privacy} from '../platform/privacy';
+import {canSaveFiles, canShareFiles, fileName, saveFile, shareFile} from '../files';
 import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
@@ -400,6 +401,16 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     [document, navigation, name, revision, topLevel],
   );
 
+  // images (1.2) load from this Satellite's own routes, with the signed-in session
+  const baseUrl = activeServer?.baseUrl ?? '';
+  const mediaSource = useCallback(
+    (mediaRoute: string) => ({
+      uri: `${baseUrl}/api/satellites/${encodeURIComponent(name)}/${mediaRoute}`,
+      headers: sessionToken ? {Authorization: `Bearer ${sessionToken}`} : undefined,
+    }),
+    [baseUrl, name, sessionToken],
+  );
+
   const runAction = useCallback(
     async (action: UiAction | undefined, scope: Scope, value?: unknown, options?: {quiet?: boolean}): Promise<boolean> => {
       const quiet = Boolean(options?.quiet);
@@ -425,6 +436,28 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         }
         (navigation as any).push(screen, {section: String(action.own)});
         return true;
+      }
+      if (action.download !== undefined || action.share !== undefined) {
+        // 1.2: a file from the Satellite's own route, fetched with this session by the app's own
+        // module: saved to Downloads, or handed to the system share sheet
+        const sharing = action.share !== undefined;
+        const route = resolveTemplate(String(sharing ? action.share : action.download), scoped);
+        if (!route || !isSafeRoute(route)) {
+          showToast("That file isn't available.", true);
+          return false;
+        }
+        const fileTitle = fileName(action.name !== undefined ? resolve(action.name, scoped) : null, route);
+        try {
+          if (sharing) {
+            await shareFile(mediaSource(route), fileTitle);
+          } else {
+            showToast(`Saved to Downloads: ${await saveFile(mediaSource(route), fileTitle)}`);
+          }
+          return true;
+        } catch (err: any) {
+          showToast(err?.message || (sharing ? 'Could not share that.' : 'Could not save that.'), true);
+          return false;
+        }
       }
       if (action.play) {
         // 1.2: played by the app's audio host, from whichever Satellite provides audio.library
@@ -558,20 +591,16 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   );
   const runSecureRef = useRef(runSecureAction);
   runSecureRef.current = runSecureAction;
+  // whether an action's control is drawn here: a secure action only where it can run, and
+  // download or share only where this phone can (saving needs Android 10 or later)
   const canRun = useCallback(
-    (action: UiAction | undefined) => !action?.secure || Boolean(secureRunner(action, providers, name, BUILTIN_SECURE_PROMPTS)),
+    (action: UiAction | undefined) =>
+      (action?.download === undefined || canSaveFiles()) &&
+      (action?.share === undefined || canShareFiles()) &&
+      (!action?.secure || Boolean(secureRunner(action, providers, name, BUILTIN_SECURE_PROMPTS))),
     [providers, name],
   );
 
-  // images (1.2) load from this Satellite's own routes, with the signed-in session
-  const baseUrl = activeServer?.baseUrl ?? '';
-  const mediaSource = useCallback(
-    (mediaRoute: string) => ({
-      uri: `${baseUrl}/api/satellites/${encodeURIComponent(name)}/${mediaRoute}`,
-      headers: sessionToken ? {Authorization: `Bearer ${sessionToken}`} : undefined,
-    }),
-    [baseUrl, name, sessionToken],
-  );
   // the picker reads the provider's routes, and loads its thumbnails, with this session
   const readProvider = useCallback((satellite: string, providerRoute: string) => api.read(satellite, providerRoute), [api]);
   // a grid's next page, a map's viewport: this Satellite's own routes, with this session

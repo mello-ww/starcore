@@ -13,6 +13,7 @@ import {
     BLOCK_TYPES, checkDocument, findProvider, formatValue, isSafeRoute, isVisible,
     missingRequirements, resolve, resolveTemplate, toneOf,
 } from "./contract.js";
+import { canShareFiles, downloadFile, fileName, shareFile } from "./files.js";
 import { createGallery, holdsCollection } from "./gallery.js";
 import { icon } from "./icons.js";
 import { createMaps } from "./map.js";
@@ -150,6 +151,15 @@ export function mount(context) {
     };
 
     // the media-grid block and its viewer (1.2), which keep their own state across renders
+    // whether an action's control is drawn here: a secure action only where it can run, an own
+    // action only where this Satellite has an own interface, and share only where this browser
+    // can hand a file to the system share sheet
+    function canRun(action) {
+        return !action || ((action.own === undefined || Boolean(own))
+            && (action.share === undefined || canShareFiles(globalThis.navigator))
+            && (!action.secure || Boolean(secureProvider(action, state.catalog && state.catalog.capabilities, satelliteName))));
+    }
+
     const gallery = createGallery({
         satelliteBase,
         // what the person chooses here (a grid's size), remembered for this Satellite in this
@@ -175,9 +185,7 @@ export function mount(context) {
         runAction: (...args) => runAction(...args),
         // the secure action (1.2): once for a whole selection, and hidden where it can't run
         runSecure: (action, items, scope) => runSecureAction(action, items, scope),
-        // and an own action only where this Satellite has an own interface here
-        canRun: (action) => !action || ((action.own === undefined || Boolean(own)) && (!action.secure
-            || Boolean(secureProvider(action, state.catalog && state.catalog.capabilities, satelliteName)))),
+        canRun: (action) => canRun(action),
         setNotice: (...args) => setNotice(...args),
         afterSelection: (then) => {
             if (then === "back") {
@@ -448,6 +456,28 @@ export function mount(context) {
             }
             own.open(String(action.own));
             return true;
+        }
+        if (action.download !== undefined || action.share !== undefined) {
+            // 1.2: a file from the Satellite's own route, with this session: saved, or handed to
+            // the system share sheet
+            const sharing = action.share !== undefined;
+            const route = resolveTemplate(sharing ? action.share : action.download, bindings);
+            if (!route || !isSafeRoute(route)) {
+                setNotice("That file isn't available.", "error");
+                return false;
+            }
+            const url = `${satelliteBase}/${route}`;
+            const name = fileName(action.name !== undefined ? resolve(action.name, bindings) : null, route);
+            if (!sharing) {
+                downloadFile(url, name);
+                return true;
+            }
+            try {
+                return await shareFile(url, name);
+            } catch (error) {
+                setNotice(error.message, "error");
+                return false;
+            }
         }
         if (action.play) {
             // 1.2: played by the shell's audio host, from whichever Satellite provides audio.library
@@ -840,8 +870,8 @@ export function mount(context) {
         },
 
         button: (block, scope) => {
-            if (block.action && block.action.own !== undefined && !own) {
-                return null;  // opens an own page this Satellite doesn't have here
+            if (block.action && !canRun(block.action)) {
+                return null;  // an own page this Satellite doesn't have here, or a share this browser can't do
             }
             const style = block.style || "secondary";
             const button = el("button", `sc-button ui-button${style === "primary" ? " sc-button-accent" : ""}${style === "danger" ? " ui-button-danger" : ""}`,

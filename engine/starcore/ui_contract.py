@@ -201,6 +201,7 @@ class _Validator:
         # the capabilities the document's Satellite declares, or None when not known
         self.provides = None if provides is None else set(provides)
         self.in_media_actions = False
+        self.in_bulk = False  # a selection's or a tile's quick actions: no download or share there
         self.errors = []
         self.lenient = False  # a newer minor: unknown blocks and keys are skipped by clients
         self.minor = MINOR
@@ -737,7 +738,7 @@ class _Validator:
         if "quick" in block:
             # a small button in each tile's corner: the first entry whose `visible` holds
             self.check_media_actions(f"{where}.quick", block["quick"], LIMITS["quick_actions"],
-                                     required=True, secure=False, icon=True)
+                                     required=True, secure=False, icon=True, files=False)
         item = block.get("item")
         if not isinstance(item, dict):
             self.error(f"{where}.item", "must be an object")
@@ -772,7 +773,7 @@ class _Validator:
             else:
                 self.unknown_keys(f"{where}.selection", selection, {"actions"})
                 self.check_media_actions(f"{where}.selection.actions", selection.get("actions"),
-                                         LIMITS["selection_actions"], required=True)
+                                         LIMITS["selection_actions"], required=True, files=False)
         if "size" in block and block["size"] not in IMAGE_SIZES:
             self.error(f"{where}.size", f"must be one of {sorted(IMAGE_SIZES)}")
         if "shape" in block and block["shape"] not in IMAGE_SHAPES:
@@ -911,7 +912,7 @@ class _Validator:
             self.check_media_actions(f"{where}.actions", viewer["actions"], LIMITS["viewer_actions"])
 
     def check_media_actions(self, where: str, actions, limit: int, required: bool = False,
-                            secure: bool = True, icon: bool = False):
+                            secure: bool = True, icon: bool = False, files: bool = True):
         """[{label, action, icon, style, visible}]: the viewer's actions on the item shown, a
         selection's on each selected item, or a tile's quick actions (no secure action there,
         and an icon each: the button has no room for its label)."""
@@ -934,10 +935,12 @@ class _Validator:
                 self.error(at, "needs an 'action'")
             else:
                 self.in_media_actions = secure  # where a secure action may be
+                self.in_bulk = not files
                 try:
                     self.check_action(f"{at}.action", entry["action"])
                 finally:
                     self.in_media_actions = False
+                    self.in_bulk = False
             if icon and "icon" not in entry:
                 self.error(at, "needs an 'icon'")
             if "icon" in entry and entry["icon"] not in ICONS:
@@ -998,6 +1001,10 @@ class _Validator:
         if "secure" in action:
             self.check_secure(where, action)
             return
+        for kind in ("download", "share"):
+            if kind in action:
+                self.check_file_action(where, action, kind)
+                return
         known = {"route", "method", "body", "confirm", "then"}
         if "pick" in action:
             self.check_pick(where, action["pick"])
@@ -1021,6 +1028,20 @@ class _Validator:
             self.check_navigate(f"{where}.then", then)
         elif then not in ACTION_THEN:
             self.error(f"{where}.then", "must be 'refresh', 'back' or {navigate, params}")
+
+    def check_file_action(self, where: str, action: dict, kind: str):
+        """{download: route, name?} and {share: route, name?} (1.2): the client fetches one of
+        the Satellite's own routes with its own session, then saves the file (download) or hands
+        it to the system share sheet (share), named `name`. Nothing is sent to the Satellite but
+        that GET; a client that can't do it hides the control. One file at a time: not in a
+        selection, and not in a tile's quick actions."""
+        self.since(f"{where}.{kind}", f"the {kind} action", 2)
+        self.unknown_keys(where, action, {kind, "name"})
+        self.check_route(f"{where}.{kind}", action[kind])
+        if "name" in action:
+            self.check_text(f"{where}.name", action["name"])
+        if self.in_bulk:
+            self.error(f"{where}.{kind}", "is one file at a time: not in a selection or a tile's quick actions")
 
     def check_play(self, where: str, action: dict):
         """{play: {search}} (1.2): the client searches the audio.library provider for `search`

@@ -9,6 +9,7 @@ import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.load
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.soloader.SoLoader
 import com.brentvatne.react.ReactNativeVideoManager
+import com.starcore.mobile.files.StarCoreFilesPackage
 import com.starcore.mobile.music.MusicPackage
 import com.starcore.mobile.music.PlayerRegistry
 import com.starcore.mobile.privacy.PrivacyPackage
@@ -22,13 +23,14 @@ import com.starcore.mobile.buildinfo.BuildInfoPackage
  * (src/music/native.ts), which has no npm package to autolink from, and
  * its react-native-video plugin hook that gives it the player's session,
  * and the Privacy package (FLAG_SECURE and image-cache eviction for the
- * Locked Folder), and BuildInfo (Settings > About).
+ * Locked Folder), BuildInfo (Settings > About), and StarCoreFiles (the shared
+ * interface's download and share actions, src/files/).
  */
 class MainApplication : Application(), ReactApplication {
 
     override val reactNativeHost: ReactNativeHost =
         object : DefaultReactNativeHost(this) {
-            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MusicPackage() + PrivacyPackage() + BuildInfoPackage()
+            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MusicPackage() + PrivacyPackage() + BuildInfoPackage() + StarCoreFilesPackage()
 
             override fun getJSMainModuleName(): String = "index"
 

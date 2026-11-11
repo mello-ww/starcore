@@ -89,6 +89,18 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
 
+        <!-- the share action hands one file from the app's private cache to another app
+             (StarCoreFilesModule); res/xml/shared_files.xml limits it to cache/shared -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/shared_files" />
+        </provider>
+
         <service
             android:name="com.brentvatne.exoplayer.VideoPlaybackService"
             android:exported="false"

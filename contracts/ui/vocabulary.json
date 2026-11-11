@@ -36,11 +36,11 @@
     },
     "1.2": {
       "blocks": ["image", "media-list", "media-grid", "search", "map"],
-      "actions": ["play", "pick", "own", "secure"],
+      "actions": ["play", "pick", "own", "secure", "download", "share"],
       "keys": ["document.preview", "media-grid.more", "media-grid.open", "media-grid.item.icon", "media-grid.quick", "map.viewport", "map.bounds", "map.item.count", "map.item.bounds", "page.offline"],
       "bindings": ["$value."],
-      "icons": ["chevron-left", "chevron-right", "edit-2", "heart", "map-pin", "play", "rotate-ccw", "search", "trash-2", "x"],
-      "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library. {own: section}: the client opens the Satellite's own interface (page.js, native screens) at a section that interface names; a client without one hides the control (a tile skips that entry of its media-grid `open`). {secure: {capability, operation}, item, confirm?, then?}: in a media viewer's or selection's actions, the client runs one of secure_operations on the items, behind its own unlock prompt (never a document form) - see secure_operations."
+      "icons": ["chevron-left", "chevron-right", "download", "edit-2", "heart", "map-pin", "play", "rotate-ccw", "search", "share-2", "trash-2", "x"],
+      "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library. {own: section}: the client opens the Satellite's own interface (page.js, native screens) at a section that interface names; a client without one hides the control (a tile skips that entry of its media-grid `open`). {secure: {capability, operation}, item, confirm?, then?}: in a media viewer's or selection's actions, the client runs one of secure_operations on the items, behind its own unlock prompt (never a document form) - see secure_operations. {download: route, name?} and {share: route, name?}: the client fetches the Satellite's own route with its session and saves the file (download) or hands it to the system share sheet (share), named `name`; a client that can't (an older Android, a browser that can't share files) hides the control. Not in a selection or a tile's quick actions."
     }
   },
   "common_block_keys": ["type", "id", "visible", "required", "developer"],
@@ -69,8 +69,8 @@
   "methods": ["GET", "POST"],
   "icons": [
     "activity", "box", "camera", "check", "chevron-left", "chevron-right", "circle", "clock", "cpu",
-    "edit-2", "file", "file-text", "folder", "grid", "hard-drive", "heart", "home", "image", "info",
-    "layers", "list", "lock", "map-pin", "music", "play", "plus", "rotate-ccw", "search", "settings",
+    "download", "edit-2", "file", "file-text", "folder", "grid", "hard-drive", "heart", "home", "image", "info",
+    "layers", "list", "lock", "map-pin", "music", "play", "plus", "rotate-ccw", "search", "settings", "share-2",
     "sliders", "star", "trash-2", "x", "zap"
   ],
   "satellite_capabilities": {
@@ -149,7 +149,7 @@
     "table_columns": 10,
     "choice_options": 8,
     "viewer_fields": 12,
-    "viewer_actions": 6,
+    "viewer_actions": 8,
     "selection_actions": 4,
     "tile_actions": 4,
     "quick_actions": 2

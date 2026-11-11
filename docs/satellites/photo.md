@@ -280,6 +280,7 @@ What it covers:
 | Viewer: full image, video playback, previous and next, details | yes | yes (no OpenStreetMap link) |
 | Viewer: pinch to zoom an image (Android) | yes, two fingers to pan | yes, one finger to pan while zoomed, double tap to zoom |
 | Favourite and unfavourite; move to the recycle bin | yes | yes, from the viewer and from a selection; favourite also from the heart on each tile (Library, Search, an album) |
+| Download and share a photo or video | Android: Share sent a bare link | yes, from every viewer: the file itself, saved (the web; Android 10 and later, to Downloads) or shared (Android; the web where the browser can share files) |
 | Albums: physical, Favorites, custom, with covers; open an album | yes | yes, with Favorites pinned at the top of Folders |
 | Create, rename, delete a custom album; remove a photo from it | yes | yes |
 | Add a photo to a custom album | yes, from a photo | yes, from the album: "Add photos" opens the client's media picker |

@@ -7,6 +7,12 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Download and share a photo or video** from every viewer of Photos' shared interface, on
+  both clients: the file itself, fetched with your session. The web saves it, and shares it
+  where the browser can share files; the app saves it to Downloads (Android 10 and later) or
+  opens the share sheet with the file. Photo's own Android viewer now shares the file too,
+  instead of a link nobody else could open. Through **UI contract 1.2's `download` and `share`
+  actions** (one file at a time) and a viewer limit of 8 actions instead of 6.
 - **A heart on each photo in Photos' shared interface** (Library, Search, an album), on both
   clients: tap it to add a favourite, and the filled heart shows and removes one, as Photo's
   own screens did. Through **UI contract 1.2's tile quick actions** (`quick`): up to 2 entries

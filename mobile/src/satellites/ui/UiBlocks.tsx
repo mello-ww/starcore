@@ -555,6 +555,9 @@ function ButtonBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
   if (block.action?.own !== undefined && !context.hasOwnScreens) {
     return null; // opens native screens this app doesn't have for the Satellite
   }
+  if ((block.action?.download !== undefined || block.action?.share !== undefined) && !context.canRun?.(block.action)) {
+    return null; // a file this phone can't save or share here
+  }
   const label = asText(resolve(block.label, scope));
   const danger = block.style === 'danger';
   const press = async () => {

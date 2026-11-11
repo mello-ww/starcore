@@ -43,6 +43,19 @@
       }}
     },
     {
+      "name": "file-actions",
+      "_why": "1.2: download and share - the client fetches the Satellite's own route with its session, then saves the file or hands it to the system share sheet, named from the item.",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {
+        "home": {"source": {"route": "items"}, "blocks": [
+          {"type": "media-grid", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"},
+           "viewer": {"image": "full/{$.id}",
+                      "actions": [{"label": "Download", "icon": "download", "action": {"download": "originals/{$.id}", "name": "$.name"}},
+                                  {"label": "Share", "icon": "share-2", "action": {"share": "originals/{$.id}", "name": "$.name"}}]}},
+          {"type": "button", "label": "Download the report", "action": {"download": "reports/latest", "name": "report.pdf"}}
+        ]}
+      }}
+    },
+    {
       "name": "media-grid",
       "_why": "1.2: a gallery of images and videos from the Satellite's own routes, grouped, with the shared viewer and selection; a preview document, so a client with the Satellite's own interface keeps it.",
       "document": {"contract": "starcore.ui/1.2", "preview": true, "entry": "home", "pages": {
@@ -344,6 +357,36 @@
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "media-grid", "items": [], "item": {"image": "t"}, "quick": [{"label": "Lock", "icon": "lock", "action": {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id"}}]}]}}},
       "error": "only for a media viewer"
+    },
+    {
+      "name": "download-in-a-selection",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "selection": {"actions": [{"label": "Save", "action": {"download": "originals/{$.id}"}}]}}]}}},
+      "error": "not in a selection"
+    },
+    {
+      "name": "share-in-quick-actions",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "quick": [{"label": "Share", "icon": "share-2", "action": {"share": "originals/{$.id}"}}]}]}}},
+      "error": "not in a selection"
+    },
+    {
+      "name": "download-outside-the-satellite",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Save", "action": {"download": "../other/file"}}]}}},
+      "error": "download"
+    },
+    {
+      "name": "share-unknown-key",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Share", "action": {"share": "file", "then": "refresh"}}]}}},
+      "error": "unknown key"
+    },
+    {
+      "name": "download-in-1.1",
+      "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Save", "action": {"download": "file"}}]}}},
+      "error": "needs starcore.ui/1.2"
     },
     {
       "name": "media-grid-unknown-kind",

@@ -27,7 +27,8 @@ export const ICONS = new Set([
     "folder", "grid", "hard-drive", "home", "image", "info", "layers", "list", "lock",
     "music", "plus", "settings", "sliders", "star", "zap",
     // 1.2
-    "chevron-left", "chevron-right", "edit-2", "heart", "map-pin", "play", "rotate-ccw", "search", "trash-2", "x",
+    "chevron-left", "chevron-right", "download", "edit-2", "heart", "map-pin", "play", "rotate-ccw", "search",
+    "share-2", "trash-2", "x",
 ]);
 // device features this client offers a document beyond its blocks: the shared audio host
 // (mission_control/media/), which the play action plays through

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the FileProvider may hand to another app: only the file being shared, in the app's
+     private cache (StarCoreFilesModule's share), never the rest of its storage -->
+<paths>
+    <cache-path name="shared" path="shared/" />
+</paths>
