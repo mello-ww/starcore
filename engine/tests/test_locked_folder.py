@@ -331,6 +331,8 @@ class LockedFolderApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         entry = next(item for item in payload["entries"] if item["name"] == self.vault.name)
         self.assertTrue(entry["locked"])
+        # only the vault: everything beside it is an ordinary entry
+        self.assertTrue(all(not item["locked"] for item in payload["entries"] if item["name"] != self.vault.name))
 
     def test_file_explorer_serves_the_vault_once_unlocked(self):
         self.configure_vault()

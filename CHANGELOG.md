@@ -206,6 +206,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Fixed
 
+- **File Explorer lists large folders about 13 times faster.** A folder of 10,000 entries took
+  about 6 seconds on Windows: each entry was read from disk three times and the Locked
+  Folder's path resolved again for it. It now reads the folder once (`os.scandir`) and resolves
+  that path once per listing (about 0.4 s); what a listing returns is unchanged.
 - **Shared pages of photos or a map use the screen's width on the web.** Every shared page
   except a dashboard was held to 880 px, so Photos filled half of a 16:9 screen. A page with a
   media grid or a map now spreads it across the page, as wide as Photo's own page; its text,

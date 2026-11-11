@@ -10,6 +10,7 @@ specific response instead of a crash or a bare 500.
 
 from datetime import datetime, timezone
 from pathlib import Path
+import os
 from stat import S_ISDIR, S_ISREG
 import shutil
 
@@ -83,33 +84,43 @@ def entries(request):
     if not S_ISDIR(status.st_mode):
         return error_response("that path is a file, not a directory", status=400)
 
+    # os.scandir rather than Path.iterdir: each entry comes with its type (and,
+    # on Windows, its stat) from the directory read itself, so a folder of
+    # thousands of entries lists in a fraction of a second rather than
+    # seconds. Like Path.is_dir()/stat(), a DirEntry follows symlinks.
     try:
-        listing = sorted(target.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower()))
+        with os.scandir(target) as found:
+            listing = list(found)
     except PermissionError:
         return error_response(f"permission denied: {target}", status=403)
     except OSError as error:
         return error_response(f"the directory could not be read ({error})", status=500)
 
-    items = []
-    for item in listing:
+    rows = []
+    for entry in listing:
         try:
-            info = item.stat()
+            info = entry.stat()
+            is_dir = entry.is_dir()
         except OSError:
             continue  # a broken symlink, a permission-denied entry, or one
                        # removed mid-listing - just skip it, don't fail the
                        # whole directory over one unreadable entry
-        items.append({
-            "name": item.name,
-            "type": "dir" if item.is_dir() else "file",
-            "size": None if item.is_dir() else info.st_size,
-            "modified": datetime.fromtimestamp(info.st_mtime, tz=timezone.utc).isoformat(timespec="seconds"),
-            # flags the Locked Folder itself (or, in principle, anything
-            # nested under it, though a listing never descends into a
-            # locked directory in the first place - see guard() above) so
-            # the frontend can show a lock icon; this is a visibility hint
-            # only, never itself what keeps the contents inaccessible
-            "locked": locked_folder_guard.is_protected(request, item),
-        })
+        rows.append((is_dir, entry.name, info))
+    rows.sort(key=lambda row: (not row[0], row[1].lower()))
+
+    # flags the Locked Folder itself (or, in principle, anything nested under
+    # it, though a listing never descends into a locked directory in the first
+    # place - see guard() above) so the frontend can show a lock icon; this is
+    # a visibility hint only, never itself what keeps the contents
+    # inaccessible. The vault's root is resolved once for the whole listing.
+    protects = locked_folder_guard.protection(request)
+    items = [{
+        "name": name,
+        "type": "dir" if is_dir else "file",
+        "size": None if is_dir else info.st_size,
+        "modified": datetime.fromtimestamp(info.st_mtime, tz=timezone.utc).isoformat(timespec="seconds"),
+        "locked": protects(target / name),
+    } for is_dir, name, info in rows]
 
     return json_response({
         "path": str(target),

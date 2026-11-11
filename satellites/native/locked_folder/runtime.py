@@ -180,13 +180,22 @@ class LockedFolderRuntime:
     def protects(self, path: Path) -> bool:
         """True if `path` is the Locked Folder root itself, or lives inside
         it. False (nothing to guard) when no root is configured at all."""
+        return self.protector()(path)
+
+    def protector(self):
+        """protects() for many paths in a row - a directory listing's entries:
+        the configured root is resolved once (resolving touches the disk)."""
         root = self.configured_root
-        if root is None:
-            return False
-        try:
-            return path == root or path.is_relative_to(root)
-        except ValueError:
-            return False
+
+        def protects(path: Path) -> bool:
+            if root is None:
+                return False
+            try:
+                return path == root or path.is_relative_to(root)
+            except ValueError:
+                return False
+
+        return protects
 
     def ensure_root_exists(self):
         root = self.configured_root

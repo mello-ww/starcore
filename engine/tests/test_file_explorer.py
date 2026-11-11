@@ -224,6 +224,17 @@ class FileExplorerApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["entries"][0]["name"], "a_dir")
 
+    def test_the_listing_puts_directories_first_then_sorts_by_name_ignoring_case(self):
+        for name in ("b.txt", "A.txt", "c.txt"):
+            (self.directory / name).write_text("x", encoding="utf-8")
+        for name in ("zeta", "Beta", "alpha"):
+            (self.directory / name).mkdir()
+
+        status, payload = self.json_request(self.with_path("entries", self.directory))
+        self.assertEqual(status, 200)
+        self.assertEqual([entry["name"] for entry in payload["entries"]],
+                         ["alpha", "Beta", "zeta", "A.txt", "b.txt", "c.txt"])
+
     def test_nested_directories_can_be_browsed_and_report_their_real_parent(self):
         nested = self.directory / "a" / "b"
         nested.mkdir(parents=True)

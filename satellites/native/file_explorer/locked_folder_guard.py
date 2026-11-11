@@ -39,6 +39,13 @@ def _runtime(engine):
     return live
 
 
+def protection(request):
+    """is_protected() for the entries of one listing: the Locked Folder root
+    is looked up and resolved once, not once per entry."""
+    live = _runtime(request.engine)
+    return live.protector() if live else (lambda path: False)
+
+
 def is_protected(request, target: Path) -> bool:
     """Whether `target` is inside the configured Locked Folder root at all,
     regardless of this session's own unlock state - used to flag an entry
