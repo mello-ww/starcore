@@ -192,7 +192,8 @@ POST /api/satellites/photo/albums/<id>/delete    delete a custom album (rejected
 POST /api/satellites/photo/albums/<id>/photos           add a photo   {"photo_id": ...}, or picked media {"items": [references]}
 POST /api/satellites/photo/albums/<id>/photos/remove    remove a photo {"photo_id": ...}
 GET  /api/satellites/photo/gallery            the library shaped for ui.json's shared gallery (read-only)
-GET  /api/satellites/photo/gallery/albums     every album as a tile with its cover
+GET  /api/satellites/photo/gallery/albums     every album as a tile with its cover: Favorites pinned first, then the
+                                              phone's folders (together under "Folders"), then custom albums ("Albums")
 GET  /api/satellites/photo/gallery/albums/<id>   one album's photos in the album's own order, for the shared gallery
 GET  /api/satellites/photo/gallery/trash      the recycle bin, with the days each item has left ("left")
 GET  /api/satellites/photo/gallery/import     the default import folder and the formats an import takes in
@@ -277,7 +278,7 @@ What it covers:
 | Viewer: full image, video playback, previous and next, details | yes | yes (no OpenStreetMap link) |
 | Viewer: pinch to zoom an image (Android) | yes, two fingers to pan | yes, one finger to pan while zoomed, double tap to zoom |
 | Favourite and unfavourite; move to the recycle bin | yes | yes, from the viewer and from a selection |
-| Albums: physical, Favorites, custom, with covers; open an album | yes | yes |
+| Albums: physical, Favorites, custom, with covers; open an album | yes | yes, with Favorites pinned at the top of Folders |
 | Create, rename, delete a custom album; remove a photo from it | yes | yes |
 | Add a photo to a custom album | yes, from a photo | yes, from the album: "Add photos" opens the client's media picker |
 | Recycle bin: restore, delete for good, retention | yes | yes, from the viewer and from a selection |

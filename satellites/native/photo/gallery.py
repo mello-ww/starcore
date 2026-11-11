@@ -40,7 +40,8 @@ from .library import library
 
 MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
           "October", "November", "December")
-GROUPS = {"physical": "Folders", "favorites": "Favorites", "virtual": "Albums"}
+# Favorites sits with the folders, pinned first (albums_view)
+GROUPS = {"physical": "Folders", "favorites": "Folders", "virtual": "Albums"}
 
 
 def _moment(value):
@@ -213,8 +214,9 @@ def library_view(satellite, limit=None, cursor=None) -> dict:
 
 
 def albums_view(satellite) -> dict:
-    """Every album as a tile: physical ones first (a phone's own folders), then Favorites and
-    custom albums, the same order the albums route gives."""
+    """Every album as a tile: Favorites pinned first, then the phone's own folders - together
+    under "Folders" - then the custom albums. A client groups consecutive tiles, so Favorites
+    always heads the Folders group."""
     photo_library = library(satellite)
     store = albums(satellite)
     listed = albums_module.physical_albums(satellite, photo_library)
@@ -222,6 +224,7 @@ def albums_view(satellite) -> dict:
         present = [photo for photo in (photo_library.get(photo_id) for photo_id in album["photo_ids"]) if photo]
         listed.append({"id": album["id"], "name": album["name"], "kind": album.get("kind", "virtual"),
                        "photo_count": len(present), "cover_photo_id": present[0]["id"] if present else None})
+    listed.sort(key=lambda album: {"favorites": 0, "physical": 1}.get(album.get("kind"), 2))  # stable: keeps each kind's order
     return {"albums": [{
         "id": album["id"],
         "title": album["name"],

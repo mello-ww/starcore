@@ -241,6 +241,16 @@ class PhotoGalleryApiTest(unittest.TestCase):
         favorites = self.json_request("/api/satellites/photo/gallery/albums/favorites")[1]
         self.assertFalse(favorites["editable"])
 
+    def test_favorites_is_pinned_first_among_the_folders(self):
+        mapping = [{"phone_path": "/DCIM/Camera", "server_path": "camera", "name": "Camera"}]
+        status, _ = self.json_request("/api/satellites/photo/configuration", "POST", {"key": "source_paths", "value": mapping})
+        self.assertEqual(status, 200)
+        self.json_request("/api/satellites/photo/albums", "POST", {"name": "Holidays"})
+
+        tiles = [(tile["title"], tile["group"]) for tile in self.json_request("/api/satellites/photo/gallery/albums")[1]["albums"]]
+        # the client groups consecutive tiles, so Favorites heads the Folders group, before the phone's folders
+        self.assertEqual(tiles, [("Favorites", "Folders"), ("Camera", "Folders"), ("Holidays", "Albums")])
+
     def test_an_album_keeps_the_order_photos_were_added_in(self):
         photos = self.import_photos("a.png", "b.png", "c.png", "d.png")
         album = self.json_request("/api/satellites/photo/albums", "POST", {"name": "Ordered"})[1]

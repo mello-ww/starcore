@@ -115,6 +115,8 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Changed
 
+- **Favorites is pinned at the top of Folders** in Photos' shared Albums page, on both clients,
+  instead of sitting in a group of its own. Only Photo's server changed (`gallery/albums`).
 - **UI contract 1.2: offline pages.** A page with `"offline": true` is kept by the Android app
   to show while StarCore can't be reached: its data and the first pages its media-grid loaded,
   per server, session, Satellite and collection, with the usual offline notice, and live again
