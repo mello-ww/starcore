@@ -53,7 +53,7 @@ Legend:
 | 30 | Offline cache (Android) | n/a | ✅ cached list, "Showing cached photos - offline" | n/a | ✗ (only the document is cached; the notice says "Offline" for any failure) | **Lost.** | C: opt-in per-server page-data cache, forgotten on a Locked Folder move (as `forgetCachedPhoto`) | P0 (Android) | M |
 | 31 | Deep link `#/satellite/Photo/LockedFolder` (web) | ✅ | n/a | ✗ | n/a | Breaks if the shared interface becomes the default. | Client wiring with #25 | P0 | S |
 | 32 | Large libraries | ◐ every tile in the DOM | ✗ 50k never loaded | ✅ paged | ✅ virtualized | Shared is far ahead. Picker add of N items saves the album file N times. | S (optional): one album save | P2 | S |
-| 33 | Viewer shows the whole photo | ✅ | ✅ | ✗ **bug** | ✅ | A portrait photo on a landscape screen is cropped: the frame is a grid with no sized row, so the image keeps its own height and overflows (a 1080×1920 image is drawn 1538 px tall in a 608 px frame). | C (renderer CSS): give the image the frame's size (`grid-template: 100% / 100%`, or an absolutely placed image) | P0 | S |
+| 33 | Viewer shows the whole photo | ✅ | ✅ | ✅ fixed in M7 | ✅ | A portrait photo on a landscape screen is cropped: the frame is a grid with no sized row, so the image keeps its own height and overflows (a 1080×1920 image is drawn 1538 px tall in a 608 px frame). | C (renderer CSS): give the image the frame's size (`grid-template: 100% / 100%`, or an absolutely placed image) | P0 | S |
 | 34 | Page uses the screen's width | ✅ | n/a | ✗ **bug** | n/a | Every shared page except a `dashboard` is capped at 880 px, so Photos fills half of a 16:9 screen. | C: an additive width hint, or full width for a page holding a media grid or map; 1.0/1.1 documents unchanged | P0 | S |
 | 35 | Favorites pinned at the top of Folders | ◐ | ◐ | ✗ own "Favorites" group | ✗ | Favorites should sit in Folders, always first, not in a group of its own. | S: `gallery.py` lists Favorites first under the Folders group (clients group consecutive items as sent) | P1 | S |
 | 36 | Locked Folder as a folder tile with a lock | ◐ own tab | ◐ own tab | ✗ button below Albums | ✗ | It should be a tile among the folders, with the shared `lock` icon as its thumbnail. | C: a media-grid tile `icon` drawn when there is no `image`, and a per-item action (`own` for this tile, `navigate` for the others); then J+S | P1 | M |
@@ -77,7 +77,7 @@ Issues in the new shared interface:
 ## Roadmap: shortest safe path to making the shared interface the default
 
 **Status (2026-11-11):** M1 to M6 are done; Photos opens in its shared interface by default on
-both clients. M7 to M14 are next, starting with the two bugs (M7, M8); #33 to #38 came from
+both clients, and M7 is done. M8 to M14 are next, starting with the page-width bug (M8); #33 to #38 came from
 the owner's review of the shared interface on 2026-11-11.
 
 **The goal these milestones serve:** at a stable release, a new Satellite needs no change to
@@ -107,7 +107,7 @@ Each milestone is small and testable on its own. The order runs from cheapest to
 - **M6. Switch the default** (client + docs, S). Shared by default, dedicated in Developer Mode (the reverse of today). Keep the dedicated screens until validated.
 
 **Bugs found after the switch (next)**
-- **M7. The viewer shows the whole photo on the web** (C renderer, S): #33. Test: a renderer test with a portrait image in a landscape viewport, and a check in a browser.
+- **M7. The viewer shows the whole photo on the web** (C renderer, S): #33. Done: checked in a browser on the local demo with portrait and landscape photos at 1920×1080 and 390 px wide (layout has no Node test).
 - **M8. Shared pages use the screen's width on the web** (C, S): #34. Additive, so 1.0 and 1.1 documents keep their layout. Test: contract fixtures, renderer tests, and a check at 1440 and 1920 px.
 
 **Should follow soon**

@@ -1467,7 +1467,11 @@ body.ui-viewer-open {
     background: transparent;
 }
 
+/* the image takes the frame's size, not its own: in flow, a tall photo kept its natural height
+   and was cropped by the frame */
 .ui-viewer-frame img {
+    position: absolute;
+    inset: 0;
     object-fit: contain;
 }
 

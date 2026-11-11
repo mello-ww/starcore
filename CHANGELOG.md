@@ -193,6 +193,9 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Fixed
 
+- **The shared viewer on the web shows the whole photo.** A photo taller than the screen
+  (a phone's portrait shot on a 16:9 monitor, say) kept its own height and was cropped by the
+  viewer's frame; it is now fitted inside it, whatever its shape.
 - **A media-grid selection on the web no longer acts on items from a cancelled selection.**
   Cancelling kept the cancelled items in the selection's memory, so the next selection's action
   (Move to bin, say) also ran on them. A selection's action now acts only on what is selected.
