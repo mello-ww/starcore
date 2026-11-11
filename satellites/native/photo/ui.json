@@ -24,6 +24,12 @@
           "size": "medium",
           "empty": "No photos yet. Import a folder, or turn on phone sync in Photo's settings.",
           "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration", "group": "$.month"},
+          "quick": [
+            {"label": "Favorite", "icon": "heart", "visible": "$.can_favorite",
+             "action": {"route": "albums/favorites/photos", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+            {"label": "Unfavorite", "icon": "heart", "style": "primary", "visible": "$.favorite",
+             "action": {"route": "albums/favorites/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}}
+          ],
           "viewer": {
             "image": "originals/{$.id}",
             "video": "originals/{$.id}",
@@ -87,6 +93,12 @@
           "more": {"route": "gallery/search?q={$state.q}&kind={$state.kind}&limit=120&cursor={$value}", "cursor": "$.next"},
           "size": "medium",
           "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration"},
+          "quick": [
+            {"label": "Favorite", "icon": "heart", "visible": "$.can_favorite",
+             "action": {"route": "albums/favorites/photos", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+            {"label": "Unfavorite", "icon": "heart", "style": "primary", "visible": "$.favorite",
+             "action": {"route": "albums/favorites/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}}
+          ],
           "viewer": {
             "image": "originals/{$.id}",
             "video": "originals/{$.id}",
@@ -215,6 +227,12 @@
           "size": "medium",
           "empty": "This album is empty.",
           "item": {"image": "thumbnails/{$.id}", "key": "$.id", "kind": "$.kind", "duration": "$.duration"},
+          "quick": [
+            {"label": "Favorite", "icon": "heart", "visible": "$.can_favorite",
+             "action": {"route": "albums/favorites/photos", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+            {"label": "Unfavorite", "icon": "heart", "style": "primary", "visible": "$.favorite",
+             "action": {"route": "albums/favorites/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}}
+          ],
           "viewer": {
             "image": "originals/{$.id}",
             "video": "originals/{$.id}",

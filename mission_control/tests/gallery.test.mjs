@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { clock, GRID_PAGE, GRID_SIZES, gridSize, gridSizeKey, holdsCollection, itemKey, mediaKind, tileAction, tileIcon } from "../ui/gallery.js";
+import { clock, GRID_PAGE, GRID_SIZES, gridSize, gridSizeKey, holdsCollection, itemKey, mediaKind, quickAction, tileAction, tileIcon } from "../ui/gallery.js";
 
 test("a tile is a video only when its kind says so", () => {
     assert.equal(mediaKind("video"), "video");
@@ -74,4 +74,15 @@ test("an item's icon is a shared icon, or none", () => {
     assert.equal(tileIcon({ item: { icon: "folder" } }, { data: {} }), "folder");
     assert.equal(tileIcon({ item: { icon: "$.icon" } }, { data: { icon: "<svg>" } }), null);
     assert.equal(tileIcon({ item: {} }, { data: {} }), null);
+});
+
+test("a tile's quick action is the first visible entry that can run here", () => {
+    const add = { label: "Favorite", icon: "heart", visible: "$.can_favorite", action: { route: "fav" } };
+    const remove = { label: "Unfavorite", icon: "heart", style: "primary", visible: "$.favorite", action: { route: "unfav" } };
+    const block = { quick: [add, remove] };
+    assert.equal(quickAction(block, { data: { can_favorite: true } }, () => true), add);
+    assert.equal(quickAction(block, { data: { favorite: true } }, () => true), remove);
+    assert.equal(quickAction(block, { data: {} }, () => true), null);
+    assert.equal(quickAction(block, { data: { favorite: true } }, () => false), null);
+    assert.equal(quickAction({}, { data: {} }, () => true), null);
 });

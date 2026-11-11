@@ -76,6 +76,18 @@ export function tileAction(block, scope, canRun) {
     return null;
 }
 
+/** A tile's quick action (`quick`): the first entry whose `visible` holds and that `canRun`
+ * here - a small button in the tile's corner - or null. */
+export function quickAction(block, scope, canRun) {
+    for (const entry of Array.isArray(block.quick) ? block.quick : []) {
+        const shown = entry.visible === undefined || isVisible(resolve(entry.visible, scope));
+        if (shown && entry.action && canRun(entry.action)) {
+            return entry;
+        }
+    }
+    return null;
+}
+
 /** The shared icon an item without an image shows (`item.icon`), or null. */
 export function tileIcon(block, scope) {
     const name = block.item && block.item.icon !== undefined ? resolve(block.item.icon, scope) : null;
@@ -450,6 +462,29 @@ export function createGallery(host) {
                 toggleSelected(block, grid, key);
             });
             thumb.appendChild(check);
+        }
+        const quick = picking ? null : quickAction(block, itemScope, (entry) => !host.canRun || host.canRun(entry));
+        if (quick) {
+            // inside the tile's own button, so a focusable span rather than a nested button
+            const button = el("span", `ui-media-quick${quick.style === "primary" ? " is-active" : ""}`);
+            const name = String(resolve(quick.label, itemScope) ?? "");
+            button.setAttribute("role", "button");
+            button.setAttribute("tabindex", "0");
+            button.setAttribute("aria-label", name);
+            button.title = name;
+            button.appendChild(glyph(quick.icon, 14));
+            const run = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                host.runAction(quick.action, itemScope);
+            };
+            button.addEventListener("click", run);
+            button.addEventListener("keydown", (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    run(event);
+                }
+            });
+            thumb.appendChild(button);
         }
         tile.appendChild(thumb);
         if (label || (subtitle !== null && subtitle !== undefined && subtitle !== "")) {

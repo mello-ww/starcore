@@ -29,6 +29,20 @@
       }}
     },
     {
+      "name": "media-grid-quick",
+      "_why": "1.2: a quick action on each tile - the first entry whose `visible` holds is a small button in the tile's corner (a heart that adds, or the active heart that removes), beside the viewer.",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {
+        "home": {"source": {"route": "items"}, "blocks": [
+          {"type": "media-grid", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"},
+           "viewer": {"image": "full/{$.id}"},
+           "quick": [{"label": "Favorite", "icon": "heart", "visible": "$.can_favorite",
+                      "action": {"route": "favorites", "body": {"id": "$.id"}, "then": "refresh"}},
+                     {"label": "Unfavorite", "icon": "heart", "style": "primary", "visible": "$.favorite",
+                      "action": {"route": "favorites/remove", "body": {"id": "$.id"}, "then": "refresh"}}]}
+        ]}
+      }}
+    },
+    {
       "name": "media-grid",
       "_why": "1.2: a gallery of images and videos from the Satellite's own routes, grouped, with the shared viewer and selection; a preview document, so a client with the Satellite's own interface keeps it.",
       "document": {"contract": "starcore.ui/1.2", "preview": true, "entry": "home", "pages": {
@@ -306,6 +320,30 @@
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "media-grid", "items": [], "item": {"image": "t", "icon": "padlock"}}]}}},
       "error": "item.icon"
+    },
+    {
+      "name": "media-grid-quick-empty",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "quick": []}]}}},
+      "error": "must be a list of {label, action}"
+    },
+    {
+      "name": "media-grid-quick-too-many",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "quick": [{"label": "Favorite", "icon": "heart", "action": {"route": "fav"}}, {"label": "Favorite", "icon": "heart", "action": {"route": "fav"}}, {"label": "Favorite", "icon": "heart", "action": {"route": "fav"}}]}]}}},
+      "error": "at most 2"
+    },
+    {
+      "name": "media-grid-quick-without-icon",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "quick": [{"label": "Favorite", "action": {"route": "fav"}}]}]}}},
+      "error": "needs an 'icon'"
+    },
+    {
+      "name": "media-grid-quick-secure",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "quick": [{"label": "Lock", "icon": "lock", "action": {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id"}}]}]}}},
+      "error": "only for a media viewer"
     },
     {
       "name": "media-grid-unknown-kind",

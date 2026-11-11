@@ -132,6 +132,16 @@ class PhotoUiDocumentTest(unittest.TestCase):
         self.assertEqual(found, {"library": (1, 1), "search": (1, 0), "map": (1, 0), "albums": (0, 0),
                                  "album": (1, 1), "trash": (0, 0)})
 
+    def test_photo_grids_carry_the_favorite_heart_on_their_tiles(self):
+        hearts = {}
+        for name, page in self.document["pages"].items():
+            for block in page["blocks"]:
+                if block["type"] == "media-grid" and "quick" in block:
+                    hearts[name] = [(entry["label"], entry["visible"], entry["action"]["route"]) for entry in block["quick"]]
+        toggle = [("Favorite", "$.can_favorite", "albums/favorites/photos"),
+                  ("Unfavorite", "$.favorite", "albums/favorites/photos/remove")]
+        self.assertEqual(hearts, {"library": toggle, "search": toggle, "album": toggle})
+
     def test_settings_sync_and_the_locked_folder_open_photos_own_screens(self):
         blocks = self.document["pages"]["albums"]["blocks"]
         opened = {block["label"]: block["action"]["own"] for block in blocks

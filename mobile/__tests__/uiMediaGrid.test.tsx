@@ -2,7 +2,7 @@ import React from 'react';
 import {Image, Modal, Pressable, Text} from 'react-native';
 import renderer, {act} from 'react-test-renderer';
 import {UiBlocks, type BlockContext} from '../src/satellites/ui/UiBlocks';
-import {clock, gridColumns, GRID_PAGE, tileAction, tileIcon} from '../src/satellites/ui/MediaGrid';
+import {clock, gridColumns, GRID_PAGE, quickAction, tileAction, tileIcon} from '../src/satellites/ui/MediaGrid';
 import type {UiBlock} from '../src/satellites/ui/contract';
 
 // the media-grid block and its viewer (UI contract 1.2), with a context like the screen's:
@@ -150,6 +150,24 @@ describe('the media-grid block', () => {
     expect(tiles(bare)).toHaveLength(0);
   });
 
+  it('puts the first visible quick action in each tile’s corner, apart from opening the tile', () => {
+    const add = {label: 'Favorite', icon: 'heart', visible: '$.can_favorite', action: {route: 'fav', body: {id: '$.id'}}};
+    const remove = {label: 'Unfavorite', icon: 'heart', style: 'primary', visible: '$.favorite', action: {route: 'unfav', body: {id: '$.id'}}};
+    const block: UiBlock = {...grid, quick: [add, remove]} as any;
+    const ctx = context();
+    const data = {items: [{id: 'a', can_favorite: true}, {id: 'b', favorite: true}, {id: 'c'}]};
+    const tree = render([block], data, ctx);
+    const quick = tree.root.findAll((node: any) => node.type === Pressable && String(node.props.testID ?? '').startsWith('media-quick-'));
+    expect(quick.map((node: any) => [node.props.testID, node.props.accessibilityLabel])).toEqual([
+      ['media-quick-a', 'Favorite'],
+      ['media-quick-b', 'Unfavorite'],
+    ]);
+    act(() => quick[1].props.onPress());
+    expect(ctx.runAction).toHaveBeenCalledWith(remove.action, expect.objectContaining({data: data.items[1]}));
+    // the viewer didn't open
+    expect((ctx.setOverlay as jest.Mock).mock.calls.filter(([overlay]) => overlay)).toEqual([]);
+  });
+
   it('shows the placeholder, and loads nothing, for a route outside the Satellite', () => {
     const block: UiBlock = {type: 'media-grid', items: [{id: 'x'}], item: {image: '../other/{$.id}'}};
     const tree = render([block], {}, context());
@@ -174,6 +192,17 @@ describe('media-grid helpers', () => {
     expect(tileIcon({item: {icon: 'folder'}} as any, {data: {}} as any)).toBe('folder');
     expect(tileIcon({item: {icon: '$.icon'}} as any, {data: {icon: '<svg>'}} as any)).toBeNull();
     expect(tileIcon({item: {}} as any, {data: {}} as any)).toBeNull();
+  });
+
+  it('chooses a tile’s quick action as Mission Control does', () => {
+    const add = {label: 'Favorite', icon: 'heart', visible: '$.can_favorite', action: {route: 'fav'}};
+    const remove = {label: 'Unfavorite', icon: 'heart', style: 'primary', visible: '$.favorite', action: {route: 'unfav'}};
+    const block = {quick: [add, remove]} as any;
+    expect(quickAction(block, {data: {can_favorite: true}} as any, () => true)).toBe(add);
+    expect(quickAction(block, {data: {favorite: true}} as any, () => true)).toBe(remove);
+    expect(quickAction(block, {data: {}} as any, () => true)).toBeNull();
+    expect(quickAction(block, {data: {favorite: true}} as any, () => false)).toBeNull();
+    expect(quickAction({} as any, {data: {}} as any, () => true)).toBeNull();
   });
 
   it('fits columns to the width and formats durations', () => {

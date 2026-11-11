@@ -1334,6 +1334,52 @@ div.ui-media-tile {
     opacity: 1;
 }
 
+/* a tile's quick action (a heart): shown on hover or focus, always while active, and always on
+   a touch screen; out of the way while selecting */
+.ui-media-quick {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(12, 13, 15, 0.6);
+    color: #fff;
+    opacity: 0;
+    cursor: pointer;
+    transition: opacity 120ms ease;
+}
+
+.ui-media-tile:hover .ui-media-quick,
+.ui-media-tile:focus-within .ui-media-quick,
+.ui-media-quick.is-active {
+    opacity: 1;
+}
+
+.ui-media-quick:focus-visible {
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 2px;
+}
+
+.ui-media-quick.is-active {
+    background: var(--sc-accent);
+    color: var(--sc-on-accent);
+}
+
+.ui-media-quick.is-active svg {
+    fill: currentColor;
+}
+
+@media (hover: none) {
+    .ui-media-quick { opacity: 1; }
+}
+
+.ui-media-grid.is-selecting .ui-media-quick {
+    display: none;
+}
+
 .ui-media-tile.is-selected .ui-media-check {
     border-color: var(--sc-accent);
     background: var(--sc-accent);
@@ -1636,7 +1682,8 @@ body.ui-viewer-open {
 @media (prefers-reduced-motion: reduce) {
     .ui-viewer { animation: none; }
     .ui-media-tile-frame img,
-    .ui-media-check { transition: none; }
+    .ui-media-check,
+    .ui-media-quick { transition: none; }
     .ui-media-tile:hover .ui-media-tile-frame img,
     .ui-media-tile.is-selected .ui-media-tile-frame img { transform: none; }
 }

@@ -41,7 +41,7 @@ Legend:
 | 18 | Viewer: pinch / zoom image | ✗ | ✅ ZoomableImage | ✗ | ✗ | Android users lose zoom. | C (renderer: reuse ZoomableImage) | P0 | M |
 | 19 | Video playback | ✅ | ✅ | ✅ | ✅ | – | – | – | – |
 | 20 | Details panel | ✅ full EXIF + mini-map + map link | ◐ 4 fields | ✅ 12 fields | ✅ 12 fields | Shared lacks aperture, shutter, ISO, focal length and orientation (the viewer field limit is 12), the location mini-map and the link. | S: one composed "Exposure" field. C (optional): field `href` | P2 | S |
-| 21 | Favorite from a tile, favorite badge | ✅ | ✅ | ✗ viewer or bulk only | ✗ | No heart on tiles, and favorites can't be seen in the grid. | C: a tile badge or quick action (`item.badge`, or one tile action) | P1 | M |
+| 21 | Favorite from a tile, favorite badge | ✅ | ✅ | ✅ fixed in M11 | ✅ fixed in M11 | No heart on tiles, and favorites can't be seen in the grid. | C: a tile badge or quick action (`item.badge`, or one tile action) | P1 | M |
 | 22 | Delete from a tile | ✅ trash badge | via selection | via selection or viewer | via selection or viewer | Acceptable difference. | – | – | – |
 | 23 | Selection, bulk actions | ✗ | ◐ long-press → delete only | ✅ Favorite, bin, restore, erase | ✅ | Shared is ahead. Missing: select all, bulk unfavorite, add selection to album. Each item is a sequential request. | C (select all); S (optional bulk routes) | P2 | M |
 | 24 | Move to Locked Folder (viewer) | ✅ PIN prompt | ✅ PIN / biometric modal | ✗ | ✗ | **Lost.** An action can't ask for an unlock first. | C: an "unlock first" step for an action, provided by a capability (a vault capability from the Locked Folder, the client's own PIN and biometric UI), similar to `pick` | P0 | L |
@@ -77,7 +77,7 @@ Issues in the new shared interface:
 ## Roadmap: shortest safe path to making the shared interface the default
 
 **Status (2026-11-11):** M1 to M6 are done; Photos opens in its shared interface by default on
-both clients, and M7 to M10 are done. M11 to M14 are next; #33 to #38 came from
+both clients, and M7 to M11 are done. M12 to M14 are next; #33 to #38 came from
 the owner's review of the shared interface on 2026-11-11.
 
 **The goal these milestones serve:** at a stable release, a new Satellite needs no change to
@@ -113,7 +113,7 @@ Each milestone is small and testable on its own. The order runs from cheapest to
 **Should follow soon**
 - **M9. Favorites pinned at the top of Folders** (S, S): #35. Done: `gallery/albums` lists Favorites first under Folders; an engine test checks the order and groups, and the web was checked on the local demo.
 - **M10. The Locked Folder as a folder tile** (C + J+S, M): #36. Done: `item.icon` and `open` in the contract (Engine validation, fixtures, both renderers), and the tile in Albums, right after Favorites, opening the Locked Folder. Tested with contract fixtures, renderer tests on both clients, engine tests, and on the local demo (web and emulator).
-- M11. Favorite heart on tiles (#21).
+- **M11. Favorite heart on tiles** (C + J, M): #21. Done: `quick` tile actions in the contract (Engine validation, fixtures, both renderers) and the heart toggle on Photos' Library, Search and album grids. Tested with fixtures, renderer tests on both clients, engine tests, and on the local demo (web and emulator).
 - M12. Download / share action, which fixes Android Share (#27).
 - M13. Web viewer touch swipe (#17).
 - M14. Camera grouping and the "All" view (#2).

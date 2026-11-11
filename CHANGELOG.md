@@ -7,6 +7,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **A heart on each photo in Photos' shared interface** (Library, Search, an album), on both
+  clients: tap it to add a favourite, and the filled heart shows and removes one, as Photo's
+  own screens did. Through **UI contract 1.2's tile quick actions** (`quick`): up to 2 entries
+  shaped like the viewer's actions, the first visible one drawn in the tile's corner.
 - **The Locked Folder is a folder in Photos' Albums**, with a lock for its cover, right after
   Favorites, on both clients; it replaces the button below the albums and still opens the
   Locked Folder's own screens behind its PIN. Photo adds the tile only while a `media.vault`

@@ -287,6 +287,12 @@ collection: the document says where each picture comes from and what can be done
   zooms in or back out. The swipe between items waits from the moment a second finger touches
   the image (so a sideways pinch is never taken for a swipe) and while it is zoomed, and an item
   is back to its own size when it leaves the screen. Videos keep their player.
+- **`quick`**: up to 2 entries shaped like the viewer's actions, each with an `icon`; a tile
+  shows the first whose `visible` holds as a small round button in its corner, apart from
+  opening the tile. A `primary` one is drawn active (filled, in the accent), so a pair makes a
+  toggle - Photos' heart: "Favorite" while `$.can_favorite`, "Unfavorite" while `$.favorite`.
+  On the web it shows on hover or focus, always while active and always on a touch screen; on
+  Android always. It hides while selecting and in the media picker; no secure action here.
 - **`selection`**: up to 4 `actions`. "Select" (or a long press on Android, or Shift-click on
   the web) starts a selection; the bar shows the count and the actions. An action runs once
   per selected item with that item as `$.`; its `confirm` is asked once, its `then` applies

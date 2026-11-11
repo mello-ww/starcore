@@ -734,6 +734,10 @@ class _Validator:
             self.error(where, "a media-grid's tiles open the viewer or run an action, not both")
         if "open" in block:
             self.check_tile_actions(f"{where}.open", block)
+        if "quick" in block:
+            # a small button in each tile's corner: the first entry whose `visible` holds
+            self.check_media_actions(f"{where}.quick", block["quick"], LIMITS["quick_actions"],
+                                     required=True, secure=False, icon=True)
         item = block.get("item")
         if not isinstance(item, dict):
             self.error(f"{where}.item", "must be an object")
@@ -906,9 +910,11 @@ class _Validator:
         if "actions" in viewer:
             self.check_media_actions(f"{where}.actions", viewer["actions"], LIMITS["viewer_actions"])
 
-    def check_media_actions(self, where: str, actions, limit: int, required: bool = False):
-        """[{label, action, icon, style, visible}]: the viewer's actions on the item shown, or a
-        selection's on each selected item."""
+    def check_media_actions(self, where: str, actions, limit: int, required: bool = False,
+                            secure: bool = True, icon: bool = False):
+        """[{label, action, icon, style, visible}]: the viewer's actions on the item shown, a
+        selection's on each selected item, or a tile's quick actions (no secure action there,
+        and an icon each: the button has no room for its label)."""
         if not isinstance(actions, list) or (required and not actions):
             self.error(where, "must be a list of {label, action}")
             return
@@ -927,11 +933,13 @@ class _Validator:
             if "action" not in entry:
                 self.error(at, "needs an 'action'")
             else:
-                self.in_media_actions = True  # where a secure action may be
+                self.in_media_actions = secure  # where a secure action may be
                 try:
                     self.check_action(f"{at}.action", entry["action"])
                 finally:
                     self.in_media_actions = False
+            if icon and "icon" not in entry:
+                self.error(at, "needs an 'icon'")
             if "icon" in entry and entry["icon"] not in ICONS:
                 self.error(f"{at}.icon", f"unknown icon {entry['icon']!r}")
             if "style" in entry and entry["style"] not in BUTTON_STYLES:

@@ -46,6 +46,18 @@ export function tileAction(block: UiBlock, scope: Scope, canRunHere: (action: Ui
   return null;
 }
 
+/** A tile's quick action (`quick`): the first entry whose `visible` holds and that `canRun`
+ * here - a small button in the tile's corner - or null. */
+export function quickAction(block: UiBlock, scope: Scope, canRunHere: (action: UiAction) => boolean): any | null {
+  for (const entry of Array.isArray((block as any).quick) ? (block as any).quick : []) {
+    const shown = entry?.visible === undefined || isVisible(resolve(entry.visible, scope));
+    if (shown && entry.action && canRunHere(entry.action)) {
+      return entry;
+    }
+  }
+  return null;
+}
+
 /** The shared icon an item without an image shows (`item.icon`), or null. */
 export function tileIcon(block: UiBlock, scope: Scope): string | null {
   const icon = (block.item as any)?.icon;
@@ -608,6 +620,8 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
             onAccent={onColor}
             reduced={reduced}
             icon={tileIcon(block, entry.scope)}
+            quick={picking || selecting ? null : quickAction(block, entry.scope, action => canRun(context, action))}
+            onQuick={runAction}
             onPress={opens(entry) ? onPress : undefined}
             onLongPress={block.selection || picking ? toggle : undefined}
           />
@@ -827,13 +841,16 @@ export function VirtualMediaGrid({
 
 const Tile = memo(function Tile({
   entry, size, textHeight = 0, aspect, round, title, subtitle, subtitleFormat, duration, selectable, selecting, selected,
-  accent, onAccent, reduced, onPress, onLongPress, icon,
+  accent, onAccent, reduced, onPress, onLongPress, icon, quick, onQuick,
 }: {
   entry: Entry; size: number; aspect: number; round: boolean; title: string; subtitle: unknown; subtitleFormat?: string;
   duration: unknown; selectable: boolean; selecting: boolean; selected: boolean; accent: string; onAccent: string;
   reduced: boolean; onPress?: (entry: Entry) => void; onLongPress?: (key: string) => void;
   /** The shared icon drawn without an image (`item.icon`), in place of the image glyph. */
   icon?: string | null;
+  /** The tile's quick action (`quick`), drawn in its corner, and how to run it. */
+  quick?: any | null;
+  onQuick?: (action: UiAction, scope: Scope) => unknown;
   /** A fixed height for the text under the tile, so every row of a grid is as tall. */
   textHeight?: number;
 }) {
@@ -876,6 +893,17 @@ const Tile = memo(function Tile({
             <Icon name="play" size={10} color="#fff" />
             {present(duration) && <Text style={styles.badgeText}>{clock(duration)}</Text>}
           </View>
+        )}
+        {quick && onQuick && (
+          <Pressable
+            onPress={() => onQuick(quick.action, entry.scope)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={asText(resolve(quick.label, entry.scope))}
+            testID={`media-quick-${entry.key}`}
+            style={({pressed}) => [styles.quick, quick.style === 'primary' && {backgroundColor: accent}, pressed && styles.pressed]}>
+            <Icon name={quick.icon} size={15} color={quick.style === 'primary' ? onAccent : '#fff'} />
+          </Pressable>
         )}
         {selectable && selecting && (
           <View
@@ -1201,6 +1229,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(12,13,15,0.72)',
   },
   badgeText: {color: '#fff', fontSize: 10, fontWeight: '700'},
+  quick: {
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(12,13,15,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   check: {
     position: 'absolute',
     top: 5,
