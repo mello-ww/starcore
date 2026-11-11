@@ -194,7 +194,10 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [ ] Storage (satellites keep their own SQLite and JSON stores today)
 - [ ] Signal Bus
 - [x] UI contract 1.0: validated `ui.json`, revisions and ETags, the capability catalog, metadata-only rediscovery (`docs/ui-contract.md`)
-- [ ] UI contract next: templates, `chart`/`table`/`image` blocks, Home widgets, discovered sections, dates in formats
+- [x] UI contract 1.1: `chart`, `table`, `choice`, `status`, `code`, the `dashboard` template, page state and sources, Home widgets, dates in formats
+- [ ] UI contract 1.2 (not released yet): media blocks and the shared viewer, `search` and `map`, `play`, `pick`, `own`, `secure`, `download` and `share`, offline pages, `preview`
+- [ ] UI contract next: templates, discovered sections
+- [ ] Retire every Satellite-specific interface (`docs/legacy-ui-retirement.md`)
 
 ## Mission Control
 
@@ -225,7 +228,9 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [ ] Remove `mobile/src/satellites/builtins.tsx` once Music's declarative interface replaces its native screens
 - [ ] Move Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/ui-contract.md`, "Migration")
     - [x] Photos opens in its shared interface by default on both clients (M1-M6 of `docs/photos-parity-audit.md`)
+    - [x] Photos' shared interface after the owner's review: whole photo in the viewer, full width, Favorites and the Locked Folder among the folders, tile hearts, download and share, web swipe, Library grouping (M7-M14)
     - [ ] Retire Photo's own page and screens once the shared interface is validated
+    - [ ] Move File Explorer onto its `ui.json`, giving Android a file browser (`docs/file-explorer-migration.md`)
 - [ ] Light theme
 - [ ] Icons instead of text glyphs for the remaining Music controls
 - [ ] Audio playback validated on a real device

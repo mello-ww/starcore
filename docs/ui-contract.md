@@ -5,9 +5,10 @@ Satellite describes its interface as data, using reusable blocks; Mission Contro
 Android app each render that description with their own platform components. A new Satellite
 therefore needs no client update, unless it introduces a genuinely new native capability.
 
-This page is the specification of **UI contract 1.1** (`starcore.ui/1.1`). 1.1 only adds to
-1.0: every 1.0 document is a valid 1.1 document, and keeps working on clients that know only
-1.0. It covers what is implemented today and what is still the target. The closed vocabulary itself is
+This page is the specification of **UI contract 1.2** (`starcore.ui/1.2`), not released yet.
+Each minor only adds to the one before: every 1.0 document is a valid 1.1 and 1.2 document,
+and keeps working on clients that know only 1.0. What arrived in 1.1 and 1.2 is marked
+where it is described. It covers what is implemented today and what is still the target. The closed vocabulary itself is
 machine-readable in [`contracts/ui/vocabulary.json`](../contracts/ui/vocabulary.json).
 
 - [Three ways a Satellite gets an interface](#three-ways-a-satellite-gets-an-interface)
@@ -33,7 +34,7 @@ machine-readable in [`contracts/ui/vocabulary.json`](../contracts/ui/vocabulary.
 
 | Mechanism | File | Web | Android | Status |
 |---|---|---|---|---|
-| **UI document** | `ui.json` | shared renderer (`mission_control/ui/renderer.js`) | shared renderer (`SatelliteUiScreen`) | contract 1.1 - the default for new Satellites |
+| **UI document** | `ui.json` | shared renderer (`mission_control/ui/renderer.js`) | shared renderer (`SatelliteUiScreen`) | contract 1.2 - the default for new Satellites |
 | **Mission Control page** | `mission_control/page.js` | the Satellite's own ES module | - | kept: a trusted, first-party extension for the web |
 | **Mobile screen (v0)** | a `mobile` route | - | `DeclarativeScreen`, four item types | kept for compatibility; superseded by `ui.json` |
 
@@ -44,8 +45,9 @@ between the shared interface and the Satellite's own page, so a migration can be
 side by side before the old page is retired. Status is the first Satellite to make that
 move (1.1). Photo follows in 1.2: its document was a **preview** (see
 [The document](#the-document)) until it reached parity, and is now its default interface, with
-its own page and screens kept in Developer Mode until they are retired. Music and Photo keep their dedicated, hand-written screens on both clients until
-the shared blocks reach parity with them (see [Migration](#migration)). Those
+its own page and screens kept in Developer Mode until they are retired. Music keeps its
+dedicated, hand-written page and screens until the shared blocks reach parity with them, and
+File Explorer its `page.js` (see [Migration](#migration)). Those
 implementations are the behavioural reference for the capabilities still to come, not code
 to be thrown away.
 
@@ -845,8 +847,8 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 | | Now (contract 1.2) | Target |
 |---|---|---|
 | Blocks | the 21 above, including `chart`, `table`, `image`, `media-list`, `media-grid`, `search` and `map`; the `dashboard` template | more, minor by minor: `tabs`; templates `list-detail`, `settings`, `media-library` |
-| Satellite capabilities | `files.browse`, `audio.library`, `audio.session`, `media.gallery` (Photo) | `vault` (Locked Folder); more pickable capabilities (files) |
-| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action | `secure.screen`, `device.biometrics`, `device.background-tasks` - each a native module written once in the app, behind a shared block |
+| Satellite capabilities | `files.browse` (File Explorer), `audio.library` and `audio.session` (Music), `media.gallery` (Photo), `media.vault` (Locked Folder, `move_in` only through the `secure` action) | browsing the Locked Folder from the shared interface; more pickable capabilities (files) |
+| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action; saving and sharing files (`download`, `share`) | `device.background-tasks` (phone sync) - a native module written once in the app, behind a shared block |
 | Home | `widgets` in each document, drawn by both clients; Android keeps the Status card only for servers older than Status's `ui.json` | the fallback card removed once older servers are gone |
 | Sections | `section_of`, but Photo still names the Locked Folder | the host discovers its sections from the catalog |
 | Icons | `icon_name` from the shared set; an Android fallback list for older servers | the fallback list removed once older servers are gone |
@@ -856,9 +858,10 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 ## Migration
 
 Every step is additive, keeps the Alpha working, and replaces a hand-written screen only
-once the shared one reaches parity. Music keeps its dedicated screens until then; Photos and
-Status open their shared interfaces and keep their previous screens in Developer Mode until
-they are retired.
+once the shared one reaches parity. Music keeps its dedicated screens until then, and File
+Explorer its `page.js` ([its plan](file-explorer-migration.md)); Photos and Status open their
+shared interfaces and keep their previous screens in Developer Mode until they are retired.
+Retiring all of them is planned in [Retiring Satellite-specific interfaces](legacy-ui-retirement.md).
 
 1. **Done:** document v0 (the `mobile` route and `page.js`); the modularity guard.
 2. **Done:** Engine metadata: `icon_name`, `provides`, `ui.json` with revisions and ETags,
@@ -880,10 +883,12 @@ they are retired.
       `media-grid` block and viewer, and Photo's `ui.json`, now its default interface on both
       clients (see "Shared interface" in [docs/satellites/photo.md](satellites/photo.md)).
       Photo's own page and screens stay in Developer Mode until they are retired;
-   2. `vault` with `secure.screen` and `device.biometrics` from the Locked Folder;
-   3. `audio.library` and `media.audio` from Music's player, queue and downloads. Specified
-      first in [Audio playback](media-audio.md), with its own milestones, because the
-      player is the largest piece of Satellite-specific client code.
+   2. `media.vault` from the Locked Folder. **Partly done (1.2):** the `secure` action moves
+      photos in from Photos' shared viewer and selection, behind each client's own PIN and
+      biometric prompt. Next: the Locked Folder itself in the shared interface;
+   3. `audio.library` and `media.audio` from Music's player, queue and downloads, specified in
+      [Audio playback](media-audio.md). **Done (1.2):** the shared audio host on both clients
+      and the `play` action. Music's own library screens are still native.
 
    Each becomes a shared block or module that any Satellite can use, and removes one name check
    from the clients.

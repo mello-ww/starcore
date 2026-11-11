@@ -106,10 +106,10 @@ By default `host = "127.0.0.1"` keeps Mission Control reachable only from the ma
 
 ## Satellites in Mission Control
 
-A Satellite's page is its own `mission_control/page.js` when it ships one. Otherwise, a
-Satellite with a `ui.json` gets a page drawn by Mission Control's shared renderer
+A Satellite with a `ui.json` gets a page drawn by Mission Control's shared renderer
 (`mission_control/ui/renderer.js`, mounted exactly like a `page.js`): its navigation as tabs,
-its blocks, live data from its routes, and actions that call them. The renderer knows the
+its blocks, live data from its routes, and actions that call them. A Satellite without one
+gets its own `mission_control/page.js` when it ships one. The renderer knows the
 [UI contract](ui-contract.md), never a Satellite. A new revision of the document (after an
 update or a rediscovery) remounts the page.
 
@@ -119,7 +119,8 @@ the catalog lists as the `audio.library` provider, and its floating bar and top-
 across every page, reloads included.
 
 A Satellite that ships both a `ui.json` and a `page.js` gets the shared interface; its
-`page.js` is the fallback if the document is refused. In Developer Mode, the button beside the
+`page.js` is the fallback if the document is refused. While the document is a `preview`
+(UI contract 1.2), the `page.js` stays the default instead. In Developer Mode, the button beside the
 Satellite's title switches between the two (remembered per browser), so a Satellite moving to
 `ui.json` can be compared with its previous page before that page is retired.
 

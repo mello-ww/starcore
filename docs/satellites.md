@@ -210,7 +210,7 @@ Folder and File Explorer use one today. A new Satellite should describe its inte
 `ui.json` instead (see "Describing an interface" above), and use `page.js` only for what the
 shared blocks can't express yet. If a Satellite ships both, both clients use `ui.json`; its
 `page.js` is Mission Control's fallback, and Developer Mode can switch to it. Status, the
-first Satellite to move, works that way for one release.
+first Satellite to move, works that way for one release, and Photos does too.
 
 A Satellite without a page still gets one: Mission Control renders whatever it publishes
 through `state.py` as generic labelled values. A Satellite that provides none of these is

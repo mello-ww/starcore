@@ -198,7 +198,7 @@ same session token it would from a password login, exactly as before.
 ## Satellite interfaces
 
 The app knows UI contracts and capabilities, not individual Satellites. A
-Satellite that ships a `ui.json` (UI contract 1.0, see
+Satellite that ships a `ui.json` (UI contract 1.0 to 1.2, see
 [`docs/ui-contract.md`](../docs/ui-contract.md)) opens in
 `src/screens/SatelliteUiScreen.tsx`, which draws its pages, navigation and
 blocks with this app's own components (`src/satellites/ui/`) - no app change
@@ -208,8 +208,10 @@ from the cache. The rules shared with the Engine and Mission Control are in
 `src/satellites/ui/contract.ts`, tested against `contracts/ui/` by
 `__tests__/uiContract.test.ts`.
 
-Music, Photos (with the Locked Folder) and Status keep their dedicated screens
-until the shared blocks reach parity with them, and the older `mobile` route
+Status and Photos open their `ui.json` by default; their dedicated screens stay
+in Developer Mode, and Photos' still serve its settings, phone sync and the
+Locked Folder. Music keeps its dedicated screens until the shared blocks reach
+parity with them (`docs/legacy-ui-retirement.md`), and the older `mobile` route
 (`DeclarativeScreen`) still works. Satellite icons come from each Satellite's
 `icon_name`.
 
