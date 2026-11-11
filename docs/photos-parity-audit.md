@@ -37,7 +37,7 @@ Legend:
 | 14 | Search | ✗ | ✅ in-memory | ✅ server, paged, + albums, kind | ✅ | Shared is ahead (web gets search for the first time). | – | – | – |
 | 15 | Map | ✅ Leaflet/OSM, clusters, popup of 12 → viewer | ◐ one marker per photo, Google key needed | ✅ viewport clusters | ◐ same Google key need | A cluster tap zooms in rather than showing a popup grid. The Android key gap is the same on both sides. | – (accept). Optional C: cluster preview | P2 | M |
 | 16 | Viewer: image, previous/next, keyboard | ✅ (+ `i` for info) | ✅ swipe | ✅ arrows, Esc | ✅ swipe | – | – | – | – |
-| 17 | Viewer: touch swipe on web | ✅ `attachSwipe` | n/a | ✗ | n/a | Lost on touch browsers. | C (renderer) | P1 | S |
+| 17 | Viewer: touch swipe on web | ✅ `attachSwipe` | n/a | ✅ fixed in M13 | n/a | Lost on touch browsers. | C (renderer) | P1 | S |
 | 18 | Viewer: pinch / zoom image | ✗ | ✅ ZoomableImage | ✗ | ✗ | Android users lose zoom. | C (renderer: reuse ZoomableImage) | P0 | M |
 | 19 | Video playback | ✅ | ✅ | ✅ | ✅ | – | – | – | – |
 | 20 | Details panel | ✅ full EXIF + mini-map + map link | ◐ 4 fields | ✅ 12 fields | ✅ 12 fields | Shared lacks aperture, shutter, ISO, focal length and orientation (the viewer field limit is 12), the location mini-map and the link. | S: one composed "Exposure" field. C (optional): field `href` | P2 | S |
@@ -77,7 +77,7 @@ Issues in the new shared interface:
 ## Roadmap: shortest safe path to making the shared interface the default
 
 **Status (2026-11-11):** M1 to M6 are done; Photos opens in its shared interface by default on
-both clients, and M7 to M12 are done. M13 and M14 are next; #33 to #38 came from
+both clients, and M7 to M13 are done. M14 is next; #33 to #38 came from
 the owner's review of the shared interface on 2026-11-11.
 
 **The goal these milestones serve:** at a stable release, a new Satellite needs no change to
@@ -115,7 +115,7 @@ Each milestone is small and testable on its own. The order runs from cheapest to
 - **M10. The Locked Folder as a folder tile** (C + J+S, M): #36. Done: `item.icon` and `open` in the contract (Engine validation, fixtures, both renderers), and the tile in Albums, right after Favorites, opening the Locked Folder. Tested with contract fixtures, renderer tests on both clients, engine tests, and on the local demo (web and emulator).
 - **M11. Favorite heart on tiles** (C + J, M): #21. Done: `quick` tile actions in the contract (Engine validation, fixtures, both renderers) and the heart toggle on Photos' Library, Search and album grids. Tested with fixtures, renderer tests on both clients, engine tests, and on the local demo (web and emulator).
 - **M12. Download and share** (C + native + J, L): #27. Done: `download` and `share` actions in the contract (Engine validation, fixtures), Mission Control's `ui/files.js`, the app's `src/files/` and its Kotlin `StarCoreFilesModule` (MediaStore Downloads, a FileProvider for the share sheet), and both actions in every Photos viewer. Photo's own Android viewer shares the file too. Tested with fixtures, unit tests on both clients, engine tests, and on the local demo (web and emulator).
-- M13. Web viewer touch swipe (#17).
+- **M13. Web viewer touch swipe** (C renderer, S): #17. Done: the shared web viewer moves on a deliberate one-finger sideways swipe, the same rule as Photo's own page, and leaves a swipe that starts on a video to its player. Tested with a unit test for the rule and simulated touches in a mobile-sized browser.
 - M14. Camera grouping and the "All" view (#2).
 
 **Before Photo's own page and screens are retired**

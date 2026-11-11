@@ -7,6 +7,9 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Swipe between photos in the shared web viewer** on a touch screen (a phone's or a tablet's
+  browser), as Photo's own page did: a deliberate one-finger sideways swipe; a tap, a scroll or
+  a pinch moves nothing, and a swipe on a video stays the player's.
 - **Download and share a photo or video** from every viewer of Photos' shared interface, on
   both clients: the file itself, fetched with your session. The web saves it, and shares it
   where the browser can share files; the app saves it to Downloads (Android 10 and later) or

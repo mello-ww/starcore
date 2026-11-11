@@ -76,6 +76,16 @@ export function tileAction(block, scope, canRun) {
     return null;
 }
 
+/** Which way a one-finger swipe moves the viewer: 1 (to the left: the next item), -1 (to the
+ * right: the previous one) or 0. A deliberate sideways swipe only - over 40 px and well wider
+ * than tall - so a tap or a scroll moves nothing; the same rule as Photo's own page. */
+export function swipeStep(deltaX, deltaY) {
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+        return deltaX < 0 ? 1 : -1;
+    }
+    return 0;
+}
+
 /** A tile's quick action (`quick`): the first entry whose `visible` holds and that `canRun`
  * here - a small button in the tile's corner - or null. */
 export function quickAction(block, scope, canRun) {
@@ -722,11 +732,42 @@ export function createGallery(host) {
         overlay.setAttribute("aria-modal", "true");
         overlay.tabIndex = -1;
         overlay.addEventListener("keydown", onViewerKey);
+        attachSwipe(overlay);
         document.body.appendChild(overlay);
         document.body.classList.add("ui-viewer-open");
         viewer = { block, key, index: gridState(block).keys.indexOf(key), overlay, stageKey: null, info: false };
         drawViewer();
         overlay.querySelector(".ui-viewer-close")?.focus();
+    }
+
+    // a touch screen swipes between items, one finger only; a mouse has the arrows and the
+    // keyboard. A swipe that starts on a video is the player's (its seek bar), not the viewer's.
+    function attachSwipe(overlay) {
+        let start = null;
+        overlay.addEventListener("touchstart", (event) => {
+            const onVideo = event.target instanceof Element && event.target.closest("video");
+            start = event.touches.length === 1 && !onVideo
+                ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
+        }, { passive: true });
+        overlay.addEventListener("touchmove", (event) => {
+            if (event.touches.length !== 1) {
+                start = null;  // a second finger: a pinch, not a swipe
+            }
+        }, { passive: true });
+        overlay.addEventListener("touchend", (event) => {
+            if (!start) {
+                return;
+            }
+            const touch = event.changedTouches[0];
+            const delta = swipeStep(touch.clientX - start.x, touch.clientY - start.y);
+            start = null;
+            if (delta) {
+                step(delta);
+            }
+        }, { passive: true });
+        overlay.addEventListener("touchcancel", () => {
+            start = null;
+        }, { passive: true });
     }
 
     function closeViewer() {

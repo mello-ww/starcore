@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { clock, GRID_PAGE, GRID_SIZES, gridSize, gridSizeKey, holdsCollection, itemKey, mediaKind, quickAction, tileAction, tileIcon } from "../ui/gallery.js";
+import { clock, GRID_PAGE, GRID_SIZES, gridSize, gridSizeKey, holdsCollection, itemKey, mediaKind, quickAction, swipeStep, tileAction, tileIcon } from "../ui/gallery.js";
 
 test("a tile is a video only when its kind says so", () => {
     assert.equal(mediaKind("video"), "video");
@@ -85,4 +85,12 @@ test("a tile's quick action is the first visible entry that can run here", () =>
     assert.equal(quickAction(block, { data: {} }, () => true), null);
     assert.equal(quickAction(block, { data: { favorite: true } }, () => false), null);
     assert.equal(quickAction({}, { data: {} }, () => true), null);
+});
+
+test("a deliberate sideways swipe moves the viewer, as Photo's own page did", () => {
+    assert.equal(swipeStep(-120, 10), 1);   // to the left: the next item
+    assert.equal(swipeStep(90, -20), -1);   // to the right: the previous one
+    assert.equal(swipeStep(30, 0), 0);      // too short: a tap
+    assert.equal(swipeStep(-80, 70), 0);    // too steep: a scroll
+    assert.equal(swipeStep(0, 0), 0);
 });

@@ -281,7 +281,9 @@ collection: the document says where each picture comes from and what can be done
   the item on screen has a player. `title`, `subtitle`, up to 12 `fields` (`{label, value,
   format, unit}`, shown under Details, empty ones left out) and up to 8 `actions`
   (`{label, action, icon, style, visible}`) on the item shown. Left and right (arrow keys on
-  the web, a swipe on Android) move between items; Escape or Back closes it. After an action's
+  the web, a swipe on Android and on a touch screen's browser) move between items; Escape or
+  Back closes it. A web swipe is one finger, over 40 px and well wider than tall, and a swipe
+  that starts on a video stays the player's. After an action's
   `refresh`, the viewer stays on its item, or shows the next one when the item is gone. On
   Android an image pinches to zoom (up to 5x) and, zoomed, pans with one finger; a double tap
   zooms in or back out. The swipe between items waits from the moment a second finger touches
