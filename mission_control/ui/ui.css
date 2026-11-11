@@ -17,6 +17,13 @@
     max-width: none;
 }
 
+/* so does a page of photos or a map, for the collection itself; its text, forms and buttons
+   keep the reading width */
+.ui-root.ui-collection > :not(.ui-page),
+.ui-root.ui-collection > .ui-page > :not(.ui-media-grid):not(.ui-map):not(.ui-card:has(.ui-media-grid, .ui-map)) {
+    max-width: 880px;
+}
+
 .ui-page {
     display: flex;
     flex-direction: column;

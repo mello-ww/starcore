@@ -13,7 +13,7 @@ import {
     BLOCK_TYPES, checkDocument, findProvider, formatValue, isSafeRoute, isVisible,
     missingRequirements, resolve, resolveTemplate, toneOf,
 } from "./contract.js";
-import { createGallery } from "./gallery.js";
+import { createGallery, holdsCollection } from "./gallery.js";
 import { icon } from "./icons.js";
 import { createMaps } from "./map.js";
 import { pickMedia } from "./picker.js";
@@ -1445,7 +1445,10 @@ export function mount(context) {
         const keep = active && root.contains(active) && active.classList.contains("ui-search-input")
             ? { node: active, start: active.selectionStart, end: active.selectionEnd } : null;
         root.replaceChildren();
-        root.classList.toggle("ui-wide", template === "dashboard");
+        // a dashboard, and a page of photos or a map, use the page's width
+        const collection = template !== "dashboard" && holdsCollection(page);
+        root.classList.toggle("ui-wide", template === "dashboard" || collection);
+        root.classList.toggle("ui-collection", collection);
 
         const isTopLevel = navigationItems().some((item) => item.page === state.page)
             || state.page === state.document.entry;

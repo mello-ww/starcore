@@ -53,6 +53,14 @@ function glyph(name, size = 18) {
     return icon(name, size) || el("span");
 }
 
+/** Whether a page holds a collection (a media grid or a map, also inside a card): such a page
+ * uses the page's width, like a dashboard, while its other blocks keep a reading width. */
+export function holdsCollection(page) {
+    const holds = (blocks) => (blocks || []).some((block) => block
+        && (block.type === "media-grid" || block.type === "map" || (block.type === "card" && holds(block.blocks))));
+    return Boolean(page) && holds(page.blocks);
+}
+
 /** What a tile's `kind` resolves to: "video", or "image" for anything else. */
 export function mediaKind(value) {
     return value === "video" ? "video" : "image";

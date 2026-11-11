@@ -54,7 +54,7 @@ Legend:
 | 31 | Deep link `#/satellite/Photo/LockedFolder` (web) | ✅ | n/a | ✗ | n/a | Breaks if the shared interface becomes the default. | Client wiring with #25 | P0 | S |
 | 32 | Large libraries | ◐ every tile in the DOM | ✗ 50k never loaded | ✅ paged | ✅ virtualized | Shared is far ahead. Picker add of N items saves the album file N times. | S (optional): one album save | P2 | S |
 | 33 | Viewer shows the whole photo | ✅ | ✅ | ✅ fixed in M7 | ✅ | A portrait photo on a landscape screen is cropped: the frame is a grid with no sized row, so the image keeps its own height and overflows (a 1080×1920 image is drawn 1538 px tall in a 608 px frame). | C (renderer CSS): give the image the frame's size (`grid-template: 100% / 100%`, or an absolutely placed image) | P0 | S |
-| 34 | Page uses the screen's width | ✅ | n/a | ✗ **bug** | n/a | Every shared page except a `dashboard` is capped at 880 px, so Photos fills half of a 16:9 screen. | C: an additive width hint, or full width for a page holding a media grid or map; 1.0/1.1 documents unchanged | P0 | S |
+| 34 | Page uses the screen's width | ✅ | n/a | ✅ fixed in M8 | n/a | Every shared page except a `dashboard` is capped at 880 px, so Photos fills half of a 16:9 screen. | C: an additive width hint, or full width for a page holding a media grid or map; 1.0/1.1 documents unchanged | P0 | S |
 | 35 | Favorites pinned at the top of Folders | ◐ | ◐ | ✗ own "Favorites" group | ✗ | Favorites should sit in Folders, always first, not in a group of its own. | S: `gallery.py` lists Favorites first under the Folders group (clients group consecutive items as sent) | P1 | S |
 | 36 | Locked Folder as a folder tile with a lock | ◐ own tab | ◐ own tab | ✗ button below Albums | ✗ | It should be a tile among the folders, with the shared `lock` icon as its thumbnail. | C: a media-grid tile `icon` drawn when there is no `image`, and a per-item action (`own` for this tile, `navigate` for the others); then J+S | P1 | M |
 | 37 | Locked Folder in the shared interface | ✅ | ✅ | ✗ opens the own screens | ✗ | Opening it leaves the shared interface for Photo's own page and screens. Retiring those screens would cut the way in. | C + Locked Folder capability: browse, view and move out through the shared viewer while unlocked, the PIN and biometric prompts reused from M5, never a listing without a grant | P0 before retiring the own screens | L |
@@ -77,7 +77,7 @@ Issues in the new shared interface:
 ## Roadmap: shortest safe path to making the shared interface the default
 
 **Status (2026-11-11):** M1 to M6 are done; Photos opens in its shared interface by default on
-both clients, and M7 is done. M8 to M14 are next, starting with the page-width bug (M8); #33 to #38 came from
+both clients, and M7 and M8 are done. M9 to M14 are next; #33 to #38 came from
 the owner's review of the shared interface on 2026-11-11.
 
 **The goal these milestones serve:** at a stable release, a new Satellite needs no change to
@@ -108,7 +108,7 @@ Each milestone is small and testable on its own. The order runs from cheapest to
 
 **Bugs found after the switch (next)**
 - **M7. The viewer shows the whole photo on the web** (C renderer, S): #33. Done: checked in a browser on the local demo with portrait and landscape photos at 1920×1080 and 390 px wide (layout has no Node test).
-- **M8. Shared pages use the screen's width on the web** (C, S): #34. Additive, so 1.0 and 1.1 documents keep their layout. Test: contract fixtures, renderer tests, and a check at 1440 and 1920 px.
+- **M8. Shared pages use the screen's width on the web** (C, S): #34. Done, with no contract change: Mission Control gives a page holding a media grid or a map the full width (up to Mission Control's 1400 px, as Photo's own page), and keeps its other blocks at 880 px. Tested with a unit test for the rule, and in a browser at 1920×1080 and 390 px (Photos' pages, Status unchanged).
 
 **Should follow soon**
 - **M9. Favorites pinned at the top of Folders** (S, S): #35. Test: engine test for the order and group of `gallery/albums`.

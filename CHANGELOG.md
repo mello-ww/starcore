@@ -193,6 +193,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Fixed
 
+- **Shared pages of photos or a map use the screen's width on the web.** Every shared page
+  except a dashboard was held to 880 px, so Photos filled half of a 16:9 screen. A page with a
+  media grid or a map now spreads it across the page, as wide as Photo's own page; its text,
+  forms and buttons keep the reading width. No document needs to change.
 - **The shared viewer on the web shows the whole photo.** A photo taller than the screen
   (a phone's portrait shot on a 16:9 monitor, say) kept its own height and was cropped by the
   viewer's frame; it is now fitted inside it, whatever its shape.

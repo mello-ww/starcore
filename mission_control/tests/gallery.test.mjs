@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { clock, GRID_PAGE, GRID_SIZES, gridSize, gridSizeKey, itemKey, mediaKind } from "../ui/gallery.js";
+import { clock, GRID_PAGE, GRID_SIZES, gridSize, gridSizeKey, holdsCollection, itemKey, mediaKind } from "../ui/gallery.js";
 
 test("a tile is a video only when its kind says so", () => {
     assert.equal(mediaKind("video"), "video");
@@ -42,4 +42,14 @@ test("each grid remembers its own size", () => {
     assert.equal(gridSizeKey({ id: "library" }), "media-grid:library:size");
     assert.equal(gridSizeKey({}), "media-grid:grid:size");
     assert.notEqual(gridSizeKey({ id: "library" }), gridSizeKey({ id: "trash" }));
+});
+
+test("a page holding a media grid or a map uses the page's width, any other keeps its reading width", () => {
+    assert.equal(holdsCollection({ blocks: [{ type: "text", text: "Hi" }, { type: "media-grid", items: "$.items" }] }), true);
+    assert.equal(holdsCollection({ blocks: [{ type: "map", items: "$.items" }] }), true);
+    // also inside a card
+    assert.equal(holdsCollection({ blocks: [{ type: "card", blocks: [{ type: "media-grid" }] }] }), true);
+    assert.equal(holdsCollection({ blocks: [{ type: "card", blocks: [{ type: "form" }] }, { type: "list" }] }), false);
+    assert.equal(holdsCollection({}), false);
+    assert.equal(holdsCollection(null), false);
 });

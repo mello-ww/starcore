@@ -533,6 +533,11 @@ become a grid of facts. The page uses the full width. On Android, metrics become
 tiles and everything else stacks. It is a layout hint, not a layout language: a document still
 cannot place, size or colour anything.
 
+A page that holds a `media-grid` or a `map` (also inside a `card`) gets the full width on
+Mission Control too, with no hint from the document: the grid or map spreads across it while
+the page's text, forms and buttons keep the reading width. Android already draws every page
+at the screen's width.
+
 **`header`** is a band above the navigation on every top-level page: `{source, blocks}`. Its
 source is loaded once for all the pages and refreshed on its own. Mission Control puts its
 `status` blocks on the right; both clients show a `field` there as one line of context.
