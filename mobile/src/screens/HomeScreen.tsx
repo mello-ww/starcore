@@ -68,6 +68,15 @@ export function hasSharedPreview(satellite: SatelliteSummary): boolean {
   return Boolean(satellite.ui?.revision) && satellite.ui?.preview === true && Boolean(DEDICATED_SCREENS[satellite.name]);
 }
 
+/**
+ * The reverse: a Satellite that opens in its shared interface and still has a screen of its own
+ * in this app, kept until the shared one is validated. Developer Mode can open that screen
+ * instead, as Mission Control's Developer Mode can show a Satellite's own page.
+ */
+export function ownScreenBeside(satellite: SatelliteSummary): 'PhotoHome' | 'MusicHome' | 'StatusHome' | undefined {
+  return opensSharedInterface(satellite) ? DEDICATED_SCREENS[satellite.name] : undefined;
+}
+
 export function alertsFor(satellites: SatelliteSummary[]) {
   return satellites
     .filter(satellite => satellite.status === 'error' || satellite.status === 'stopped')

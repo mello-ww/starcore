@@ -139,6 +139,12 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   every session's offline copies and evicted from the image cache. Photos' shared interface
   offers "Move to Locked Folder" in the viewer (Library, Search, Map, an album) and on a
   selection (Library, an album).
+- **Photos opens in its shared interface by default** (M6 of the Photos parity audit). Its
+  `ui.json` is no longer a preview, so Mission Control and the Android app draw Photos with the
+  shared blocks. Photo's own page and screens stay until it is validated: in Developer Mode on
+  the web (the button beside the title) and in the app ("Own screen (previous)" on Photo's card in
+  Satellites, the reverse of the preview's pill), and for the released Alpha app, which ignores
+  the document. `#/satellite/Photo/LockedFolder` keeps opening Photo's own page.
 - **Moving into the Locked Folder without opening it (server).** An unlock can ask for a
   single-use grant for one move instead (`for: {operation: "move_in", items}`): bound to the
   session, the exact items and 60 seconds, used up by the first `move_in` whatever its outcome,

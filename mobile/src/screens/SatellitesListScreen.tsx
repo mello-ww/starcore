@@ -9,7 +9,7 @@ import {getCachedSatellites, setCachedSatellites} from '../satellites/cache';
 import {STATUS_LABELS, satelliteIcon, statusDotColor} from '../satellites/icons';
 import type {SatelliteSummary} from '../satellites/types';
 import {ScreenTitle} from '../components/ScreenTitle';
-import {DEDICATED_SCREENS, hasSharedPreview, opensSharedInterface} from './HomeScreen';
+import {DEDICATED_SCREENS, hasSharedPreview, opensSharedInterface, ownScreenBeside} from './HomeScreen';
 import {useDeveloperMode} from '../developer/DeveloperModeContext';
 import {Surface} from '../components/Surface';
 import {tokens, useAccent, useTopInset} from '../theme';
@@ -93,10 +93,12 @@ export function SatellitesListScreen({navigation}: Props) {
           // It comes first: a dedicated screen is what a Satellite without one
           // uses (Photo, Music), or the fallback for a server older than its ui.json. A
           // preview document (1.2) leaves the dedicated screen first; Developer Mode
-          // offers the shared interface beside it.
+          // offers the shared interface beside it. Otherwise Developer Mode offers the
+          // dedicated screen beside the shared interface, until that screen is retired.
           const declarative = opensSharedInterface(item);
           const dedicated = declarative ? undefined : DEDICATED_SCREENS[item.name];
           const preview = developer && hasSharedPreview(item);
+          const own = developer ? ownScreenBeside(item) : undefined;
           const openable = item.mobile_ui || Boolean(item.ui?.revision);
           return (
           <Pressable
@@ -133,6 +135,17 @@ export function SatellitesListScreen({navigation}: Props) {
                   style={({pressed}) => [styles.previewPill, pressed && styles.pressed]}>
                   <Icon name="layers" size={14} color={palette.text2} />
                   <Text style={styles.previewLabel}>Shared interface (preview)</Text>
+                </Pressable>
+              )}
+              {own && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${item.name}'s own screen`}
+                  testID={`own-screen-${item.name}`}
+                  onPress={() => navigation.navigate(own)}
+                  style={({pressed}) => [styles.previewPill, pressed && styles.pressed]}>
+                  <Icon name="layers" size={14} color={palette.text2} />
+                  <Text style={styles.previewLabel}>Own screen (previous)</Text>
                 </Pressable>
               )}
               {!openable && <Text style={styles.noUi}>No mobile interface yet</Text>}

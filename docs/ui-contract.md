@@ -42,9 +42,9 @@ it as the web's fallback, used when its document is missing or refused, and in D
 Mode Mission Control can show either: the button beside the Satellite's title switches
 between the shared interface and the Satellite's own page, so a migration can be compared
 side by side before the old page is retired. Status is the first Satellite to make that
-move (1.1). Photo ships a **preview** document (1.2, see [The document](#the-document)): its
-own screens stay the default and Developer Mode shows the shared Library and Albums beside
-them. Music and Photo keep their dedicated, hand-written screens on both clients until
+move (1.1). Photo follows in 1.2: its document was a **preview** (see
+[The document](#the-document)) until it reached parity, and is now its default interface, with
+its own page and screens kept in Developer Mode until they are retired. Music and Photo keep their dedicated, hand-written screens on both clients until
 the shared blocks reach parity with them (see [Migration](#migration)). Those
 implementations are the behavioural reference for the capabilities still to come, not code
 to be thrown away.
@@ -109,7 +109,7 @@ comes from the Satellite's ordinary routes, through bindings.
 | `navigation` | Optional top-level pages: tabs on both clients. Each names a `page`, a `label`, an optional `icon` from the shared set and, from 1.1, `developer: true` for a page shown only in Developer Mode. |
 | `header` | 1.1, optional: blocks shown above the navigation on every top-level page, with a `source` of their own - see [Dashboards, headers and widgets](#dashboards-headers-and-widgets). |
 | `widgets` | 1.1, optional: up to 4 summaries a client may show outside the Satellite (Home). |
-| `preview` | 1.2, optional `true`: the document doesn't replace the Satellite's own interface yet. A client that has one (a `page.js` on the web, a screen of its own in the app) keeps opening it and offers the document in Developer Mode; a client without one opens the document. The listing reports it as `ui.preview`. |
+| `preview` | 1.2, optional `true`: the document doesn't replace the Satellite's own interface yet. A client that has one (a `page.js` on the web, a screen of its own in the app) keeps opening it and offers the document in Developer Mode; a client without one opens the document. The listing reports it as `ui.preview`. Without it, the document is the default and Developer Mode offers the Satellite's own interface instead, on both clients. |
 | `pages` | Page id (lower case, digits, `-`, `_`) to page. |
 
 A **page** has `blocks` and optionally:
@@ -818,8 +818,9 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 ## Migration
 
 Every step is additive, keeps the Alpha working, and replaces a hand-written screen only
-once the shared one reaches parity. Music, Photos and Status keep their dedicated screens
-until then.
+once the shared one reaches parity. Music keeps its dedicated screens until then; Photos and
+Status open their shared interfaces and keep their previous screens in Developer Mode until
+they are retired.
 
 1. **Done:** document v0 (the `mobile` route and `page.js`); the modularity guard.
 2. **Done:** Engine metadata: `icon_name`, `provides`, `ui.json` with revisions and ETags,
@@ -837,9 +838,10 @@ until then.
    servers. Then they are retired (see "Status's migration" in
    [docs/satellites/status.md](satellites/status.md)).
 7. **Capabilities, one at a time, extracted from the existing code:**
-   1. `media.gallery` from Photos' grid and viewer. **Started (1.2):** the shared
-      `media-grid` block and viewer, and Photo's preview `ui.json` for its Library and Albums
-      (see "Shared interface" in [docs/satellites/photo.md](satellites/photo.md));
+   1. `media.gallery` from Photos' grid and viewer. **Done (1.2):** the shared
+      `media-grid` block and viewer, and Photo's `ui.json`, now its default interface on both
+      clients (see "Shared interface" in [docs/satellites/photo.md](satellites/photo.md)).
+      Photo's own page and screens stay in Developer Mode until they are retired;
    2. `vault` with `secure.screen` and `device.biometrics` from the Locked Folder;
    3. `audio.library` and `media.audio` from Music's player, queue and downloads. Specified
       first in [Audio playback](media-audio.md), with its own milestones, because the

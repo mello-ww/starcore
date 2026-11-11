@@ -36,12 +36,13 @@ class PhotoUiDocumentTest(unittest.TestCase):
     def setUp(self):
         self.document = ui_contract.load(PHOTO_DIR / "ui.json")
 
-    def test_the_document_is_a_valid_preview(self):
-        # a preview: both clients keep Photo's own screens first until parity
+    def test_the_document_is_valid_and_no_longer_a_preview(self):
+        # M6: both clients open the shared interface by default; Photo's own screens stay in
+        # Developer Mode until it is validated
         self.assertEqual(self.document["contract"], "starcore.ui/1.2")
-        self.assertIs(self.document["preview"], True)
+        self.assertNotIn("preview", self.document)
         definition = ui_contract.UiDefinition(self.document)
-        self.assertEqual(definition.describe()["preview"], True)
+        self.assertNotIn("preview", definition.describe())
 
     def test_every_route_it_names_is_one_of_photos_own(self):
         from satellites.native.photo import api
@@ -290,13 +291,16 @@ class PhotoGalleryApiTest(unittest.TestCase):
         self.assertEqual(self.json_request("/api/satellites/photo/gallery/nope")[0], 404)
         self.assertEqual(self.json_request("/api/satellites/photo/gallery", "POST", {})[0], 405)
 
-    def test_the_listing_marks_photos_document_as_a_preview(self):
+    def test_the_listing_offers_photos_document_as_its_interface(self):
         status, listing = self.json_request("/api/satellites")
         self.assertEqual(status, 200)
         entries = listing["satellites"] if isinstance(listing, dict) else listing
         photo = next(entry for entry in entries if entry["name"] == "Photo")
         self.assertTrue(photo["ui"]["revision"])
-        self.assertIs(photo["ui"]["preview"], True)
+        self.assertNotIn("preview", photo["ui"])
+        # its own page and screens stay, for Developer Mode and older apps
+        self.assertTrue(photo["page"])
+        self.assertTrue(photo["mobile_ui"])
 
 
     # ---------- media.gallery: what the media picker chooses from ----------

@@ -263,10 +263,11 @@ now" and status live inside the Photo configuration screen, alongside `source_pa
 
 Photo also describes its Library, Albums, Search, Map, recycle bin and folder import in a
 `ui.json` (UI contract 1.2), drawn by both clients' shared blocks - the first step of moving
-Photo off client code of its own. It is a **preview** document: Mission Control and the app keep opening Photo's own
-page and screens, and Developer Mode shows the shared one beside them (on the web, the button
-beside the Satellite's title; in the app, "Shared interface (preview)" on Photo's card in
-Satellites). The released Alpha app ignores it.
+Photo off client code of its own. Since M6 it is Photo's **default** interface on both
+clients. Photo's own page and screens stay until the shared one is validated, and Developer Mode
+opens them instead (on the web, the button beside the Satellite's title; in the app, "Own
+screen (previous)" on Photo's card in Satellites). The released Alpha app ignores the document
+and keeps opening Photo's own screens.
 
 What it covers:
 
@@ -310,8 +311,8 @@ them, and the app pushes Photo configuration, or the Locked Folder on its own sc
 shared one, so Back returns there. Nothing about the Locked Folder changes: it asks for its PIN
 or biometrics as before, locks again on leaving, blocks screenshots on Android, and the shared
 document never reaches its routes or media. A server without a Locked Folder says so on that
-screen. `#/satellite/Photo/LockedFolder` keeps opening Photo's own page on the web, also while
-Developer Mode shows the shared interface.
+screen. `#/satellite/Photo/LockedFolder` keeps opening Photo's own page on the web, whichever
+interface is shown.
 
 **Move to Locked Folder** is the contract's `secure` action (`media.vault` / `move_in`), on the
 viewer and on a selection. The document names neither the Locked Folder nor a route.

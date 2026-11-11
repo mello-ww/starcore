@@ -224,6 +224,8 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] Audio: any Satellite can play through both clients with the UI contract's `play` action (1.2)
 - [ ] Remove `mobile/src/satellites/builtins.tsx` once Music's declarative interface replaces its native screens
 - [ ] Move Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/ui-contract.md`, "Migration")
+    - [x] Photos opens in its shared interface by default on both clients (M1-M6 of `docs/photos-parity-audit.md`)
+    - [ ] Retire Photo's own page and screens once the shared interface is validated
 - [ ] Light theme
 - [ ] Icons instead of text glyphs for the remaining Music controls
 - [ ] Audio playback validated on a real device

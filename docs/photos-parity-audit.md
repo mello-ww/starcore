@@ -70,6 +70,9 @@ Issues in the new shared interface:
 
 ## Roadmap: shortest safe path to making the shared interface the default
 
+**Status (2026-11-11):** M1 to M6 are done; Photos opens in its shared interface by default on
+both clients. M7 to M10 are next.
+
 Each milestone is small and testable on its own. The order runs from cheapest to riskiest.
 
 **Required before the shared interface becomes the default**

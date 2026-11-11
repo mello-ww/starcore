@@ -1,4 +1,4 @@
-import {hasSharedPreview, opensSharedInterface} from '../src/screens/HomeScreen';
+import {hasSharedPreview, opensSharedInterface, ownScreenBeside} from '../src/screens/HomeScreen';
 import type {SatelliteSummary} from '../src/satellites/types';
 
 // a preview document (UI contract 1.2) leaves the app's own screen for a Satellite first;
@@ -30,5 +30,16 @@ describe('which interface a Satellite opens in', () => {
     const refused = satellite('Photo', {contract: null, revision: null, error: 'ui.json is invalid', preview: true});
     expect(opensSharedInterface(refused)).toBe(false);
     expect(hasSharedPreview(refused)).toBe(false);
+    expect(ownScreenBeside(refused)).toBeUndefined();
+  });
+
+  it('opens a document that is no longer a preview by default, with the app’s own screen beside it', () => {
+    const switched = satellite('Photo', {contract: 'starcore.ui/1.2', revision: 'r4', error: null});
+    expect(opensSharedInterface(switched)).toBe(true);
+    expect(hasSharedPreview(switched)).toBe(false);
+    expect(ownScreenBeside(switched)).toBe('PhotoHome');
+    // a preview, or a Satellite the app has no screen of its own for, has nothing to offer here
+    expect(ownScreenBeside(satellite('Photo', {contract: 'starcore.ui/1.2', revision: 'r2', error: null, preview: true}))).toBeUndefined();
+    expect(ownScreenBeside(satellite('Gallery', {contract: 'starcore.ui/1.2', revision: 'r3', error: null}))).toBeUndefined();
   });
 });
