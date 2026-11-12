@@ -242,7 +242,8 @@ file. A file Photo can't read (a document, say) stays in the vault and is report
 
 The Locked Folder provides the `media.vault` capability: `status`, `unlock`, `lock`, `move_in`
 and, optionally, `biometric`. It has no operation that lists or reads the vault; viewing it
-stays in its own screens.
+stays in its own screens. The design, its security audit and the accepted risks are in
+[`archive/m5-locked-folder-actions-audit.md`](../archive/m5-locked-folder-actions-audit.md).
 
 ```
 POST /api/satellites/LockedFolder/unlock   { "pin", "for": { "operation": "move_in", "items": [reference] } }

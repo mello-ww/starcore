@@ -19,9 +19,8 @@ class Request:
         # authorization of its own, on top of the Core's own "is there a valid
         # session at all" gate - without re-implementing any part of session
         # validation itself. Empty when the Core hasn't required a session for
-        # this request at all (StarCore not yet bootstrapped). The Locked
-        # Folder Satellite is what actually uses this (see docs/satellites/locked_folder.md);
-        # every other existing route ignores it exactly as before.
+        # this request at all (StarCore not yet bootstrapped). A route that
+        # doesn't need it ignores it.
         self.token = token
 
 
@@ -40,7 +39,7 @@ class Response:
         self.cache = cache
         # when set, the file is sent with Content-Disposition: attachment - a
         # generic way for any satellite to say "this should download, not open
-        # in the browser" (File Explorer uses it; nothing else has needed to yet)
+        # in the browser"
         self.download_name = download_name
 
 

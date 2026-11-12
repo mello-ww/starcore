@@ -366,7 +366,7 @@ class PhotoLibrary:
     def trash(self, photo_id: str) -> dict:
         """Soft-deletes an active photo: it disappears from the library (all(),
         get(), albums) but its file is untouched until it is either restored
-        or its retention period runs out - see docs/photo.md."""
+        or its retention period runs out - see docs/satellites/photo.md."""
         with self._changing:
             photo = self._photos.get(photo_id)
             if photo is None or photo.get("trashed_at"):

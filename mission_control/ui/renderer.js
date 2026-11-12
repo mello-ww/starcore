@@ -1476,7 +1476,7 @@ export function mount(context) {
         const keep = active && root.contains(active) && active.classList.contains("ui-search-input")
             ? { node: active, start: active.selectionStart, end: active.selectionEnd } : null;
         root.replaceChildren();
-        // a dashboard, and a page of photos or a map, use the page's width
+        // a dashboard, and a page holding a media grid or a map, use the page's width
         const collection = template !== "dashboard" && holdsCollection(page);
         root.classList.toggle("ui-wide", template === "dashboard" || collection);
         root.classList.toggle("ui-collection", collection);

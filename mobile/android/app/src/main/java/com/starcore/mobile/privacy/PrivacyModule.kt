@@ -9,7 +9,7 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
 
 /**
- * Keeps the Locked Folder off the screen and out of caches it shouldn't be in.
+ * Keeps private content off the screen and out of caches it shouldn't be in.
  *
  * setSecure: FLAG_SECURE while private content is showing - Android then
  * blocks screenshots and screen recording of the app and shows a blank card
@@ -17,8 +17,8 @@ import com.facebook.react.bridge.ReadableArray
  * screens open at once keep it on until both have closed.
  *
  * evictImages: drops images from React Native's image caches (memory and
- * disk) - used for a photo's library thumbnail once it has moved into the
- * Locked Folder, so the gallery's cache doesn't keep a copy of it.
+ * disk) - used for an image's thumbnail once it has moved into protected
+ * storage, so the gallery's cache doesn't keep a copy of it.
  */
 class PrivacyModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
     private var holders = 0

@@ -30,8 +30,8 @@ type ResumeInfo = {name: string; address: string};
  */
 export default function App() {
   useEffect(() => {
-    // Configures react-native-background-fetch's periodic schedule (see
-    // photo/backgroundSyncTask.ts) and immediately runs one sync pass -
+    // Configures react-native-background-fetch's periodic phone-sync
+    // schedule and immediately runs one sync pass -
     // "immediate sync also triggered on app foreground" in the approved
     // design. Runs once per app start, independent of which server is
     // active or even whether one is configured yet (runBackgroundSync

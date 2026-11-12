@@ -15,7 +15,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
 /**
- * Offline music, written only beneath the app's private files/music directory. The
+ * Offline audio, written only beneath one folder of the app's private files. The
  * session token arrives as a request header and is never written anywhere.
  */
 class StarCoreDownloadsModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {

@@ -1,8 +1,8 @@
 import React, {createContext, useContext} from 'react';
 import {StyleSheet, View} from 'react-native';
 
-/** One control the app shows in every header's top-right group, beside Developer Mode (Music's
- * now-playing disc today). Headers render <TopBarSlot />; what goes in it is provided once,
+/** One control the app shows in every header's top-right group, beside Developer Mode (the
+ * player's now-playing disc today). Headers render <TopBarSlot />; what goes in it is provided once,
  * above the navigation, so no header names a Satellite. */
 const SlotContext = createContext<React.ComponentType | null>(null);
 

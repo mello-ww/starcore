@@ -22,7 +22,7 @@ export interface DownloadNative {
 
 const unsupported: EffectResult = {applied: false, reason: 'unsupported'};
 
-/** The app's own Kotlin modules (android/.../music); absent on other platforms and under Jest. */
+/** The app's own Kotlin audio and downloads modules; absent on other platforms and under Jest. */
 export const audioEffects: AudioEffects = {
   setEqualizer: (enabled, bands, preamp) =>
     NativeModules.StarCoreAudio?.setEqualizer(enabled, bands, preamp) ?? Promise.resolve(unsupported),

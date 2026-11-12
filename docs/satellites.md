@@ -210,7 +210,9 @@ Folder and File Explorer use one today. A new Satellite should describe its inte
 `ui.json` instead (see "Describing an interface" above), and use `page.js` only for what the
 shared blocks can't express yet. If a Satellite ships both, both clients use `ui.json`; its
 `page.js` is Mission Control's fallback, and Developer Mode can switch to it. Status, the
-first Satellite to move, works that way for one release, and Photos does too.
+first Satellite to move, works that way for one release, and Photos does too. File Explorer
+ships both with its document marked `preview`, so its `page.js` stays the web's default until
+the shared interface reaches parity.
 
 A Satellite without a page still gets one: Mission Control renders whatever it publishes
 through `state.py` as generic labelled values. A Satellite that provides none of these is
@@ -373,9 +375,8 @@ Applied so far:
 | Photos | sync_host, sync_port, sync_default_path; phone sync's upload counters and log |
 | Status | the Diagnostics tab; Platform and Python on the generic mobile screen |
 
-File Explorer has nothing advanced on its page yet. Its `root`, the boundary every request is
-confined to, is changed in its `config.toml` only, and stays that way: showing a setting is not a
-reason to add a route that changes it. Docker Links, Wings and AI Satellites use the same three
+File Explorer has nothing advanced on its page, and no setting at all: it browses whatever
+this StarCore process can reach (see "Worked examples" below). Docker Links, Wings and AI Satellites use the same three
 hooks; nothing in the shell needs to change for them.
 
 ## Satellites with several modules
@@ -421,8 +422,9 @@ Both categories share the same lifecycle and extension model. The only differenc
 - **Photo** (`satellites/native/photo/`, `docs/satellites/photo.md`) - state, routes, a Mission Control
   page, a background service (its phone-sync listener) and Satellite configuration, all
   together.
-- **FileExplorer** (`satellites/native/file_explorer/`) - a Satellite with routes and a
-  Mission Control page but no background service (`has_service` is `False`, so its status is
+- **FileExplorer** (`satellites/native/file_explorer/`) - a Satellite with routes, a
+  Mission Control page and a read-only shared interface (`ui.json`, a preview, over display
+  routes in `views.py`; see `docs/file-explorer-migration.md`) but no background service (`has_service` is `False`, so its status is
   always `"running"` while enabled), and the first to use `file_response(...,
   download_name=...)` and a raw (non-JSON) request body - see "Satellite endpoints" in
   `docs/api.md`. It has no `"configuration"` route and no configured root: it browses

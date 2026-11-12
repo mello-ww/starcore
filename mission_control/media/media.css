@@ -105,7 +105,7 @@ textarea.mu-input {
     border-color: var(--mu-accent);
 }
 
-/* chips and tabs are filled pills, as on Status; selected ones take the accent */
+/* chips and tabs are filled pills; selected ones take the accent */
 .mu-chip,
 .mu-tab {
     min-height: 34px;

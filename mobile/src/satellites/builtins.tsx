@@ -1,6 +1,6 @@
 /**
  * The app's composition root for Satellites that still have native code of their own
- * (`src/music/`, and the Locked Folder's unlock prompt): the one shared file allowed to import a
+ * (native screens, and an unlock prompt for media.vault): the one shared file allowed to import a
  * Satellite's folder, so navigation,
  * layout and the AudioHost never do. Each entry goes once its Satellite moves to its ui.json
  * (docs/ui-contract.md, "Migration"); engine/tests/test_client_modularity.py checks that no
@@ -60,5 +60,5 @@ export const BUILTIN_AUDIO: {extensions: AudioHostExtensions; fallbackProvider: 
 };
 
 /** The app's own unlock prompts for the secure action (UI contract 1.2), by capability and
- * provider: the Locked Folder's PIN and biometric screen, asking for a single-use grant. */
+ * provider: the media.vault provider's PIN and biometric screen, asking for a single-use grant. */
 export const BUILTIN_SECURE_PROMPTS: SecurePrompt[] = [VAULT_GRANT_PROMPT];

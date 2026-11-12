@@ -4,8 +4,8 @@ import {tokens, useAccent} from '../theme';
 
 const {palette, space, type} = tokens;
 
-/** A row of pill tabs, as on Status: the selected one is filled with the accent. Any screen
- * with a few sections can use it (Music today; Photos and File Explorer later). */
+/** A row of pill tabs: the selected one is filled with the accent. Any screen with a few
+ * sections can use it. */
 export function PillTabs<K extends string>({
   items,
   selected,

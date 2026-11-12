@@ -1,7 +1,7 @@
 """Where StarCore's own runtime-generated, machine-specific data lives.
 
-Credentials, sessions, and a Satellite's own generated secrets (the Locked
-Folder's PIN hash, specifically) are machine-specific state, not source code
+Credentials, sessions, and a Satellite's own generated secrets (a PIN hash,
+for example) are machine-specific state, not source code
 - they have no business inside the Git checkout, the same way a desktop
 application's user data never lives inside its own installation directory.
 This module is the one place that decides where that data actually goes, so

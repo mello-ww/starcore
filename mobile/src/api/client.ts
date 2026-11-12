@@ -1,7 +1,7 @@
 import {REQUEST_TIMEOUT_MS, UPLOAD_TIMEOUT_MS} from '../config';
 import {ApiError, UploadableFile} from './types';
 
-// re-exported so callers (photo/api.ts) can `import {StarCoreClient,
+// re-exported so callers can `import {StarCoreClient,
 // UploadableFile} from '../api/client'` in one line, rather than reaching
 // into './types' separately just for this one type
 export type {UploadableFile};
@@ -12,8 +12,8 @@ export type TokenProvider = () => Promise<string | null>;
  * A thin wrapper around `fetch`, talking to the exact same `/api/...`
  * StarCore already serves to Mission Control - see docs/api.md in the main
  * repository. This is the *only* place in the app that builds a request
- * URL or reads a response; every other module (api/auth.ts, and File
- * Explorer/Photo Library/Locked Folder clients added in later blocks) goes
+ * URL or reads a response; every other module (api/auth.ts, the shared
+ * renderer, the audio host, and the Satellite-specific folders) goes
  * through an instance of this class rather than calling `fetch` itself, so
  * there is exactly one place that knows how StarCore's API is shaped and
  * one place a future change (a new base path, a new auth header) would
@@ -48,8 +48,8 @@ export class StarCoreClient {
   }
 
   /** Uploads a file already on the device as a raw request body - matching
-   * what a route like Photo's sync_upload_route expects (request.raw, never
-   * JSON or multipart form data - see its own docstring). Passing an object
+   * what a Satellite route reading `request.raw` expects (never JSON or
+   * multipart form data). Passing an object
    * shaped `{uri, type, name}` as fetch's own `body` is React Native's own
    * documented way to stream a local file's bytes straight from disk,
    * without ever reading them into a JS string first - the same reason

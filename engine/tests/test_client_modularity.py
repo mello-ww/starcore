@@ -9,10 +9,16 @@ an entry here.
 
 The same applies between Satellites: one Satellite's code naming another is
 listed too, so that list can only shrink as well.
+
+Comments in shared code (the Engine, Mission Control, the app outside its
+Satellite-specific folders, its Kotlin and manifest) name no Satellite at all,
+with no exception list: they describe contracts and capabilities.
 """
 
 from pathlib import Path
+import io
 import re
+import tokenize
 import tomllib
 import unittest
 
@@ -89,6 +95,60 @@ def generic_client_files() -> list:
         if not relative.startswith(SATELLITE_SPECIFIC):
             files.append(path)
     return sorted(files)
+
+
+def shared_files() -> list:
+    """Every shared source file whose comments are checked: the generic client code, plus
+    Mission Control's styles and page, the Engine, and the app's Kotlin and manifest."""
+    android = REPO / "mobile/android/app/src/main"
+    files = [*generic_client_files(),
+             *REPO.glob("mission_control/*.css"), *REPO.glob("mission_control/*.html"),
+             *REPO.glob("mission_control/ui/*.css"), *REPO.glob("mission_control/media/*.css"),
+             *REPO.glob("engine/starcore/**/*.py"),
+             *android.glob("java/**/*.kt"), android / "AndroidManifest.xml"]
+    return sorted(set(files))
+
+
+BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.S)
+LINE_COMMENT = re.compile(r"(?<![:\w\"'\\])//[^\n]*")
+MARKUP_COMMENT = re.compile(r"<!--.*?-->", re.S)
+
+
+def comments(path: Path) -> list:
+    """(line, text) of each comment in a file: # comments and triple-quoted strings
+    (docstrings) in Python, /* */ and // elsewhere, <!-- --> in markup."""
+    text = path.read_text(encoding="utf-8")
+    if path.suffix == ".py":
+        found = []
+        for token in tokenize.generate_tokens(io.StringIO(text).readline):
+            if token.type == tokenize.COMMENT or (
+                    token.type == tokenize.STRING and token.string.lstrip("rbuRBU").startswith(('"""', "'''"))):
+                found.append((token.start[0], token.string))
+        return found
+    patterns = [BLOCK_COMMENT, LINE_COMMENT]
+    if path.suffix in (".html", ".xml"):
+        patterns.append(MARKUP_COMMENT)
+    return [(text.count("\n", 0, match.start()) + 1, match.group(0))
+            for pattern in patterns for match in pattern.finditer(text)]
+
+
+def satellite_name_pattern() -> re.Pattern:
+    """A Satellite's name in prose: its manifest name, spelled out ("Locked Folder"), plural,
+    capitalised, and its folders (locked_folder, src/photo/, lockedFolder/)."""
+    words = set()
+    for name in satellite_names():
+        spelled = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", name)
+        for form in {name, spelled, name[0].upper() + name[1:], spelled[0].upper() + spelled[1:]}:
+            words.update({form, form + "s"})
+    folders = {path.parent.name for path in REPO.glob("satellites/*/*/satellite.toml")}
+    folders |= {prefix.rstrip("/").rsplit("/", 1)[1] for prefix in SATELLITE_SPECIFIC}
+    names = "|".join(re.escape(word).replace(r"\ ", r"\s+") for word in sorted(words, key=len, reverse=True))
+    snake = "|".join(re.escape(folder) for folder in sorted(folders) if "_" in folder)
+    paths = "|".join(re.escape(folder) for folder in sorted(folders))
+    # a folder in a path (src/photo/, ../music/, photo/api.ts), not a word before a slash
+    folder_path = (rf"(?<![\w.])(?:src|native|link|\.\.?)/(?:{paths})/"
+                   rf"|\b(?:{paths})/\w+\.(?:py|js|ts|tsx|css|kt)\b")
+    return re.compile(rf"\b(?:{names})\b|\b(?:{snake})\b|{folder_path}")
 
 
 IMPORT = re.compile(r"""\bfrom\s+['"](\.[^'"]*)['"]|\brequire\(\s*['"](\.[^'"]*)['"]|\bimport\(\s*['"](\.[^'"]*)['"]""")
@@ -178,6 +238,27 @@ class ClientModularityTest(unittest.TestCase):
                     problems.append(f"{relative}: {len(found)} references to other Satellites "
                                     f"(listed: {allowed}): {found}")
         self.assertEqual(problems, [])
+
+    def test_shared_code_comments_name_no_satellite(self):
+        pattern = satellite_name_pattern()
+        files = shared_files()
+        self.assertTrue(any(path.suffix == ".kt" for path in files))
+        problems = []
+        for path in files:
+            for line, comment in comments(path):
+                for match in pattern.finditer(comment):
+                    number = line + comment.count("\n", 0, match.start())
+                    problems.append(f"{path.relative_to(REPO).as_posix()}:{number}: {match.group(0)!r}")
+        self.assertEqual(problems, [])
+
+    def test_the_comment_check_finds_a_satellite_in_each_kind_of_comment(self):
+        pattern = satellite_name_pattern()
+        for sample in ("// opens Photo's page", "/* the Locked\n Folder */", "# File Explorer",
+                       "<!-- see src/music/ -->", "locked_folder/vault.py", "Photos' grid", "photo/api.ts"):
+            self.assertRegex(sample, pattern)
+        for sample in ("// a photo", "// the session's status", "// https://example.com/music",
+                       "status/setup/login/logout"):
+            self.assertNotRegex(sample, pattern)
 
     def test_the_shared_renderers_and_contract_name_no_satellite_at_all(self):
         names = satellite_names()

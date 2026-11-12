@@ -352,7 +352,7 @@ class StarCore:
 
     def health(self) -> dict:
         """The engine, Mission Control and every satellite as pass/fail checks -
-        what `engine health` and the Status satellite both report."""
+        what `engine health` reports, and what any Satellite may report too."""
         from .api.payloads import satellite_status
 
         checks = [{"check": "engine", "ok": self._running, "detail": "running" if self._running else "not running"}]

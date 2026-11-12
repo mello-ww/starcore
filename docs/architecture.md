@@ -32,8 +32,8 @@ later) - a separate application that speaks to the Engine's existing public API 
 Mission Control does, over the same `/api/...` endpoints and the same session system, rather than
 a second backend of its own. See `mobile/README.md`.
 
-Audio playback is moving to one host per client (`media.audio`), which plays content any
-Satellite provides through `audio.library`. See [docs/media-audio.md](media-audio.md).
+Audio plays through one host per client (`media.audio`), which plays content any Satellite
+provides through `audio.library`. See [docs/media-audio.md](media-audio.md).
 
 ## Design
 
@@ -69,7 +69,7 @@ flowchart LR
     Android -- "actions and data" --> Routes
 ```
 
-**Today**, this runs alongside what came before it. Status (UI contract 1.1) and Photos (1.2) are drawn from their `ui.json` by default, on both clients and on Home; their previous page and screens stay in Developer Mode until retired. Music and the Locked Folder keep their dedicated, hand-written screens on both clients (and their Mission Control `page.js`), and File Explorer its `page.js`, until the shared blocks reach parity with them ([Retiring Satellite-specific interfaces](legacy-ui-retirement.md)). Those screens are the reference the shared components are extracted from, not code to discard. A handful of name-based couplings from before the contract remain, each listed in a test that only lets the list shrink. See "Current implementation and target" and "Migration" in [UI contract](ui-contract.md).
+**Today**, this runs alongside what came before it. Status (UI contract 1.1) and Photos (1.2) are drawn from their `ui.json` by default, on both clients and on Home; their previous page and screens stay in Developer Mode until retired (Photos' still serve its settings, phone sync and the Locked Folder). File Explorer has a read-only shared interface as a preview: the Android app opens it, Mission Control keeps File Explorer's `page.js` by default. Music and the Locked Folder keep their dedicated, hand-written screens on both clients (and their Mission Control `page.js`) until the shared blocks reach parity with them ([Remaining work](remaining-work.md)). Those screens are the reference the shared components are extracted from, not code to discard. A handful of name-based couplings from before the contract remain, each listed in a test that only lets the list shrink. See "Current implementation and target" and "Migration" in [UI contract](ui-contract.md).
 
 
 

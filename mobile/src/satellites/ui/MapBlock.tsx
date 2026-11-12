@@ -13,8 +13,8 @@ const {palette, space, type, radii} = tokens;
  * The map block (UI contract 1.2): items with a latitude and longitude on an interactive map,
  * grouped into clusters that separate as it zooms - the same screen-space grid Mission
  * Control's map uses. A marker opens the shared viewer on its items, or runs the block's action. It
- * draws with react-native-maps, the map the app already uses for Photo's own Map tab: no new
- * service or key. It never asks for the device's location.
+ * draws with react-native-maps and the app's one Google Maps key (AndroidManifest.xml): no
+ * other service or key. It never asks for the device's location.
  */
 
 export interface MapPoint {

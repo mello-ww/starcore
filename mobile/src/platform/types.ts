@@ -21,7 +21,7 @@
  * over the wire.
  *
  * Entries are encrypted at rest but never biometric-gated: the headless
- * background sync task (src/photo/backgroundSyncTask.ts) must read the
+ * background phone-sync task must read the
  * token with no UI, and every API request reads it too. Biometric unlock
  * is enforced as an app lock in front of the UI instead - see
  * src/auth/appLock.ts. */
@@ -74,8 +74,8 @@ export type SignResult =
   | {status: 'key-invalid'};
 
 /** A Keystore key that only signs after a strong biometric match - used
- * for the Locked Folder's biometric unlock, where the server verifies the
- * signature (see src/lockedFolder/biometricUnlock.ts). The private key
+ * for a Satellite's server-verified biometric unlock (the media.vault
+ * prompt), where the server verifies the signature. The private key
  * never leaves the device's secure hardware. One key per app install. */
 export interface BiometricSigner {
   isAvailable(): Promise<BiometricAvailability>;

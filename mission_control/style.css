@@ -1282,9 +1282,9 @@ button.chip:hover {
 /* ---------- directory picker ----------
  *
  * A generic filesystem directory picker, opened from any "path"-typed
- * configuration field. It delegates entirely to the FileExplorer satellite's
- * own /entries route (docs/satellites.md) - nothing here knows about Photo,
- * Music, or any other satellite's settings. */
+ * configuration field. It browses through whichever Satellite provides
+ * files.browse (docs/ui-contract.md) - nothing here knows any Satellite's
+ * settings. */
 
 #directory-picker-overlay .modal {
     max-width: 560px;

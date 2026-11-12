@@ -9,24 +9,23 @@ in a browser); there is no second backend anywhere in this directory.
 Mobile UI  ->  Existing StarCore API  ->  StarCore Engine  ->  Satellites
 ```
 
-## What's here (this block)
+## What's here
 
-- A working Android project (`android/`) and React Native app (`src/`).
-- Connect-to-server, login, secure session storage and restore, logout.
-- A foundation for biometric unlock (Settings screen toggle).
+- Several servers, sign-in, secure session storage and restore, and a per-server biometric
+  app lock.
+- Home, Satellites, Settings, and in Developer Mode the Console and Config tabs.
+- Every Satellite that ships a `ui.json`, drawn by the shared renderer (see "Satellite
+  interfaces" below): Status, Photos, and File Explorer's read-only preview, the app's file
+  browser.
+- The shared audio player (`src/media/`), and Music's native library screens.
+- Photos' previous native screens, its background phone sync, and the Locked Folder's unlock
+  prompt and screens, until they are retired (`docs/remaining-work.md`).
 - Developer Mode (`src/developer/`): the terminal icon at the top right of each tab, or the
   switch in Settings. Off by default and remembered per server on this device; it shows the
   Console and Config tabs and anything a Satellite marks `developer: true`. A display
   preference only - see docs/satellites.md, "Developer Mode".
-- Bottom-tab navigation with placeholder screens for Locked Folder, Files
-  and Photos - the shell those later blocks fill in, not built yet.
-- Tests for the session/authentication logic (`__tests__/`).
 
-Not in this block, on purpose (see the next blocks instead): File
-Explorer, Photo Library, Locked Folder's actual unlock flow, notifications,
-an iOS build. Adding each of those should mean filling in an existing
-placeholder screen and/or a new `src/api/*.ts` client, not restructuring
-anything here.
+Not built yet: notifications, an iOS build and a light theme.
 
 ## Prerequisites
 
@@ -55,14 +54,6 @@ an already-running emulator (Android Studio's Device Manager, or
 device with USB debugging enabled and `adb devices` showing it connected.
 
 If Metro's bundler needs restarting on its own: `npm start`.
-
-> This project was authored and reviewed in an environment without access
-> to the npm registry or an Android SDK/emulator, so `npm install` and the
-> Android build itself have not been executed as part of writing it. The
-> non-native logic (`src/auth/session.ts` and everything `__tests__/`
-> covers) needs neither and should be verified with `npm test` as a first
-> step after `npm install` on a real machine, before attempting the full
-> Android build.
 
 ### A pinned dependency: react-native-video
 
@@ -210,34 +201,50 @@ from the cache. The rules shared with the Engine and Mission Control are in
 
 Status and Photos open their `ui.json` by default; their dedicated screens stay
 in Developer Mode, and Photos' still serve its settings, phone sync and the
-Locked Folder. Music keeps its dedicated screens until the shared blocks reach
-parity with them (`docs/legacy-ui-retirement.md`), and the older `mobile` route
-(`DeclarativeScreen`) still works. Satellite icons come from each Satellite's
-`icon_name`.
+Locked Folder. File Explorer has no screen of its own: its `ui.json` is a
+read-only preview, which the app opens (Mission Control keeps File Explorer's
+own page by default). Music keeps its dedicated screens until the shared blocks
+reach parity with them (`docs/remaining-work.md`), and the older `mobile`
+route (`DeclarativeScreen`) still works. Satellite icons come from each
+Satellite's `icon_name`.
+
+Code written for one Satellite lives only in its own folder (`src/music/`,
+`src/photo/`, `src/status/`, `src/lockedFolder/`), wired in by
+`src/satellites/builtins.tsx` and the navigation. Everything else is generic;
+`engine/tests/test_client_modularity.py` lists the couplings left, and that list
+may only shrink.
 
 ## Project structure
 
 ```
 mobile/
-├── android/            native Android project
+├── android/              native Android project, with the app's own Kotlin
+│                         modules (audio, downloads, files, privacy, build info)
 ├── src/
-│   ├── api/             StarCore API clients (auth.ts today; File
-│   │                    Explorer/Photo/Locked Folder clients join this
-│   │                    same directory in later blocks)
-│   ├── auth/             SessionManager (framework-free) + AuthContext
-│   │                     (wires it into React)
+│   ├── api/              the StarCore API client (sign-in, sessions)
+│   ├── auth/             SessionManager (framework-free), AuthContext, app lock
+│   ├── servers/          the saved servers
 │   ├── platform/         SecureStore/BiometricAuthenticator/DeviceInfo
 │   │                     interfaces, with one *.android.ts implementation
 │   │                     each - see platform/README.md
 │   ├── navigation/       bottom tabs + the signed-in/signed-out switch
-│   ├── screens/          one file per screen
-│   ├── components/       shared UI (Card, PrimaryButton, Starfield)
-│   ├── theme/             StarCore's palette/typography, ported from
-│   │                     mission_control/style.css
+│   ├── screens/          the app's own screens, and SatelliteUiScreen
+│   ├── satellites/       the Satellite list and document cache, and in ui/
+│   │                     the shared renderer for UI contract documents
+│   ├── media/            the shared audio host and player
+│   ├── files/            saving, sharing and opening files
+│   ├── components/       shared UI (cards, pills, sliders, charts, TopBarSlot,
+│   │                     FloatingPlayerInset, ZoomableImage)
+│   ├── theme/            tokens.ts (kept in sync with
+│   │                     mission_control/tokens.css) and the accent
+│   ├── developer/        Developer Mode
 │   ├── storage/          plain (non-secret) local preferences
+│   ├── music/ photo/     Satellite-specific screens, until they are retired
+│   │   status/           (docs/remaining-work.md)
+│   │   lockedFolder/
 │   └── config.ts         build-time constants only - no server address,
 │                          no credentials, ever
-└── __tests__/            session/auth logic tests (see "Testing" below)
+└── __tests__/            Jest tests (see "Testing" below)
 ```
 
 ## Why React Native
@@ -248,10 +255,11 @@ framework that shares UI code as well as business logic fits better than
 two fully separate native codebases sharing only a hand-drawn design spec -
 which is what "reuse the majority of the application logic and design
 system" for a future iOS build calls for. React Native is used here in the
-most boring, standard way possible: no custom native modules beyond the two
-community libraries `src/platform/` wraps, and `src/App.tsx` is the only
-platform-agnostic entry point (`index.js` registers it identically on
-Android and, later, iOS).
+most standard way possible: community libraries where they exist, the app's
+own Kotlin modules only for what JS can't reach (audio effects and downloads,
+saving and sharing files, screen privacy, build info), and `src/App.tsx` as
+the only platform-agnostic entry point (`index.js` registers it identically
+on Android and, later, iOS).
 
 `src/platform/` is where the genuinely platform-specific 10% lives, kept
 behind two small interfaces (see `platform/README.md`) - everything else in
@@ -280,13 +288,12 @@ Adding iOS later means:
 npm test
 ```
 
-Covers the logic the task brief calls out specifically - login, session
-restore (including a revoked/expired token being treated as signed out,
-never trusted just because it's stored locally), logout clearing storage,
-and the biometric-unlock gate (`__tests__/session.test.ts`). These tests
-use plain in-memory fakes (`__tests__/fakes.ts`) for every platform/network
-interface `SessionManager` depends on - no native module, network call, or
-React Native test renderer involved, so they run under plain Jest/Node.
+The Jest suites in `__tests__/` cover sessions and the app lock (with
+in-memory fakes from `__tests__/fakes.ts`, so a stored token is never trusted
+without the live server), the UI contract against the shared fixtures in
+`contracts/ui/` (`uiContract.test.ts`), the shared renderer and its blocks,
+offline pages, the audio host, files, and the Satellite-specific screens. Run
+`npm run typecheck` and `npm run lint` as well.
 
 ## Release builds
 

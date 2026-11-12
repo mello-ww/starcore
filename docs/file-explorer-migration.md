@@ -1,4 +1,4 @@
-# File Explorer migration plan (2026-11-12, at 425ec1b)
+# File Explorer migration plan (2026-11-12, at 425ec1b; F1 done at 9c79049)
 
 Moves File Explorer to the shared interface (`ui.json`) on both clients, the way Photos moved
 (see `photos-parity-audit.md`). Compared from the code, not the docs:
@@ -91,14 +91,6 @@ the existing actions.
 File Explorer's own code already lives in its folder: its web page is under the Satellite, and
 the app has no screen of its own for it. This migration gives Android the feature and adds
 only generic contract features; it removes no entry from `engine/tests/test_client_modularity.py`.
-What still names a Satellite outside its folder afterwards (planned in
-[`legacy-ui-retirement.md`](legacy-ui-retirement.md)):
-
-| Where | What | Way out |
-|---|---|---|
-| `mobile/src/music/`, `builtins.tsx` | Music's native screens | Music on `ui.json` (needs the audio host actions) |
-| `mobile/src/photo/`, `MainTabs.tsx`, `App.tsx` | Photo's own screens, settings and background phone sync | Shared interface as default (done in M1-M14), then: settings as a form (repeatable rows), phone sync as a generic device capability, retire the screens |
-| `mobile/src/lockedFolder/`, `builtins.tsx` | The Locked Folder's PIN and biometric prompt | Photos #37: the Locked Folder in the shared interface; the prompt is registered for the `media.vault` capability |
-| `mobile/src/status/`, `HomeScreen.tsx` | Status's screen and Home card for servers older than its `ui.json` | Drop once those servers are no longer supported |
-| `mobile/src/satellites/icons.ts` | Icons for servers older than UI contract 1.0 | Same; then Photos #38, icons shipped by the Satellite |
-| `satellites/native/file_explorer/locked_folder_guard.py`, Photo ↔ Locked Folder | One Satellite naming another | A `files.protected` capability; the vault beside Photo's library through `media.vault` |
+One thing still names another Satellite: `locked_folder_guard.py`, which becomes a
+`files.protected` capability in R3 of [`remaining-work.md`](remaining-work.md),
+where everything else left outside Satellite folders is listed.

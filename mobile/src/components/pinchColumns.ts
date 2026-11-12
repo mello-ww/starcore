@@ -12,8 +12,8 @@ export function pinchedColumns(start: number, scale: number, min: number, max: n
 /**
  * A pinch over a grid that changes its column count once, when the fingers lift - re-laying out
  * a list on every frame of the gesture would be far more jank than useful. Two fingers only, so
- * it never takes a one-finger scroll or a tile's press. Shared by Photo's own grid and the UI
- * contract's media-grid.
+ * it never takes a one-finger scroll or a tile's press. Used by the UI contract's media-grid
+ * and by any native grid.
  */
 export function usePinchColumnsGesture(columns: number, min: number, max: number, onChange: (next: number) => void) {
   const apply = useCallback(

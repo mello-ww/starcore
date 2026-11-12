@@ -1420,9 +1420,9 @@ async function handleConfigurationSubmit(event) {
 /* ---------- active sessions ----------
  *
  * Every session AuthStore currently considers valid (see starcore/auth.py) -
- * a browser's own "web" session and, once a StarCore mobile app exists,
- * whatever "mobile" sessions it has established by logging in the same way
- * a browser does (see docs/locked_folder.md). This never sees a token, only
+ * a browser's own "web" session and the Android app's "mobile" sessions,
+ * established by logging in the same way a browser does (see docs/api.md,
+ * "Authentication"). This never sees a token, only
  * the opaque session_id list_sessions() reports - revoking asks for that id,
  * never the token itself. */
 
@@ -1503,7 +1503,7 @@ async function handleRevokeSession(sessionId, button, isCurrent) {
  * reload button and an enable/disable button, native or link, whether or not
  * it has a background service at all - the Core's set_satellite_enabled()
  * and reload_satellite() are what actually run, and neither this file nor
- * the Core has to know anything Photo- or Music-specific to offer them. */
+ * the Core has to know anything about a particular Satellite to offer them. */
 
 function reloadIcon() {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1908,8 +1908,7 @@ async function handleSatelliteConfigSubmit(event) {
  * above). It browses through the files.browse capability's "list"
  * operation - whichever Satellite provides it - so a directory
  * can be chosen without retyping a path by hand. Nothing here is specific to
- * Photo, Music, or any other caller: it just hands back whatever absolute
- * path the user picked. */
+ * any caller: it just hands back whatever absolute path the user picked. */
 
 function openDirectoryPicker(initialPath, onChoose) {
     directoryPickerState = { onChoose, path: "", parent: null };

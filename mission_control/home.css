@@ -259,7 +259,7 @@ body {
     gap: 8px;
 }
 
-/* a slot a Satellite may put one control into (Music's now-playing disc) */
+/* a slot for one control beside Developer Mode (the player's now-playing disc) */
 .topbar-extras {
     display: flex;
     align-items: center;

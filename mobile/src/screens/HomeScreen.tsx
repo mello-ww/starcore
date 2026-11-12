@@ -44,8 +44,8 @@ export function formatUptime(seconds: number): string {
 /**
  * Satellites with a native screen of their own. A Satellite's ui.json comes
  * first (the shared SatelliteUiScreen): these are for Satellites without one
- * yet (Photo, Music), and for a server older than a Satellite's ui.json
- * (Status before UI contract 1.1).
+ * yet, and for a server older than a Satellite's ui.json. Listed in
+ * docs/remaining-work.md, and removed from there.
  */
 export const DEDICATED_SCREENS: Record<string, 'PhotoHome' | 'MusicHome' | 'StatusHome'> = {
   Photo: 'PhotoHome',
@@ -148,12 +148,12 @@ export function HomeScreen() {
           : undefined;
     navigation.navigate('Satellites', {screen, params, initial: false});
   };
-  // a server older than Status's ui.json (UI contract 1.1) has no widget for it:
-  // its dedicated card stays, so a newer app on an older server loses nothing
+  // a server older than UI contract 1.1 has no widgets: the dedicated card stays,
+  // so a newer app on an older server loses nothing
   const legacyStatus = satellites?.find(satellite => satellite.name === 'Status' && !satellite.ui?.revision);
 
   const online = satellites?.filter(satellite => satellite.status === 'running').length ?? 0;
-  // a satellite shown inside another (the Locked Folder, in Photos) gets no card of its own;
+  // a satellite shown as a section of another gets no card of its own;
   // the system metric above still counts every satellite
   const listed = satellites?.filter(satellite => !satellite.section_of) ?? null;
   const listedOnline = listed?.filter(satellite => satellite.status === 'running').length ?? 0;

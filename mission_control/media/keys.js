@@ -5,7 +5,8 @@ import { player } from "./player.js";
 
 let installed = false;
 
-// only while Music is on screen, so other Mission Control pages keep their own keys
+// only while the audio provider's own page (.mu-root) or the full player is on screen, so other
+// Mission Control pages keep their own keys (tied to that page for now: docs/remaining-work.md)
 function active() {
     return isFullscreenOpen() || Boolean(document.querySelector(".mu-root"));
 }

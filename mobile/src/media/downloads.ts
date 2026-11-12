@@ -33,7 +33,7 @@ export interface DownloadSettings {
 type Listener = () => void;
 
 /**
- * Offline copies for one server, in app-private storage beneath music/<server>/. The index
+ * Offline copies for one server, in the native downloads module's app-private folder, per server. The index
  * (what is downloaded, when it was last played) lives in AsyncStorage under the server's id.
  */
 export class DownloadManager {

@@ -80,7 +80,7 @@ More in [Architecture](docs/architecture.md) and [Terminology](docs/terminology.
 | <img src="docs/assets/readme/satellite-photo.svg" width="24" align="center" alt=""> [**Photo**](docs/satellites/photo.md) | Photo and video library with albums, map and phone backup | Web · Android |
 | <img src="docs/assets/readme/satellite-locked-folder.svg" width="24" align="center" alt=""> [**Locked&nbsp;Folder**](docs/satellites/locked_folder.md) | PIN-protected private area in Photos, optionally encrypted | Web · Android |
 | <img src="docs/assets/readme/satellite-music.svg" width="24" align="center" alt=""> [**Music**](docs/satellites/music.md) | Music library, streaming, playlists, Daily Mixes, lyrics, Connect | Web · Android |
-| <img src="docs/assets/readme/satellite-file-explorer.svg" width="24" align="center" alt=""> **File&nbsp;Explorer** | Browse, upload and manage files | Web |
+| <img src="docs/assets/readme/satellite-file-explorer.svg" width="24" align="center" alt=""> **File&nbsp;Explorer** | Browse, upload and manage files | Web · Android (browsing only, preview) |
 | <img src="docs/assets/readme/satellite-docker.svg" width="24" align="center" alt=""> **Docker** | *Link Satellite* - a placeholder that loads and reports its status | — |
 
 <sub>Locked Folder on Android lives in the Photos tab; its location, encryption and recovery are

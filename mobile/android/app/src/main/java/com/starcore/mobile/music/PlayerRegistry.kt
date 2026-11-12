@@ -3,7 +3,7 @@ package com.starcore.mobile.music
 import com.brentvatne.react.RNVPlugin
 
 /**
- * Holds the ExoPlayer react-native-video creates for the Music player. Typed as Any and
+ * Holds the ExoPlayer react-native-video creates for the audio host's player. Typed as Any and
  * reached through reflection so the app never compiles against media3 itself - it stays
  * whatever version react-native-video ships.
  */

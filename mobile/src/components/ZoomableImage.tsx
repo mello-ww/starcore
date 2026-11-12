@@ -19,13 +19,13 @@ function clamp(value: number, limit: number): number {
 }
 
 /**
- * A still image that pinches to zoom (1x-5x) and, zoomed in, pans - shared by Photo's own
- * viewer and the UI contract's media viewer, so both feel the same. Releasing below the
+ * A still image that pinches to zoom (1x-5x) and, zoomed in, pans - shared by the UI
+ * contract's media viewer and any native viewer, so they feel the same. Releasing below the
  * original size springs back; leaving the page (`active` false) resets it.
  *
  * Swiping between items belongs to the pager the image sits in, never to this view:
  * - without `onZoomChange`, a zoomed image pans with two fingers only, so one finger always
- *   swipes (Photo's own viewer, whose pager can't be paused);
+ *   swipes (for a pager that can't be paused);
  * - with it, the pager hears when the image is zoomed and pauses its own swiping, and a
  *   zoomed image pans with one finger and zooms in or out on a double tap.
  */

@@ -19,11 +19,11 @@ import com.starcore.mobile.buildinfo.BuildInfoPackage
  * Standard React Native application bootstrap - autolinking (via
  * `PackageList`) is what wires in the native halves of react-native-keychain
  * and react-native-biometrics (see src/platform/), so neither is
- * hand-registered here. The one exception is the app's own Music package
- * (src/music/native.ts), which has no npm package to autolink from, and
+ * hand-registered here. The one exception is the app's own audio package
+ * (src/media/native.ts), which has no npm package to autolink from, and
  * its react-native-video plugin hook that gives it the player's session,
- * and the Privacy package (FLAG_SECURE and image-cache eviction for the
- * Locked Folder), BuildInfo (Settings > About), and StarCoreFiles (the shared
+ * and the Privacy package (FLAG_SECURE and image-cache eviction for private
+ * content), BuildInfo (Settings > About), and StarCoreFiles (the shared
  * interface's download and share actions, src/files/).
  */
 class MainApplication : Application(), ReactApplication {

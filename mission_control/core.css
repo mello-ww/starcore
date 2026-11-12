@@ -460,7 +460,7 @@
     background: var(--sc-on-accent);
 }
 
-/* Music's light theme sits on white, so its unchecked track needs a darker grey */
+/* the player's light theme (media/theme.js) sits on white, so an unchecked track needs a darker grey */
 [data-mu-theme="light"] .sc-switch:not(:checked) {
     background: #c9cbd2;
 }

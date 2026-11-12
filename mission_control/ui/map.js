@@ -3,8 +3,8 @@
 // Items with a latitude and longitude on an interactive map, grouped into clusters that separate
 // as it zooms (a grid about 64 px wide on screen, so thousands of items stay a few markers). A single marker
 // opens the shared viewer (or runs the block's action); a cluster shows its thumbnails first.
-// It draws with Leaflet and OpenStreetMap tiles, loaded only when a map is shown: the same
-// library and tiles Photo's own page already uses, so no new service or key is involved.
+// It draws with Leaflet and OpenStreetMap tiles, loaded only when a map is shown: no service
+// account or key is involved.
 
 import { isSafeRoute, resolve, resolveTemplate } from "./contract.js";
 import { itemKey, mediaKind } from "./gallery.js";

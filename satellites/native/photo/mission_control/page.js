@@ -39,7 +39,7 @@ function tabLabel(name) {
 // actually about to be shown (the Map tab, or a photo's location panel) -
 // everything else in Mission Control stays dependency-free (see
 // docs/mission_control.md); this is the one deliberate, documented exception
-// (see "Map" in docs/photo.md) and it never blocks anything else from working
+// (see "Map" in docs/satellites/photo.md) and it never blocks anything else from working
 const LEAFLET_VERSION = "1.9.4";
 const LEAFLET_CSS = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leaflet.css`;
 const LEAFLET_JS = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leaflet.js`;
@@ -776,7 +776,7 @@ export function mount(context) {
         return button;
     }
 
-    // Moves a photo to the recycle bin (see docs/photo.md#recycle-bin) - the
+    // Moves a photo to the recycle bin (see docs/satellites/photo.md#recycle-bin) - the
     // same "trash" endpoint the mobile app and the bin itself use, never a
     // separate delete path. `onDeleted` decides how the caller's own view
     // catches up (a full refresh from the main gallery, a narrower re-fetch
@@ -901,7 +901,7 @@ export function mount(context) {
         // four visually distinguished groups, always in this order - Physical
         // (from Photo configuration's source_paths, see albums.py), Favorites
         // (always present, see AlbumStore.ensure_favorites()), Custom/virtual
-        // albums the user created, then the Recycle bin - see docs/photo.md,
+        // albums the user created, then the Recycle bin - see docs/satellites/photo.md,
         // "Albums"
         const physical = albums.filter((album) => album.kind === "physical");
         const favorites = albums.find((album) => album.kind === "favorites");

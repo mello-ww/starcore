@@ -6,8 +6,9 @@ let playingAlbum = null; // the playing track's album: its cover colours the pla
 const themed = new Set();
 const media = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
 
-// Music's accent preference: "starcore" (default) follows StarCore's global accent, "#rrggbb" is a
-// colour for Music only, and "artwork" also follows StarCore except in the player, which takes
+// The player's accent preference (from the audio session's preferences): "starcore" (default)
+// follows StarCore's global accent, "#rrggbb" is a colour for the player and its provider's page
+// only, and "artwork" also follows StarCore except in the player, which takes
 // the playing cover's colour. Anything not yet loaded or unknown reads as "starcore".
 function accentMode() {
     const value = String(session.preference("accent", "starcore") || "starcore").toLowerCase();
@@ -54,7 +55,7 @@ function hexToRgb(hex) {
     return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 }
 
-// Sets one of Music's own colours, with the text colour that reads on it; null removes it, and
+// Sets one of the player's own colours, with the text colour that reads on it; null removes it, and
 // page.css then falls back to StarCore's --sc-accent / --sc-on-accent, so the global choice
 // applies live without anything here listening for it.
 function setColour(property, onProperty, rgb) {

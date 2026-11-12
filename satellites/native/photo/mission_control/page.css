@@ -876,9 +876,9 @@
 
 /* the StarCore skin around the map: a dark panel that reads as part of
    Mission Control rather than a foreign embed, with the map itself inset
-   inside it - see docs/photo.md "Map" for the CSS trick that recolors the
-   OpenStreetMap tiles to fit, and why an external map library is the one
-   documented departure from Mission Control's usual zero-dependency rule */
+   inside it. The rules below recolor the OpenStreetMap tiles to fit; the map
+   library (Leaflet) is the one departure from Mission Control's usual
+   zero-dependency rule (docs/satellites/photo.md) */
 .photo-map-shell {
     position: relative;
     height: min(70vh, 640px);

@@ -17,7 +17,7 @@
     max-width: none;
 }
 
-/* so does a page of photos or a map, for the collection itself; its text, forms and buttons
+/* so does a page holding a media grid or a map, for the collection itself; its text, forms and buttons
    keep the reading width */
 .ui-root.ui-collection > :not(.ui-page),
 .ui-root.ui-collection > .ui-page > :not(.ui-media-grid):not(.ui-map):not(.ui-card:has(.ui-media-grid, .ui-map)) {
@@ -1520,7 +1520,7 @@ body.ui-viewer-open {
     background: transparent;
 }
 
-/* the image takes the frame's size, not its own: in flow, a tall photo kept its natural height
+/* the image takes the frame's size, not its own: in flow, a tall image kept its natural height
    and was cropped by the frame */
 .ui-viewer-frame img {
     position: absolute;
@@ -1830,8 +1830,8 @@ body.ui-viewer-open {
     background: var(--sc-control);
 }
 
-/* the standard OpenStreetMap tiles recoloured for StarCore's near-black surfaces (as on
-   Photo's own map); only the imagery is filtered, never the markers or controls above it */
+/* the standard OpenStreetMap tiles recoloured for StarCore's near-black surfaces; only the
+   imagery is filtered, never the markers or controls above it */
 .ui-map-canvas .leaflet-tile-pane {
     filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.12);
 }

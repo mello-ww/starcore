@@ -46,8 +46,9 @@ side by side before the old page is retired. Status is the first Satellite to ma
 move (1.1). Photo follows in 1.2: its document was a **preview** (see
 [The document](#the-document)) until it reached parity, and is now its default interface, with
 its own page and screens kept in Developer Mode until they are retired. Music keeps its
-dedicated, hand-written page and screens until the shared blocks reach parity with them, and
-File Explorer its `page.js` (see [Migration](#migration)). Those
+dedicated, hand-written page and screens until the shared blocks reach parity with them.
+File Explorer's document is a read-only preview: the Android app opens it, Mission Control
+keeps File Explorer's `page.js` by default (see [Migration](#migration)). Those
 implementations are the behavioural reference for the capabilities still to come, not code
 to be thrown away.
 
@@ -857,11 +858,12 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 
 ## Migration
 
-Every step is additive, keeps the Alpha working, and replaces a hand-written screen only
-once the shared one reaches parity. Music keeps its dedicated screens until then, and File
-Explorer its `page.js` ([its plan](file-explorer-migration.md)); Photos and Status open their
+Every step replaces a hand-written screen only once the shared one reaches parity and the
+owner has validated it. Music keeps its dedicated screens until then, and File
+Explorer's `page.js` stays the web's default while its preview catches up
+([its plan](file-explorer-migration.md), F1 done); Photos and Status open their
 shared interfaces and keep their previous screens in Developer Mode until they are retired.
-Retiring all of them is planned in [Retiring Satellite-specific interfaces](legacy-ui-retirement.md).
+Retiring all of them is planned in [Remaining work](remaining-work.md).
 
 1. **Done:** document v0 (the `mobile` route and `page.js`); the modularity guard.
 2. **Done:** Engine metadata: `icon_name`, `provides`, `ui.json` with revisions and ETags,
@@ -895,7 +897,9 @@ Retiring all of them is planned in [Retiring Satellite-specific interfaces](lega
 8. Retire v0: deprecate the `mobile` route once nothing uses it. `page.js` stays as the web
    extension mechanism.
 
-Backward compatibility:
+Backward compatibility (not required for now: StarCore runs only on the owner's server, on
+the latest version, so what follows is kept only until the code for it is removed, stage 1 of
+[Remaining work](remaining-work.md)):
 
 - An Alpha (0.1.0-alpha.1) Android app talking to a newer server ignores the new fields: it
   shows a Satellite that has only `ui.json` as having no mobile interface yet, and still opens

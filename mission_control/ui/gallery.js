@@ -78,7 +78,7 @@ export function tileAction(block, scope, canRun) {
 
 /** Which way a one-finger swipe moves the viewer: 1 (to the left: the next item), -1 (to the
  * right: the previous one) or 0. A deliberate sideways swipe only - over 40 px and well wider
- * than tall - so a tap or a scroll moves nothing; the same rule as Photo's own page. */
+ * than tall - so a tap or a scroll moves nothing. */
 export function swipeStep(deltaX, deltaY) {
     if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
         return deltaX < 0 ? 1 : -1;

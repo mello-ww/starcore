@@ -17,8 +17,8 @@ export const APP_NAME = 'StarCore';
 export const SESSION_KIND = 'mobile' as const;
 
 /** Timeout for a single StarCore API call. Generous - some of these (a
- * large File Explorer listing, a Photo Library scan trigger) can
- * legitimately take a while on a modest home server. */
+ * large folder listing, a library scan) can legitimately take a while on
+ * a modest home server. */
 export const REQUEST_TIMEOUT_MS = 20_000;
 
 /** Timeout for a single background-sync file upload (see api/client.ts's

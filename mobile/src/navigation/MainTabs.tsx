@@ -46,22 +46,14 @@ export type SatellitesStackParamList = {
    * `revision` is the one GET /api/satellites reported, so a cached copy of
    * exactly that document opens without a request. */
   SatelliteUi: {name: string; page?: string; params?: Record<string, any>; revision?: string | null};
-  /** The "Photo" Satellite is special-cased here rather than going through
-   * SatelliteDetail's generic DeclarativeScreen - see PhotoHomeScreen's own
-   * docstring and "Exposing a mobile interface" in docs/satellites.md. */
-  /** `section` (from a shared interface's own action): "settings" opens Photo configuration,
-   * "locked" the Locked Folder on its own. */
+  /** A Satellite's previous native screens, registered here until they are retired
+   * (docs/remaining-work.md). `section` comes from a shared interface's own action. */
   PhotoHome: {section?: string} | undefined;
   PhotoAlbum: {albumId: string; name: string};
-  /** Reached from PhotoHomeScreen's gear icon, never a bottom-tab segment of
-   * its own - see "Photo configuration... reachable via a settings entry"
-   * in the task brief. */
   PhotoConfiguration: undefined;
-  /** The Recycle bin, reached from inside the Albums section - see
-   * PhotoAlbumsTab's own "Recycle bin" card. */
   PhotoTrash: undefined;
   PhotoViewer: {media: {id: string; mediaType: 'photo' | 'video'; duration: number | null}[]; startIndex: number};
-  /** "Status" gets its own native screen too - see src/status/StatusHomeScreen.tsx. */
+  /** The fallback screen for a server older than its ui.json. */
   StatusHome: undefined;
 } & BuiltinScreenParams;
 

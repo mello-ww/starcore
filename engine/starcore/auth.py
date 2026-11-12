@@ -15,9 +15,9 @@ native client) and an optional `device_name` - free-form labels, not a
 second authentication mechanism: a mobile client authenticates exactly the
 same way a browser does, by calling login() with the user's password, and
 `kind`/`device_name` exist purely so the account owner can later see which
-sessions exist and revoke one by name (see list_sessions()/revoke_session(),
-and docs/satellites/locked_folder.md for how a Satellite - the Locked Folder - builds
-on this rather than inventing its own notion of "is this really the user").
+sessions exist and revoke one by name (see list_sessions()/revoke_session()).
+A Satellite that guards something of its own builds on this rather than inventing its
+own notion of "is this really the user".
 """
 
 from pathlib import Path
@@ -46,9 +46,9 @@ class AuthError(Exception):
 def hash_secret(secret: str, salt: bytes) -> str:
     """PBKDF2-HMAC-SHA256, the one password/PIN hashing routine StarCore
     uses everywhere a human-chosen secret needs to be stored - the account
-    password here, and the Locked Folder's PIN (satellites/native/
-    locked_folder/pin_store.py), which imports this directly rather than
-    re-implementing it, per "do not duplicate security-sensitive logic"."""
+    password here, and any Satellite's own secret (a PIN, for example),
+    which imports this directly rather than re-implementing it, per "do not
+    duplicate security-sensitive logic"."""
     return hashlib.pbkdf2_hmac("sha256", secret.encode("utf-8"), salt, PBKDF2_ITERATIONS).hex()
 
 
@@ -64,8 +64,7 @@ class LoginThrottle:
     is called, so firing many guesses at once cannot get around the limit
     while the slow password check runs.
 
-    Kept in memory only: a restart forgets it, the same as the Locked Folder's
-    PIN lockout. Behind a reverse proxy every client shares the proxy's
+    Kept in memory only: a restart forgets it. Behind a reverse proxy every client shares the proxy's
     address, so they would also share one lockout.
     """
 
@@ -247,8 +246,7 @@ class AuthStore:
 
     def session_kind(self, token: str) -> str:
         """"web", "mobile", or "" for a token that doesn't (or no longer)
-        validates - lets a Satellite (the Locked Folder, specifically) treat
-        a mobile session differently without re-implementing any part of
+        validates - lets a Satellite treat a mobile session differently without re-implementing any part of
         session validation itself. Never raises - an invalid token is simply
         reported as no kind at all, the same as validate_session() reports
         it as simply not valid."""
@@ -279,9 +277,8 @@ class AuthStore:
         `session_id` created alongside it, which is all revoke_session()
         below needs. Exposing the real bearer token back through an API
         response would be handing out a working credential a second time,
-        exactly what "never expose ... through ... API responses" (see
-        docs/satellites/locked_folder.md's security model) forbids for a PIN, and is
-        just as wrong here.
+        exactly what "never expose ... through ... API responses" forbids for
+        any secret.
         """
         now = time.time()
         sessions = []

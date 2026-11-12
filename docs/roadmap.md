@@ -3,76 +3,39 @@
 The roadmap represents the long-term direction of StarCore, and the current state of what is
 already built. Items may change as the project evolves.
 
-`[x]` means implemented **and** covered by the automated tests or the checks listed under
-"Current state". `[ ]` means planned. Anything implemented but not verified says so.
+`[x]` means implemented **and** covered by the automated tests or checked by hand. `[ ]` means
+planned. What was implemented but not verified is under "Not verified yet".
 
 ## Current state
 
-Stable checkpoint: tag `checkpoint-2026-11-02` (see `git show checkpoint-2026-11-02` for the
-exact commit). It contains the StarCore design-language redesign of Mission Control and the
-Android app, on top of the Music, Photo and Locked Folder satellites.
+At 2026-11-12 (`9c79049`), on top of the 0.1.0-alpha.1 release and the stable checkpoint
+`checkpoint-2026-11-02` (the StarCore design-language redesign). The test runs recorded at
+each step until then are in this file's history (`git log -p docs/roadmap.md`).
 
-### Verified at the checkpoint
+- **UI contract 1.2** (not released yet) is in progress: media blocks and the shared viewer,
+  `search`, `map`, `play`, `pick`, `own`, `secure`, `download`, `share`, offline pages and
+  `preview` (`docs/ui-contract.md`).
+- **Status** (1.1) and **Photos** (1.2) open their shared interface by default on both clients.
+- **File Explorer** has a read-only shared interface as a preview: the Android app's first file
+  browser (`docs/file-explorer-migration.md`, F1).
+- **Music** plays through the shared audio host on both clients, and keeps its own library
+  screens. The **Locked Folder** keeps its own screens; photos move into it from the shared
+  interface through `media.vault`.
+- What is left before no client code names a Satellite: `docs/remaining-work.md`.
 
-Run on Windows 11 with Python 3.13, Node 24 and JDK 17. Python tests use temporary
-directories only; the web checks ran against a throwaway demo server with temporary Music,
-Photo and Locked Folder storage, never a real library.
+### Not verified yet
 
-| Check | Result |
-| --- | --- |
-| Python engine and satellite tests (`python -m unittest discover -s tests -t .` in `engine/`) | 679 tests: 674 passed, 5 skipped, 0 failed |
-| Mission Control scripts (`node --check` on every tracked `.js` outside `mobile/`) | 35 files, all parse |
-| Mission Control API smoke test (sign-in, 401 when signed out, every satellite page, path traversal refused, Locked Folder session checks) | 35 / 35 |
-| Mission Control visual checks (Home, Satellites, Configuration, Music, Photo, Locked Folder, File Explorer, Status; 1440, 1000 and 390 px wide; dark and light Music; accent changes) | Checked by screenshot |
-| Android Jest | 30 suites, 288 tests passed |
-| Android TypeScript (`tsc --noEmit`) and ESLint (`src`, `__tests__`) | Clean |
-| Android Metro release bundle | Builds |
-| Android `assembleDebug` (JDK 17) | Builds |
-| Android emulator (API 37, 1080×2400): server list, sign-in, Home, Satellites, Music, Music Settings, Photos, live accent change | Checked by screenshot |
-
-The 5 skipped Python tests need things this Windows machine does not provide: two
-permission-denial cases, two symlink cases (one of them is the Locked Folder check that a
-symlink into the vault stays blocked while locked) and one FFmpeg video-thumbnail case. They
-should be run on Linux before relying on those behaviours.
-
-Not verified: real audio output (the demo library is empty and no speakers were checked),
-any physical Android device, iOS, Linux hosts, and HTTPS with a real certificate.
-
-### Photos grid and Locked Folder in Photos (after the checkpoint)
-
-Verified on the same machine against a demo server whose every satellite configuration was
-redirected to temporary folders (generated test photos, a temporary vault, a test PIN):
-
-| Check | Result |
-| --- | --- |
-| Python tests | 727 tests: 722 passed, 5 skipped (the same 5 as above), 0 failed |
-| Mission Control scripts | 36 files, all parse; API smoke test 35 / 35 |
-| Photos gallery columns (1440 / 1000 / 390 / 300 px wide) | 7 / 5 / 3 / 2, no horizontal overflow |
-| Web Locked Folder in a browser: wrong PIN, unlock, move in from the viewer, relock after the move, on leaving the tab, on reload and on navigating away, move out | All as expected |
-| Android Jest / TypeScript / ESLint / Metro release bundle | 32 suites, 312 tests passed; clean; clean; builds |
-| Android `assembleDebug` (JDK 17, with the new native privacy module) | Builds |
-| Android emulator: Locked section hidden from Home and Satellites lists, PIN unlock, relock on background, biometric enrollment and unlock with a simulated fingerprint, move out and move in, FLAG_SECURE (screen capture comes out blank) | All as expected |
-
-Not verified: biometric unlock on a physical phone, and Android's handling of a changed
-fingerprint enrollment (covered by unit tests only).
-
-### Locked Folder encryption, persistent lockouts and recovery (after the checkpoint)
-
-Same machine, same isolated demo server (temporary photos, vault, keys and test PIN; the
-encryption extra installed in `engine/.venv`):
-
-| Check | Result |
-| --- | --- |
-| Python tests | 776 tests: 771 passed, 5 skipped (the same 5), 0 failed - 49 of them new in `test_locked_folder_encryption.py` |
-| Mission Control scripts | 35 tracked files, all parse; API smoke test 35 / 35 |
-| Web Locked Folder in a browser: encrypt with a recovery key (key shown once, confirmation required), photos decrypting in the grid, an upload stored encrypted, a move in from Photos, deleting the backup with the PIN, relock on reload, a wrong and a right recovery key, the old PIN refused and the new one accepted, the "needs attention" state at 390 px | All as expected; no plaintext left in the vault folder |
-| Android Jest / TypeScript / ESLint | 32 suites, 315 tests passed; clean; clean |
-| Android `assembleDebug` (JDK 17) | Builds |
-
-Not verified: the emulator was not re-run (only TypeScript changed on Android - the "needs
-attention" state and an "encrypted" note); a physical phone;
-Linux and macOS hosts; a real power cut or full disk (both simulated); a real Windows password
-reset.
+- The Python tests skipped on Windows (4 at `9c79049`: permission denials, symlink cases - among
+  them the Locked Folder check that a symlink into the vault stays blocked while locked - and
+  FFmpeg video thumbnails): run them on Linux before relying on those behaviours.
+- A physical Android phone: biometric unlock and grants, background playback, the
+  notification and lock-screen controls, audio focus, Android's handling of a changed
+  fingerprint enrollment (unit tests only).
+- Real audio output, music and video streaming and uploads over 1 MB through the production
+  HTTPS proxy.
+- Linux and macOS hosts for Locked Folder encryption; a real power cut, full disk or Windows
+  password reset (simulated only).
+- iOS, which doesn't exist yet.
 
 ### Implemented
 
@@ -119,7 +82,7 @@ reset.
   pick the folder or recover.
 - The Signal Bus is not implemented yet (`engine/starcore/signals.py` is empty).
 - Space Mode does not exist yet. Developer Mode is a visibility preference only (see
-  docs/satellites.md); File Explorer has nothing behind it yet.
+  docs/satellites.md).
 
 ### Security review (2026-11-02)
 
@@ -197,7 +160,7 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] UI contract 1.1: `chart`, `table`, `choice`, `status`, `code`, the `dashboard` template, page state and sources, Home widgets, dates in formats
 - [ ] UI contract 1.2 (not released yet): media blocks and the shared viewer, `search` and `map`, `play`, `pick`, `own`, `secure`, `download` and `share`, offline pages, `preview`
 - [ ] UI contract next: templates, discovered sections
-- [ ] Retire every Satellite-specific interface (`docs/legacy-ui-retirement.md`)
+- [ ] Retire every Satellite-specific interface (`docs/remaining-work.md`)
 
 ## Mission Control
 
@@ -231,6 +194,10 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
     - [x] Photos' shared interface after the owner's review: whole photo in the viewer, full width, Favorites and the Locked Folder among the folders, tile hearts, download and share, web swipe, Library grouping (M7-M14)
     - [ ] Retire Photo's own page and screens once the shared interface is validated
     - [ ] Move File Explorer onto its `ui.json`, giving Android a file browser (`docs/file-explorer-migration.md`)
+        - [x] F1: read-only browsing, as a preview (Android opens it; the web keeps its own page)
+        - [ ] F2-F5: list paging, the file page (download, share, open), management, upload
+        - [ ] F6-F7: shared by default, then retire its own page
+    - [ ] The Locked Folder through `media.vault`, and Music on `ui.json` (R3 and R4 of `docs/remaining-work.md`)
 - [ ] Light theme
 - [ ] Icons instead of text glyphs for the remaining Music controls
 - [ ] Audio playback validated on a real device

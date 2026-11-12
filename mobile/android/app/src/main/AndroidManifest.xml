@@ -3,10 +3,8 @@
     <!-- StarCore is typically reached over the local network - a LAN
          address, or a home server's own domain - which docs/deployment.md
          (in the main repository) already supports over plain HTTP by
-         default. INTERNET is the only permission this foundation needs;
-         later blocks (File Explorer downloads, Photo Library) may add
-         storage-related permissions when they're actually implemented,
-         never speculatively ahead of the feature that needs them. -->
+         default. Every other permission below is declared for a feature
+         that uses it, never speculatively ahead of one. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Declared, not required: biometric hardware is a nice-to-have
@@ -16,12 +14,10 @@
         android:name="android.hardware.fingerprint"
         android:required="false" />
 
-    <!-- Photo's automatic background sync (see docs/satellites/photo.md,
-         "Real automatic phone sync") reads the camera roll via
-         @react-native-camera-roll/camera-roll - requested at runtime too
-         (see photo/mediaPermission.ts), this is just the manifest
-         declaration Android requires before that runtime prompt can even
-         be shown. READ_MEDIA_IMAGES/READ_MEDIA_VIDEO are Android 13+'s
+    <!-- The automatic background phone sync reads the camera roll via
+         @react-native-camera-roll/camera-roll - requested at runtime too,
+         this is just the manifest declaration Android requires before that
+         runtime prompt can even be shown. READ_MEDIA_IMAGES/READ_MEDIA_VIDEO are Android 13+'s
          replacement for READ_EXTERNAL_STORAGE, which is still declared
          (capped at API 32) for older devices. None of this grants write or
          delete access - sync only ever reads from the camera roll, never
@@ -33,12 +29,11 @@
         android:maxSdkVersion="32" />
 
     <!-- react-native-background-fetch's periodic scheduling (WAKE_LOCK) and
-         resuming it after a reboot (startOnBoot in
-         photo/backgroundSyncTask.ts's configureBackgroundFetch). -->
+         resuming it after a reboot (startOnBoot), for the phone sync. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Music (see src/music/): background playback runs in react-native-video's
+    <!-- The audio host (src/media/): background playback runs in react-native-video's
          media session service, a mediaPlayback foreground service with its
          notification and lock-screen controls. POST_NOTIFICATIONS is only
          asked for at runtime the first time something plays (Android 13+).
@@ -76,15 +71,16 @@
 
         <!-- react-native-maps' Android backend (react-native-maps' own
              AIRGoogleMapModule) needs a real Google Maps SDK key here before
-             PhotoMapTab's map will render anything but a blank grid -
+             any map (the shared map block included) renders anything but a
+             blank grid -
              MAPS_API_KEY is read from android/gradle.properties (not
              committed - add it there as `MAPS_API_KEY=your-key-here`,
              matching the project's existing "no keystore of any kind
              committed" convention for local secrets). Get a key from
              https://developers.google.com/maps/documentation/android-sdk/get-api-key;
              this app never needs any Maps *web* API, only this Android SDK
-             one. Without a key, every other Photo feature still works -
-             only the Map tab is affected. -->
+             one. Without a key, everything else still works - only maps
+             are affected. -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />

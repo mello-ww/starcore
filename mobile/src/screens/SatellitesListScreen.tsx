@@ -75,8 +75,8 @@ export function SatellitesListScreen({navigation}: Props) {
     <View style={styles.screen}>
       <FlatList
         ListFooterComponent={<FloatingPlayerSpacer />}
-        // a satellite shown as a section of another (the Locked Folder, in
-        // Photos) is opened from there, not listed on its own
+        // a satellite shown as a section of another is opened from there,
+        // not listed on its own
         data={(satellites ?? []).filter(item => !item.section_of)}
         keyExtractor={item => item.name}
         contentContainerStyle={[styles.list, {paddingTop: top + space.xl}]}
@@ -91,7 +91,7 @@ export function SatellitesListScreen({navigation}: Props) {
           // a ui.json the Engine validated (UI contract 1.x) - drawn by the
           // generic SatelliteUiScreen, so a new Satellite needs no app change.
           // It comes first: a dedicated screen is what a Satellite without one
-          // uses (Photo, Music), or the fallback for a server older than its ui.json. A
+          // uses, or the fallback for a server older than its ui.json. A
           // preview document (1.2) leaves the dedicated screen first; Developer Mode
           // offers the shared interface beside it. Otherwise Developer Mode offers the
           // dedicated screen beside the shared interface, until that screen is retired.

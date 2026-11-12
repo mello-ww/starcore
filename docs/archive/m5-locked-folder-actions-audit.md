@@ -1,7 +1,7 @@
 # M5 security audit: Locked Folder actions from the shared interface (2026-11-08)
 
 The audit comes before implementation. M5 is milestone 5 of the Photos roadmap in
-[`photos-parity-audit.md`](photos-parity-audit.md) (gap #24): "Move to Locked Folder" from the
+[`photos-parity-audit.md`](../photos-parity-audit.md) (gap #24): "Move to Locked Folder" from the
 shared Photos viewer and selection, on the web and on Android, without weakening the Locked
 Folder. I read the code at `42ff5e4`. Nothing has been implemented.
 

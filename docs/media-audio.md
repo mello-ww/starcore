@@ -153,6 +153,10 @@ tab when a remote target is registered. Info shows what the resolved `plan` repo
 
 ## Compatibility
 
+Not required for now (StarCore runs only on the owner's server, on the latest version): the
+points below describe what was kept, and stages 1 and 6 of [Remaining work](remaining-work.md)
+remove it.
+
 - Music's REST routes stay exactly as they are. The released Alpha app and Music's own page use
   them directly.
 - Persisted state keeps its keys, read as they are and never renamed: `starcore.music.*`
@@ -200,13 +204,9 @@ Follow-ups found while building it:
   media controls showed the position as 0:00 (seen on the emulator). The output component
   (react-native-video's `<Video>` and its props) was moved unchanged, so this looks like
   existing behaviour rather than a regression of this milestone. To investigate.
-
-
-- Move the player controller, `dock.ts`, `MiniPlayer`, `FullPlayer`, `MusicDisc`/`MusicFlight`
-  and the effects and downloads bridges behind a generic host in `mobile/src/media/`.
-- MainTabs mounts the host instead of `MusicProvider`.
-- The host resolves the provider through the catalog instead of `MUSIC_BASE`.
-- Music's screens call the host.
+- **Naming left from Music** in both hosts (a type, test IDs, labels, the web's keyboard
+  shortcuts tied to Music's page): listed under "Leftovers the guard can't see" in
+  [Remaining work](remaining-work.md).
 
 Accepted when:
 - `MainTabs.tsx` imports nothing from `src/music/`.
@@ -240,11 +240,6 @@ What it is now:
 - Tests: `node --test mission_control/tests/media.test.mjs` (a provider the client doesn't
   know, found only through the catalog; missing operations) and the modularity guard (the
   host imports only its own folder).
-
-
-- Move `player/`, `audio/` and the bar into `mission_control/media/`, started by the shell at
-  sign-in rather than by Music's page.
-- Music's `page.js` keeps its library views and calls the host.
 
 Accepted when:
 - The bar and disc appear on any page once something plays, including after a reload before
