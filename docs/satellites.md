@@ -209,8 +209,8 @@ rights of the signed-in page, and the Android app can't use it. Music, Photo, th
 Folder and File Explorer use one today. A new Satellite should describe its interface with
 `ui.json` instead (see "Describing an interface" above), and use `page.js` only for what the
 shared blocks can't express yet. If a Satellite ships both, both clients use `ui.json`; its
-`page.js` is Mission Control's fallback, and Developer Mode can switch to it. Status, the
-first Satellite to move, works that way for one release, and Photos does too. File Explorer
+`page.js` is Mission Control's fallback, and Developer Mode can switch to it. Photos works
+that way until its page is retired (Status, the first to move, no longer has one). File Explorer
 ships both with its document marked `preview`, so its `page.js` stays the web's default until
 the shared interface reaches parity.
 

@@ -20,7 +20,6 @@ import {PhotoConfigurationScreen} from '../photo/PhotoConfigurationScreen';
 import {PhotoHomeScreen} from '../photo/PhotoHomeScreen';
 import {PhotoTrashTab} from '../photo/PhotoTrashTab';
 import {PhotoViewerScreen} from '../photo/PhotoViewerScreen';
-import {StatusHomeScreen} from '../status/StatusHomeScreen';
 import {AudioHost} from '../media/AudioHost';
 import {AudioDisc, AudioFlight} from '../media/ui/AudioDisc';
 import {FullPlayer} from '../media/ui/FullPlayer';
@@ -51,8 +50,6 @@ export type SatellitesStackParamList = {
   PhotoConfiguration: undefined;
   PhotoTrash: undefined;
   PhotoViewer: {media: {id: string; mediaType: 'photo' | 'video'; duration: number | null}[]; startIndex: number};
-  /** The fallback screen for a server older than its ui.json. */
-  StatusHome: undefined;
 } & BuiltinScreenParams;
 
 export type SettingsStackParamList = {
@@ -100,7 +97,6 @@ function SatellitesStack() {
         <SatellitesStackNav.Screen key={screen.name} name={screen.name} component={screen.component}
           options={screen.title !== undefined ? {title: screen.title} : undefined} />
       ))}
-      <SatellitesStackNav.Screen name="StatusHome" component={StatusHomeScreen} options={{title: ''}} />
     </SatellitesStackNav.Navigator>
   );
 }

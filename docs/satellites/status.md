@@ -32,10 +32,10 @@ satellites/native/status/
     satellite.py  start/stop hooks: the sampler is Status's background service
     state.py      the Home summary, published with every satellite listing
     view.py       the snapshot shaped for display: what ui.json binds to
-    api.py        metrics, history, diagnostics, view, mobile
+    api.py        metrics, history, diagnostics, view
     ui.json       the interface, for every client (UI contract 1.1)
     commands/status.py           the CLI namespace
-    mission_control/page.js      the previous web page, kept for one release (see "Interface")
+    mission_control/icon.svg     its icon (no page of its own: the interface is ui.json)
 ```
 
 Standard library only - no psutil or other package. While Status's service runs (it starts
@@ -186,51 +186,18 @@ The Home widget binds to the summary in `state.py`, which now also carries the w
 display keys (`health_label`, `health_tone`, `cpu_tone`, `memory_tone`, `satellites`,
 `warning_items`) beside the keys the Alpha app reads.
 
-### Status's migration
+### Differences from the interfaces it replaced
 
-Status's previous interfaces stay for one release, so the shared one can be checked against
-them:
-
-- **Mission Control** uses `ui.json`. `mission_control/page.js` is the fallback if the document
-  is ever refused, and in Developer Mode the button beside the Satellite's title switches
-  between the two. Its charts, meters and sparklines are now Mission Control's shared ones
-  (`mission_control/ui/charts.js`), which its `charts.js` re-exports.
-- **The Android app** opens Status in the shared `SatelliteUiScreen`. `StatusHomeScreen` and
-  Home's dedicated Status card are what the app uses with a server older than this
-  `ui.json`, so a newer app on an Alpha server loses nothing. Its column chart and meter are
-  now the app's shared ones (`mobile/src/components/charts.tsx`).
-- **The Alpha app** (0.1.0-alpha.1) keeps opening its own Status screen, which reads the
-  `metrics` and `history` routes, unchanged.
-
-Feature by feature:
-
-| | Previous web page | Previous Android screen | Shared interface |
-| --- | --- | --- | --- |
-| Header: node, health, warning count, last update, sampling | yes | yes | yes, both clients |
-| Overview: warnings, 6 tiles, last-hour CPU and memory | yes (tiles with sparklines) | yes (no sparklines) | yes, sparklines on both |
-| Tiles open their section | yes | no | yes, both |
-| Hardware: processor, per-thread bars, memory, swap, drives, disk activity, system | yes | yes | yes |
-| Network: rates, interfaces, last-hour throughput | yes | yes | yes |
-| Services: engine, checks, satellites, dependencies, components | yes | yes | yes |
-| History: 4 ranges, 8 charts, unsupported list, values as a table | yes | yes (no table) | yes, table on both |
-| Diagnostics (Developer Mode) with raw JSON and Copy | yes | no | yes, both |
-| Refresh: polling while visible, pull to refresh | yes / - | yes / yes | yes / yes |
-| Offline: last readings kept, dimmed, with their age; retry when nothing loaded | yes | yes | yes |
-| Home summary | dedicated card | dedicated card | the Satellite's widget, both |
-
-Differences that remain, by design or for later:
+Status's own web page and Android screen (and the Home card) are gone: `ui.json` is its
+interface on both clients. Some things differ from them, by design or for later:
 
 - Sizes read "GB" where the previous screens said "GiB" (the same powers of 1024): the UI
   contract has one `bytes` format for every Satellite.
 - Percentages keep one decimal ("74.5%") where the previous screens rounded above 10%.
 - Navigation is the shared tab style (pills with icons) rather than Status's own segmented
   bar, on both clients.
-- On the web, Hardware's per-thread bars are a `bars` chart; the previous page's bars were
-  the same shape.
-
-Once this release is validated, `page.js` and its stylesheet, `StatusHomeScreen` and its
-sections, and the dedicated Home cards are removed, together with their entries in
-`engine/tests/test_client_modularity.py`.
+- Its charts, meters and sparklines are the shared ones (`mission_control/ui/charts.js`,
+  `mobile/src/components/charts.tsx`).
 
 ## API
 

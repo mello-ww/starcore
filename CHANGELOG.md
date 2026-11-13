@@ -145,6 +145,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Changed
 
+- **Older interfaces removed.** StarCore now runs only on the latest version, so the code kept
+  for older servers and the Alpha app is gone: the `mobile` Satellite route and its
+  `mobile_ui` flag, the app's fallback icons and assumed audio provider, and Status's own web
+  page, Android screen and Home card (its `ui.json` is its only interface, on both clients).
+  An older app no longer works with this server, and this app no longer works with an older one.
 - **Favorites is pinned at the top of Folders** in Photos' shared Albums page, on both clients,
   instead of sitting in a group of its own. Only Photo's server changed (`gallery/albums`).
 - **UI contract 1.2: offline pages.** A page with `"offline": true` is kept by the Android app

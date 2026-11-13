@@ -107,9 +107,7 @@ library), laid on a fixed time grid so gaps stay gaps
 Satellite's `ui.json` widgets (`src/satellites/ui/Widgets.tsx`) from the
 satellite list it already loads, so Status's costs no request of its own.
 
-`src/status/` is Status's previous native screen and Home card. The app uses
-them only with a server older than Status's `ui.json`, and they are removed
-once that release is validated. See `docs/satellites/status.md`.
+Status has no native screen of its own any more: see `docs/satellites/status.md`.
 
 ## Connecting to a server
 
@@ -199,16 +197,16 @@ from the cache. The rules shared with the Engine and Mission Control are in
 `src/satellites/ui/contract.ts`, tested against `contracts/ui/` by
 `__tests__/uiContract.test.ts`.
 
-Status and Photos open their `ui.json` by default; their dedicated screens stay
-in Developer Mode, and Photos' still serve its settings, phone sync and the
-Locked Folder. File Explorer has no screen of its own: its `ui.json` is a
+Status opens its `ui.json` alone; Photos opens its `ui.json` by default and keeps
+its dedicated screens in Developer Mode, where they still serve its settings, phone
+sync and the Locked Folder. File Explorer has no screen of its own: its `ui.json` is a
 read-only preview, which the app opens (Mission Control keeps File Explorer's
 own page by default). Music keeps its dedicated screens until the shared blocks
 reach parity with them (`docs/remaining-work.md`). Satellite icons come from each
 Satellite's `icon_name`.
 
 Code written for one Satellite lives only in its own folder (`src/music/`,
-`src/photo/`, `src/status/`, `src/lockedFolder/`), wired in by
+`src/photo/`, `src/lockedFolder/`), wired in by
 `src/satellites/builtins.tsx` and the navigation. Everything else is generic;
 `engine/tests/test_client_modularity.py` lists the couplings left, and that list
 may only shrink.
@@ -239,8 +237,7 @@ mobile/
 │   ├── developer/        Developer Mode
 │   ├── storage/          plain (non-secret) local preferences
 │   ├── music/ photo/     Satellite-specific screens, until they are retired
-│   │   status/           (docs/remaining-work.md)
-│   │   lockedFolder/
+│   │   lockedFolder/     (docs/remaining-work.md)
 │   └── config.ts         build-time constants only - no server address,
 │                          no credentials, ever
 └── __tests__/            Jest tests (see "Testing" below)

@@ -36,7 +36,7 @@ Clients implement the UI contract and capability protocols, never a Satellite.
 
 | Satellite | Shared interface | Own code still used |
 |---|---|---|
-| Status | ✅ default on both clients (1.1) | web `page.js` (fallback); Android `src/status/` and the Home card, for servers older than its `ui.json` |
+| Status | ✅ its only interface on both clients (1.1) | none |
 | Photos | ✅ default on both clients (1.2) | web `page.js` for settings and the Locked Folder; Android `src/photo/` for settings, phone sync and the Locked Folder; background sync started by `App.tsx` |
 | File Explorer | ◐ read-only preview (F1): Android opens it, the web keeps `page.js` | web `page.js` and `page.css` |
 | Music | ◐ only the player: the shared audio host on both clients, and `play` for any Satellite. No `ui.json` | web `page.js` with its views (home, library, album, artist, playlist, search, settings, stats); Android `src/music/` (11 screen and tab files), wired by `builtins.tsx` |
@@ -51,9 +51,8 @@ Its library screens were never moved, which is why it is the largest piece left.
 
 Small and independent; unblocked by the no-compatibility rule.
 
-- [ ] Status's previous interface: its `page.js`, `mobile/src/status/`, the Home card, the
-  `StatusHome` route, `DEDICATED_SCREENS`' Status entry and the `KNOWN_*` lines (after the
-  owner's OK on Status's shared interface).
+- [x] Status's previous interface: its `page.js`, `mobile/src/status/`, the Home card, the
+  `StatusHome` route, `DEDICATED_SCREENS`' Status entry and the `KNOWN_*` lines.
 - [x] The fallback icons for servers before UI contract 1.0 (`mobile/src/satellites/icons.ts`'s
   name list); every Satellite declares `icon_name`.
 - [x] The v0 `mobile` route: Music's, Photo's and Status's `mobile` routes, the Engine's

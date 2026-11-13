@@ -1,8 +1,7 @@
 import React from 'react';
 import {Text} from 'react-native';
 import renderer, {act} from 'react-test-renderer';
-import {ColumnChart, buildSlots, chartMax} from '../src/status/charts';
-import {history} from './statusFixtures';
+import {ColumnChart, buildSlots, niceMax} from '../src/components/charts';
 
 type Tree = ReturnType<typeof renderer.create>;
 
@@ -10,15 +9,20 @@ function texts(tree: Tree): string[] {
   return tree.root.findAllByType(Text).map((node: any) => [node.props.children].flat().join(''));
 }
 
+// a day of readings every 1440 s with five columns missing: a gap
+const FROM = 1_730_000_000;
+const RESOLUTION = 1440;
+const TO = FROM + 60 * RESOLUTION;
+function cpuPoints(): [number, number, number][] {
+  return Array.from({length: 60}, (_, index) => index)
+    .filter(index => index < 20 || index >= 25)
+    .map(index => [FROM + index * RESOLUTION, 30 + (index % 5), 40] as [number, number, number]);
+}
+const percent = (value: number | null | undefined) => (value == null ? '—' : value === 0 ? '0' : `${Math.round(value)}%`);
+
 describe('buildSlots', () => {
   it('lays points on a fixed time grid and leaves a gap where there were no readings', () => {
-    const data = history();
-    const slots = buildSlots(
-      [{key: 'cpu', label: 'CPU', color: '#fff', points: data.series.cpu!.points}],
-      data.from,
-      data.to,
-      data.resolution,
-    );
+    const slots = buildSlots([{key: 'cpu', label: 'CPU', color: '#fff', points: cpuPoints()}], FROM, TO, RESOLUTION);
     expect(slots).toHaveLength(60);
     expect(slots.slice(20, 25).every(slot => slot.values[0] === null)).toBe(true);
     expect(slots[19].values[0]).toBe(34);
@@ -60,29 +64,29 @@ describe('buildSlots', () => {
   });
 });
 
-describe('chartMax', () => {
+describe('niceMax', () => {
   it('uses 100% for usage and round numbers otherwise', () => {
-    expect(chartMax('cpu', 12)).toBe(100);
-    expect(chartMax('load', 3.2)).toBe(5);
-    expect(chartMax('temperature', 61)).toBe(100);
-    expect(chartMax('disk_read', 3 * 1024 * 1024)).toBe(5 * 1024 * 1024);
-    expect(chartMax('net_rx', 1_000_000)).toBe(1_250_000); // 8 Mb/s -> a 10 Mb/s axis
+    expect(niceMax(12, 'percent')).toBe(100);
+    expect(niceMax(3.2, 'plain')).toBe(5);
+    expect(niceMax(3 * 1024 * 1024, 'bytes')).toBe(5 * 1024 * 1024);
+    expect(niceMax(1_000_000, 'bits')).toBe(1_250_000); // 8 Mb/s -> a 10 Mb/s axis
   });
 });
 
 describe('ColumnChart', () => {
   function render(): Tree {
-    const data = history();
     let tree!: Tree;
     act(() => {
       tree = renderer.create(
         <ColumnChart
           title="CPU"
-          period="24h"
-          from={data.from}
-          to={data.to}
-          resolution={data.resolution}
-          series={[{key: 'cpu', label: 'CPU', color: '#ee444b', points: data.series.cpu!.points}]}
+          from={FROM}
+          to={TO}
+          resolution={RESOLUTION}
+          scale="percent"
+          format={percent}
+          timeLabel={() => '12:00'}
+          series={[{key: 'cpu', label: 'CPU', color: '#ee444b', points: cpuPoints()}]}
         />,
       );
     });

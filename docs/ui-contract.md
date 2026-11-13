@@ -42,7 +42,7 @@ it as the web's fallback, used when its document is missing or refused, and in D
 Mode Mission Control can show either: the button beside the Satellite's title switches
 between the shared interface and the Satellite's own page, so a migration can be compared
 side by side before the old page is retired. Status is the first Satellite to make that
-move (1.1). Photo follows in 1.2: its document was a **preview** (see
+move (1.1; its page is gone since). Photo follows in 1.2: its document was a **preview** (see
 [The document](#the-document)) until it reached parity, and is now its default interface, with
 its own page and screens kept in Developer Mode until they are retired. Music keeps its
 dedicated, hand-written page and screens until the shared blocks reach parity with them.
@@ -788,9 +788,7 @@ and `media.picker` (the `pick` action); the other reserved names are in `vocabul
 `own` action needs no capability: whether a client has a Satellite's own interface is its own
 knowledge, so it hides what it can't open.
 
-An app released with 1.0 (the Alpha) that meets a 1.1 document draws its 1.0 blocks and skips
-the rest. Status keeps that case simple: the Alpha app opens Status's own dedicated screen,
-which reads the routes it always did.
+A client that meets a block or action it doesn't know skips it (see "Trust and validation").
 
 ## Trust and validation
 
@@ -849,7 +847,7 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 | Blocks | the 21 above, including `chart`, `table`, `image`, `media-list`, `media-grid`, `search` and `map`; the `dashboard` template | more, minor by minor: `tabs`; templates `list-detail`, `settings`, `media-library` |
 | Satellite capabilities | `files.browse` (File Explorer), `audio.library` and `audio.session` (Music), `media.gallery` (Photo), `media.vault` (Locked Folder, `move_in` only through the `secure` action) | browsing the Locked Folder from the shared interface; more pickable capabilities (files) |
 | Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action; saving and sharing files (`download`, `share`) | `device.background-tasks` (phone sync) - a native module written once in the app, behind a shared block |
-| Home | `widgets` in each document, drawn by both clients; Android keeps the Status card only for servers older than Status's `ui.json` | the fallback card removed once older servers are gone |
+| Home | `widgets` in each document, drawn by both clients | |
 | Sections | `section_of`, but Photo still names the Locked Folder | the host discovers its sections from the catalog |
 | Icons | `icon_name` from the shared set, a neutral circle without one | Satellite-provided icons |
 | Rediscovery | Mission Control button and API | also on Android; and a CLI command |
@@ -875,9 +873,8 @@ Retiring all of them is planned in [Remaining work](remaining-work.md).
 5. Rediscovery and cache controls on Android.
 6. **Done (1.1): Status first.** `chart`, `table`, `choice`, `status`, `code`, the
    `dashboard` template, page state and sources, the header and widgets. Status's `ui.json`
-   now draws its interface on both clients. Its `page.js` and `StatusHomeScreen` stay for one
-   release: the web's fallback and Developer Mode comparison, and the app's screen for older
-   servers. Then they are retired (see "Status's migration" in
+   now draws its interface on both clients; its previous web page, Android screen and Home card
+   are removed (see "Differences from the interfaces it replaced" in
    [docs/satellites/status.md](satellites/status.md)).
 7. **Capabilities, one at a time, extracted from the existing code:**
    1. `media.gallery` from Photos' grid and viewer. **Done (1.2):** the shared
@@ -898,5 +895,4 @@ Retiring all of them is planned in [Remaining work](remaining-work.md).
 
 Backward compatibility is not required for now: StarCore runs only on the owner's server, on
 the latest version, with the latest app ([Remaining work](remaining-work.md)). The app no
-longer keeps a fallback for a server without `/api/catalog` or without a Satellite's `ui.json`
-(except Status's previous screen, until its removal).
+longer keeps a fallback for a server without `/api/catalog` or without a Satellite's `ui.json`.

@@ -9,7 +9,7 @@ const satellite = (name: string, ui: SatelliteSummary['ui']): SatelliteSummary =
 
 describe('which interface a Satellite opens in', () => {
   it('opens a document in the shared interface', () => {
-    const shown = satellite('Status', {contract: 'starcore.ui/1.1', revision: 'r1', error: null});
+    const shown = satellite('Gallery', {contract: 'starcore.ui/1.1', revision: 'r1', error: null});
     expect(opensSharedInterface(shown)).toBe(true);
     expect(hasSharedPreview(shown)).toBe(false);
   });

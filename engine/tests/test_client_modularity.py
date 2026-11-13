@@ -25,28 +25,25 @@ import unittest
 REPO = Path(__file__).resolve().parents[2]
 
 # folders of Satellite-specific client code, which may know their own Satellite
-SATELLITE_SPECIFIC = ("mobile/src/music/", "mobile/src/photo/", "mobile/src/status/", "mobile/src/lockedFolder/")
+SATELLITE_SPECIFIC = ("mobile/src/music/", "mobile/src/photo/", "mobile/src/lockedFolder/")
 
 # generic code that still names a Satellite: (file, current count) - lower a
 # count, or drop the line, when a coupling goes; never raise one or add a line
 KNOWN_COUPLINGS = {
-    # the dedicated Photo and Music screens, and Status's screen and Home card for
-    # servers older than its ui.json (the Satellites list reads the same table)
-    "mobile/src/screens/HomeScreen.tsx": 4,
+    # the dedicated Photo and Music screens (the Satellites list reads the same table)
+    "mobile/src/screens/HomeScreen.tsx": 2,
 }
 
 # generic mobile code that imports a Satellite-specific folder: (file, {folder: count}).
-# The composition root is where native Satellite code is wired in; the Photo and Status
+# The composition root is where native Satellite code is wired in; the Photo
 # screens are still registered by the navigation. Lower a count when one goes.
 KNOWN_IMPORTS = {
     # the composition root: Music's native screens, and the Locked Folder's unlock prompt for
     # the secure action (media.vault)
     "mobile/src/satellites/builtins.tsx": {"mobile/src/music/": 10, "mobile/src/lockedFolder/": 1},
-    "mobile/src/navigation/MainTabs.tsx": {"mobile/src/photo/": 5, "mobile/src/status/": 1},
+    "mobile/src/navigation/MainTabs.tsx": {"mobile/src/photo/": 5},
     # Photo's background sync, started with the app
     "mobile/src/App.tsx": {"mobile/src/photo/": 1},
-    # Status's Home card, for servers older than its ui.json
-    "mobile/src/screens/HomeScreen.tsx": {"mobile/src/status/": 1},
 }
 
 # Satellite code naming another Satellite: (file, current count)

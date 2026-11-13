@@ -14,7 +14,6 @@ import type {SatelliteSummary} from '../satellites/types';
 import {UiApi} from '../satellites/ui/api';
 import {SatelliteWidgets} from '../satellites/ui/Widgets';
 import {useServers} from '../servers/ServersContext';
-import {StatusWidget} from '../status/StatusWidget';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
@@ -47,10 +46,9 @@ export function formatUptime(seconds: number): string {
  * yet, and for a server older than a Satellite's ui.json. Listed in
  * docs/remaining-work.md, and removed from there.
  */
-export const DEDICATED_SCREENS: Record<string, 'PhotoHome' | 'MusicHome' | 'StatusHome'> = {
+export const DEDICATED_SCREENS: Record<string, 'PhotoHome' | 'MusicHome'> = {
   Photo: 'PhotoHome',
   Music: 'MusicHome',
-  Status: 'StatusHome',
 };
 
 /**
@@ -78,7 +76,7 @@ export function canOpen(satellite: SatelliteSummary): boolean {
  * in this app, kept until the shared one is validated. Developer Mode can open that screen
  * instead, as Mission Control's Developer Mode can show a Satellite's own page.
  */
-export function ownScreenBeside(satellite: SatelliteSummary): 'PhotoHome' | 'MusicHome' | 'StatusHome' | undefined {
+export function ownScreenBeside(satellite: SatelliteSummary): 'PhotoHome' | 'MusicHome' | undefined {
   return opensSharedInterface(satellite) ? DEDICATED_SCREENS[satellite.name] : undefined;
 }
 
@@ -151,10 +149,6 @@ export function HomeScreen() {
     const params = declarative ? {name: satellite.name, revision: satellite.ui?.revision, page, params: pageParams} : undefined;
     navigation.navigate('Satellites', {screen, params, initial: false});
   };
-  // a server older than UI contract 1.1 has no widgets: the dedicated card stays,
-  // so a newer app on an older server loses nothing
-  const legacyStatus = satellites?.find(satellite => satellite.name === 'Status' && !satellite.ui?.revision);
-
   const online = satellites?.filter(satellite => satellite.status === 'running').length ?? 0;
   // a satellite shown as a section of another gets no card of its own;
   // the system metric above still counts every satellite
@@ -258,7 +252,6 @@ export function HomeScreen() {
 
         {/* every Satellite's ui.json widgets - Home names none of them */}
         {!error && satellites && <SatelliteWidgets satellites={satellites} api={uiApi} developer={developer} onOpen={open} />}
-        {!error && legacyStatus && <StatusWidget satellite={legacyStatus} onOpen={() => open(legacyStatus)} />}
 
         <View style={styles.sectionHead}>
           <Text style={type.eyebrow}>SATELLITES</Text>

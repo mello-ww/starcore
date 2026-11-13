@@ -642,20 +642,19 @@ class StatusEngineTest(unittest.TestCase):
         # what the Home widget in ui.json binds to
         for key in ("health_label", "health_tone", "cpu_tone", "memory_tone", "satellites", "warning_items"):
             self.assertIn(key, entry["state"])
-        self.assertEqual(entry["page"], {"module": "page.js", "stylesheet": "page.css"})
+        # its interface is its ui.json alone: no page of its own for Mission Control
+        self.assertIsNone(entry["page"])
 
-    def test_page_assets_are_served(self):
-        for name, kind in (("page.js", "javascript"), ("charts.js", "javascript"), ("format.js", "javascript"),
-                           ("page.css", "text/css")):
-            connection = HTTPConnection("127.0.0.1", self.engine.api.port, timeout=10)
-            try:
-                connection.request("GET", f"/api/satellites/status/assets/{name}")
-                response = connection.getresponse()
-                response.read()
-                self.assertEqual(response.status, 200)
-                self.assertIn(kind, response.headers.get("Content-Type", ""))
-            finally:
-                connection.close()
+    def test_the_icon_is_still_served(self):
+        connection = HTTPConnection("127.0.0.1", self.engine.api.port, timeout=10)
+        try:
+            connection.request("GET", "/api/satellites/status/assets/icon.svg")
+            response = connection.getresponse()
+            response.read()
+            self.assertEqual(response.status, 200)
+            self.assertIn("svg", response.headers.get("Content-Type", ""))
+        finally:
+            connection.close()
 
     # ---------- CLI ----------
 
@@ -692,7 +691,7 @@ class StatusEngineTest(unittest.TestCase):
         output.encode("ascii")  # any console can print it
 
 
-# ---------- the Mission Control page and the Home summary ----------
+# ---------- the shared charts and the Home summary ----------
 
 class StatusPageTest(unittest.TestCase):
     def test_home_reads_the_summary_from_the_listing_it_already_polls(self):
@@ -712,22 +711,11 @@ class StatusPageTest(unittest.TestCase):
         self.assertIn("--sc-chart-2: #7d808a;", css)
 
     @unittest.skipUnless(shutil.which("node"), "needs Node.js")
-    def test_page_helpers(self):
-        folder = (STATUS_DIR / "mission_control").as_uri()
+    def test_shared_chart_helpers(self):
         script = f"""
-import * as f from "{folder}/format.js";
 const assert = (ok, message) => {{ if (!ok) {{ console.error(message); process.exit(1); }} }};
-assert(f.bytes(1536) === "1.5 KiB", "bytes " + f.bytes(1536));
-assert(f.bytes(null) === f.DASH, "bytes dash");
-assert(f.byteRate(1048576) === "1.0 MiB/s", "byteRate " + f.byteRate(1048576));
-assert(f.bitRate(125000) === "1.0 Mb/s", "bitRate " + f.bitRate(125000));
-assert(f.linkSpeed(2500) === "2.5 Gb/s" && f.linkSpeed(100) === "100 Mb/s", "linkSpeed");
-assert(f.percent(7.44) === "7.4%" && f.percent(42.4) === "42%" && f.percent(90.44) === "90.4%", "percent");
-assert(f.megahertz(4493) === "4.49 GHz", "MHz " + f.megahertz(4493));
-assert(f.duration(90061) === "1d 1h" && f.duration(59) === "59s", "duration");
-assert(f.span(86400) === "24 hours" && f.span(604800) === "7 days" && f.span(10) === "10 s", "span");
 globalThis.document = undefined;
-// the page's charts are Mission Control's shared ones (its charts.js re-exports them)
+// the charts Status's ui.json draws are Mission Control's shared ones
 const charts = await import("{(REPO / "mission_control" / "ui" / "charts.js").as_uri()}");
 assert(charts.niceMaximum(73, "percent") === 100, "percent max");
 assert(charts.niceMaximum(3_000_000, "bytes") === 5 * 1024 * 1024, "bytes max " + charts.niceMaximum(3_000_000, "bytes"));

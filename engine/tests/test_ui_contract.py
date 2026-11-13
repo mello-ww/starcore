@@ -360,7 +360,7 @@ class UiApiTest(unittest.TestCase):
         self.assertEqual(status, 405)
 
     def test_assets_and_frontend_revalidate_instead_of_redownloading(self):
-        for path in ("/app.js", "/api/satellites/Status/assets/page.js"):
+        for path in ("/app.js", "/api/satellites/Status/assets/icon.svg"):
             status, _, headers = request(self.engine, path)
             self.assertEqual(status, 200, path)
             self.assertEqual(headers["Cache-Control"], "no-cache")
