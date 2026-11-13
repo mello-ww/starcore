@@ -245,6 +245,24 @@ button.ui-metric {
 
 /* ---------- lists ---------- */
 
+/* a list with `more` (1.2): the rows, then where the next page loads */
+.ui-list-more {
+    height: 1px;
+}
+
+.ui-list-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sc-space-3);
+    padding: var(--sc-space-3) 0;
+}
+
+.ui-list-footer[hidden] {
+    display: none;
+}
+
 .ui-list {
     display: flex;
     flex-direction: column;

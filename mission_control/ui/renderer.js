@@ -15,6 +15,7 @@ import {
 } from "./contract.js";
 import { canShareFiles, downloadFile, fileName, shareFile } from "./files.js";
 import { createGallery, holdsCollection } from "./gallery.js";
+import { createListPaging } from "./listpaging.js";
 import { icon } from "./icons.js";
 import { createMaps } from "./map.js";
 import { pickMedia } from "./picker.js";
@@ -198,6 +199,21 @@ export function mount(context) {
         },
     });
 
+    // a list's further pages (1.2 `more`), kept across renders; `listViews` is each paged list
+    // as last drawn, where a page that arrives is appended
+    const listPaging = createListPaging({ load: (route) => requestJson(`${satelliteBase}/${route}`) });
+    let listViews = new WeakMap();
+    const listObservers = new Set();
+
+    function resetLists() {
+        listPaging.reset();
+        listViews = new WeakMap();
+        for (const entry of listObservers) {
+            entry.observer.disconnect();
+        }
+        listObservers.clear();
+    }
+
     // the map block (1.2): its Leaflet map lives across renders, and its markers open the
     // gallery's shared viewer
     const maps = createMaps({
@@ -207,6 +223,125 @@ export function mount(context) {
     // the search block (1.2): one input per block, kept across renders so typing is never lost
     let searchInputs = new WeakMap();
     const SEARCH_PAUSE = 300;
+
+    // ---------- lists ----------
+
+    function listRow(block, item, scope) {
+        const formats = (block.item && block.item.format) || {};
+        const itemScope = { ...scope, data: item };
+        const row = el(block.action ? "button" : "div", "ui-list-row");
+        if (block.action) {
+            row.type = "button";
+            row.addEventListener("click", () => runAction(block.action, itemScope));
+        }
+        if (block.item.tone !== undefined) {
+            row.appendChild(stateDot(resolve(block.item.tone, itemScope)));
+        }
+        const glyph = icon(resolve(block.item.icon, itemScope));
+        if (glyph) {
+            const holder = el("span", "ui-list-icon");
+            holder.appendChild(glyph);
+            row.appendChild(holder);
+        }
+        const main = el("span", "ui-list-main");
+        main.appendChild(el("span", "ui-list-title", text(block.item.title, itemScope)));
+        if (block.item.subtitle !== undefined) {
+            const subtitle = resolve(block.item.subtitle, itemScope);
+            if (subtitle !== null && subtitle !== undefined && subtitle !== "") {
+                main.appendChild(el("span", "ui-list-subtitle", formatValue(subtitle, formats.subtitle)));
+            }
+        }
+        row.appendChild(main);
+        if (block.item.value !== undefined) {
+            row.appendChild(el("span", "ui-list-value", formatValue(resolve(block.item.value, itemScope), formats.value)));
+        }
+        if (block.action) {
+            row.appendChild(el("span", "ui-list-chevron", "›"));
+        }
+        return row;
+    }
+
+    /** A list with `more` (1.2): its rows, then a footer that loads the next page - by itself as
+     * it comes near the screen, or with "Show more" - says "Loading…", or offers "Try again". */
+    function pagedList(block, scope, list) {
+        const wrapper = el("div", "ui-list-paged");
+        const sentinel = el("div", "ui-list-more");
+        sentinel.setAttribute("aria-hidden", "true");
+        const footer = el("div", "ui-list-footer");
+        wrapper.append(list, sentinel, footer);
+        const view = { list, wrapper, footer, sentinel, scope };
+        listViews.set(block, view);
+
+        const near = () => typeof window !== "undefined" && view.wrapper.isConnected
+            && view.sentinel.getBoundingClientRect().top < window.innerHeight + 800;
+        const draw = () => {
+            const status = listPaging.status(block);
+            footer.replaceChildren();
+            if (status.error) {
+                footer.appendChild(el("p", "ui-text ui-text-caption", status.error));
+                const retry = el("button", "ui-pill", "Try again");
+                retry.type = "button";
+                retry.addEventListener("click", () => next());
+                footer.appendChild(retry);
+            } else if (status.loading) {
+                const note = el("p", "ui-text ui-text-caption", "Loading…");
+                note.setAttribute("role", "status");
+                footer.appendChild(note);
+            } else if (status.more) {
+                const button = el("button", "ui-pill", "Show more");
+                button.type = "button";
+                button.addEventListener("click", () => next());
+                footer.appendChild(button);
+            }
+            footer.hidden = footer.childElementCount === 0;
+        };
+        view.draw = draw;
+        // the rows of a page go into the list as it is drawn when the page arrives
+        const next = () => {
+            const pending = listPaging.loadMore(block).then((added) => {
+                const current = listViews.get(block);
+                if (!current || !current.wrapper.isConnected) {
+                    return;
+                }
+                for (const item of added) {
+                    current.list.appendChild(listRow(block, item, current.scope));
+                }
+                current.draw();
+                const status = listPaging.status(block);
+                if (status.more && !status.error && (status.restoring || current.near())) {
+                    current.next();
+                }
+            });
+            draw();
+            return pending;
+        };
+        view.next = next;
+        view.near = near;
+        draw();
+
+        if (typeof IntersectionObserver === "function") {
+            const observer = new IntersectionObserver((entries) => {
+                const status = listPaging.status(block);
+                if (entries.some((entry) => entry.isIntersecting) && status.more && !status.loading && !status.error) {
+                    next();
+                }
+            }, { rootMargin: "800px 0px" });
+            observer.observe(sentinel);
+            // one observer per list: the one of its previous drawing goes
+            for (const previous of listObservers) {
+                if (previous.block === block) {
+                    previous.observer.disconnect();
+                    listObservers.delete(previous);
+                }
+            }
+            listObservers.add({ block, observer });
+        }
+        const status = listPaging.status(block);
+        if (status.restoring && !status.loading) {
+            next();
+        }
+        return wrapper;
+    }
 
     // ---------- navigation ----------
 
@@ -256,6 +391,7 @@ export function mount(context) {
             state.forms = {};
             gallery.reset();
             maps.reset();
+            resetLists();
             searchInputs = new WeakMap();
             for (const [name, timer] of state.timers) {
                 if (name !== "header") {
@@ -733,47 +869,17 @@ export function mount(context) {
         },
 
         list: (block, scope) => {
-            const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
+            const items = listPaging.rows(block, scope);
             const list = el("div", "ui-list");
-            if (!Array.isArray(items) || items.length === 0) {
+            const paging = block.more ? listPaging.status(block) : null;
+            if (items.length === 0 && !(paging && (paging.more || paging.error))) {
                 list.appendChild(el("p", "ui-text ui-text-caption", block.empty ? text(block.empty, scope) : "Nothing here."));
                 return list;
             }
-            const formats = (block.item && block.item.format) || {};
             for (const item of items) {
-                const itemScope = { ...scope, data: item };
-                const row = el(block.action ? "button" : "div", "ui-list-row");
-                if (block.action) {
-                    row.type = "button";
-                    row.addEventListener("click", () => runAction(block.action, itemScope));
-                }
-                if (block.item.tone !== undefined) {
-                    row.appendChild(stateDot(resolve(block.item.tone, itemScope)));
-                }
-                const glyph = icon(resolve(block.item.icon, itemScope));
-                if (glyph) {
-                    const holder = el("span", "ui-list-icon");
-                    holder.appendChild(glyph);
-                    row.appendChild(holder);
-                }
-                const main = el("span", "ui-list-main");
-                main.appendChild(el("span", "ui-list-title", text(block.item.title, itemScope)));
-                if (block.item.subtitle !== undefined) {
-                    const subtitle = resolve(block.item.subtitle, itemScope);
-                    if (subtitle !== null && subtitle !== undefined && subtitle !== "") {
-                        main.appendChild(el("span", "ui-list-subtitle", formatValue(subtitle, formats.subtitle)));
-                    }
-                }
-                row.appendChild(main);
-                if (block.item.value !== undefined) {
-                    row.appendChild(el("span", "ui-list-value", formatValue(resolve(block.item.value, itemScope), formats.value)));
-                }
-                if (block.action) {
-                    row.appendChild(el("span", "ui-list-chevron", "›"));
-                }
-                list.appendChild(row);
+                list.appendChild(listRow(block, item, scope));
             }
-            return list;
+            return block.more ? pagedList(block, scope, list) : list;
         },
 
         image: (block, scope) => {

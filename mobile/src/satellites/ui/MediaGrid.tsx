@@ -948,7 +948,7 @@ const Tile = memo(function Tile({
   );
 });
 
-function ActionPill({
+export function ActionPill({
   entry, scope, onPress, disabled, dark,
 }: {entry: any; scope: Scope; onPress: () => void; disabled?: boolean; dark?: boolean}) {
   const {color: accent, onColor} = useAccent();

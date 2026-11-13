@@ -1,5 +1,5 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {Alert, Animated, Clipboard, Image, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {ActivityIndicator, Alert, Animated, Clipboard, Image, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {Bars, ChartScale, ColumnChart, Meter, Sparkline} from '../../components/charts';
 import {PrimaryButton} from '../../components/PrimaryButton';
@@ -8,7 +8,8 @@ import {StarSwitch} from '../../components/StarSwitch';
 import {Surface} from '../../components/Surface';
 import {TOUCH_TARGET, tokens, useAccent} from '../../theme';
 import {MapBlock} from './MapBlock';
-import {MediaGridBlock} from './MediaGrid';
+import {ActionPill, MediaGridBlock} from './MediaGrid';
+import {createListPaging} from './listPaging';
 import {
   BLOCK_TYPES, findProvider, formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate, toneOf,
   type Providers, type Scope, type UiAction, type UiBlock,
@@ -357,31 +358,92 @@ function MetricBlock({
   );
 }
 
+function listRow(block: UiBlock, item: any, index: number, scope: Scope, context: BlockContext) {
+  const formats = block.item?.format ?? {};
+  const itemScope = {...scope, data: item};
+  const iconName = resolve(block.item?.icon, itemScope);
+  const title = asText(resolve(block.item?.title, itemScope));
+  const subtitle = block.item?.subtitle !== undefined ? resolve(block.item.subtitle, itemScope) : undefined;
+  return (
+    <Row
+      key={item?.id ?? index}
+      icon={typeof iconName === 'string' && ICONS.has(iconName) ? iconName : undefined}
+      tone={block.item?.tone !== undefined ? resolve(block.item.tone, itemScope) : undefined}
+      title={title}
+      subtitle={subtitle !== undefined && subtitle !== null && subtitle !== '' ? formatValue(subtitle, formats.subtitle) : undefined}
+      value={block.item?.value !== undefined ? formatValue(resolve(block.item.value, itemScope), formats.value) : undefined}
+      onPress={block.action ? () => context.runAction(block.action, itemScope) : undefined}
+    />
+  );
+}
+
 function ListBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  if (block.more) {
+    return <PagedListBlock block={block} scope={scope} context={context} />;
+  }
   const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
   if (!Array.isArray(items) || items.length === 0) {
     return <Text style={type.caption}>{block.empty !== undefined ? asText(resolve(block.empty, scope)) : 'Nothing here.'}</Text>;
   }
-  const formats = block.item?.format ?? {};
+  return <View style={styles.list}>{items.map((item: any, index: number) => listRow(block, item, index, scope, context))}</View>;
+}
+
+/** A list with `more` (1.2): its rows, then the next page - loaded as the screen scrolls near
+ * its end, or with "Show more" - "Loading…" while it comes, or the error and "Try again". The
+ * rows stay in the page's own scrolling (docs/ui-contract.md, "Paging a list"). */
+function PagedListBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const {color: accent} = useAccent();
+  const paging = useRef(createListPaging({load: context.load})).current;
+  const [, setVersion] = useState(0);
+  const rows = paging.rows(block, scope);
+  const status = paging.status(block);
+  const next = useCallback(() => {
+    const now = paging.status(block);
+    if (!now.more || now.loading) {
+      return;
+    }
+    paging.loadMore(block).then(() => setVersion(version => version + 1));
+    setVersion(version => version + 1);
+  }, [paging, block]);
+  const {onNearEnd} = context;
+  useEffect(() => {
+    if (!onNearEnd) {
+      return undefined;
+    }
+    return onNearEnd(() => {
+      const now = paging.status(block);
+      if (now.more && !now.loading && !now.error) {
+        next();
+      }
+    });
+  }, [onNearEnd, paging, block, next]);
+  // after a refresh of the same list: back to as many pages as it had
+  useEffect(() => {
+    if (status.restoring && !status.loading && !status.error) {
+      next();
+    }
+  }, [status.restoring, status.loading, status.error, next]);
+
+  if (rows.length === 0 && !status.more && !status.error) {
+    return <Text style={type.caption}>{block.empty !== undefined ? asText(resolve(block.empty, scope)) : 'Nothing here.'}</Text>;
+  }
   return (
     <View style={styles.list}>
-      {items.map((item: any, index: number) => {
-        const itemScope = {...scope, data: item};
-        const iconName = resolve(block.item?.icon, itemScope);
-        const title = asText(resolve(block.item?.title, itemScope));
-        const subtitle = block.item?.subtitle !== undefined ? resolve(block.item.subtitle, itemScope) : undefined;
-        return (
-          <Row
-            key={item?.id ?? index}
-            icon={typeof iconName === 'string' && ICONS.has(iconName) ? iconName : undefined}
-            tone={block.item?.tone !== undefined ? resolve(block.item.tone, itemScope) : undefined}
-            title={title}
-            subtitle={subtitle !== undefined && subtitle !== null && subtitle !== '' ? formatValue(subtitle, formats.subtitle) : undefined}
-            value={block.item?.value !== undefined ? formatValue(resolve(block.item.value, itemScope), formats.value) : undefined}
-            onPress={block.action ? () => context.runAction(block.action, itemScope) : undefined}
-          />
-        );
-      })}
+      {rows.map((item: any, index: number) => listRow(block, item, index, scope, context))}
+      {status.error ? (
+        <View style={styles.listFoot} testID="list-more-error">
+          <Text style={type.caption}>{status.error}</Text>
+          <ActionPill entry={{label: 'Try again'}} scope={scope} onPress={next} />
+        </View>
+      ) : status.loading ? (
+        <View style={styles.listFoot} testID="list-more-loading">
+          <ActivityIndicator color={accent} accessibilityLabel="Loading…" />
+        </View>
+      ) : status.more ? (
+        <View style={styles.listFoot} testID="list-more">
+          <ActionPill entry={{label: 'Show more'}} scope={scope} onPress={next} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1115,6 +1177,7 @@ const styles = StyleSheet.create({
   tileValue: {...type.title, fontSize: 24, lineHeight: 30},
   card: {gap: space.md},
   list: {gap: 2},
+  listFoot: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: space.md, paddingVertical: space.md},
   row: {
     flexDirection: 'row',
     alignItems: 'center',
