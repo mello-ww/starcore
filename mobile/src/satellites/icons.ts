@@ -3,27 +3,11 @@ import {tokens} from '../theme';
 
 import {ICONS} from './ui/contract';
 
-// The names below are only for servers older than UI contract 1.0, whose
-// Satellites can't declare an icon_name yet - a Satellite's own SVG icon is
-// something this app can't draw. Never add to this list: a new Satellite
-// sets icon_name in its satellite.toml instead.
-const LEGACY_SATELLITE_ICONS: Record<string, string> = {
-  FileExplorer: 'folder',
-  LockedFolder: 'lock',
-  Music: 'music',
-  Photo: 'camera',
-  Status: 'activity',
-  docker: 'box',
-};
-
-/** A Feather icon name for a satellite: the shared icon it declares
- * (icon_name), else the legacy fallback for an older server, else a
- * neutral circle. */
-export function satelliteIcon(name: string, iconName?: string | null): string {
-  if (iconName && ICONS.has(iconName)) {
-    return iconName;
-  }
-  return LEGACY_SATELLITE_ICONS[name] ?? 'circle';
+/** A Feather icon name for a satellite: the shared icon it declares in its
+ * satellite.toml (icon_name), else a neutral circle. A Satellite's own SVG
+ * icon is something this app can't draw yet (docs/remaining-work.md). */
+export function satelliteIcon(_name: string, iconName?: string | null): string {
+  return iconName && ICONS.has(iconName) ? iconName : 'circle';
 }
 
 export const STATUS_LABELS: Record<SatelliteSummary['status'], string> = {

@@ -51,7 +51,7 @@ export function appBuildInfo(): AppBuildInfo {
 }
 
 /** Accepts `/api/status`'s "build" as-is, or null when it's missing or
- * malformed (an Engine older than 0.1.0-alpha.1). */
+ * malformed. */
 export function parseEngineBuild(value: unknown): EngineBuildInfo | null {
   if (!value || typeof value !== 'object') {
     return null;

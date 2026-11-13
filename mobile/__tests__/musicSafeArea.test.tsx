@@ -6,7 +6,7 @@ import {MusicProvider, useMusic} from '../src/music/MusicProvider';
 import {FullPlayer} from '../src/media/ui/FullPlayer';
 import {TrackActions} from '../src/music/ui/TrackActions';
 import {TOUCH_TARGET} from '../src/theme';
-import {makeTracks, preferences} from './musicFakes';
+import {makeTracks, preferences, testCatalog} from './musicFakes';
 
 // Insets exist only inside a provider, like a Modal window: the root provider of a non
 // edge-to-edge activity reports none, which is exactly what made the player draw under the
@@ -32,6 +32,9 @@ import {useServers} from '../src/servers/ServersContext';
 function client() {
   return {
     get: jest.fn(async (path: string) => {
+      if (path === '/api/catalog') {
+        return {status: 200, body: {capabilities: testCatalog}};
+      }
       if (path.endsWith('/preferences')) {
         return {status: 200, body: preferences};
       }

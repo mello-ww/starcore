@@ -57,17 +57,12 @@ async function requestNotifications() {
  * per signed-in server: AuthProvider is keyed by server, so switching servers unmounts it
  * and with it the player, its queue, Connect device and downloads. It sits under the lock
  * screen overlay, so playback continues while the UI is locked.
- *
- * `fallbackProvider` is for servers older than the audio.library capability (the released
- * Alpha), whose catalog lists none; the composition root supplies it.
  */
 export function AudioHost({
   children,
-  fallbackProvider = null,
   extensions = {},
 }: {
   children: React.ReactNode;
-  fallbackProvider?: AudioProvider | null;
   extensions?: AudioHostExtensions;
 }) {
   const {client, state} = useAuth();
@@ -88,8 +83,6 @@ export function AudioHost({
   const [liked, setLikedState] = useState<Set<string>>(new Set());
   const [fullPlayer, setFullPlayer] = useState(false);
   const videoRef = useRef<VideoRef>(null);
-  const fallbackRef = useRef(fallbackProvider);
-  fallbackRef.current = fallbackProvider;
 
   const downloads = useMemo(
     () =>
@@ -193,7 +186,7 @@ export function AudioHost({
       if (cancelled) {
         return;
       }
-      const resolved = resolveAudioProvider(catalog, fallbackRef.current);
+      const resolved = resolveAudioProvider(catalog);
       library.setProvider(resolved);
       setProvider(resolved);
       if (!resolved) {

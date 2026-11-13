@@ -54,16 +54,17 @@ Small and independent; unblocked by the no-compatibility rule.
 - [ ] Status's previous interface: its `page.js`, `mobile/src/status/`, the Home card, the
   `StatusHome` route, `DEDICATED_SCREENS`' Status entry and the `KNOWN_*` lines (after the
   owner's OK on Status's shared interface).
-- [ ] The fallback icons for servers before UI contract 1.0 (`mobile/src/satellites/icons.ts`'s
+- [x] The fallback icons for servers before UI contract 1.0 (`mobile/src/satellites/icons.ts`'s
   name list); every Satellite declares `icon_name`.
 - [x] The v0 `mobile` route: Music's, Photo's and Status's `mobile` routes, the Engine's
   `mobile_ui` field, the app's `DeclarativeScreen` and `SatelliteDetailScreen`, their tests.
-- [ ] The audio host's `fallbackProvider` and `MUSIC_LEGACY_PROVIDER` (servers without the
+- [x] The audio host's `fallbackProvider` and `MUSIC_LEGACY_PROVIDER` (servers without the
   `audio.library` capability).
-- [ ] The app's checks for an Engine without `/api/catalog` or `ui` fields, wherever they only
-  served the Alpha.
-- [ ] Docs: the "Backward compatibility" part of `ui-contract.md`, `media-audio.md`'s
-  "Compatibility", and the Alpha notes in `mobile/README.md`.
+- [x] The app's other checks for an old Engine (the About card's "older Engine" wording, the
+  "absent on servers older than 1.0" notes). The optional typing of `ui`, `icon_name` and
+  `provides` stays: harmless, and several tests build Satellites without them.
+- [x] Docs: the "Backward compatibility" part of `ui-contract.md` and `media-audio.md`'s
+  "Compatibility". Status's Alpha notes go with its interface (next item).
 
 ## 2. File Explorer (R1)
 

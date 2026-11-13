@@ -36,11 +36,11 @@ describe('resolveAudioProvider', () => {
     expect(resolveAudioProvider(catalog)?.session).toEqual({});
   });
 
-  it('falls back only for a server whose catalog lists no audio library at all', () => {
-    expect(resolveAudioProvider(null, testProvider)).toBe(testProvider);
-    expect(resolveAudioProvider({}, testProvider)).toBe(testProvider);
-    // a server that lists providers, none usable: nothing to play, rather than a guess
-    expect(resolveAudioProvider({'audio.library': [{...radio, enabled: false}]}, testProvider)).toBeNull();
+  it('finds nothing to play from when the catalog lists no usable audio library', () => {
+    expect(resolveAudioProvider(null)).toBeNull();
+    expect(resolveAudioProvider({})).toBeNull();
+    // providers listed, none usable: nothing to play, rather than a guess
+    expect(resolveAudioProvider({'audio.library': [{...radio, enabled: false}]})).toBeNull();
   });
 });
 
@@ -96,16 +96,15 @@ describe('AudioHost', () => {
     tree.unmount();
   });
 
-  it('uses the fallback provider on a server older than the capability', async () => {
+  it('has no provider, and plays nothing, when the catalog lists no audio library', async () => {
     const http = {get: jest.fn(async () => ({status: 404, body: {}})), post: jest.fn(async () => ({status: 404, body: {}}))};
     (useAuth as jest.Mock).mockReturnValue({client: http, state: {status: 'signed-in', session: {token: 'token-a'}}});
     (useServers as jest.Mock).mockReturnValue({activeServer: {id: 'server-a', baseUrl: 'https://server-a.test'}});
     let tree!: ReturnType<typeof renderer.create>;
     await act(async () => {
-      tree = renderer.create(<AudioHost fallbackProvider={testProvider}><Probe /></AudioHost>);
+      tree = renderer.create(<AudioHost><Probe /></AudioHost>);
     });
-    expect(captured!.provider).toBe(testProvider);
-    expect(captured!.library.path).toBe('/api/satellites/music');
+    expect(captured!.provider).toBeNull();
     tree.unmount();
   });
 });

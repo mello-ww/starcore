@@ -4,7 +4,7 @@ import renderer, {act} from 'react-test-renderer';
 import {MusicProvider, useMusic, usePlayerState} from '../src/music/MusicProvider';
 import {musicKeys} from '../src/media/storage';
 import {SatellitesListScreen} from '../src/screens/SatellitesListScreen';
-import {makeTracks, preferences} from './musicFakes';
+import {makeTracks, preferences, testCatalog} from './musicFakes';
 
 jest.mock('../src/auth/AuthContext', () => ({useAuth: jest.fn()}));
 jest.mock('../src/servers/ServersContext', () => ({useServers: jest.fn()}));
@@ -22,6 +22,9 @@ const {__mocks} = jest.requireMock('../src/satellites/api') as {__mocks: {list: 
 function client() {
   return {
     get: jest.fn(async (path: string) => {
+      if (path === '/api/catalog') {
+        return {status: 200, body: {capabilities: testCatalog}};
+      }
       if (path.endsWith('/preferences')) {
         return {status: 200, body: preferences};
       }

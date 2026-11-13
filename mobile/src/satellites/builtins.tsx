@@ -9,8 +9,7 @@
 import React from 'react';
 import {VAULT_GRANT_PROMPT} from '../lockedFolder/VaultGrantPrompt';
 import type {AudioHostExtensions} from '../media/AudioHost';
-import type {AudioProvider} from '../media/library';
-import {MUSIC_AUDIO_EXTENSIONS, MUSIC_LEGACY_PROVIDER} from '../music/MusicProvider';
+import {MUSIC_AUDIO_EXTENSIONS} from '../music/MusicProvider';
 import {AlbumScreen} from '../music/screens/AlbumScreen';
 import {ArtistScreen} from '../music/screens/ArtistScreen';
 import {DownloadsScreen} from '../music/screens/DownloadsScreen';
@@ -52,11 +51,9 @@ export const BUILTIN_SCREENS: BuiltinScreen[] = [
   {name: 'MusicDownloads', component: DownloadsScreen, title: 'Downloads'},
 ];
 
-/** What native code adds to the shared AudioHost: a track menu and links into its own
- * screens, and the provider to assume on a server older than the audio.library capability. */
-export const BUILTIN_AUDIO: {extensions: AudioHostExtensions; fallbackProvider: AudioProvider | null} = {
+/** What native code adds to the shared AudioHost: a track menu and links into its own screens. */
+export const BUILTIN_AUDIO: {extensions: AudioHostExtensions} = {
   extensions: MUSIC_AUDIO_EXTENSIONS,
-  fallbackProvider: MUSIC_LEGACY_PROVIDER,
 };
 
 /** The app's own unlock prompts for the secure action (UI contract 1.2), by capability and

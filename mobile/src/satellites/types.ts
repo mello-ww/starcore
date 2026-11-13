@@ -18,14 +18,12 @@ export interface SatelliteSummary {
   /** What the Satellite publishes about itself (its state.py) - free-form,
    * except where a legacy screen knows one Satellite's shape (Home's fallback card). */
   state?: Record<string, unknown>;
-  /** A name from the shared icon set (contracts/ui/vocabulary.json). Absent
-   * on servers older than UI contract 1.0. */
+  /** A name from the shared icon set (contracts/ui/vocabulary.json). */
   icon_name?: string | null;
   /** Satellite capabilities it provides to others - see docs/ui-contract.md. */
   provides?: Record<string, {version: number; operations: Record<string, string>}>;
   /** Its declarative interface (ui.json): a revision when the Engine
-   * validated one, an error when it refused it, null when there is none.
-   * Absent on servers older than UI contract 1.0. */
+   * validated one, an error when it refused it, null when there is none. */
   /** `preview` (UI contract 1.2): the document doesn't replace the Satellite's own screens yet -
    * they stay the default, and Developer Mode offers the shared interface beside them. */
   ui?: {contract: string | null; revision: string | null; error: string | null; preview?: boolean} | null;

@@ -99,6 +99,12 @@ export const testProvider: AudioProvider = {
             stream: 'stream', connect: 'connect'},
 };
 
+/** The catalog a server lists for {@link testProvider}: what the host resolves it from. */
+export const testCatalog = {
+  'audio.library': [{satellite: testProvider.satellite, version: 1, enabled: true, operations: testProvider.operations}],
+  'audio.session': [{satellite: testProvider.satellite, version: 1, enabled: true, operations: testProvider.session}],
+};
+
 /** A provider client that makes no requests: for the URL-building parts of the host. */
 export function testLibrary(provider: AudioProvider = testProvider) {
   return new AudioLibraryClient({} as any, provider);

@@ -38,13 +38,12 @@ export interface AudioProvider {
 
 /**
  * The provider to play from: the first enabled `audio.library` v1 provider, with that
- * Satellite's `audio.session` operations. `fallback` covers servers older than the
- * capability (the released Alpha), whose catalog lists no audio library.
+ * Satellite's `audio.session` operations, or null when there is none to play from.
  */
-export function resolveAudioProvider(catalog: Catalog | null | undefined, fallback: AudioProvider | null = null): AudioProvider | null {
+export function resolveAudioProvider(catalog: Catalog | null | undefined): AudioProvider | null {
   const library = (catalog?.[AUDIO_LIBRARY] ?? []).find(entry => entry.enabled && LIBRARY_VERSIONS.includes(entry.version));
   if (!library) {
-    return catalog?.[AUDIO_LIBRARY]?.length ? null : fallback;
+    return null;
   }
   const session = (catalog?.[AUDIO_SESSION] ?? []).find(
     entry => entry.enabled && entry.satellite === library.satellite && SESSION_VERSIONS.includes(entry.version),

@@ -851,7 +851,7 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 | Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action; saving and sharing files (`download`, `share`) | `device.background-tasks` (phone sync) - a native module written once in the app, behind a shared block |
 | Home | `widgets` in each document, drawn by both clients; Android keeps the Status card only for servers older than Status's `ui.json` | the fallback card removed once older servers are gone |
 | Sections | `section_of`, but Photo still names the Locked Folder | the host discovers its sections from the catalog |
-| Icons | `icon_name` from the shared set; an Android fallback list for older servers | the fallback list removed once older servers are gone |
+| Icons | `icon_name` from the shared set, a neutral circle without one | Satellite-provided icons |
 | Rediscovery | Mission Control button and API | also on Android; and a CLI command |
 | Formats | 12, including rates, dates and relative times | |
 
@@ -896,12 +896,7 @@ Retiring all of them is planned in [Remaining work](remaining-work.md).
 8. **Done:** the v0 `mobile` route, its Engine flag (`mobile_ui`) and the app's screens for it
    are removed. `page.js` stays as the web extension mechanism.
 
-Backward compatibility (not required for now: StarCore runs only on the owner's server, on
-the latest version, so what follows is kept only until the code for it is removed, stage 1 of
-[Remaining work](remaining-work.md)):
-
-- An Alpha (0.1.0-alpha.1) Android app talking to a newer server ignores the new fields: it
-  shows a Satellite that has only `ui.json` as having no mobile interface yet, and still opens
-  everything it opened before.
-- A newer app talking to an Alpha server finds no `ui` fields and no `/api/catalog`, and
-  behaves like the Alpha app.
+Backward compatibility is not required for now: StarCore runs only on the owner's server, on
+the latest version, with the latest app ([Remaining work](remaining-work.md)). The app no
+longer keeps a fallback for a server without `/api/catalog` or without a Satellite's `ui.json`
+(except Status's previous screen, until its removal).

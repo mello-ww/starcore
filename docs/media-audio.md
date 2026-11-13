@@ -153,12 +153,10 @@ tab when a remote target is registered. Info shows what the resolved `plan` repo
 
 ## Compatibility
 
-Not required for now (StarCore runs only on the owner's server, on the latest version): the
-points below describe what was kept, and stages 1 and 6 of [Remaining work](remaining-work.md)
-remove it.
+Backward compatibility is not required for now (StarCore runs only on the owner's server, on the
+latest version); the host no longer assumes a provider on a server without the capability.
 
-- Music's REST routes stay exactly as they are. The released Alpha app and Music's own page use
-  them directly.
+- Music's REST routes stay as they are: Music's own page and screens use them directly.
 - Persisted state keeps its keys, read as they are and never renamed: `starcore.music.*`
   (web) and `starcore_music_*` (Android). The AudioHost reads Music's existing keys. A rename,
   if it ever happens, is a migration with a fallback read.
@@ -190,8 +188,9 @@ What it is now:
   the native output), `library.ts` (provider resolution and requests), the controller and
   queue, and the player UI under `media/ui/`.
 - `MainTabs.tsx` mounts it. Music's screens and its additions to the player (the track menu,
-  links to its album and artist screens, and the provider to assume on a server older than
-  the capability) come in through one composition root, `mobile/src/satellites/builtins.tsx`.
+  links to its album and artist screens) come in through one composition root,
+  `mobile/src/satellites/builtins.tsx`. With no `audio.library` provider in the catalog, the
+  host has nothing to play from.
 - Music's screens still reach Music's own routes (`music/api.ts`). They are Music's code.
 - `builtins.tsx` is temporary. It exists so Music's native screens keep working while they
   have no `ui.json`. Each entry goes once Music's declarative interface replaces that screen,

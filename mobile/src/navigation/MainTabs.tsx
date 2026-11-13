@@ -173,7 +173,7 @@ export function MainTabs() {
   // and the screens leave its measured height (0 while it is hidden) at the end of their scrolling
   const [playerHeight, setPlayerHeight] = useState(0);
   return (
-    <AudioHost fallbackProvider={BUILTIN_AUDIO.fallbackProvider} extensions={BUILTIN_AUDIO.extensions}>
+    <AudioHost extensions={BUILTIN_AUDIO.extensions}>
       <TopBarSlotProvider component={AudioDisc}>
       <FloatingPlayerInsetProvider value={playerHeight > 0 ? playerHeight + tokens.space.sm : 0}>
       <View style={styles.fill}>

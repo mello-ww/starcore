@@ -110,7 +110,7 @@ describe('AboutCard', () => {
 
   it('explains an Engine that does not report its version', async () => {
     const tree = await render(jest.fn().mockResolvedValue({status: 200, body: {}}));
-    expect(textOf(tree, 'about-engine-missing')).toContain('older Engine');
+    expect(textOf(tree, 'about-engine-missing')).toContain('version not reported');
   });
 
   it('copies the build report', async () => {

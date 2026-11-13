@@ -47,7 +47,7 @@ export function AboutCard() {
         }
         const build = status === 200 ? parseEngineBuild(body?.build) : null;
         setEngine(build);
-        setEngineError(status !== 200 ? 'unreachable' : build ? undefined : 'version not reported (older Engine)');
+        setEngineError(status !== 200 ? 'unreachable' : build ? undefined : 'version not reported');
       })
       .catch(() => live && setEngineError('unreachable'));
     return () => {
