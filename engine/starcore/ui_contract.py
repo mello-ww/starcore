@@ -118,6 +118,17 @@ BINDING_ROOTS = ("$.", "$page.", "$params.", "$form.", "$state.", "$sources.", "
 BINDING_WORDS = {"$", "$value", "$page", "$params", "$form", "$state", "$sources"}
 
 
+def paged_lists(blocks) -> list:
+    """The `list` blocks of a page that load further pages (`more`), also inside a card."""
+    found = []
+    for block in blocks or []:
+        if isinstance(block, dict):
+            if block.get("type") == "list" and "more" in block:
+                found.append(block)
+            found += paged_lists(block.get("blocks"))
+    return found
+
+
 def choice_keys(blocks) -> set:
     """The state keys a page's `choice` blocks set, also inside a card."""
     keys = set()
@@ -436,6 +447,8 @@ class _Validator:
                 offline = False
             if offline and not isinstance(page.get("source"), dict):
                 self.error(f"{where}.offline", "needs the page's own source")
+            elif offline and paged_lists(page.get("blocks")):
+                self.error(f"{where}.offline", "can't keep a list that loads further pages (`more`)")
             elif offline:
                 # a source may depend on a choice's state - a handful of fixed values, one kept
                 # collection each - but never on any other (a search's free text)
@@ -696,6 +709,12 @@ class _Validator:
         else:
             for key, value in formats.items():
                 self.check_format(f"{where}.item.format.{key}", value)
+        if "more" in block:
+            # 1.2: a long list arrives page by page, as a media-grid's does
+            self.since(f"{where}.more", "a list's more", 2)
+            if not is_binding(items):
+                self.error(f"{where}.more", "needs `items` bound to the page's data")
+            self.check_more(f"{where}.more", block["more"])
 
     def check_media_options(self, where: str, block: dict):
         """size, shape and fit, shared by image and media-list: fixed words, never bindings,
@@ -823,7 +842,7 @@ class _Validator:
                 self.check_text(f"{at}.visible", entry["visible"])
 
     def check_more(self, where: str, more):
-        """{route, cursor} (1.2): how a media-grid loads its next page. `cursor` binds into the
+        """{route, cursor} (1.2): how a media-grid or a list loads its next page. `cursor` binds into the
         page's data - and into each further page's response, which has the same shape - to the
         provider's cursor for what comes next (null at the end); `route` gets it as {$value}.
         The provider owns the cursor: the client only passes it back."""

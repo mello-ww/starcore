@@ -151,7 +151,7 @@ Keys starting with `_` are comments and are ignored.
 | `field` | `label`, `value` | `format`, `unit`, `tone` | a label and its value |
 | `metric` | `label`, `value` | `format`, `unit`, `max`, `tone` | a prominent value, with a bar when `max` is set |
 | `card` | `blocks` | `title` | a group of blocks (nested at most 4 deep) |
-| `list` | `items`, `item` | `empty`, `action` | rows from an array; `item` maps `title`, `subtitle`, `value`, `icon` and `format` (`{subtitle, value}`) for each one |
+| `list` | `items`, `item` | `empty`, `action`, `more` (1.2) | rows from an array; `item` maps `title`, `subtitle`, `value`, `icon` and `format` (`{subtitle, value}`) for each one; `more` loads a long list page by page, as a media-grid's does (see "Paging a list" below) |
 | `button` | `label`, `action` | `style`: `primary`, `secondary`, `danger` | runs an action |
 | `toggle` | `label`, `value`, `action` | `description` | an on/off switch; the action gets the new value as `$value` |
 | `slider` | `label`, `value`, `min`, `max`, `action` | `step`, `format`, `unit` | a range; the action runs once, on release, with `$value` |
@@ -338,6 +338,19 @@ collection: the document says where each picture comes from and what can be done
 - Images and videos load with the client's own session, as for `image`. A route outside the
   Satellite loads nothing and shows the image glyph.
 
+### Paging a list
+
+A `list` takes the same `more` as a media-grid (1.2): `{"route": "...&cursor={$value}",
+"cursor": "$.next"}`, and `items` must be bound to the page's data. The page's data holds the
+first page; near the end of the list (or with "Show more"), the client calls `route` with the
+cursor and appends the rows of the answer, which has the page data's shape. As for a grid, the
+client loads one page at a time, drops a page that arrives after the page data changed, never
+shows a row twice, shows "Loading…" or an error with "Try again", and keeps the loaded pages
+across a refresh of the same collection. Several lists on a page page independently, each
+with its own cursor (a folder's folders, then its files). On Android the rows stay in the
+page's own scrolling (not a separate virtualized list), so a provider should keep its pages
+small (a few hundred rows).
+
 ## Search and map
 
 Both arrived in 1.2, for a Satellite whose data has text to look through or places to show.
@@ -398,7 +411,7 @@ Any text, value or action body can be a binding instead of a literal:
 | `$` | the current data itself |
 | `$page.a` | the page's data, also from inside a list row |
 | `$params.id` | a page param |
-| `$value` | a control's new value (toggle, slider, file browser); a grid's cursor in `more.route` |
+| `$value` | a control's new value (toggle, slider, file browser); a grid's or a list's cursor in `more.route` |
 | `$value.a` | 1.2: `a` inside a value that is an object - a map's `$value.bbox` and `$value.zoom` |
 | `$form.key` | a form field, inside its submit action |
 | `$state.key` | 1.1: the page's own state (see `state` above) |
@@ -693,6 +706,8 @@ Control keeps nothing: a browser tab without StarCore has nowhere to load from.
   - inside a block with `items` (or `rows`), its bindings applied to each item;
   - for each `media-grid`, the same fields of the first 4 pages it loaded after that through
     `more`, with the cursor after the last.
+
+  A page with a `list` that pages (`more`) can't be offline: the Engine refuses it.
 
   A path keeps only itself (`$.place.city` keeps `place.city`, not the rest of `place`); a
   field bound as a whole keeps its whole value. Everything else the Satellite answered is
