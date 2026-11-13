@@ -8,6 +8,7 @@ whatever it reports (missing, denied, not a directory, ...) into a clean,
 specific response instead of a crash or a bare 500.
 """
 
+from bisect import bisect_right
 from datetime import datetime, timezone
 from pathlib import Path
 import os
@@ -93,31 +94,96 @@ def view(request):
     if where == ("locations",):
         return json_response(views.locations_view(_roots_listing()))
     if where == ("folder",):
-        target, items, failure = _read_directory(request, request.query.get("path", ""))
-        if failure is not None:
-            return failure
-        return json_response(views.folder_view(target, paths.parent_of(target), items, _disk_usage(target)))
+        return _folder_view(request)
     return error_response(f"unknown endpoint 'view/{'/'.join(where)}'")
+
+
+# a page of view/folder: the interface's lists arrive this many rows at a time (UI contract 1.2's
+# `more` on a list), however large the folder
+PAGE_SIZE = 200
+MAX_PAGE_SIZE = 500
+
+
+def _folder_view(request):
+    """view/folder?path=[&part=folders|files&cursor=&limit=]: without `part`, the first page of
+    the folder's folders and the first page of its files; with it, the page of that part after
+    `cursor` (the last name the previous page held). Only the rows of the page are examined."""
+    part = request.query.get("part", "")
+    if part not in ("", "folders", "files"):
+        return error_response("'part' must be folders or files", status=400)
+    raw_limit = request.query.get("limit", "")
+    try:
+        limit = PAGE_SIZE if raw_limit == "" else int(raw_limit)
+    except ValueError:
+        limit = 0
+    if limit < 1:
+        return error_response("'limit' must be a positive number", status=400)
+    limit = min(limit, MAX_PAGE_SIZE)
+    cursor = request.query.get("cursor", "")
+
+    target, folders, files, failure = _scan_directory(request, request.query.get("path", ""))
+    if failure is not None:
+        return failure
+    shown, following = [], {}
+    for name, entries in (("folders", folders), ("files", files)):
+        if part in ("", name):
+            chosen, following[name] = _page(entries, cursor if part == name else "", limit)
+            shown += chosen
+    return json_response(views.folder_view(
+        target, paths.parent_of(target), _describe(request, target, shown),
+        _disk_usage(target) if part == "" else None,
+        folders_next=following.get("folders"), files_next=following.get("files"),
+        totals=(len(folders), len(files))))
+
+
+def _sort_key(name: str):
+    """Names as people read them (case-insensitive), then exactly, so two names that differ
+    only by case keep one order from page to page."""
+    return name.lower(), name
+
+
+def _page(entries, cursor: str, limit: int):
+    """(the entries after `cursor`, at most `limit` of them; the cursor of the page after, or
+    None at the end). A cursor is a name, so a page carries on after it even if that name has
+    gone since, and nothing already shown comes back."""
+    start = 0
+    if cursor:
+        after = _sort_key(cursor)
+        keys = [_sort_key(entry.name) for entry in entries]
+        start = bisect_right(keys, after)
+    chosen = entries[start:start + limit]
+    return chosen, chosen[-1].name if chosen and start + limit < len(entries) else None
 
 
 def _read_directory(request, raw_path):
     """One directory's entries, folders first: (target, items, None), or
     (None, None, an error response) when the path is malformed, protected,
     missing, not a directory or unreadable."""
+    target, folders, files, failure = _scan_directory(request, raw_path)
+    if failure is not None:
+        return None, None, failure
+    return target, _describe(request, target, folders + files), None
+
+
+def _scan_directory(request, raw_path):
+    """One directory's folders and files as os.DirEntry, each sorted by name, nothing examined
+    beyond what the directory read itself gives: (target, folders, files, None), or
+    (None, None, None, an error response) when the path is malformed, protected, missing, not
+    a directory or unreadable."""
     try:
         target = paths.resolve_path(raw_path)
     except paths.PathError as error:
-        return None, None, error_response(str(error), status=400)
+        return None, None, None, error_response(str(error), status=400)
 
     blocked = locked_folder_guard.guard(request, target)
     if blocked is not None:
-        return None, None, blocked
+        return None, None, None, blocked
 
     status, failure = _stat(target)
     if failure is not None:
-        return None, None, failure
+        return None, None, None, failure
     if not S_ISDIR(status.st_mode):
-        return None, None, error_response("that path is a file, not a directory", status=400)
+        return None, None, None, error_response("that path is a file, not a directory", status=400)
 
     # os.scandir rather than Path.iterdir: each entry comes with its type (and,
     # on Windows, its stat) from the directory read itself, so a folder of
@@ -127,12 +193,27 @@ def _read_directory(request, raw_path):
         with os.scandir(target) as found:
             listing = list(found)
     except PermissionError:
-        return None, None, error_response(f"permission denied: {target}", status=403)
+        return None, None, None, error_response(f"permission denied: {target}", status=403)
     except OSError as error:
-        return None, None, error_response(f"the directory could not be read ({error})", status=500)
+        return None, None, None, error_response(f"the directory could not be read ({error})", status=500)
 
-    rows = []
+    folders, files = [], []
     for entry in listing:
+        try:
+            is_dir = entry.is_dir()  # from the directory read itself on Linux and Windows
+        except OSError:
+            continue
+        (folders if is_dir else files).append(entry)
+    folders.sort(key=lambda entry: _sort_key(entry.name))
+    files.sort(key=lambda entry: _sort_key(entry.name))
+    return target, folders, files, None
+
+
+def _describe(request, target: Path, entries) -> list:
+    """The rows for `entries`, in their order: size, date and the Locked Folder's flag. Only
+    these entries are examined (a stat each on Linux), so a page costs its own rows."""
+    rows = []
+    for entry in entries:
         try:
             info = entry.stat()
             is_dir = entry.is_dir()
@@ -141,7 +222,6 @@ def _read_directory(request, raw_path):
                        # removed mid-listing - just skip it, don't fail the
                        # whole directory over one unreadable entry
         rows.append((is_dir, entry.name, info))
-    rows.sort(key=lambda row: (not row[0], row[1].lower()))
 
     # flags the Locked Folder itself (or, in principle, anything nested under
     # it, though a listing never descends into a locked directory in the first
@@ -156,7 +236,7 @@ def _read_directory(request, raw_path):
         "modified": datetime.fromtimestamp(info.st_mtime, tz=timezone.utc).isoformat(timespec="seconds"),
         "locked": protects(target / name),
     } for is_dir, name, info in rows]
-    return target, items, None
+    return items
 
 
 def _disk_usage(path: Path):

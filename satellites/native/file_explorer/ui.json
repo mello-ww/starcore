@@ -1,5 +1,5 @@
 {
-  "_about": "File Explorer's shared interface (UI contract 1.2), a preview while it reaches parity with the web page (docs/file-explorer-migration.md): Mission Control keeps page.js by default and offers this in Developer Mode; the Android app, which has no File Explorer screen of its own, opens it. F1 browses read-only: the locations with their storage, and each folder's folders and files. It binds to the read-only view routes (views.py).",
+  "_about": "File Explorer's shared interface (UI contract 1.2), a preview while it reaches parity with the web page (docs/file-explorer-migration.md): Mission Control keeps page.js by default and offers this in Developer Mode; the Android app, which has no File Explorer screen of its own, opens it. F1 browses read-only: the locations with their storage, and each folder's folders and files. F2 pages them: each list loads 200 rows at a time (`more`). It binds to the read-only view routes (views.py).",
   "contract": "starcore.ui/1.2",
   "title": "Files",
   "preview": true,
@@ -32,9 +32,11 @@
         {"type": "text", "style": "caption", "text": "This folder is empty.", "visible": "$.empty"},
         {"type": "list", "id": "folders", "visible": "$.has_folders", "items": "$.folders",
          "item": {"title": "$.name", "subtitle": "$.subtitle", "format": {"subtitle": "datetime"}, "icon": "$.icon"},
-         "action": {"navigate": "folder", "params": {"path": "$.path"}}},
+         "action": {"navigate": "folder", "params": {"path": "$.path"}},
+         "more": {"route": "view/folder?path={$params.path}&part=folders&cursor={$value}", "cursor": "$.folders_next"}},
         {"type": "list", "id": "files", "visible": "$.has_files", "items": "$.files",
-         "item": {"title": "$.name", "subtitle": "$.modified", "value": "$.size", "format": {"subtitle": "datetime", "value": "bytes"}, "icon": "$.icon"}},
+         "item": {"title": "$.name", "subtitle": "$.modified", "value": "$.size", "format": {"subtitle": "datetime", "value": "bytes"}, "icon": "$.icon"},
+         "more": {"route": "view/folder?path={$params.path}&part=files&cursor={$value}", "cursor": "$.files_next"}},
         {"type": "text", "style": "caption", "text": "$.storage", "visible": "$.storage"}
       ]
     }

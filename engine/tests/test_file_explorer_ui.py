@@ -133,6 +133,86 @@ class FileExplorerViewTest(unittest.TestCase):
         self.assertEqual(self.json_request("/api/satellites/FileExplorer/view/nope")[0], 404)
         self.assertEqual(self.json_request("/api/satellites/FileExplorer/view/locations", "POST")[0], 405)
 
+    # ---------- paging (F2): each list arrives a page at a time ----------
+
+    def page(self, **query):
+        return self.json_request(f"/api/satellites/FileExplorer/view/folder?{urlencode(query)}")
+
+    def every_row(self, view, part, limit=None):
+        """Follows one list's cursors to its end: every name, in the order shown."""
+        names = [row["name"] for row in view[part]]
+        cursor = view[f"{part}_next"]
+        while cursor is not None:
+            query = {"path": str(self.directory), "part": part, "cursor": cursor}
+            if limit is not None:
+                query["limit"] = limit
+            status, following = self.page(**query)
+            self.assertEqual(status, 200)
+            names += [row["name"] for row in following[part]]
+            cursor = following[f"{part}_next"]
+        return names
+
+    def test_a_folder_of_ten_thousand_files_arrives_page_by_page(self):
+        for index in range(10_000):
+            (self.directory / f"file-{index:05d}.txt").touch()
+        for index in range(250):
+            (self.directory / f"Folder {index:03d}").mkdir()
+
+        status, view = self.folder(self.directory)
+        self.assertEqual(status, 200)
+        self.assertEqual((len(view["folders"]), len(view["files"])), (200, 200))
+        self.assertEqual((view["total_folders"], view["total_files"]), (250, 10_000))
+        self.assertEqual(view["summary"], "250 folders, 10,000 files")
+        self.assertTrue(view["has_folders"] and view["has_files"])
+        self.assertIsNotNone(view["storage"])
+
+        folders = self.every_row(view, "folders")
+        files = self.every_row(view, "files", limit=500)
+        self.assertEqual(folders, [f"Folder {index:03d}" for index in range(250)])
+        self.assertEqual(files, [f"file-{index:05d}.txt" for index in range(10_000)])
+
+    def test_a_page_of_one_part_holds_only_that_part(self):
+        (self.directory / "a").mkdir()
+        (self.directory / "b").mkdir()
+        (self.directory / "x.txt").touch()
+        status, view = self.page(path=str(self.directory), part="folders", cursor="a")
+        self.assertEqual(status, 200)
+        self.assertEqual(([row["name"] for row in view["folders"]], view["files"]), (["b"], []))
+        self.assertIsNone(view["folders_next"])
+        self.assertIsNone(view["storage"])  # only the first page says it
+        self.assertEqual(view["summary"], "2 folders, 1 file")
+
+    def test_a_page_carries_on_after_its_cursor_even_when_the_folder_changed(self):
+        for name in ("a", "b", "c", "d", "e"):
+            (self.directory / f"{name}.txt").touch()
+        status, first = self.page(path=str(self.directory), limit=2)
+        self.assertEqual([row["name"] for row in first["files"]], ["a.txt", "b.txt"])
+        self.assertEqual(first["files_next"], "b.txt")
+        # between pages: one already shown goes, the cursor's own goes, one before it and one after it arrive
+        (self.directory / "a.txt").unlink()
+        (self.directory / "b.txt").unlink()
+        (self.directory / "aa.txt").touch()
+        (self.directory / "f.txt").touch()
+        rest = self.every_row(first, "files", limit=2)
+        self.assertEqual(rest, ["a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "f.txt"])
+
+    def test_names_that_differ_only_by_case_keep_one_order(self):
+        names = ["b.txt", "B.TXT"] if sys.platform != "win32" else ["b.txt", "c.txt"]
+        for name in names:
+            (self.directory / name).touch()
+        status, view = self.page(path=str(self.directory), limit=1)
+        self.assertEqual(self.every_row(view, "files", limit=1), sorted(names, key=lambda name: (name.lower(), name)))
+
+    def test_paging_refuses_what_it_doesnt_understand(self):
+        for query in ({"limit": "0"}, {"limit": "ten"}, {"limit": "-3"}, {"part": "both"}):
+            with self.subTest(query):
+                status, _ = self.page(path=str(self.directory), **query)
+                self.assertEqual(status, 400)
+        for index in range(600):
+            (self.directory / f"{index:03d}").touch()
+        status, view = self.page(path=str(self.directory), limit=10_000)
+        self.assertEqual(len(view["files"]), 500)  # at most a page of 500
+
     def test_the_listing_offers_the_document_as_a_preview_beside_the_page(self):
         status, listing = self.json_request("/api/satellites")
         self.assertEqual(status, 200)
@@ -151,6 +231,7 @@ class FolderViewTest(unittest.TestCase):
             {"name": "vault", "type": "dir", "size": None, "modified": "2026-11-12T10:00:00+00:00", "locked": True},
         ], None)
         [vault] = view["folders"]
+        self.assertEqual((view["total_folders"], view["total_files"], view["folders_next"]), (1, 0, None))
         self.assertEqual((vault["icon"], vault["subtitle"]), ("lock", "Locked"))
         self.assertEqual(vault["modified"], int(datetime(2026, 11, 12, 10, tzinfo=timezone.utc).timestamp()))
         self.assertIsNone(view["storage"])

@@ -122,6 +122,28 @@ describe('a paged list on screen', () => {
     expect(tree.root.findAllByProps({testID: 'list-more'})).toHaveLength(0);
   });
 
+  it('asks for the next page as soon as one arrives when the screen reached its end meanwhile', async () => {
+    let release!: (value: any) => void;
+    const load = jest.fn()
+      .mockImplementationOnce(() => new Promise(resolve => (release = resolve)))
+      .mockResolvedValueOnce({files: [{name: 'c'}], files_next: null});
+    const ctx = context(load);
+    const tree = mount({files: [{name: 'a'}], files_next: 'a'}, ctx);
+    await act(async () => {
+      ctx.nearEnd(); // asks for page 2
+    });
+    await act(async () => {
+      ctx.nearEnd(); // the end again while page 2 is on its way: no scroll event will follow
+    });
+    expect(load).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      release({files: [{name: 'b'}], files_next: 'b'});
+    });
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenLastCalledWith('view?path=%2Fsrv&part=files&cursor=b');
+    expect(texts(tree)).toEqual(expect.arrayContaining(['a', 'b', 'c']));
+  });
+
   it('says why a page failed, and tries again on request', async () => {
     const load = jest.fn().mockRejectedValueOnce(new Error('Server unreachable')).mockResolvedValueOnce({files: [{name: 'b'}], files_next: null});
     const ctx = context(load);

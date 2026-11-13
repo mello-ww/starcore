@@ -395,6 +395,9 @@ function PagedListBlock({block, scope, context}: {block: UiBlock; scope: Scope; 
   const {color: accent} = useAccent();
   const paging = useRef(createListPaging({load: context.load})).current;
   const [, setVersion] = useState(0);
+  // the screen reached its end while a page was on its way: it sends no more scroll events once
+  // it can't move, so the next page is asked for as soon as this one is in
+  const wanted = useRef(false);
   const rows = paging.rows(block, scope);
   const status = paging.status(block);
   const next = useCallback(() => {
@@ -402,7 +405,14 @@ function PagedListBlock({block, scope, context}: {block: UiBlock; scope: Scope; 
     if (!now.more || now.loading) {
       return;
     }
-    paging.loadMore(block).then(() => setVersion(version => version + 1));
+    wanted.current = false;
+    paging.loadMore(block).then(() => {
+      setVersion(version => version + 1);
+      const after = paging.status(block);
+      if (wanted.current && after.more && !after.error) {
+        next();
+      }
+    });
     setVersion(version => version + 1);
   }, [paging, block]);
   const {onNearEnd} = context;
@@ -412,7 +422,9 @@ function PagedListBlock({block, scope, context}: {block: UiBlock; scope: Scope; 
     }
     return onNearEnd(() => {
       const now = paging.status(block);
-      if (now.more && !now.loading && !now.error) {
+      if (now.loading) {
+        wanted.current = true;
+      } else if (now.more && !now.error) {
         next();
       }
     });

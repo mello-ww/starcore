@@ -310,6 +310,11 @@ export function mount(context) {
                 const status = listPaging.status(block);
                 if (status.more && !status.error && (status.restoring || current.near())) {
                     current.next();
+                } else if (current.rearm) {
+                    // the browser may keep the end of the list in view as rows arrive (scroll
+                    // anchoring), so the sentinel never "enters" again: watching it afresh
+                    // reports where it is now
+                    current.rearm();
                 }
             });
             draw();
@@ -327,6 +332,10 @@ export function mount(context) {
                 }
             }, { rootMargin: "800px 0px" });
             observer.observe(sentinel);
+            view.rearm = () => {
+                observer.unobserve(sentinel);
+                observer.observe(sentinel);
+            };
             // one observer per list: the one of its previous drawing goes
             for (const previous of listObservers) {
                 if (previous.block === block) {

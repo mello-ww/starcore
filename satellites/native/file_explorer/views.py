@@ -69,10 +69,13 @@ def locations_view(listing: dict) -> dict:
     }
 
 
-def folder_view(target: Path, parent, items: list, storage) -> dict:
+def folder_view(target: Path, parent, items: list, storage, folders_next=None, files_next=None,
+                totals=None) -> dict:
     """One folder: its folders, then its files, and the way back up. `parent`
     is paths.parent_of(target): "" at a drive's root, where up is the list of
-    locations."""
+    locations. `items` may be one page of each; `folders_next` and
+    `files_next` are then the cursors of the next pages (None at the end), and
+    `totals` (folders, files) count the whole folder."""
     folders, files = [], []
     for item in items:
         row = {
@@ -89,6 +92,7 @@ def folder_view(target: Path, parent, items: list, storage) -> dict:
             row["icon"] = "file"
             row["size"] = item.get("size")
             files.append(row)
+    total_folders, total_files = totals if totals is not None else (len(folders), len(files))
     return {
         "path": str(target),
         "name": target.name or str(target),
@@ -96,10 +100,14 @@ def folder_view(target: Path, parent, items: list, storage) -> dict:
         "at_drive_root": parent == "",
         "folders": folders,
         "files": files,
-        "has_folders": bool(folders),
-        "has_files": bool(files),
-        "empty": not folders and not files,
-        "summary": _summary(len(folders), len(files)),
+        "folders_next": folders_next,
+        "files_next": files_next,
+        "total_folders": total_folders,
+        "total_files": total_files,
+        "has_folders": bool(total_folders),
+        "has_files": bool(total_files),
+        "empty": not total_folders and not total_files,
+        "summary": _summary(total_folders, total_files),
         "storage": _storage_summary(storage) if storage else None,
     }
 
@@ -107,7 +115,7 @@ def folder_view(target: Path, parent, items: list, storage) -> dict:
 def _summary(folders: int, files: int) -> str:
     parts = []
     if folders:
-        parts.append(f"{folders} {'folder' if folders == 1 else 'folders'}")
+        parts.append(f"{folders:,} {'folder' if folders == 1 else 'folders'}")
     if files:
-        parts.append(f"{files} {'file' if files == 1 else 'files'}")
+        parts.append(f"{files:,} {'file' if files == 1 else 'files'}")
     return ", ".join(parts) or "Empty"

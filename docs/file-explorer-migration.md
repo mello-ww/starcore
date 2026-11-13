@@ -28,7 +28,7 @@ Legend: as in `photos-parity-audit.md`.
 | 4 | Folder listing: icon, name, size, date | ✅ | ✗ | ✅ fixed in F1: `folder` page with a `path` param; `view/folder?path=` returns display-ready rows, folders then files | F1 | M |
 | 5 | Breadcrumb and Up | ✅ | ✗ | ◐ F1: the full path and an Up button (All locations at a drive's root); clickable segments would need a horizontal list (C, later) | F1 | S |
 | 6 | Locked Folder entry shown with a lock | ✅ badge | ✗ | ✅ fixed in F1: a lock icon and "Locked" in place of the date; the server guard stays what protects it | F1 | S |
-| 7 | Large folders (thousands of entries) | ◐ every row in the DOM | ✗ | C: `more` paging on `list` (same shape as `media-grid`); S: `limit`/`cursor` | F2 | M |
+| 7 | Large folders (thousands of entries) | ◐ every row in the DOM | ✗ | ✅ fixed in F2: `more` on `list`; `view/folder` pages each list 200 rows at a time (`part`, `cursor`, `limit`) | F2 | M |
 | 8 | File details | ✗ | ✗ | J: `file` page: size, date, type, `image` preview for pictures | F3 | S |
 | 9 | Download | ✅ | ✅ action exists (M12) | J | F3 | S |
 | 10 | Share | ✗ | ✅ action exists (M12) | J | F3 | S |
@@ -75,8 +75,15 @@ the existing actions.
   Server: `view/locations` and `view/folder` display routes (`views.py`; `ui` is a Core
   segment), sharing `entries`' directory read and the guard. **Done.**
   Tests: Engine route tests, document validation.
-- **F2 - List paging.** Contract `more` on `list` in the three validators, fixtures, both
-  renderers; `view/folder` gains `limit` and `cursor`. Tests on a folder of 10,000 entries.
+- **F2 - List paging.** Contract `more` on `list` (the Engine's validation, the vocabulary,
+  shared fixtures), both renderers; `view/folder` gains `part`, `cursor` and `limit`. **Done.**
+  The first page holds 200 folders and 200 files with the folder's totals; each list then
+  pages on its own from the last name shown, so a change in the folder between pages never
+  repeats or skips what was already shown. Only the page's rows are examined (one stat each on
+  Linux). Tests: a folder of 10,000 files and 250 folders, a folder that changes between pages,
+  names differing only by case, bad parameters; both clients' paging rules. Checked on the
+  demo: the web pages through 2,500 files in order, none twice; Android pages too, but past
+  about 1,500 rows its page saturates - virtualized lists are F2b (`remaining-work.md`).
 - **F3 - File page.** Details, picture preview, Download, Share, Open (`download` + `open`).
   Kotlin `open` in `StarCoreFilesModule.kt`; web new tab.
 - **F4 - Management.** New folder, rename, delete through forms and confirms; the guard
