@@ -665,32 +665,6 @@ class PhotoSatelliteTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload["page"], {"module": "page.js", "stylesheet": "page.css"})
 
-    def test_the_satellite_exposes_a_mobile_route(self):
-        from starcore.api import payloads
-
-        described = payloads.describe_satellite(self.engine, self.satellite)
-
-        self.assertTrue(described["mobile_ui"])
-        self.assertIn("mobile", self.satellite.routes)
-
-    def test_the_mobile_route_reports_the_library_state(self):
-        self.fill(2)
-
-        status, payload = self.json_request("/api/satellites/photo/mobile")
-
-        self.assertEqual(status, 200)
-        screen = payload["screen"]
-        self.assertEqual(screen["title"], "Photo")
-        labels = {item["label"]: item["value"] for item in screen["sections"][0]["items"]}
-        self.assertEqual(labels["Photos"], "2")
-        self.assertEqual(labels["Phone sync"], "off")
-
-    def test_the_mobile_route_rejects_other_methods(self):
-        status, payload = self.json_request("/api/satellites/photo/mobile", "POST", {})
-
-        self.assertEqual(status, 405)
-        self.assertIn("error", payload)
-
     def test_page_assets_are_served(self):
         for asset, expected in (("page.js", "javascript"), ("page.css", "text/css")):
             status, content_type, body = self.request(f"/api/satellites/photo/assets/{asset}")

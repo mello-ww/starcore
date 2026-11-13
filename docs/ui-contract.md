@@ -11,7 +11,7 @@ and keeps working on clients that know only 1.0. What arrived in 1.1 and 1.2 is 
 where it is described. It covers what is implemented today and what is still the target. The closed vocabulary itself is
 machine-readable in [`contracts/ui/vocabulary.json`](../contracts/ui/vocabulary.json).
 
-- [Three ways a Satellite gets an interface](#three-ways-a-satellite-gets-an-interface)
+- [Two ways a Satellite gets an interface](#two-ways-a-satellite-gets-an-interface)
 - [Two kinds of capability](#two-kinds-of-capability)
 - [The document](#the-document)
 - [Blocks](#blocks)
@@ -30,13 +30,12 @@ machine-readable in [`contracts/ui/vocabulary.json`](../contracts/ui/vocabulary.
 - [Current implementation and target](#current-implementation-and-target)
 - [Migration](#migration)
 
-## Three ways a Satellite gets an interface
+## Two ways a Satellite gets an interface
 
 | Mechanism | File | Web | Android | Status |
 |---|---|---|---|---|
 | **UI document** | `ui.json` | shared renderer (`mission_control/ui/renderer.js`) | shared renderer (`SatelliteUiScreen`) | contract 1.2 - the default for new Satellites |
 | **Mission Control page** | `mission_control/page.js` | the Satellite's own ES module | - | kept: a trusted, first-party extension for the web |
-| **Mobile screen (v0)** | a `mobile` route | - | `DeclarativeScreen`, four item types | kept for compatibility; superseded by `ui.json` |
 
 A validated `ui.json` comes first on both clients. A Satellite that also ships `page.js` keeps
 it as the web's fallback, used when its document is missing or refused, and in Developer
@@ -865,7 +864,7 @@ Explorer's `page.js` stays the web's default while its preview catches up
 shared interfaces and keep their previous screens in Developer Mode until they are retired.
 Retiring all of them is planned in [Remaining work](remaining-work.md).
 
-1. **Done:** document v0 (the `mobile` route and `page.js`); the modularity guard.
+1. **Done:** the first document format (a `mobile` route, removed since) and `page.js`; the modularity guard.
 2. **Done:** Engine metadata: `icon_name`, `provides`, `ui.json` with revisions and ETags,
    `catalog_revision`, `/api/catalog`, rediscovery, revalidating static files.
 3. **Done:** contract 1.0 and both renderers, proven by Showcase.
@@ -894,8 +893,8 @@ Retiring all of them is planned in [Remaining work](remaining-work.md).
 
    Each becomes a shared block or module that any Satellite can use, and removes one name check
    from the clients.
-8. Retire v0: deprecate the `mobile` route once nothing uses it. `page.js` stays as the web
-   extension mechanism.
+8. **Done:** the v0 `mobile` route, its Engine flag (`mobile_ui`) and the app's screens for it
+   are removed. `page.js` stays as the web extension mechanism.
 
 Backward compatibility (not required for now: StarCore runs only on the owner's server, on
 the latest version, so what follows is kept only until the code for it is removed, stage 1 of

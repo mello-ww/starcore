@@ -244,7 +244,6 @@ route).
 | `diagnostics` | sampler statistics, the history file's size and rows per tier, StarCore's process, unavailable readings |
 | `view` | the latest snapshot shaped for display (`header` keys, `overview`, `hardware`, `network`, `services`, `history_notes`) - what `ui.json` binds to; see `view.py` |
 | `view/diagnostics` | `diagnostics` shaped for display, with the raw answer under `raw` |
-| `mobile` | the generic declarative screen of UI contract v0, for older clients |
 
 A reading that isn't available is `null`; the reason is under `unsupported`. Invalid query
 parameters answer `400`.

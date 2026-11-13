@@ -27,7 +27,7 @@ export const STATUS_SECTIONS: {key: StatusSectionKey; label: string}[] = [
 
 /**
  * The Status satellite's native screen - what the Satellites tab and Home
- * open for "Status" instead of its generic declarative screen. One metrics
+ * open for "Status" on a server older than its ui.json. One metrics
  * poller feeds every section; it runs only while this screen is focused and
  * the app is in the foreground (see useStatusMetrics).
  */

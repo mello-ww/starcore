@@ -241,9 +241,8 @@ dimensions, plus duration) as a photo.
 
 ## Mobile app
 
-StarCore's own mobile app recognizes "Photo" by name (rather than falling back to the generic
-declarative screen every other Satellite gets - see "Exposing a mobile interface" in
-`docs/satellites.md`) and gives it a dedicated gallery: Library, Albums, Map and Search, as
+Photo's shared interface (below) is what the app opens by default. Its previous screens, kept
+in Developer Mode until they are retired (`docs/remaining-work.md`), are a dedicated gallery: Library, Albums, Map and Search, as
 segments of one screen, with Photo configuration reached separately (see below) rather than as
 a segment of its own. All of it is built on exactly the routes above and the same Albums model
 documented there - there is no second implementation of the library, albums, the recycle bin,

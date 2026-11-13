@@ -25,17 +25,17 @@ const route = {} as any;
 
 const satelliteA = {
   name: 'status', version: '1', author: 'a', description: 'System status', icon: null,
-  type: 'native' as const, enabled: true, status: 'running' as const, configurable: false, mobile_ui: true,
+  type: 'native' as const, enabled: true, status: 'running' as const, configurable: false,
 };
 const satelliteB = {
   name: 'docker', version: '1', author: 'a', description: 'Container control', icon: null,
-  type: 'link' as const, enabled: true, status: 'stopped' as const, configurable: true, mobile_ui: false,
+  type: 'link' as const, enabled: true, status: 'stopped' as const, configurable: true,
 };
 
 /**
  * Covers requirement 2 (satellite system): the Satellites tab fetches from
  * the currently active server's /api/satellites, shows loading/cached/error
- * states, and lets satellites without a mobile UI be seen but not opened.
+ * states, and lets satellites without an interface be seen but not opened.
  */
 describe('SatellitesListScreen', () => {
   beforeEach(() => {
@@ -74,7 +74,7 @@ describe('SatellitesListScreen', () => {
     expect(texts(tree)).not.toContain('LockedFolder');
   });
 
-  it('marks a satellite with no mobile UI as such and does not navigate on tap', async () => {
+  it('marks a satellite with no interface as such and does not navigate on tap', async () => {
     __mocks.list.mockResolvedValue([satelliteB]);
     let tree!: ReturnType<typeof renderer.create>;
     await act(async () => {
@@ -86,21 +86,9 @@ describe('SatellitesListScreen', () => {
     expect(pressable).toBeTruthy();
   });
 
-  it('navigates to the satellite detail screen when one with a mobile UI is tapped', async () => {
-    __mocks.list.mockResolvedValue([satelliteA]);
-    let tree!: ReturnType<typeof renderer.create>;
-    await act(async () => {
-      tree = renderer.create(<SatellitesListScreen navigation={navigation} route={route} />);
-    });
-
-    act(() => tree.root.findByProps({disabled: false}).props.onPress());
-
-    expect(navigation.navigate).toHaveBeenCalledWith('SatelliteDetail', {name: 'status'});
-  });
-
   it('opens a Satellite that only ships a ui.json in the generic renderer, with its own icon', async () => {
     const notes = {
-      ...satelliteB, name: 'Notes', mobile_ui: false, icon_name: 'file-text',
+      ...satelliteB, name: 'Notes', icon_name: 'file-text',
       ui: {contract: 'starcore.ui/1.0', revision: 'abc123', error: null},
     };
     __mocks.list.mockResolvedValue([notes]);
@@ -116,7 +104,7 @@ describe('SatellitesListScreen', () => {
   });
 
   it('does not open a ui.json the Engine refused', async () => {
-    const broken = {...satelliteB, name: 'Broken', mobile_ui: false, ui: {contract: null, revision: null, error: 'ui.json is invalid'}};
+    const broken = {...satelliteB, name: 'Broken', ui: {contract: null, revision: null, error: 'ui.json is invalid'}};
     __mocks.list.mockResolvedValue([broken]);
     let tree!: ReturnType<typeof renderer.create>;
     await act(async () => {
@@ -147,7 +135,7 @@ describe('SatellitesListScreen', () => {
     expect(texts(tree)).toEqual(expect.arrayContaining(['status', 'Showing cached data - offline']));
   });
 
-  it('opens the dedicated Photo screens instead of the generic satellite detail screen', async () => {
+  it('opens the dedicated Photo screens for a Photo whose server has no ui.json', async () => {
     const photoSatellite = {...satelliteA, name: 'Photo', description: 'Photo library'};
     __mocks.list.mockResolvedValue([photoSatellite]);
     let tree!: ReturnType<typeof renderer.create>;
@@ -158,7 +146,6 @@ describe('SatellitesListScreen', () => {
     act(() => tree.root.findByProps({disabled: false}).props.onPress());
 
     expect(navigation.navigate).toHaveBeenCalledWith('PhotoHome');
-    expect(navigation.navigate).not.toHaveBeenCalledWith('SatelliteDetail', expect.anything());
   });
 
   it('opens the native Status screen for the Status satellite', async () => {

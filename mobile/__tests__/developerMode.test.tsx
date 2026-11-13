@@ -10,8 +10,6 @@ import {
   useDeveloperMode,
   visibleToDeveloper,
 } from '../src/developer/DeveloperModeContext';
-import {DeclarativeScreen} from '../src/satellites/DeclarativeScreen';
-import type {UiScreen} from '../src/satellites/types';
 
 type Tree = ReturnType<typeof renderer.create>;
 
@@ -36,20 +34,6 @@ async function mount(serverId: string, children: React.ReactNode = <Probe />): P
   });
   return tree;
 }
-
-const screen: UiScreen = {
-  title: 'Status',
-  sections: [
-    {
-      type: 'card',
-      items: [
-        {type: 'status', label: 'Health', value: 'Healthy'},
-        {type: 'status', label: 'Python', value: '3.13.0', developer: true},
-      ],
-    },
-    {type: 'card', title: 'Collector', developer: true, items: [{type: 'text', value: 'sampling every 5 s'}]},
-  ],
-};
 
 beforeEach(async () => {
   latest = null;
@@ -110,21 +94,5 @@ describe('Developer Mode', () => {
     const entries = [{name: 'everyday'}, {name: 'advanced', developer: true}];
     expect(visibleToDeveloper(entries, false).map(entry => entry.name)).toEqual(['everyday']);
     expect(visibleToDeveloper(entries, true).map(entry => entry.name)).toEqual(['everyday', 'advanced']);
-  });
-
-  it('hides developer sections and items of a declarative Satellite screen until it is on', async () => {
-    const tree = await mount('server-a', (
-      <>
-        <DeclarativeScreen screen={screen} onAction={() => {}} />
-        <Probe />
-      </>
-    ));
-    expect(texts(tree)).toContain('Health');
-    expect(texts(tree)).not.toContain('Python');
-    expect(texts(tree)).not.toContain('Collector');
-
-    await act(async () => latest!.setEnabled(true));
-    expect(texts(tree)).toContain('Python');
-    expect(texts(tree)).toContain('Collector');
   });
 });

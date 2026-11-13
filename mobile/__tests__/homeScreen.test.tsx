@@ -33,11 +33,11 @@ const {__navigation} = jest.requireMock('@react-navigation/native') as {__naviga
 
 const music = {
   name: 'Music', version: '1', author: 'a', description: 'Local music library satellite.', icon: 'icon.svg',
-  type: 'native' as const, enabled: true, status: 'running' as const, configurable: true, mobile_ui: true,
+  type: 'native' as const, enabled: true, status: 'running' as const, configurable: true,
 };
 const docker = {
   name: 'docker', version: '1', author: 'a', description: 'Containers', icon: null,
-  type: 'link' as const, enabled: true, status: 'stopped' as const, configurable: false, mobile_ui: false,
+  type: 'link' as const, enabled: true, status: 'stopped' as const, configurable: false,
 };
 
 function clientWith(username: string | null, statusCode = 200) {

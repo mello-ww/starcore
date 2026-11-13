@@ -9,7 +9,7 @@ import {getCachedSatellites, setCachedSatellites} from '../satellites/cache';
 import {STATUS_LABELS, satelliteIcon, statusDotColor} from '../satellites/icons';
 import type {SatelliteSummary} from '../satellites/types';
 import {ScreenTitle} from '../components/ScreenTitle';
-import {DEDICATED_SCREENS, hasSharedPreview, opensSharedInterface, ownScreenBeside} from './HomeScreen';
+import {canOpen, DEDICATED_SCREENS, hasSharedPreview, opensSharedInterface, ownScreenBeside} from './HomeScreen';
 import {useDeveloperMode} from '../developer/DeveloperModeContext';
 import {Surface} from '../components/Surface';
 import {tokens, useAccent, useTopInset} from '../theme';
@@ -24,8 +24,8 @@ type Props = NativeStackScreenProps<SatellitesStackParamList, 'SatellitesList'>;
  * "Satellites" tab - lists whatever the *currently selected* server
  * reports (see "Fully modular satellite mobile architecture" in the task
  * brief): this screen never hard-codes a satellite's name. Individual
- * satellites are opened inside this section (SatelliteDetailScreen), never
- * added as their own bottom tab.
+ * satellites are opened inside this section (their ui.json in SatelliteUiScreen),
+ * never added as their own bottom tab.
  */
 export function SatellitesListScreen({navigation}: Props) {
   const {client} = useAuth();
@@ -99,7 +99,7 @@ export function SatellitesListScreen({navigation}: Props) {
           const dedicated = declarative ? undefined : DEDICATED_SCREENS[item.name];
           const preview = developer && hasSharedPreview(item);
           const own = developer ? ownScreenBeside(item) : undefined;
-          const openable = item.mobile_ui || Boolean(item.ui?.revision);
+          const openable = canOpen(item);
           return (
           <Pressable
             disabled={!openable}
@@ -109,9 +109,7 @@ export function SatellitesListScreen({navigation}: Props) {
             onPress={() =>
               dedicated
                 ? navigation.navigate(dedicated)
-                : declarative
-                  ? navigation.navigate('SatelliteUi', {name: item.name, revision: item.ui?.revision})
-                  : navigation.navigate('SatelliteDetail', {name: item.name})
+                : navigation.navigate('SatelliteUi', {name: item.name, revision: item.ui?.revision})
             }>
             <Surface style={styles.card}>
               <View style={styles.row}>

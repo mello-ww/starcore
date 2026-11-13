@@ -6,7 +6,7 @@ from starcore.api.response import error_response, file_response
 
 from . import audio
 from .connect import ConnectError
-from .library import MusicScanError, readable_duration, readable_size
+from .library import MusicScanError
 from .routing import identifier, ok, route
 
 STREAM_CACHE = "private, max-age=3600"
@@ -127,18 +127,3 @@ def connect(call):
         return ok({"event": hub.transfer(call.user, sender, body.get("target"), body.get("source"),
                                          bool(body.get("play", True)))})
     return error_response(f"unknown connect action '{action}'")
-
-
-@route("GET")
-def mobile(call):
-    """The generic declarative screen; StarCore's own app has dedicated Music screens instead."""
-    summary = call.music.summary()
-    return ok({"screen": {"title": "Music", "sections": [{"type": "card", "title": "Library", "items": [
-        {"type": "status", "label": "Tracks", "value": str(summary["tracks"])},
-        {"type": "status", "label": "Albums", "value": str(summary["albums"])},
-        {"type": "status", "label": "Artists", "value": str(summary["artists"])},
-        {"type": "status", "label": "Duration", "value": readable_duration(summary["duration"])},
-        {"type": "status", "label": "Size", "value": readable_size(summary["size_bytes"])},
-        {"type": "status", "label": "Last scan", "value": summary["last_scan"] or "never"},
-        {"type": "button", "label": "Scan library", "action": {"route": "scan", "method": "POST"}},
-    ]}]}})

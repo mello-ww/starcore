@@ -46,12 +46,12 @@ const statusState = {
 };
 const status = {
   name: 'Status', version: '1', author: 'a', description: 'System monitoring satellite.', icon: 'icon.svg',
-  type: 'native' as const, enabled: true, status: 'running' as const, configurable: false, mobile_ui: true,
+  type: 'native' as const, enabled: true, status: 'running' as const, configurable: false,
   state: statusState,
 };
 const music = {
   name: 'Music', version: '1', author: 'a', description: 'Local music library satellite.', icon: 'icon.svg',
-  type: 'native' as const, enabled: true, status: 'running' as const, configurable: true, mobile_ui: true,
+  type: 'native' as const, enabled: true, status: 'running' as const, configurable: true,
 };
 
 type Tree = ReturnType<typeof renderer.create>;

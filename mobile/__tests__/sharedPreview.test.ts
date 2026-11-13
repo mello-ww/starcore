@@ -5,7 +5,7 @@ import type {SatelliteSummary} from '../src/satellites/types';
 // any other document - or a preview for a Satellite the app has no screen of its own for -
 // opens in the shared interface
 const satellite = (name: string, ui: SatelliteSummary['ui']): SatelliteSummary =>
-  ({name, ui, mobile_ui: false, status: 'running', description: ''}) as unknown as SatelliteSummary;
+  ({name, ui, status: 'running', description: ''}) as unknown as SatelliteSummary;
 
 describe('which interface a Satellite opens in', () => {
   it('opens a document in the shared interface', () => {

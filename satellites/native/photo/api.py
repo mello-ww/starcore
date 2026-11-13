@@ -4,7 +4,6 @@ from starcore.api.response import error_response, file_response, json_response
 
 from . import albums as albums_module
 from . import configuration, gallery, sync
-from . import state as state_module
 from .albums import AlbumError, AlbumNotFound, albums
 from .images import UnsupportedImage
 from .library import PhotoImportError, PhotoNotFound, library
@@ -44,13 +43,6 @@ def routes() -> dict:
         # naming a route "configuration" is the whole contract with the Core's
         # generic satellite configuration mechanism - see docs/satellites.md
         "configuration": configuration_route,
-        # same convention, for a mobile interface - see "Exposing a mobile
-        # interface" in docs/satellites.md. StarCore's own mobile app
-        # recognizes "Photo" by name and opens its own dedicated gallery
-        # screens instead (grid, folders, search, a full-screen viewer) - this
-        # is the generic fallback any *other* client gets, the same
-        # status-style declarative screen Status's worked example uses.
-        "mobile": mobile,
     }
 
 
@@ -169,34 +161,6 @@ def configuration_route(request):
         return json_response(configuration.update(request.engine, request.satellite, key, value))
     except configuration.ConfigurationError as error:
         return error_response(str(error), status=400)
-
-
-def mobile(request):
-    """The generic declarative fallback screen (see "Exposing a mobile
-    interface" in docs/satellites.md) - reused only by a client that doesn't
-    know Photo specifically. StarCore's own mobile app never calls this: it
-    recognizes "Photo" by name and opens its own dedicated screens instead,
-    built on the same photos/albums/trash routes as everything else here."""
-    if request.method != "GET":
-        return error_response("only GET is supported here", status=405)
-
-    data = state_module.state(request.engine, request.satellite)
-
-    return json_response({
-        "screen": {
-            "title": request.satellite.manifest.name,
-            "sections": [
-                {
-                    "type": "card",
-                    "items": [
-                        {"type": "status", "label": "Photos", "value": str(data.get("photos", "-"))},
-                        {"type": "status", "label": "Library size", "value": str(data.get("library_size", "-"))},
-                        {"type": "status", "label": "Phone sync", "value": str(data.get("sync", "-"))},
-                    ],
-                },
-            ],
-        },
-    })
 
 
 def summary(request):

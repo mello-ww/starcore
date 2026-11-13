@@ -68,6 +68,11 @@ export function hasSharedPreview(satellite: SatelliteSummary): boolean {
   return Boolean(satellite.ui?.revision) && satellite.ui?.preview === true && Boolean(DEDICATED_SCREENS[satellite.name]);
 }
 
+/** Whether tapping a Satellite opens anything: its shared interface, or a screen of this app's own. */
+export function canOpen(satellite: SatelliteSummary): boolean {
+  return Boolean(satellite.ui?.revision) || Boolean(DEDICATED_SCREENS[satellite.name]);
+}
+
 /**
  * The reverse: a Satellite that opens in its shared interface and still has a screen of its own
  * in this app, kept until the shared one is validated. Developer Mode can open that screen
@@ -139,13 +144,11 @@ export function HomeScreen() {
 
   const open = (satellite: SatelliteSummary, page?: string, pageParams?: Record<string, any>) => {
     const declarative = opensSharedInterface(satellite);
-    const screen: string = declarative ? 'SatelliteUi' : DEDICATED_SCREENS[satellite.name] ?? 'SatelliteDetail';
-    const params =
-      screen === 'SatelliteUi'
-        ? {name: satellite.name, revision: satellite.ui?.revision, page, params: pageParams}
-        : screen === 'SatelliteDetail'
-          ? {name: satellite.name}
-          : undefined;
+    const screen: string | undefined = declarative ? 'SatelliteUi' : DEDICATED_SCREENS[satellite.name];
+    if (!screen) {
+      return;
+    }
+    const params = declarative ? {name: satellite.name, revision: satellite.ui?.revision, page, params: pageParams} : undefined;
     navigation.navigate('Satellites', {screen, params, initial: false});
   };
   // a server older than UI contract 1.1 has no widgets: the dedicated card stays,
@@ -277,7 +280,7 @@ export function HomeScreen() {
             <Text style={[type.body, styles.cardDesc]} numberOfLines={2}>
               {satellite.description}
             </Text>
-            {satellite.mobile_ui || satellite.ui?.revision ? (
+            {canOpen(satellite) ? (
               <Pressable
                 onPress={() => open(satellite)}
                 accessibilityRole="button"

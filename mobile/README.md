@@ -204,8 +204,7 @@ in Developer Mode, and Photos' still serve its settings, phone sync and the
 Locked Folder. File Explorer has no screen of its own: its `ui.json` is a
 read-only preview, which the app opens (Mission Control keeps File Explorer's
 own page by default). Music keeps its dedicated screens until the shared blocks
-reach parity with them (`docs/remaining-work.md`), and the older `mobile`
-route (`DeclarativeScreen`) still works. Satellite icons come from each
+reach parity with them (`docs/remaining-work.md`). Satellite icons come from each
 Satellite's `icon_name`.
 
 Code written for one Satellite lives only in its own folder (`src/music/`,

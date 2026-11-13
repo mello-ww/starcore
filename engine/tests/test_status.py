@@ -20,7 +20,6 @@ import time
 import unittest
 
 from starcore import ui_contract
-from starcore.api.response import Request
 from starcore.auth import AuthStore
 from starcore.cli import runner, spec
 from starcore.cli.audit import AuditLog
@@ -556,7 +555,7 @@ class StatusEngineTest(unittest.TestCase):
 
     def test_every_route_needs_a_session(self):
         token = self.engine.auth.bootstrap("admin", "a very good password")
-        for route in ("metrics", "history", "diagnostics", "view", "view/diagnostics", "mobile"):
+        for route in ("metrics", "history", "diagnostics", "view", "view/diagnostics"):
             with self.subTest(route=route):
                 self.assertEqual(self.request(f"/api/satellites/status/{route}")[0], 401)
                 self.assertEqual(self.request(f"/api/satellites/status/{route}", token=token)[0], 200)
@@ -644,11 +643,6 @@ class StatusEngineTest(unittest.TestCase):
         for key in ("health_label", "health_tone", "cpu_tone", "memory_tone", "satellites", "warning_items"):
             self.assertIn(key, entry["state"])
         self.assertEqual(entry["page"], {"module": "page.js", "stylesheet": "page.css"})
-
-    def test_the_mobile_screen_shows_real_readings(self):
-        response = self.satellite.routes["mobile"](Request(self.engine, self.satellite, "GET", (), {}))
-        labels = [item["label"] for item in response.payload["screen"]["sections"][0]["items"]]
-        self.assertEqual(labels[:4], ["Health", "CPU", "Memory", "Satellites"])
 
     def test_page_assets_are_served(self):
         for name, kind in (("page.js", "javascript"), ("charts.js", "javascript"), ("format.js", "javascript"),

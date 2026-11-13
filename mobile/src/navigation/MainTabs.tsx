@@ -9,7 +9,6 @@ import {ConfigScreen} from '../screens/ConfigScreen';
 import {ConnectScreen} from '../screens/ConnectScreen';
 import {ConsoleScreen} from '../screens/ConsoleScreen';
 import {HomeScreen} from '../screens/HomeScreen';
-import {SatelliteDetailScreen} from '../screens/SatelliteDetailScreen';
 import {SatelliteUiScreen} from '../screens/SatelliteUiScreen';
 import {SatellitesListScreen} from '../screens/SatellitesListScreen';
 import {ServersScreen} from '../screens/ServersScreen';
@@ -40,7 +39,6 @@ export type MainTabParamList = {
 
 export type SatellitesStackParamList = {
   SatellitesList: undefined;
-  SatelliteDetail: {name: string};
   /** Any Satellite's declarative interface (its ui.json, UI contract 1.0 -
    * see docs/ui-contract.md): one page of it, with the page's params.
    * `revision` is the one GET /api/satellites reported, so a cached copy of
@@ -84,7 +82,6 @@ function SatellitesStack() {
   return (
     <SatellitesStackNav.Navigator screenOptions={stackScreenOptions}>
       <SatellitesStackNav.Screen name="SatellitesList" component={SatellitesListScreen} options={{title: 'Satellites', headerShown: false}} />
-      <SatellitesStackNav.Screen name="SatelliteDetail" component={SatelliteDetailScreen} />
       <SatellitesStackNav.Screen name="SatelliteUi" component={SatelliteUiScreen} />
       <SatellitesStackNav.Screen name="PhotoHome" component={PhotoHomeScreen} options={{title: ''}} />
       <SatellitesStackNav.Screen name="PhotoAlbum" component={PhotoAlbumScreen} />

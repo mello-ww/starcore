@@ -198,7 +198,7 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
         - [ ] F2-F5: list paging, the file page (download, share, open), management, upload
         - [ ] F6-F7: shared by default, then retire its own page
     - [ ] The Locked Folder through `media.vault`, and Music on `ui.json` (R3 and R4 of `docs/remaining-work.md`)
-- [ ] Light theme
+- [ ] Light theme (after the stable release)
 - [ ] Icons instead of text glyphs for the remaining Music controls
 - [ ] Audio playback validated on a real device
 

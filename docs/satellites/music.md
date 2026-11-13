@@ -297,7 +297,6 @@ GET  queue?device=&expand=1       POST {"device", "state"}
 GET  connect/devices | events | cursor | active
 POST connect/register | state | command | transfer | forget
 
-GET  mobile                       the generic declarative screen
 GET  configuration                POST {"key", "value"}
 ```
 

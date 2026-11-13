@@ -1,4 +1,4 @@
-"""Mission Control and mobile routes, served under /api/satellites/music/. See docs/satellites/music.md."""
+"""Music routes, served under /api/satellites/music/. See docs/satellites/music.md."""
 
 from starcore.api.response import error_response, json_response
 
@@ -38,8 +38,7 @@ def routes() -> dict:
         "playback": routes_playback.playback,
         "queue": routes_playback.queue,
         "connect": routes_playback.connect,
-        # same conventions as every other Satellite - see docs/satellites.md
-        "mobile": routes_playback.mobile,
+        # same convention as every other Satellite - see docs/satellites.md
         "configuration": configuration_route,
     }
 

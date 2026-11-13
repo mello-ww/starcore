@@ -359,9 +359,8 @@ class PhotoGalleryApiTest(unittest.TestCase):
         photo = next(entry for entry in entries if entry["name"] == "Photo")
         self.assertTrue(photo["ui"]["revision"])
         self.assertNotIn("preview", photo["ui"])
-        # its own page and screens stay, for Developer Mode and older apps
+        # its own page and screens stay, for Developer Mode
         self.assertTrue(photo["page"])
-        self.assertTrue(photo["mobile_ui"])
 
 
     # ---------- media.gallery: what the media picker chooses from ----------

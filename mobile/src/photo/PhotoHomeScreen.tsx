@@ -34,11 +34,9 @@ const SECTIONS: {key: Section; label: string}[] = [
  * The Photo satellite's dedicated mobile home - Library / Albums / Map /
  * Search as one screen with a segmented control rather than four separate
  * stack screens, so switching between them never re-triggers navigation
- * transitions. This is what SatellitesListScreen opens for "Photo" instead
- * of the generic SatelliteDetail + DeclarativeScreen every other Satellite
- * gets - see "Exposing a mobile interface" in docs/satellites.md for why
- * Photo still also answers a plain declarative "mobile" route for any
- * *other* client.
+ * transitions. Photo's ui.json is its default interface; this is the
+ * previous screen, kept in Developer Mode until it is retired
+ * (docs/remaining-work.md).
  */
 export function PhotoHomeScreen({navigation, route}: Props) {
   const accentStyle = useAccentStyles();

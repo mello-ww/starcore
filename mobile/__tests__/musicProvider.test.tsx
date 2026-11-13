@@ -107,7 +107,7 @@ describe('SatellitesListScreen and Music', () => {
     (useAuth as jest.Mock).mockReturnValue({client: {}});
     (useServers as jest.Mock).mockReturnValue({activeServer: {id: 'srv-1', name: 'Home'}});
     __mocks.list.mockResolvedValue([{name: 'Music', version: '1', author: 'a', description: 'Music', icon: null,
-      type: 'native', enabled: true, status: 'running', configurable: true, mobile_ui: true}]);
+      type: 'native', enabled: true, status: 'running', configurable: true}]);
     const navigation = {navigate: jest.fn()} as any;
     let tree!: ReturnType<typeof renderer.create>;
     await act(async () => {

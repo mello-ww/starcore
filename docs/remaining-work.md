@@ -56,8 +56,8 @@ Small and independent; unblocked by the no-compatibility rule.
   owner's OK on Status's shared interface).
 - [ ] The fallback icons for servers before UI contract 1.0 (`mobile/src/satellites/icons.ts`'s
   name list); every Satellite declares `icon_name`.
-- [ ] The v0 `mobile` route: Music's, Photo's and Status's `mobile` routes, the Engine's
-  `mobile_ui` field, the app's `DeclarativeScreen` and its tests.
+- [x] The v0 `mobile` route: Music's, Photo's and Status's `mobile` routes, the Engine's
+  `mobile_ui` field, the app's `DeclarativeScreen` and `SatelliteDetailScreen`, their tests.
 - [ ] The audio host's `fallbackProvider` and `MUSIC_LEGACY_PROVIDER` (servers without the
   `audio.library` capability).
 - [ ] The app's checks for an Engine without `/api/catalog` or `ui` fields, wherever they only
@@ -124,12 +124,14 @@ Needs its own security audit before implementation, as M5 had
   `files.protected` capability. Their comments naming each other go with them (about 130).
 - [ ] Then remove the Locked Folder's `page.js` and `mobile/src/lockedFolder/`.
 
+Its audit and plan go in [`satellites/locked_folder.md`](satellites/locked_folder.md).
+
 ## 5. Music on `ui.json` (R4)
 
 The largest piece. Its own audit comes first, as for Photos: a parity matrix of the web views
 and the Android screens against what the contract can draw.
 
-- [ ] **The audit and plan** (`docs/music-parity-audit.md`).
+- [ ] **The audit and plan,** in [`media-audio.md`](media-audio.md).
 - [ ] **Library pages:** home (Daily Mixes, recents), library, albums, artists, playlists,
   tracks, search, as media lists and grids that play through the audio host.
 - [ ] **Playlists:** create, rename, reorder, add and remove tracks, M3U import and export.
@@ -161,13 +163,25 @@ user-facing text.
 - [ ] **The guard's code check extended to the Engine** (the CLI's `Status` column label and
   its help examples need rewording or an allowance).
 
-## Order
+## Order (validated by the owner on 2026-11-13)
 
-Stage 1 and stage 6 are small and can be done any time. File Explorer (2) is under way.
-The Locked Folder (4) unblocks the end of Photos (3). Music (5) is independent and the largest.
+1. Stages 1 and 6: the cleanup, small and safe, so there is less code to carry.
+2. File Explorer (2): under way; its paging, upload and open serve Music and the Locked Folder.
+3. The Locked Folder (4): a security audit first. It unblocks the end of Photos.
+4. Photos (3): settings, phone sync and icons, then its own interface goes.
+5. Music (5): the largest, last, reusing everything built before. An audit first.
+6. Stabilisation before the stable release: the bugs, security points and checks listed in
+   [`roadmap.md`](roadmap.md) (not the light theme, which waits until after it).
+
+**Method:** one piece at a time. Each piece starts with a plan in the existing docs (no new
+files), which the owner approves before any code. Then small milestones, one commit each,
+tested on both clients (automated tests, the web and the emulator), each followed by a short
+summary to the owner. An old interface goes only after the owner has validated its
+replacement on the web and on the phone. Tick the boxes here as items are done.
 
 ## Outside this migration
 
 Tracked in [`roadmap.md`](roadmap.md), not here: what has not been verified (the Python tests
 skipped on Windows, a physical phone, the production HTTPS proxy), the Android lock-screen
-position after a pause, the light theme on Android, and the features still to build.
+position after a pause, and the features still to build. The light theme on Android is not
+part of the stable release.

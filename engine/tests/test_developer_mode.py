@@ -87,15 +87,6 @@ class DeveloperSettingsTest(unittest.TestCase):
         self.assertTrue(settings)
         self.assertTrue(all(setting["developer"] is True for setting in settings.values()))
 
-    def test_the_status_fallback_screen_marks_technical_items(self):
-        status, payload = self.request("/api/satellites/Status/mobile", token=self.token)
-        self.assertEqual(status, 200, payload)
-        items = [item for section in payload["screen"]["sections"] for item in section["items"]
-                 if item["type"] == "status"]
-        flagged = {item["label"] for item in items if item.get("developer")}
-        self.assertEqual(flagged, {"Platform", "Python"})
-        self.assertIn("Health", {item["label"] for item in items if not item.get("developer")})
-
     # ---------- never a permission ----------
 
     def test_developer_routes_and_settings_still_require_a_session(self):
