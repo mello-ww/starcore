@@ -3,7 +3,7 @@ import * as session from "./session.js";
 import { Engine } from "./engine.js";
 
 const SAVE_DELAY = 1500;
-const DEVICE_KEY = "starcore.music.device";
+const DEVICE_KEY = "starcore.player.device";
 
 function deviceId() {
     try {

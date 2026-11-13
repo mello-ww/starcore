@@ -1,6 +1,6 @@
 import type {StarCoreClient} from '../api/client';
 import {ApiError} from '../api/types';
-import type {ConnectDevice, ConnectEvent, Lyrics, MusicPreferences, PlaybackInfo, Quality, QueueState, Track} from './types';
+import type {ConnectDevice, ConnectEvent, Lyrics, PlaybackPreferences, PlaybackInfo, Quality, QueueState, Track} from './types';
 
 /**
  * The audio library the AudioHost plays from: whichever Satellite the capability catalog
@@ -159,11 +159,11 @@ export class AudioLibraryClient {
   // ---------- audio.session (optional) ----------
 
   async preferences() {
-    return this.get<MusicPreferences>(this.route('session', 'preferences'), 'Could not load playback settings.');
+    return this.get<PlaybackPreferences>(this.route('session', 'preferences'), 'Could not load playback settings.');
   }
 
-  async updatePreferences(changes: Partial<MusicPreferences>) {
-    return this.post<MusicPreferences>(this.route('session', 'preferences'), changes, 'Could not save playback settings.');
+  async updatePreferences(changes: Partial<PlaybackPreferences>) {
+    return this.post<PlaybackPreferences>(this.route('session', 'preferences'), changes, 'Could not save playback settings.');
   }
 
   async favorites() {

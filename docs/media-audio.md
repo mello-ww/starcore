@@ -2,7 +2,7 @@
 
 Status: **specification**, with its contract groundwork in place: `audio.library` v1 is in
 `contracts/ui/vocabulary.json` and Music provides it. No client plays through it yet. Music's current web player (`satellites/native/music/mission_control/
-player/`, `audio/`) and Android player (`mobile/src/music/`, `android/.../music/`) are the
+player/`, `audio/`) and Android player (`mobile/src/music/`, `android/.../media/`) are the
 behavioural reference: each section says which file it describes. See
 [UI contract](ui-contract.md), "Two kinds of capability", for the general model.
 
@@ -107,15 +107,14 @@ The behavioural reference is `player/player.js` (web) and `mobile/src/music/play
 | System controls | Media Session metadata and actions (`player.js`, `updateMediaSession`) | the media notification and lock screen through the same service |
 | Audio focus | the browser's | Media3's: pause on loss, duck on transient loss |
 | Autoplay | `blocked` state with a "Tap to resume here" chip (`bar.js`) | none needed |
-| Persistence | the queue on the server (`GET/POST queue?device=`) | `starcore_music_queue:<server>` locally, plus the server queue |
+| Persistence | the queue on the server (`GET/POST queue?device=`) | `starcore_player_queue:<server>` locally, plus the server queue |
 
 ### Effects
 
 Effects are optional. Each one reports `{applied, reason}` and never fails playback:
 equalizer, bass boost, loudness, ReplayGain, normalisation, speed and pitch.
 - **Web:** Web Audio (`audio/effects.js`).
-- **Android:** `StarCoreAudioModule.kt`. Its Kotlin package stays `com.starcore.mobile.music`
-  for now; renaming it is cosmetic and not part of this work.
+- **Android:** `StarCoreAudioModule.kt`, in the Kotlin package `com.starcore.mobile.media`.
 
 ### Connect
 
@@ -130,7 +129,9 @@ Hosts show "Playing on <device>" and route controls to it without knowing Connec
 ### Offline downloads
 
 Downloads are an Android client feature (`StarCoreDownloadsModule.kt`,
-`starcore_music_downloads:<server>`). A resolved local file wins over the stream. A document
+`starcore_music_downloads:<server>`, in the app-private `files/music/` folder: both keep their
+first name, because renaming either would orphan the copies already on a phone). A resolved
+local file wins over the stream. A document
 that depends on them declares `requires.client: ["media.audio"]` and checks its own features.
 
 ## The shared player UI
@@ -142,7 +143,7 @@ controls, the global accent for active states, restrained motion.
 | Element | Behaviour to keep | Web reference | Android reference |
 |---|---|---|---|
 | Floating bar | a rounded bubble clear of the edges, drawn over content (no backing rectangle); cover, title, artist, like, transport, seek; the cover opens the full player | `bar.js`, `styles/player.css` (`.mu-bar`) | `MiniPlayer.tsx`, mounted over the screens in `MainTabs.tsx` |
-| Retract | a chevron (and a swipe down on Android) puts the bar away; the choice is remembered | `starcore.music.playerCollapsed` | `starcore_music_player_collapsed` (`dock.ts`) |
+| Retract | a chevron (and a swipe down on Android) puts the bar away; the choice is remembered | `starcore.player.collapsed` | `starcore_player_collapsed` (`dock.ts`) |
 | Top-bar disc | the playing cover as a disc, spinning while playing, with an accent ring while the bar is open; tap toggles the bar | `#topbar-extras` slot (`index.html`) | `TopBarSlot` in every header |
 | Transition | the cover flies between the disc and the bar, between measured positions; skipped when reduced motion is on | Web Animations in `bar.js` | `MusicFlight`, `dock.ts` anchors |
 | Scroll space | screens keep their last row clear of the bar, using the bar's measured height, only while it shows | `body.mu-has-bar` padding | `FloatingPlayerInset` / `FloatingPlayerSpacer` |
@@ -157,9 +158,10 @@ Backward compatibility is not required for now (StarCore runs only on the owner'
 latest version); the host no longer assumes a provider on a server without the capability.
 
 - Music's REST routes stay as they are: Music's own page and screens use them directly.
-- Persisted state keeps its keys, read as they are and never renamed: `starcore.music.*`
-  (web) and `starcore_music_*` (Android). The AudioHost reads Music's existing keys. A rename,
-  if it ever happens, is a migration with a fallback read.
+- Persisted state is the player's own: `starcore.player.*` (web) and `starcore_player_*`
+  (Android). They replaced `starcore.music.*` and `starcore_music_*` on 2026-11-13, without a
+  migration: the saved queue and the Connect device id were reset once. Only the offline
+  downloads keep their first names (above).
 - Until a client implements `media.audio`, Music keeps its current players. A host that does
   implement it takes over the same keys and the same UI, so the switch is invisible.
 
@@ -244,7 +246,7 @@ Accepted when:
 - The bar and disc appear on any page once something plays, including after a reload before
   Music's page is opened. This fixes today's gap.
 - Media Session controls, the autoplay tap, the effects, Connect and the collapsed state
-  (`starcore.music.playerCollapsed`) behave as before.
+  (`starcore.player.collapsed`) behave as before.
 - The shell names no Satellite, and Music's page works with the host.
 
 ### 5. A second consumer - done

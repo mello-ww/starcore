@@ -1,11 +1,11 @@
-package com.starcore.mobile.music
+package com.starcore.mobile.media
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.uimanager.ViewManager
 
-class MusicPackage : ReactPackage {
+class MediaPackage : ReactPackage {
     override fun createNativeModules(context: ReactApplicationContext): List<NativeModule> =
         listOf(StarCoreAudioModule(context), StarCoreDownloadsModule(context))
 

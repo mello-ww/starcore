@@ -85,7 +85,7 @@ describe('AudioHost', () => {
     await act(async () => {
       await captured!.player.playTracks([track], 0);
     });
-    const video = tree.root.findByProps({testID: 'music-video'});
+    const video = tree.root.findByProps({testID: 'player-video'});
     expect(video.props.source.uri).toBe(`https://server-a.test/api/satellites/Radio/listen/${track.id}`);
     expect(video.props.source.headers).toEqual({Authorization: 'Bearer token-a'});
     // no session: no Connect, and nothing asked of routes the provider never declared
@@ -206,7 +206,7 @@ describe('playSearch (the play action of the UI contract)', () => {
     });
     expect(count).toBe(2);
     expect(captured!.player.state.track?.id).toBe(found[0].id);
-    expect(tree.root.findByProps({testID: 'music-video'}).props.source.uri).toBe(`https://server-a.test/api/satellites/Radio/listen/${found[0].id}`);
+    expect(tree.root.findByProps({testID: 'player-video'}).props.source.uri).toBe(`https://server-a.test/api/satellites/Radio/listen/${found[0].id}`);
     await act(async () => {
       count = await captured!.playSearch('nothing');
     });

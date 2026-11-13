@@ -3,7 +3,7 @@ import type {DownloadManager} from './downloads';
 import type {AudioEffects, NetworkType} from './native';
 import * as Q from './queue';
 import type {SavedQueue} from './storage';
-import type {MusicPreferences, PlaybackPlan, Quality, QueueState, RepeatMode, Track} from './types';
+import type {PlaybackPreferences, PlaybackPlan, Quality, QueueState, RepeatMode, Track} from './types';
 
 export interface Source {
   uri: string;
@@ -42,7 +42,7 @@ export interface PlayerDeps {
   downloads: DownloadManager | null;
   effects: AudioEffects;
   network: () => Promise<NetworkType>;
-  preferences: () => MusicPreferences | null;
+  preferences: () => PlaybackPreferences | null;
   saveLocal: (saved: SavedQueue) => void;
   requestNotifications?: () => void;
   now?: () => number;

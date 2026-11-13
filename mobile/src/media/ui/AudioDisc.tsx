@@ -65,7 +65,7 @@ export function AudioDisc() {
       accessibilityRole="button"
       accessibilityLabel={collapsed ? 'Show the player' : 'Put the player away'}
       accessibilityState={{expanded: !collapsed}}
-      testID="music-disc"
+      testID="player-disc"
       hitSlop={4}
       style={[styles.disc, !collapsed && {borderColor: accent}]}>
       <Animated.View style={[styles.art, {opacity: flying ? 0 : collapsed ? 1 : 0.55, transform: [{rotate}]}]}>

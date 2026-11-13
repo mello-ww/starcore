@@ -10,8 +10,8 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.soloader.SoLoader
 import com.brentvatne.react.ReactNativeVideoManager
 import com.starcore.mobile.files.StarCoreFilesPackage
-import com.starcore.mobile.music.MusicPackage
-import com.starcore.mobile.music.PlayerRegistry
+import com.starcore.mobile.media.MediaPackage
+import com.starcore.mobile.media.PlayerRegistry
 import com.starcore.mobile.privacy.PrivacyPackage
 import com.starcore.mobile.buildinfo.BuildInfoPackage
 
@@ -30,7 +30,7 @@ class MainApplication : Application(), ReactApplication {
 
     override val reactNativeHost: ReactNativeHost =
         object : DefaultReactNativeHost(this) {
-            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MusicPackage() + PrivacyPackage() + BuildInfoPackage() + StarCoreFilesPackage()
+            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MediaPackage() + PrivacyPackage() + BuildInfoPackage() + StarCoreFilesPackage()
 
             override fun getJSMainModuleName(): String = "index"
 

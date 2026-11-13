@@ -24,7 +24,7 @@ function setHref(node, target) {
 }
 
 // The bar can be put away: it then lives in the top bar as the playing cover, a spinning disc.
-const COLLAPSED_KEY = "starcore.music.playerCollapsed";
+const COLLAPSED_KEY = "starcore.player.collapsed";
 
 function readCollapsed() {
     try {
@@ -146,7 +146,7 @@ export function mountBar() {
     }
     const element = el("div", "mu-bar");
     element.setAttribute("role", "region");
-    element.setAttribute("aria-label", "Music player");
+    element.setAttribute("aria-label", "Audio player");
     register(element);
 
     const now = el("div", "mu-bar-now");

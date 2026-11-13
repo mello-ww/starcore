@@ -10,7 +10,7 @@ import type {
   HomePayload,
   Lyrics,
   Mix,
-  MusicPreferences,
+  PlaybackPreferences,
   PlaybackInfo,
   Playlist,
   PlaylistDetail,
@@ -177,11 +177,11 @@ export class MusicApi {
   }
 
   preferences() {
-    return this.get<MusicPreferences>('preferences', 'Could not load music settings.');
+    return this.get<PlaybackPreferences>('preferences', 'Could not load music settings.');
   }
 
-  updatePreferences(changes: Partial<MusicPreferences>) {
-    return this.post<MusicPreferences>('preferences', changes, 'Could not save music settings.');
+  updatePreferences(changes: Partial<PlaybackPreferences>) {
+    return this.post<PlaybackPreferences>('preferences', changes, 'Could not save music settings.');
   }
 
   playback(trackId: string, quality: Quality) {

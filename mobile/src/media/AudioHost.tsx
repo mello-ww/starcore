@@ -8,8 +8,8 @@ import {DownloadManager} from './downloads';
 import {AudioLibraryClient, type AudioProvider, type Catalog, resolveAudioProvider} from './library';
 import {audioEffects, nativeDownloads} from './native';
 import {PlayerController, type PlayerState} from './player';
-import {deviceId as loadDeviceId, musicKeys, readJson, type SavedQueue, writeJson} from './storage';
-import type {MusicPreferences, Track} from './types';
+import {deviceId as loadDeviceId, playerKeys, readJson, type SavedQueue, writeJson} from './storage';
+import type {PlaybackPreferences, Track} from './types';
 
 /** What a Satellite's own native code may add to the shared player: a menu for a track
  * (add to a playlist, go to its album...), and links from the full player's title and artist.
@@ -30,8 +30,8 @@ export interface AudioHostValue {
   baseUrl: string;
   token: string | null;
   deviceId: string | null;
-  preferences: MusicPreferences | null;
-  updatePreferences: (changes: Partial<MusicPreferences>) => Promise<void>;
+  preferences: PlaybackPreferences | null;
+  updatePreferences: (changes: Partial<PlaybackPreferences>) => Promise<void>;
   liked: Set<string>;
   setLiked: (trackIds: string[], liked: boolean) => Promise<void>;
   fullPlayer: boolean;
@@ -74,7 +74,7 @@ export function AudioHost({
   const serverId = activeServer?.id ?? 'server';
   const library = useMemo(() => new AudioLibraryClient(client), [client]);
   const [provider, setProvider] = useState<AudioProvider | null>(null);
-  const [preferences, setPreferences] = useState<MusicPreferences | null>(null);
+  const [preferences, setPreferences] = useState<PlaybackPreferences | null>(null);
   const preferencesRef = useRef(preferences);
   preferencesRef.current = preferences;
   const [deviceId, setDeviceId] = useState<string | null>(null);
@@ -114,7 +114,7 @@ export function AudioHost({
         effects: audioEffects,
         network: () => audioEffects.getNetworkType(),
         preferences: () => preferencesRef.current,
-        saveLocal: saved => writeJson(musicKeys.queue(serverId), saved),
+        saveLocal: saved => writeJson(playerKeys.queue(serverId), saved),
         requestNotifications,
       }),
     [library, baseUrl, downloads, serverId],
@@ -162,7 +162,7 @@ export function AudioHost({
         return;
       }
       setDeviceId(id);
-      const saved = await readJson<SavedQueue>(musicKeys.queue(serverId));
+      const saved = await readJson<SavedQueue>(playerKeys.queue(serverId));
       if (!cancelled && saved?.tracks?.length) {
         player.restore(saved);
       }
@@ -235,7 +235,7 @@ export function AudioHost({
   }, [player, preferences]);
 
   const updatePreferences = useCallback(
-    async (changes: Partial<MusicPreferences>) => {
+    async (changes: Partial<PlaybackPreferences>) => {
       if (!library.offersSession('preferences')) {
         return;
       }

@@ -153,13 +153,19 @@ clients' code, and every comment of shared code (the Engine, Mission Control, th
 its Satellite-specific folders, its Kotlin and manifest). It does not check identifiers or
 user-facing text.
 
-- [ ] **Neutral player wording:** the web bar's "Music player" label, "Open StarCore Music on
+- [x] **Neutral player wording:** the web bar's "Music player" label, "Open StarCore Music on
   your phone", the Android Devices panel's "Music streams…".
-- [ ] **Neutral names in the audio hosts:** the `MusicPreferences` type, `musicKeys`, the test
-  IDs `music-disc`, `music-mini-player` and `music-player-retract`.
-- [ ] **Stored keys** `starcore.music.*` (web) and `starcore_music_*` (Android) renamed; with
-  no compatibility to keep, a one-time reset of the local queue and player state is acceptable.
-- [ ] **The Kotlin package** `com.starcore.mobile.music` renamed to `media`.
+- [x] **Neutral names in the audio hosts:** `MusicPreferences` is `PlaybackPreferences`,
+  `musicKeys` is `playerKeys`, the test IDs are `player-disc`, `player-mini`, `player-retract`
+  and `player-video`.
+- [x] **Stored keys** renamed to `starcore.player.*` (web) and `starcore_player_*` (Android):
+  the saved queue and the Connect device id were reset once. The offline downloads keep
+  `starcore_music_downloads` and the `files/music/` folder, so the copies on the phone survive.
+- [x] **The Kotlin package** `com.starcore.mobile.music` renamed to `media` (`MusicPackage` is
+  `MediaPackage`); `:app:compileDebugKotlin` builds with JDK 17.
+- [ ] **The web player's `mu-` CSS prefix** (`.mu-bar`, `--mu-*`, `data-mu-theme`) is shared by
+  the player and Music's page; renaming it means renaming Music's page styles too, so it goes
+  with Music's own migration (stage 5).
 - [ ] **The guard's code check extended to the Engine** (the CLI's `Status` column label and
   its help examples need rewording or an allowance).
 

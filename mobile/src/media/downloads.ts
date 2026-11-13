@@ -1,7 +1,7 @@
 import type {AudioLibraryClient} from './library';
 import type {DownloadNative, NetworkType} from './native';
 import {serverFolder} from './native';
-import {musicKeys, readJson, writeJson} from './storage';
+import {playerKeys, readJson, writeJson} from './storage';
 import type {Quality, Track} from './types';
 
 export interface DownloadEntry {
@@ -85,7 +85,7 @@ export class DownloadManager {
   }
 
   private async load() {
-    this.entries = (await readJson<Record<string, DownloadEntry>>(musicKeys.downloads(this.serverId))) ?? {};
+    this.entries = (await readJson<Record<string, DownloadEntry>>(playerKeys.downloads(this.serverId))) ?? {};
   }
 
   ready(): Promise<void> {
@@ -93,7 +93,7 @@ export class DownloadManager {
   }
 
   private persist() {
-    return writeJson(musicKeys.downloads(this.serverId), this.entries);
+    return writeJson(playerKeys.downloads(this.serverId), this.entries);
   }
 
   isDownloaded(trackId: string): boolean {

@@ -7,7 +7,7 @@ import {useDeveloperMode} from '../../developer/DeveloperModeContext';
 import {Surface} from '../../components/Surface';
 import {tokens, TOUCH_TARGET, useAccentStyles} from '../../theme';
 import {useMusic} from '../MusicProvider';
-import type {MusicPreferences} from '../../media/types';
+import type {PlaybackPreferences} from '../../media/types';
 import {useMusicNavigation} from '../ui/navigation';
 import {FloatingPlayerSpacer} from '../../components/FloatingPlayerInset';
 
@@ -130,7 +130,7 @@ export function MusicSettingsScreen() {
       </View>
     );
   }
-  const set = (changes: Partial<MusicPreferences>) =>
+  const set = (changes: Partial<PlaybackPreferences>) =>
     updatePreferences(changes).catch((error: any) => Alert.alert('Music settings', error?.message ?? 'Could not save.'));
 
   return (

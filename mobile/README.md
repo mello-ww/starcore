@@ -86,7 +86,7 @@ uses that same `react-native-video` rather than adding
 playback runs in react-native-video's media3 `VideoPlaybackService` - a
 `mediaPlayback` foreground service with notification, lock-screen and
 headset play/pause, audio focus and becoming-noisy handling. The app's own
-Kotlin package (`android/.../music/`) adds what JS can't reach: a
+Kotlin package (`android/.../media/`) adds what JS can't reach: a
 react-native-video plugin hook that gives the equalizer, bass boost,
 loudness (ReplayGain boost) and pitch/tempo the player's own audio session,
 Wi-Fi/cellular detection, and private-storage downloads under

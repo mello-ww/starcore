@@ -1,10 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {RepeatMode, Track} from './types';
 
-/** Every key carries the server id: queues, devices and downloads never cross servers. */
-export const musicKeys = {
-  queue: (serverId: string) => `starcore_music_queue:${serverId}`,
-  device: (serverId: string) => `starcore_music_device:${serverId}`,
+/** Every key carries the server id: queues, devices and downloads never cross servers. The
+ * downloads index keeps its first name, like the folder the native module writes to: renaming
+ * either would orphan the offline copies already on the phone. */
+export const playerKeys = {
+  queue: (serverId: string) => `starcore_player_queue:${serverId}`,
+  device: (serverId: string) => `starcore_player_device:${serverId}`,
   downloads: (serverId: string) => `starcore_music_downloads:${serverId}`,
 };
 
@@ -36,7 +38,7 @@ export async function writeJson(key: string, value: unknown): Promise<void> {
 }
 
 export async function deviceId(serverId: string, random: () => number = Math.random): Promise<string> {
-  const key = musicKeys.device(serverId);
+  const key = playerKeys.device(serverId);
   const existing = await AsyncStorage.getItem(key);
   if (existing && /^[A-Za-z0-9_-]{8,64}$/.test(existing)) {
     return existing;

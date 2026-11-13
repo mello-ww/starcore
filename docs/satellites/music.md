@@ -323,7 +323,7 @@ playlist, full-screen player with queue, lyrics, info and devices, equaliser, do
 settings) with a mini-player above the tab bar. Playback uses `react-native-video` (already a
 dependency), which runs ExoPlayer in a media session service for background playback, the
 notification and lock-screen controls, audio focus and becoming-noisy handling; no new
-dependency was added. A small app-local native module (`mobile/android/.../music/`) adds the
+dependency was added. A small app-local native module (`mobile/android/.../media/`) adds the
 equaliser, bass boost, pitch and speed on that player's audio session, and offline downloads
 into app-private storage per server. Music lives under the signed-in server's `AuthProvider`,
 so queues and downloads are per server and the biometric lock hides it like everything else.

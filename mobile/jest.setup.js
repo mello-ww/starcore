@@ -60,7 +60,7 @@ jest.mock('react-native-video', () => {
   const {View} = require('react-native');
   const Video = React.forwardRef((props, ref) => {
     React.useImperativeHandle(ref, () => ({seek: jest.fn(), pause: jest.fn(), resume: jest.fn()}));
-    return React.createElement(View, {testID: 'music-video', ...props});
+    return React.createElement(View, {testID: 'player-video', ...props});
   });
   return {__esModule: true, default: Video, Video};
 });

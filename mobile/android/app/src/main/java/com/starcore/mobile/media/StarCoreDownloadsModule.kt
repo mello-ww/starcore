@@ -1,4 +1,4 @@
-package com.starcore.mobile.music
+package com.starcore.mobile.media
 
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -21,6 +21,7 @@ import java.util.concurrent.Future
 class StarCoreDownloadsModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
     private val executor = Executors.newFixedThreadPool(2)
     private val jobs = ConcurrentHashMap<String, Future<*>>()
+    // the folder keeps its first name: renaming it would orphan the copies already on the phone
     private val root: File by lazy { File(reactApplicationContext.filesDir, "music").canonicalFile }
 
     override fun getName() = "StarCoreDownloads"

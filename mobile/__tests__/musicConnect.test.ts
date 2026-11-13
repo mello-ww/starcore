@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {ConnectClient} from '../src/media/connect';
 import {activeLine, activeWords, lyricsTime} from '../src/media/lyrics';
-import {deviceId, musicKeys} from '../src/media/storage';
+import {deviceId, playerKeys} from '../src/media/storage';
 import type {LyricLine} from '../src/media/types';
 
 function handlers() {
@@ -85,6 +85,6 @@ describe('music storage', () => {
     expect(first).toMatch(/^[A-Za-z0-9_-]{8,64}$/);
     expect(await deviceId('server-a')).toBe(first);
     expect(await deviceId('server-b')).not.toBe(first);
-    expect(musicKeys.queue('server-a')).not.toBe(musicKeys.queue('server-b'));
+    expect(playerKeys.queue('server-a')).not.toBe(playerKeys.queue('server-b'));
   });
 });

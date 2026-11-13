@@ -1,5 +1,5 @@
 import {AudioLibraryClient, type AudioProvider} from '../src/media/library';
-import type {MusicPreferences, Track} from '../src/media/types';
+import type {PlaybackPreferences, Track} from '../src/media/types';
 
 export function makeTrack(index: number, prefix = 'a'): Track {
   const id = `${prefix.charCodeAt(0).toString(16)}${String(index).padStart(14, '0')}`;
@@ -36,7 +36,7 @@ export function makeTracks(count: number, prefix = 'a'): Track[] {
   return Array.from({length: count}, (_, index) => makeTrack(index, prefix));
 }
 
-export const preferences: MusicPreferences = {
+export const preferences: PlaybackPreferences = {
   streaming_quality: 'original',
   cellular_quality: 'normal',
   download_quality: 'original',

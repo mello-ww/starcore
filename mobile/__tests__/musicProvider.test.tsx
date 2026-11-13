@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import {MusicProvider, useMusic, usePlayerState} from '../src/music/MusicProvider';
-import {musicKeys} from '../src/media/storage';
+import {playerKeys} from '../src/media/storage';
 import {SatellitesListScreen} from '../src/screens/SatellitesListScreen';
 import {makeTracks, preferences, testCatalog} from './musicFakes';
 
@@ -68,7 +68,7 @@ describe('MusicProvider', () => {
     await act(async () => {
       await captured!.player.playTracks(makeTracks(2), 0);
     });
-    const video = tree.root.findByProps({testID: 'music-video'});
+    const video = tree.root.findByProps({testID: 'player-video'});
     expect(video.props.source.uri).toContain('https://server-a.test/api/satellites/music/stream/');
     expect(video.props.source.uri).not.toContain('token');
     expect(video.props.source.headers).toEqual({Authorization: 'Bearer token-server-a'});
@@ -84,13 +84,13 @@ describe('MusicProvider', () => {
     await act(async () => {
       await captured!.player.playTracks(makeTracks(1), 0);
     });
-    expect(tree.root.findByProps({testID: 'music-video'}).props.paused).toBe(false);
+    expect(tree.root.findByProps({testID: 'player-video'}).props.paused).toBe(false);
     tree.unmount();
   });
 
   it('restores only the active server’s queue, never another server’s', async () => {
     const tracks = makeTracks(2);
-    await AsyncStorage.setItem(musicKeys.queue('server-a'), JSON.stringify({
+    await AsyncStorage.setItem(playerKeys.queue('server-a'), JSON.stringify({
       tracks, order: [0, 1], position: 1, shuffle: false, repeat: 'off', seconds: 12, context: null}));
     const first = await mount('server-a');
     expect(captured!.player.state.track?.id).toBe(tracks[1].id);

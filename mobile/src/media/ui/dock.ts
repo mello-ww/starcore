@@ -3,7 +3,7 @@ import {useSyncExternalStore} from 'react';
 
 /** Whether the mini-player is put away: it then waits in the header as the playing cover, a
  * spinning disc. Shared by the bar and the disc, and remembered across launches. */
-const KEY = 'starcore_music_player_collapsed';
+const KEY = 'starcore_player_collapsed';
 let collapsed = false;
 const listeners = new Set<() => void>();
 

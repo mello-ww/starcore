@@ -56,7 +56,7 @@ export function MiniPlayer() {
     transform: [{translateY: shown.interpolate({inputRange: [0, 1], outputRange: [96, 0]})}],
   };
   return (
-    <Animated.View style={[styles.wrapper, motion]} {...responder.panHandlers} testID="music-mini-player">
+    <Animated.View style={[styles.wrapper, motion]} {...responder.panHandlers} testID="player-mini">
       <Pressable style={styles.bar} onPress={() => setFullPlayer(true)} accessibilityLabel="Open the player">
         <View
           ref={cover}
@@ -99,7 +99,7 @@ export function MiniPlayer() {
           style={styles.pill}
           accessibilityRole="button"
           accessibilityLabel="Put the player away"
-          testID="music-player-retract">
+          testID="player-retract">
           <Icon name="chevron-down" size={18} color={colors.textDim} />
         </Pressable>
       </Pressable>

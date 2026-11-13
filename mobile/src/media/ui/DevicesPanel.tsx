@@ -70,7 +70,7 @@ export function DevicesPanel() {
         );
       })}
       <Text style={[typography.caption, styles.note]}>
-        Music streams straight from your server to the device that plays it. This phone answers remote control
+        Audio streams straight from your server to the device that plays it. This phone answers remote control
         while the app is open; Android pauses that in the background.
       </Text>
     </ScrollView>

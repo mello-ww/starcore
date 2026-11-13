@@ -169,7 +169,7 @@ export interface Equalizer {
   preamp: number;
 }
 
-export interface MusicPreferences {
+export interface PlaybackPreferences {
   streaming_quality: Quality;
   cellular_quality: Quality;
   download_quality: Quality;

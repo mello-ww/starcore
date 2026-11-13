@@ -1,4 +1,4 @@
-package com.starcore.mobile.music
+package com.starcore.mobile.media
 
 import android.content.Context
 import android.media.audiofx.BassBoost

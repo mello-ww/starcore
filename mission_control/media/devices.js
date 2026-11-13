@@ -42,7 +42,7 @@ export function devicesPanel() {
             items.push(entry);
         }
         if (!others.length) {
-            items.push(emptyState("No other devices", "Open StarCore Music on your phone or another browser signed in to this server and it appears here."));
+            items.push(emptyState("No other devices", "Open StarCore on your phone or another browser signed in to this server and it appears here."));
         }
         if (remote) {
             items.push(button("Stop controlling and stay here", "mu-text-button", () => hub.disconnectRemote()));

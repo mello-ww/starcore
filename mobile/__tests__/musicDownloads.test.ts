@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {DownloadManager, type DownloadSettings} from '../src/media/downloads';
 import type {DownloadNative} from '../src/media/native';
-import {musicKeys} from '../src/media/storage';
+import {playerKeys} from '../src/media/storage';
 import {makeTracks, testLibrary} from './musicFakes';
 
 function fakeNative() {
@@ -57,7 +57,7 @@ describe('DownloadManager', () => {
     expect(native.calls[0].url).toBe(`https://music.test/api/satellites/music/stream/${tracks[0].id}?quality=original`);
     expect(native.calls[0].url).not.toContain('secret');
     expect(downloads.localUri(tracks[0].id)).toBe(`file:///data/files/music/server-a/tracks/${tracks[0].id}.audio`);
-    const stored = JSON.parse((await AsyncStorage.getItem(musicKeys.downloads('server-a')))!);
+    const stored = JSON.parse((await AsyncStorage.getItem(playerKeys.downloads('server-a')))!);
     expect(Object.keys(stored)).toEqual(expect.arrayContaining(tracks.map(track => track.id)));
   });
 
