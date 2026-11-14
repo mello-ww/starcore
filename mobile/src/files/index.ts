@@ -3,9 +3,10 @@ import {NativeModules, Platform} from 'react-native';
 /**
  * The download and share actions of the shared interface (UI contract 1.2) in the app: one file
  * from a Satellite's own route, fetched with the session by the app's own Kotlin module
- * (android/.../files/StarCoreFilesModule.kt), then saved to Downloads or handed to the system
- * share sheet. Absent on other platforms and under Jest, where both actions are hidden. It
- * knows the contract, never a Satellite.
+ * (android/.../files/StarCoreFilesModule.kt), then saved to Downloads, opened in the phone's own
+ * viewer (a download with `open`) or handed to the system share sheet. Absent on other
+ * platforms and under Jest, where these actions are hidden. It knows the contract, never a
+ * Satellite.
  */
 
 // control characters are exactly what this strips from a file name
@@ -41,6 +42,11 @@ export function canShareFiles(): boolean {
   return Boolean(native()?.canShare);
 }
 
+/** Opening needs no storage permission: the file stays in the app's cache. */
+export function canOpenFiles(): boolean {
+  return Boolean(native()?.canOpen);
+}
+
 type Source = {uri: string; headers?: Record<string, string>};
 
 /** Saves the file to Downloads; resolves the name it was saved under. */
@@ -60,4 +66,13 @@ export async function shareFile(source: Source, name: string): Promise<void> {
     throw new Error('Sharing files is not available here.');
   }
   await module.share(source.uri, source.headers ?? {}, name);
+}
+
+/** Fetches the file and opens it in whichever app on the phone views that kind of file. */
+export async function openFile(source: Source, name: string): Promise<void> {
+  const module = native();
+  if (!module) {
+    throw new Error('Opening files is not available here.');
+  }
+  await module.open(source.uri, source.headers ?? {}, name);
 }

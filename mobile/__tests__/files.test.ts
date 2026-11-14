@@ -1,5 +1,5 @@
 import {NativeModules, Platform} from 'react-native';
-import {canSaveFiles, canShareFiles, fileName, saveFile, shareFile} from '../src/files';
+import {canOpenFiles, canSaveFiles, canShareFiles, fileName, openFile, saveFile, shareFile} from '../src/files';
 
 // the download and share actions (UI contract 1.2), the app's side: the same file name rule as
 // Mission Control's, and the native module's own answer to what this phone can do
@@ -22,6 +22,8 @@ describe('file actions', () => {
   it('offers nothing without the native module', async () => {
     expect(canSaveFiles()).toBe(false);
     expect(canShareFiles()).toBe(false);
+    expect(canOpenFiles()).toBe(false);
+    await expect(openFile({uri: 'https://s.test/a'}, 'a.pdf')).rejects.toThrow('not available');
     await expect(saveFile({uri: 'https://s.test/a'}, 'a.jpg')).rejects.toThrow('not available');
   });
 
@@ -37,5 +39,14 @@ describe('file actions', () => {
     expect(share).toHaveBeenCalledWith(source.uri, {Authorization: 'Bearer t'}, 'a.jpg');
     await expect(saveFile(source, 'a.jpg')).resolves.toBe('a.jpg');
     expect(save).toHaveBeenCalledWith(source.uri, {Authorization: 'Bearer t'}, 'a.jpg');
+  });
+
+  it('opens a file through the native module, even where saving is not possible', async () => {
+    const open = jest.fn(async () => true);
+    (NativeModules as any).StarCoreFiles = {canSave: false, canShare: true, canOpen: true, open};
+    expect(canOpenFiles()).toBe(true);
+    const source = {uri: 'https://s.test/api/satellites/Any/content?path=a.pdf', headers: {Authorization: 'Bearer t'}};
+    await openFile(source, 'a.pdf');
+    expect(open).toHaveBeenCalledWith(source.uri, {Authorization: 'Bearer t'}, 'a.pdf');
   });
 });

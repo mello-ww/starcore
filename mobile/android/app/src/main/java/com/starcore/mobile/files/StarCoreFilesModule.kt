@@ -1,10 +1,12 @@
 package com.starcore.mobile.files
 
+import android.content.ActivityNotFoundException
 import android.content.ContentValues
 import android.content.Intent
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -22,14 +24,16 @@ import java.util.concurrent.Executors
 /**
  * The download and share actions of the shared interface (UI contract 1.2): one file from a
  * Satellite's own route, fetched with the session token as a request header (never written
- * anywhere), then saved to Downloads (Android 10 and later, no storage permission needed) or
- * handed to the system share sheet. A shared file is written only beneath the app's private
- * cache/shared directory, which the FileProvider exposes, and replaced by the next one.
- * Nothing here knows a Satellite.
+ * anywhere), then saved to Downloads (Android 10 and later, no storage permission needed),
+ * opened in the phone's own viewer (a download with `open`) or handed to the system share
+ * sheet. A shared or opened file is written only beneath the app's private cache/shared or
+ * cache/opened directory, which the FileProvider exposes read-only to the app chosen, and
+ * replaced by the next one. Nothing here knows a Satellite.
  */
 class StarCoreFilesModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
     private val executor = Executors.newSingleThreadExecutor()
     private val sharedDir: File by lazy { File(reactApplicationContext.cacheDir, "shared") }
+    private val openedDir: File by lazy { File(reactApplicationContext.cacheDir, "opened") }
 
     override fun getName() = "StarCoreFiles"
 
@@ -37,6 +41,7 @@ class StarCoreFilesModule(context: ReactApplicationContext) : ReactContextBaseJa
         // MediaStore.Downloads arrived in Android 10; before it, saving needs a storage permission
         "canSave" to (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q),
         "canShare" to true,
+        "canOpen" to true,
     )
 
     private fun safeName(name: String): String {
@@ -45,7 +50,7 @@ class StarCoreFilesModule(context: ReactApplicationContext) : ReactContextBaseJa
     }
 
     /** Opens the URL with the given headers; the caller reads it and disconnects it. */
-    private fun open(url: String, headers: ReadableMap): HttpURLConnection {
+    private fun connect(url: String, headers: ReadableMap): HttpURLConnection {
         if (!url.startsWith("https://") && !url.startsWith("http://")) {
             throw IllegalArgumentException("invalid url")
         }
@@ -65,6 +70,26 @@ class StarCoreFilesModule(context: ReactApplicationContext) : ReactContextBaseJa
 
     private fun mimeOf(connection: HttpURLConnection): String =
         connection.contentType?.substringBefore(';')?.trim()?.takeIf { it.contains('/') } ?: "application/octet-stream"
+
+    /** The server's type, else one guessed from the name's extension, so a viewer is found for
+     * a file the server sends as plain bytes. */
+    private fun viewMimeOf(connection: HttpURLConnection, name: String): String {
+        val sent = mimeOf(connection)
+        if (sent != "application/octet-stream") return sent
+        val extension = name.substringAfterLast('.', "").lowercase()
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: sent
+    }
+
+    /** Fetches the file into `dir`, emptied first, so only the latest one lives there. */
+    private fun fetchInto(dir: File, connection: HttpURLConnection, name: String): File {
+        dir.deleteRecursively()
+        dir.mkdirs()
+        val file = File(dir, safeName(name))
+        connection.inputStream.use { input ->
+            file.outputStream().use { output -> copy(input, output, connection.contentLengthLong) }
+        }
+        return file
+    }
 
     private fun copy(input: InputStream, output: OutputStream, expected: Long) {
         val buffer = ByteArray(64 * 1024)
@@ -89,7 +114,7 @@ class StarCoreFilesModule(context: ReactApplicationContext) : ReactContextBaseJa
             var connection: HttpURLConnection? = null
             var target: android.net.Uri? = null
             try {
-                connection = open(url, headers)
+                connection = connect(url, headers)
                 val values = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, safeName(name))
                     put(MediaStore.MediaColumns.MIME_TYPE, mimeOf(connection))
@@ -118,15 +143,10 @@ class StarCoreFilesModule(context: ReactApplicationContext) : ReactContextBaseJa
         executor.execute {
             var connection: HttpURLConnection? = null
             try {
-                connection = open(url, headers)
+                connection = connect(url, headers)
                 val mime = mimeOf(connection)
                 // only the file being shared lives here: the previous one goes first
-                sharedDir.deleteRecursively()
-                sharedDir.mkdirs()
-                val file = File(sharedDir, safeName(name))
-                connection.inputStream.use { input ->
-                    file.outputStream().use { output -> copy(input, output, connection.contentLengthLong) }
-                }
+                val file = fetchInto(sharedDir, connection, name)
                 val context = reactApplicationContext
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
                 val send = Intent(Intent.ACTION_SEND).apply {
@@ -144,6 +164,45 @@ class StarCoreFilesModule(context: ReactApplicationContext) : ReactContextBaseJa
                 promise.resolve(true)
             } catch (error: Exception) {
                 promise.reject("E_SHARE", error.message ?: "the file could not be shared")
+            } finally {
+                connection?.disconnect()
+            }
+        }
+    }
+
+    @ReactMethod
+    fun open(url: String, headers: ReadableMap, name: String, promise: Promise) {
+        executor.execute {
+            var connection: HttpURLConnection? = null
+            try {
+                connection = connect(url, headers)
+                val mime = viewMimeOf(connection, name)
+                // only the file being opened lives here: the previous one goes first
+                val file = fetchInto(openedDir, connection, name)
+                val context = reactApplicationContext
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                val view = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, mime)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val start = Runnable {
+                    try {
+                        val activity = currentActivity
+                        if (activity != null) {
+                            activity.startActivity(view)
+                        } else {
+                            context.startActivity(view.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
+                        promise.resolve(true)
+                    } catch (error: ActivityNotFoundException) {
+                        promise.reject("E_NO_VIEWER", "No app on this phone opens this kind of file.")
+                    } catch (error: Exception) {
+                        promise.reject("E_OPEN", error.message ?: "the file could not be opened")
+                    }
+                }
+                currentActivity?.runOnUiThread(start) ?: start.run()
+            } catch (error: Exception) {
+                promise.reject("E_OPEN", error.message ?: "the file could not be opened")
             } finally {
                 connection?.disconnect()
             }

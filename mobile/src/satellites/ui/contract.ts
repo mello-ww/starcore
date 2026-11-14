@@ -61,9 +61,11 @@ export interface UiAction {
   /** 1.2: open the Satellite's own native screens at a section they name ("settings"). */
   own?: string;
   /** 1.2: a file from one of the Satellite's own routes, saved to Downloads (download) or handed
-   * to the system share sheet (share), named `name`. */
+   * to the system share sheet (share), named `name`; a download with `open` opens it in the
+   * phone's own viewer instead. */
   download?: string;
   share?: string;
+  open?: boolean;
   name?: Json;
   /** 1.2: run one secure operation (media.vault move_in) on the items shown or selected, behind
    * the app's own unlock prompt; `item` binds each item's id. */

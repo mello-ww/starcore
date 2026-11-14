@@ -85,8 +85,9 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
 
-        <!-- the share action hands one file from the app's private cache to another app
-             (StarCoreFilesModule); res/xml/shared_files.xml limits it to cache/shared -->
+        <!-- the share action and a download's open hand one file from the app's private cache to
+             another app (StarCoreFilesModule); res/xml/shared_files.xml limits it to cache/shared
+             and cache/opened -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

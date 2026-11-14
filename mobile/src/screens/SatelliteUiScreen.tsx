@@ -27,7 +27,7 @@ import {
 import {BUILTIN_SECURE_PROMPTS} from '../satellites/builtins';
 import {runSecure, secureRunner, type GrantRequest, type SecurePromptProps} from '../satellites/ui/secure';
 import {privacy} from '../platform/privacy';
-import {canSaveFiles, canShareFiles, fileName, saveFile, shareFile} from '../files';
+import {canOpenFiles, canSaveFiles, canShareFiles, fileName, openFile, saveFile, shareFile} from '../files';
 import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
@@ -447,8 +447,10 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       }
       if (action.download !== undefined || action.share !== undefined) {
         // 1.2: a file from the Satellite's own route, fetched with this session by the app's own
-        // module: saved to Downloads, or handed to the system share sheet
+        // module: saved to Downloads, opened in the phone's own viewer (`open`), or handed to the
+        // system share sheet
         const sharing = action.share !== undefined;
+        const opening = !sharing && action.open === true;
         const route = resolveTemplate(String(sharing ? action.share : action.download), scoped);
         if (!route || !isSafeRoute(route)) {
           showToast("That file isn't available.", true);
@@ -458,12 +460,14 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         try {
           if (sharing) {
             await shareFile(mediaSource(route), fileTitle);
+          } else if (opening) {
+            await openFile(mediaSource(route), fileTitle);
           } else {
             showToast(`Saved to Downloads: ${await saveFile(mediaSource(route), fileTitle)}`);
           }
           return true;
         } catch (err: any) {
-          showToast(err?.message || (sharing ? 'Could not share that.' : 'Could not save that.'), true);
+          showToast(err?.message || (sharing ? 'Could not share that.' : opening ? 'Could not open that.' : 'Could not save that.'), true);
           return false;
         }
       }
@@ -600,10 +604,10 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const runSecureRef = useRef(runSecureAction);
   runSecureRef.current = runSecureAction;
   // whether an action's control is drawn here: a secure action only where it can run, and
-  // download or share only where this phone can (saving needs Android 10 or later)
+  // download, open or share only where this phone can (saving needs Android 10 or later)
   const canRun = useCallback(
     (action: UiAction | undefined) =>
-      (action?.download === undefined || canSaveFiles()) &&
+      (action?.download === undefined || (action.open === true ? canOpenFiles() : canSaveFiles())) &&
       (action?.share === undefined || canShareFiles()) &&
       (!action?.secure || Boolean(secureRunner(action, providers, name, BUILTIN_SECURE_PROMPTS))),
     [providers, name],

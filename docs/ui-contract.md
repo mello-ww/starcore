@@ -514,7 +514,10 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
   `{"download": "content?path={$.path}", "name": "$.name", "open": true}`. Mission Control
   opens the route in a new tab with no handle on its page, where the browser shows what it can
   and saves the rest; the Engine sandboxes a file that could run script there (HTML, SVG, XML,
-  see [the API](api.md)). The route should answer inline, without `Content-Disposition`.
+  see [the API](api.md)). The app fetches the file into its private cache and hands it,
+  read-only through its `FileProvider`, to whichever app on the phone views that kind of file
+  (`ACTION_VIEW`), saying so when none does; opening needs no storage permission, so it works
+  where saving doesn't. The route should answer inline, without `Content-Disposition`.
 - **`secure`** (1.2), in a media viewer's or selection's `actions` only: runs one protected
   operation on the items shown or selected, behind the **client's own** unlock prompt.
 
