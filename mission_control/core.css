@@ -461,11 +461,11 @@
 }
 
 /* the player's light theme (media/theme.js) sits on white, so an unchecked track needs a darker grey */
-[data-mu-theme="light"] .sc-switch:not(:checked) {
+[data-pl-theme="light"] .sc-switch:not(:checked) {
     background: #c9cbd2;
 }
 
-[data-mu-theme="light"] .sc-switch:not(:checked)::before {
+[data-pl-theme="light"] .sc-switch:not(:checked)::before {
     background: #ffffff;
 }
 

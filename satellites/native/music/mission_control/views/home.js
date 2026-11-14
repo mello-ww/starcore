@@ -15,23 +15,23 @@ function contextCard(entry) {
         return artistCard(entry.item);
     }
     if (entry.kind === "mix") {
-        const node = button(null, "mu-context-chip", () => go(`mix/${encode(entry.item.id)}`));
-        node.append(mosaic([], null, "mu-art", 96), el("span", null, entry.item.id.replace(/-/g, " ")));
+        const node = button(null, "pl-context-chip", () => go(`mix/${encode(entry.item.id)}`));
+        node.append(mosaic([], null, "pl-art", 96), el("span", null, entry.item.id.replace(/-/g, " ")));
         return node;
     }
     return null;
 }
 
 function moodCard(mood) {
-    const node = button(null, `mu-mood mu-mood-${mood.id}`, () => go(`mood/${encode(mood.id)}`));
+    const node = button(null, `pl-mood pl-mood-${mood.id}`, () => go(`mood/${encode(mood.id)}`));
     node.append(el("strong", null, mood.name), el("span", null, mood.genres.slice(0, 3).join(", ")));
     return node;
 }
 
 export async function render({ node, alive }) {
-    const greeting = el("h1", "mu-greeting", " ");
-    const sections = el("div", "mu-sections");
-    sections.append(skeletonRows(3, "mu-skeleton-shelf"));
+    const greeting = el("h1", "pl-greeting", " ");
+    const sections = el("div", "pl-sections");
+    sections.append(skeletonRows(3, "pl-skeleton-shelf"));
     node.append(greeting, sections);
 
     const [home, summary] = await Promise.all([
@@ -54,14 +54,14 @@ export async function render({ node, alive }) {
         let content = null;
         if (section.kind === "tracks") {
             const list = trackList(section.items.slice(0, 8), { art: true, album: false, reason: true, context: section.id === "liked" ? "liked:all" : `library:${section.id}` });
-            const wrap = el("section", "mu-shelf");
-            const head = el("div", "mu-shelf-head");
+            const wrap = el("section", "pl-shelf");
+            const head = el("div", "pl-shelf-head");
             head.append(el("h3", null, section.title));
             if (section.subtitle) {
-                head.append(el("p", "mu-shelf-sub", section.subtitle));
+                head.append(el("p", "pl-shelf-sub", section.subtitle));
             }
             if (section.id === "liked") {
-                head.append(button("Show all", "mu-text-button", () => go("library/liked")));
+                head.append(button("Show all", "pl-text-button", () => go("library/liked")));
             }
             wrap.append(head, list);
             content = wrap;
@@ -76,7 +76,7 @@ export async function render({ node, alive }) {
             content = cards.length ? shelf(section.title, cards, { subtitle: section.subtitle }) : null;
         } else if (section.kind === "moods") {
             content = shelf(section.title, section.items.map(moodCard), { subtitle: section.subtitle });
-            content.classList.add("mu-shelf-moods");
+            content.classList.add("pl-shelf-moods");
         }
         if (content) {
             content.dataset.section = section.id;
@@ -84,7 +84,7 @@ export async function render({ node, alive }) {
         }
     }
     if (!home.personalized) {
-        const hint = el("p", "mu-hint", "Recommendations here are built only from your own library and listening, on this server. Play and like songs and they get better.");
+        const hint = el("p", "pl-hint", "Recommendations here are built only from your own library and listening, on this server. Play and like songs and they get better.");
         rendered.push(hint);
     }
     sections.replaceChildren(...rendered);

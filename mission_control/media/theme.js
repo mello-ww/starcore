@@ -33,15 +33,15 @@ export function apply() {
     const theme = resolvedTheme();
     const density = session.preference("density", "comfortable");
     for (const node of themed) {
-        node.dataset.muTheme = theme;
+        node.dataset.plTheme = theme;
         node.dataset.muDensity = density;
     }
     const mode = accentMode();
-    setColour("--mu-accent", "--mu-on-accent", mode.startsWith("#") ? hexToRgb(mode) : null);
+    setColour("--pl-accent", "--pl-on-accent", mode.startsWith("#") ? hexToRgb(mode) : null);
     if (mode === "artwork") {
         followArtwork(playingAlbum);
     } else {
-        setColour("--mu-player-accent", "--mu-player-on-accent", null);
+        setColour("--pl-player-accent", "--pl-player-on-accent", null);
     }
 }
 
@@ -145,6 +145,6 @@ export async function followArtwork(albumId) {
     }
     const colours = await palette(playingAlbum);
     if (playingAlbum === (albumId || null) && accentMode() === "artwork") {
-        setColour("--mu-player-accent", "--mu-player-on-accent", colours ? colours.primary : null);
+        setColour("--pl-player-accent", "--pl-player-on-accent", colours ? colours.primary : null);
     }
 }

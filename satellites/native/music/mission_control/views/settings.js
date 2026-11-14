@@ -22,10 +22,10 @@ function set(key, value) {
 }
 
 function section(title, description) {
-    const node = el("section", "mu-settings-section");
+    const node = el("section", "pl-settings-section");
     node.append(el("h2", null, title));
     if (description) {
-        node.append(el("p", "mu-hint", description));
+        node.append(el("p", "pl-hint", description));
     }
     return node;
 }
@@ -37,17 +37,17 @@ function developer(node) {
 }
 
 function row(label, control, hint) {
-    const node = el("label", "mu-setting");
-    const text = el("span", "mu-setting-label", label);
+    const node = el("label", "pl-setting");
+    const text = el("span", "pl-setting-label", label);
     node.append(text, control);
     if (hint) {
-        node.append(el("small", "mu-setting-hint", hint));
+        node.append(el("small", "pl-setting-hint", hint));
     }
     return node;
 }
 
 function choice(key, options) {
-    const select = el("select", "mu-select");
+    const select = el("select", "pl-select");
     for (const [value, label] of options) {
         select.append(new Option(label, value));
     }
@@ -68,8 +68,8 @@ function toggle(key, disabled = false) {
 }
 
 function slider(key, min, max, step, format) {
-    const wrap = el("span", "mu-slider");
-    const input = el("input", "mu-range");
+    const wrap = el("span", "pl-slider");
+    const input = el("input", "pl-range");
     input.type = "range";
     input.min = String(min);
     input.max = String(max);
@@ -119,15 +119,15 @@ function equalizer() {
     enabled.setAttribute("aria-label", "Equalizer");
     enabled.checked = eq.enabled;
     enabled.addEventListener("change", () => { eq.enabled = enabled.checked; update(); });
-    const preset = el("select", "mu-select");
+    const preset = el("select", "pl-select");
     for (const name of [...Object.keys(PRESETS), "custom"]) {
         preset.append(new Option(name[0].toUpperCase() + name.slice(1), name));
     }
     preset.value = PRESETS[eq.preset] ? eq.preset : "custom";
-    const sliders = el("div", "mu-eq");
+    const sliders = el("div", "pl-eq");
     const inputs = BANDS.map((frequency, index) => {
-        const column = el("label", "mu-eq-band");
-        const input = el("input", "mu-range mu-range-vertical");
+        const column = el("label", "pl-eq-band");
+        const input = el("input", "pl-range pl-range-vertical");
         input.type = "range";
         input.min = "-12";
         input.max = "12";
@@ -154,8 +154,8 @@ function equalizer() {
             update();
         }
     });
-    const preampWrap = el("span", "mu-slider");
-    const preamp = el("input", "mu-range");
+    const preampWrap = el("span", "pl-slider");
+    const preamp = el("input", "pl-range");
     preamp.type = "range";
     preamp.min = "-12";
     preamp.max = "12";
@@ -166,7 +166,7 @@ function equalizer() {
     preampWrap.append(preamp, preampValue);
     node.append(row("Equalizer on", enabled), row("Preset", preset), sliders, row("Preamp", preampWrap),
         row("Bass boost", slider("bass_boost", 0, 12, 1, (value) => (value ? `+${value} dB` : "Off"))));
-    const path = el("p", "mu-hint mu-audio-path");
+    const path = el("p", "pl-hint pl-audio-path");
     const describe = () => { path.textContent = player().engine.effects.describe(); };
     describe();
     store.on("preferences", describe);
@@ -182,8 +182,8 @@ function starcoreAccent() {
 
 function appearance() {
     const node = section("Appearance");
-    const accent = el("span", "mu-accent-pick");
-    const mode = el("select", "mu-select");
+    const accent = el("span", "pl-accent-pick");
+    const mode = el("select", "pl-select");
     mode.setAttribute("aria-label", "Accent colour");
     mode.append(new Option("StarCore accent", "starcore"), new Option("From the artwork (player only)", "artwork"),
         new Option("Custom colour", "custom"));
@@ -234,15 +234,15 @@ function privacy() {
 
 async function devices() {
     const node = section("Devices", "Browsers and phones signed in to this server that can play or control music.");
-    const list = el("div", "mu-device-list");
+    const list = el("div", "pl-device-list");
     const hub = connect(player());
     const draw = () => {
         list.replaceChildren(...hub.devices.map((device) => {
-            const item = el("div", "mu-device-row");
+            const item = el("div", "pl-device-row");
             item.append(el("strong", null, `${device.name}${device.id === player().device ? " (this browser)" : ""}`),
                 el("span", null, device.online ? "Online" : `Last seen ${new Date(device.last_seen * 1000).toLocaleString()}`));
             if (device.id !== player().device) {
-                item.append(button("Forget", "mu-text-button", async () => {
+                item.append(button("Forget", "pl-text-button", async () => {
                     await api.post("connect/forget", { device_id: player().device, target: device.id });
                     await hub.refresh();
                     draw();
@@ -263,10 +263,10 @@ async function server(alive) {
     if (!alive()) {
         return node;
     }
-    const facts = el("dl", "mu-tiles");
+    const facts = el("dl", "pl-tiles");
     for (const [label, value] of [["Songs", summary.tracks], ["Albums", summary.albums], ["Artists", summary.artists], ["Playing time", longDuration(summary.duration)],
         ["Size", size(summary.size_bytes)], ["Lossless", summary.lossless], ["Hi-Res", summary.hires], ["Missing files", summary.missing], ["Transcoding", summary.transcoding ? "Available" : "Unavailable"]]) {
-        const tile = el("div", "mu-tile");
+        const tile = el("div", "pl-tile");
         if (label === "Missing files" || label === "Transcoding") {
             developer(tile);
         }
@@ -275,27 +275,27 @@ async function server(alive) {
     }
     node.append(facts);
 
-    const form = el("div", "mu-config");
+    const form = el("div", "pl-config");
     for (const setting of config.settings) {
         let control;
         const list = setting.type === "path-list" || setting.type === "list";
         if (list) {
-            control = el("textarea", "mu-input");
+            control = el("textarea", "pl-input");
             control.rows = 3;
             control.value = String(setting.value || "").split(/;\s*/).filter(Boolean).join("\n");
             control.placeholder = setting.type === "path-list" ? "One folder per line" : "One pattern per line";
         } else if (setting.options) {
-            control = el("select", "mu-select");
+            control = el("select", "pl-select");
             for (const option of setting.options) {
                 control.append(new Option(option, option));
             }
             control.value = setting.value;
         } else {
-            control = el("input", "mu-input");
+            control = el("input", "pl-input");
             control.type = typeof setting.value === "number" ? "number" : "text";
             control.value = String(setting.value ?? "");
         }
-        const status = el("small", "mu-setting-hint", setting.description);
+        const status = el("small", "pl-setting-hint", setting.description);
         control.addEventListener("change", async () => {
             let value = control.value;
             if (list) {
@@ -312,13 +312,13 @@ async function server(alive) {
                 status.classList.add("error");
             }
         });
-        const field = el("label", "mu-setting mu-setting-wide");
-        field.append(el("span", "mu-setting-label", setting.key.replace(/_/g, " ")), control, status);
+        const field = el("label", "pl-setting pl-setting-wide");
+        field.append(el("span", "pl-setting-label", setting.key.replace(/_/g, " ")), control, status);
         form.append(setting.developer ? developer(field) : field);
     }
     const advanced = config.settings.filter((setting) => setting.developer).length;
     if (advanced) {
-        const hint = el("p", "mu-hint", `${advanced} advanced library and transcoding settings are shown in Developer Mode.`);
+        const hint = el("p", "pl-hint", `${advanced} advanced library and transcoding settings are shown in Developer Mode.`);
         hint.dataset.developerHint = "";
         form.append(hint);
     }
@@ -327,8 +327,8 @@ async function server(alive) {
 }
 
 async function scanner(alive) {
-    const node = el("div", "mu-scan");
-    const status = el("div", "mu-scan-status");
+    const node = el("div", "pl-scan");
+    const status = el("div", "pl-scan-status");
     const start = button("Scan now", "button button-primary", async () => {
         try {
             await api.post("scan", { background: true });
@@ -338,7 +338,7 @@ async function scanner(alive) {
         }
     });
     const cancel = button("Cancel", "button", () => api.post("scan", { cancel: true }).then(poll));
-    node.append(el("h3", null, "Scanning"), status, el("div", "mu-scan-actions"));
+    node.append(el("h3", null, "Scanning"), status, el("div", "pl-scan-actions"));
     node.lastChild.append(start, cancel);
     let timer = null;
     const draw = (state) => {
@@ -354,7 +354,7 @@ async function scanner(alive) {
                 const details = el("details");
                 details.append(el("summary", null, "Unreadable files"));
                 for (const failure of last.failed.slice(0, 50)) {
-                    details.append(el("div", "mu-hint", `${failure.file}: ${failure.reason}`));
+                    details.append(el("div", "pl-hint", `${failure.file}: ${failure.reason}`));
                 }
                 status.append(details);
             }
@@ -362,7 +362,7 @@ async function scanner(alive) {
             status.textContent = "Never scanned.";
         }
         if (state.error && state.error !== "cancelled") {
-            status.append(el("div", "mu-error-text", state.error));
+            status.append(el("div", "pl-error-text", state.error));
         }
     };
     const poll = async () => {
@@ -386,10 +386,10 @@ async function scanner(alive) {
 }
 
 function duplicates() {
-    const node = el("div", "mu-duplicates");
+    const node = el("div", "pl-duplicates");
     node.append(el("h3", null, "Duplicates"), button("Find duplicates", "button", async () => {
         const payload = await api.get("duplicates");
-        const blocks = [el("p", "mu-hint", `${plural(payload.identical.length, "song")} with identical copies elsewhere on disk (indexed once), ${plural(payload.likely.length, "likely duplicate group")} across releases. Nothing is ever deleted.`)];
+        const blocks = [el("p", "pl-hint", `${plural(payload.identical.length, "song")} with identical copies elsewhere on disk (indexed once), ${plural(payload.likely.length, "likely duplicate group")} across releases. Nothing is ever deleted.`)];
         for (const group of payload.likely.slice(0, 50)) {
             blocks.push(trackList(group.tracks, { art: true }));
         }
@@ -402,7 +402,7 @@ export async function render({ node, alive }) {
     pending = {};
     await store.load();
     const transcoding = await api.get("library").then((summary) => summary.transcoding).catch(() => false);
-    node.append(el("h1", "mu-page-title", "Music settings"), playback(transcoding), equalizer(), appearance(), privacy());
+    node.append(el("h1", "pl-page-title", "Music settings"), playback(transcoding), equalizer(), appearance(), privacy());
     node.append(await devices());
     node.append(await server(alive));
     return () => save.cancel();

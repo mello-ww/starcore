@@ -13,20 +13,20 @@ export async function render({ node, parts, alive }) {
     }
     const context = `artist:${artist.id}`;
     const allTracks = async () => (await api.get(`tracks${api.query({ artist: artist.id, sort: "album" })}`)).tracks;
-    const follow = button(store.isLiked("artist", artist.id) ? "Following" : "Follow", "mu-chip mu-follow", async () => {
+    const follow = button(store.isLiked("artist", artist.id) ? "Following" : "Follow", "pl-chip pl-follow", async () => {
         await store.toggleLiked("artist", artist.id).catch((error) => store.toast(error.message, "error"));
         follow.textContent = store.isLiked("artist", artist.id) ? "Following" : "Follow";
     });
     node.append(header({
-        art: artwork(artist.artwork, 600, "mu-art mu-hero-art mu-art-round"),
+        art: artwork(artist.artwork, 600, "pl-art pl-hero-art pl-art-round"),
         kind: "Artist",
         title: artist.name,
         meta: [plural(artist.tracks, "song"), artist.genres.slice(0, 3).join(", ") || null],
         actions: [...playButtons(allTracks, context), follow, iconButton("radio", "Artist radio", () => startRadio("artist", artist.id, `${artist.name} radio`))],
     }));
     if (artist.top_tracks.length) {
-        const section = el("section", "mu-shelf");
-        section.append(el("h3", null, "Popular in your library"), el("p", "mu-shelf-sub", "Ordered by how often you play them"),
+        const section = el("section", "pl-shelf");
+        section.append(el("h3", null, "Popular in your library"), el("p", "pl-shelf-sub", "Ordered by how often you play them"),
             trackList(artist.top_tracks, { art: true, context }));
         node.append(section);
     }
@@ -40,11 +40,11 @@ export async function render({ node, parts, alive }) {
         node.append(shelf("Appears on", artist.appears_on.map((album) => albumCard(album))));
     }
     if (artist.similar.length) {
-        const section = el("section", "mu-shelf");
+        const section = el("section", "pl-shelf");
         section.append(el("h3", null, "Similar artists in your library"));
-        const chips = el("div", "mu-similar");
+        const chips = el("div", "pl-similar");
         for (const other of artist.similar) {
-            const chip = button(null, "mu-similar-item", () => go(`artist/${encode(other.id)}`));
+            const chip = button(null, "pl-similar-item", () => go(`artist/${encode(other.id)}`));
             chip.append(el("strong", null, other.name), el("span", null, other.reason));
             chips.append(chip);
         }

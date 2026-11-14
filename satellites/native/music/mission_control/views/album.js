@@ -20,7 +20,7 @@ export async function render({ node, parts, alive }) {
     ];
     const pinned = store.isPinned("album", album.id);
     const hero = header({
-        art: artwork(album.artwork ? album.id : null, 600, "mu-art mu-hero-art"),
+        art: artwork(album.artwork ? album.id : null, 600, "pl-art pl-hero-art"),
         kind: { single: "Single", ep: "EP", compilation: "Compilation" }[album.type] || "Album",
         title: album.album,
         meta,
@@ -29,7 +29,7 @@ export async function render({ node, parts, alive }) {
             likeButton("album", album.id, "Save album to Your Library"),
             iconButton("plus", "Add album to playlist", () => addToPlaylist(album.tracks)),
             iconButton("radio", "Album radio", () => startRadio("album", album.id, `${album.album} radio`)),
-            button(pinned ? "Unpin" : "Pin", "mu-chip", async (event) => {
+            button(pinned ? "Unpin" : "Pin", "pl-chip", async (event) => {
                 await store.setPinned("album", album.id, !store.isPinned("album", album.id)).catch((error) => store.toast(error.message, "error"));
                 event.target.textContent = store.isPinned("album", album.id) ? "Unpin" : "Pin";
             }),
@@ -48,12 +48,12 @@ export async function render({ node, parts, alive }) {
     }
     for (const [disc, tracks] of discs) {
         if (discs.size > 1) {
-            node.append(el("h3", "mu-disc", `Disc ${disc}`));
+            node.append(el("h3", "pl-disc", `Disc ${disc}`));
         }
         node.append(trackList(tracks, { numbered: "track", album: false, context }));
     }
 
-    const credits = el("dl", "mu-facts mu-album-credits");
+    const credits = el("dl", "pl-facts pl-album-credits");
     const add = (label, values) => {
         if (values && values.length) {
             credits.append(el("dt", null, label), el("dd", null, values.join(", ")));
@@ -69,7 +69,7 @@ export async function render({ node, parts, alive }) {
         add("Copyright", album.credits.copyright);
     }
     if (credits.childNodes.length) {
-        const section = el("section", "mu-shelf");
+        const section = el("section", "pl-shelf");
         section.append(el("h3", null, "Credits"), credits);
         node.append(section);
     }

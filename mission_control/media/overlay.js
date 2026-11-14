@@ -28,18 +28,18 @@ function escape(event) {
 // items: [{label, action, danger, disabled}] or "-" for a separator
 export function menu(items, anchor) {
     closeMenu();
-    const node = el("div", "mu-menu");
+    const node = el("div", "pl-menu");
     node.setAttribute("role", "menu");
     register(node);
     for (const item of items) {
         if (item === "-") {
-            node.appendChild(el("div", "mu-menu-separator"));
+            node.appendChild(el("div", "pl-menu-separator"));
             continue;
         }
         if (!item) {
             continue;
         }
-        const entry = button(item.label, `mu-menu-item${item.danger ? " danger" : ""}`, () => {
+        const entry = button(item.label, `pl-menu-item${item.danger ? " danger" : ""}`, () => {
             closeMenu();
             item.action();
         });
@@ -87,13 +87,13 @@ export function menu(items, anchor) {
 
 export function modal(title, body, actions = []) {
     closeMenu();
-    const backdrop = el("div", "mu-modal-backdrop");
-    const dialog = el("div", "mu-modal");
+    const backdrop = el("div", "pl-modal-backdrop");
+    const dialog = el("div", "pl-modal");
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
     dialog.setAttribute("aria-label", title);
     register(backdrop);
-    const head = el("div", "mu-modal-head");
+    const head = el("div", "pl-modal-head");
     const close = () => {
         backdrop.remove();
         document.removeEventListener("keydown", onKey, true);
@@ -109,7 +109,7 @@ export function modal(title, body, actions = []) {
     };
     const previous = document.activeElement;
     head.append(el("h3", null, title), iconButton("close", "Close", close));
-    const foot = el("div", "mu-modal-foot");
+    const foot = el("div", "pl-modal-foot");
     for (const action of actions) {
         foot.appendChild(button(action.label, action.primary ? "button button-primary" : action.danger ? "button button-stop" : "button", async () => {
             const result = await action.action();
@@ -127,7 +127,7 @@ export function modal(title, body, actions = []) {
     });
     document.addEventListener("keydown", onKey, true);
     document.body.appendChild(backdrop);
-    const focusable = dialog.querySelector("input, select, textarea, button:not(.mu-icon-button)");
+    const focusable = dialog.querySelector("input, select, textarea, button:not(.pl-icon-button)");
     if (focusable) {
         focusable.focus();
     }
@@ -136,8 +136,8 @@ export function modal(title, body, actions = []) {
 
 export function prompt(title, label, value = "") {
     return new Promise((resolve) => {
-        const body = el("label", "mu-field");
-        const input = el("input", "mu-input");
+        const body = el("label", "pl-field");
+        const input = el("input", "pl-input");
         input.value = value;
         body.append(el("span", null, label), input);
         let done = false;
@@ -166,7 +166,7 @@ export function prompt(title, label, value = "") {
 
 export function confirm(title, message, label = "Delete") {
     return new Promise((resolve) => {
-        modal(title, el("p", "mu-modal-text", message), [
+        modal(title, el("p", "pl-modal-text", message), [
             { label: "Cancel", action: () => resolve(false) },
             { label, danger: true, action: () => resolve(true) },
         ]);
@@ -177,7 +177,7 @@ let toastHost = null;
 
 function toastLayer() {
     if (!toastHost || !toastHost.isConnected) {
-        toastHost = el("div", "mu-toasts");
+        toastHost = el("div", "pl-toasts");
         toastHost.setAttribute("role", "status");
         toastHost.setAttribute("aria-live", "polite");
         register(toastHost);
@@ -187,7 +187,7 @@ function toastLayer() {
 }
 
 session.on("toast", ({ message, kind }) => {
-    const node = el("div", `mu-toast mu-toast-${kind}`, message);
+    const node = el("div", `pl-toast pl-toast-${kind}`, message);
     toastLayer().appendChild(node);
     setTimeout(() => node.classList.add("leaving"), 3600);
     setTimeout(() => node.remove(), 4000);

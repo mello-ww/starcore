@@ -42,7 +42,7 @@ function registerExtensions() {
             if (!current()) {
                 return;
             }
-            const field = document.querySelector(".mu-search-input");
+            const field = document.querySelector(".pl-search-input");
             if (field) {
                 field.focus();
             } else {
@@ -61,48 +61,48 @@ export function mount(context) {
     // the shell normally started it already; a no-op then
     startAudioHost();
 
-    const root = el("div", "mu-root");
+    const root = el("div", "pl-root");
     const unregister = register(root);
-    const sidebar = el("nav", "mu-sidebar");
+    const sidebar = el("nav", "pl-sidebar");
     sidebar.setAttribute("aria-label", "Music");
-    const main = el("main", "mu-main");
+    const main = el("main", "pl-main");
     main.tabIndex = -1;
     root.append(sidebar, main);
     element.replaceChildren(root);
     // Music is a full-height app: its host view stops scrolling and Music's own content area scrolls
     const host = element.closest(".view");
-    host?.classList.add("mu-host");
+    host?.classList.add("pl-host");
 
     const navButtons = new Map();
-    const navList = el("div", "mu-nav");
+    const navList = el("div", "pl-nav");
     for (const [key, label, iconName] of NAV) {
-        const item = button(null, "mu-nav-item", () => go(key === "home" ? "" : key));
+        const item = button(null, "pl-nav-item", () => go(key === "home" ? "" : key));
         item.append(icon(iconName), el("span", null, label));
         navButtons.set(key, item);
         navList.append(item);
     }
-    const shelf = el("div", "mu-nav-shelf");
-    const shelfHead = el("div", "mu-nav-shelf-head");
-    shelfHead.append(el("span", null, "Playlists"), button("+", "mu-icon-button mu-nav-add", async () => {
+    const shelf = el("div", "pl-nav-shelf");
+    const shelfHead = el("div", "pl-nav-shelf-head");
+    shelfHead.append(el("span", null, "Playlists"), button("+", "pl-icon-button pl-nav-add", async () => {
         const { createPlaylist } = await import("./views/playlist.js");
         createPlaylist();
     }, "Create playlist"));
-    const shelfList = el("div", "mu-nav-playlists");
+    const shelfList = el("div", "pl-nav-playlists");
     shelf.append(shelfHead, shelfList);
     sidebar.append(navList, shelf);
 
     function renderShelf() {
         const pinned = new Set(store.state.pins.filter((pin) => pin.kind === "playlist").map((pin) => pin.id));
         const items = [];
-        const liked = button(null, "mu-nav-playlist", () => go("library/liked"));
-        const likedArt = el("div", "mu-art mu-liked-art");
+        const liked = button(null, "pl-nav-playlist", () => go("library/liked"));
+        const likedArt = el("div", "pl-art pl-liked-art");
         likedArt.append(icon("heart", 16));
         liked.append(likedArt, el("span", null, "Liked Songs"));
         items.push(liked);
         const sorted = [...store.state.playlists].sort((a, b) => Number(pinned.has(b.id)) - Number(pinned.has(a.id)));
         for (const playlist of sorted) {
-            const entry = button(null, "mu-nav-playlist", () => go(`playlist/${encodeURIComponent(playlist.id)}`));
-            entry.append(mosaic(playlist.mosaic, playlist.cover, "mu-art", 96), el("span", null, playlist.name));
+            const entry = button(null, "pl-nav-playlist", () => go(`playlist/${encodeURIComponent(playlist.id)}`));
+            entry.append(mosaic(playlist.mosaic, playlist.cover, "pl-art", 96), el("span", null, playlist.name));
             if (pinned.has(playlist.id)) {
                 entry.append(icon("pin", 12));
             }
@@ -138,14 +138,14 @@ export function mount(context) {
             go("");
             return;
         }
-        main.replaceChildren(el("div", "mu-skeleton mu-skeleton-hero"));
+        main.replaceChildren(el("div", "pl-skeleton pl-skeleton-hero"));
         try {
             await store.load();
             const module = await loader();
             if (mine !== token) {
                 return;
             }
-            const view = el("div", "mu-view");
+            const view = el("div", "pl-view");
             main.replaceChildren(view);
             main.scrollTop = 0;
             const result = await module.render({
@@ -181,7 +181,7 @@ export function mount(context) {
         if (disposeView) {
             disposeView();
         }
-        host?.classList.remove("mu-host");
+        host?.classList.remove("pl-host");
         unregister();
     };
 }

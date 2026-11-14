@@ -1,18 +1,18 @@
-/* Music's own views. The player and the shared pieces it draws with (and the --mu-* tokens)
+/* Music's own views. The player and the shared pieces it draws with (and the --pl-* tokens)
    are Mission Control's, in /media/media.css, loaded for every page. */
 @import url("./styles/views.css");
 
 /* Music is a full-height app inside Mission Control: the host view stops scrolling, the sidebar
    stays put, and only the content column scrolls. The mini-player is fixed to the bottom of the
-   window and body.mu-has-bar reserves its height, so the app always ends just above it. */
-.view.mu-host {
+   window and body.pl-has-bar reserves its height, so the app always ends just above it. */
+.view.pl-host {
     display: flex;
     flex-direction: column;
     overflow: hidden;
     padding-bottom: 1rem;
 }
 
-.view.mu-host > #satellite-page {
+.view.pl-host > #satellite-page {
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -20,39 +20,39 @@
     max-width: none;
 }
 
-.mu-root {
+.pl-root {
     display: grid;
     flex: 1;
     grid-template-columns: 220px minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     gap: 0;
     min-height: 0;
-    border: 1px solid var(--mu-line);
-    border-radius: var(--mu-radius);
-    background: var(--mu-bg);
+    border: 1px solid var(--pl-line);
+    border-radius: var(--pl-radius);
+    background: var(--pl-bg);
     overflow: hidden;
 }
 
-.mu-sidebar {
+.pl-sidebar {
     display: flex;
     flex-direction: column;
     gap: 1rem;
     min-height: 0;
     padding: 1rem 0.6rem;
-    border-right: 1px solid var(--mu-line);
-    background: var(--mu-surface);
+    border-right: 1px solid var(--pl-line);
+    background: var(--pl-surface);
     overflow-y: auto;
     overscroll-behavior: contain;
 }
 
-.mu-nav {
+.pl-nav {
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
 
-.mu-nav-item,
-.mu-nav-playlist {
+.pl-nav-item,
+.pl-nav-playlist {
     display: flex;
     align-items: center;
     gap: 0.7rem;
@@ -61,7 +61,7 @@
     border: 0;
     border-radius: 999px;
     background: transparent;
-    color: var(--mu-dim);
+    color: var(--pl-dim);
     font: inherit;
     font-size: 0.9rem;
     text-align: left;
@@ -69,126 +69,126 @@
     transition: background 120ms ease, color 120ms ease;
 }
 
-.mu-nav-item:hover,
-.mu-nav-playlist:hover {
-    background: var(--mu-hover);
-    color: var(--mu-text);
+.pl-nav-item:hover,
+.pl-nav-playlist:hover {
+    background: var(--pl-hover);
+    color: var(--pl-text);
 }
 
 /* selected = the accent, as on every StarCore tab; a playlist is a row, so it only lifts */
-.mu-nav-item.active {
-    background: var(--mu-accent);
-    color: var(--mu-on-accent);
+.pl-nav-item.active {
+    background: var(--pl-accent);
+    color: var(--pl-on-accent);
     font-weight: 600;
 }
 
-.mu-nav-playlist.active {
-    background: var(--mu-raised);
-    color: var(--mu-text);
+.pl-nav-playlist.active {
+    background: var(--pl-raised);
+    color: var(--pl-text);
     font-weight: 600;
 }
 
-.mu-nav-shelf {
+.pl-nav-shelf {
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
     min-height: 0;
 }
 
-.mu-nav-shelf-head {
+.pl-nav-shelf-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 0.65rem;
-    color: var(--mu-faint);
+    color: var(--pl-faint);
     font-size: 0.72rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
 
-.mu-nav-playlist {
+.pl-nav-playlist {
     padding: 0.35rem 0.5rem;
     font-size: 0.85rem;
 }
 
-.mu-nav-playlist .mu-art {
+.pl-nav-playlist .pl-art {
     width: 34px;
     height: 34px;
     flex: none;
 }
 
-.mu-nav-playlist span {
+.pl-nav-playlist span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     flex: 1;
 }
 
-.mu-main {
+.pl-main {
     position: relative;
     min-width: 0;
     min-height: 0;
     padding: 1.5rem clamp(1rem, 3vw, 2.25rem) 2.5rem;
     outline: none;
-    background: var(--mu-bg);
+    background: var(--pl-bg);
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
 }
 
-.mu-view {
+.pl-view {
     display: flex;
     flex-direction: column;
-    gap: var(--mu-gap);
-    animation: mu-rise 220ms ease both;
+    gap: var(--pl-gap);
+    animation: pl-rise 220ms ease both;
 }
 
-.mu-page-title,
-.mu-greeting {
+.pl-page-title,
+.pl-greeting {
     margin: 0;
     font-size: clamp(1.5rem, 3vw, 2.1rem);
     font-weight: 700;
     letter-spacing: -0.02em;
 }
 
-@keyframes mu-rise {
+@keyframes pl-rise {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: none; }
 }
 
-@keyframes mu-shimmer {
+@keyframes pl-shimmer {
     from { background-position: -400px 0; }
     to { background-position: 400px 0; }
 }
 
 @media (max-width: 1024px) {
-    .mu-root {
+    .pl-root {
         grid-template-columns: 64px minmax(0, 1fr);
     }
 
-    .mu-nav-item span,
-    .mu-nav-shelf-head span,
-    .mu-nav-playlist span {
+    .pl-nav-item span,
+    .pl-nav-shelf-head span,
+    .pl-nav-playlist span {
         display: none;
     }
 
-    .mu-nav-item,
-    .mu-nav-playlist {
+    .pl-nav-item,
+    .pl-nav-playlist {
         justify-content: center;
     }
 
-    .mu-nav-add {
+    .pl-nav-add {
         margin: 0 auto;
     }
 }
 
 @media (max-width: 680px) {
-    .mu-root {
+    .pl-root {
         grid-template-columns: minmax(0, 1fr);
         border: 0;
     }
 
-    .mu-sidebar {
+    .pl-sidebar {
         position: sticky;
         top: 0;
         z-index: 5;
@@ -196,19 +196,19 @@
         max-height: none;
         padding: 0.4rem;
         border-right: 0;
-        border-bottom: 1px solid var(--mu-line);
+        border-bottom: 1px solid var(--pl-line);
         overflow-x: auto;
     }
 
-    .mu-nav {
+    .pl-nav {
         flex-direction: row;
     }
 
-    .mu-nav-shelf {
+    .pl-nav-shelf {
         display: none;
     }
 
-    .mu-main {
+    .pl-main {
         padding: 1rem 0.9rem 2rem;
     }
 }
@@ -216,18 +216,18 @@
 /* Phones and very short windows: no room for a fixed frame, so the page scrolls as a whole
    again and the nav row sticks to the top of the view. */
 @media (max-width: 680px), (max-height: 520px) {
-    .view.mu-host {
+    .view.pl-host {
         display: block;
         overflow-y: auto;
     }
 
-    .mu-root {
+    .pl-root {
         grid-template-rows: auto;
         min-height: auto;
         overflow: visible;
     }
 
-    .mu-sidebar {
+    .pl-sidebar {
         position: sticky;
         top: 0;
         z-index: 5;
@@ -235,15 +235,15 @@
         max-height: 100vh;
     }
 
-    .mu-main {
+    .pl-main {
         overflow: visible;
         scrollbar-gutter: auto;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    [data-mu-theme] *,
-    .mu-view {
+    [data-pl-theme] *,
+    .pl-view {
         animation: none !important;
         transition: none !important;
     }
@@ -251,29 +251,29 @@
 
 /* StarCore's rounded language for Music's own views (the player's pieces get theirs in
    /media/media.css). */
-.mu-root .mu-sidebar {
-    background: var(--mu-bg);
+.pl-root .pl-sidebar {
+    background: var(--pl-bg);
 }
 
-.mu-suggestion {
+.pl-suggestion {
     border-radius: 12px;
 }
 
-.mu-device,
-.mu-context-chip {
+.pl-device,
+.pl-context-chip {
     border-radius: 16px;
 }
 
-.mu-settings-section,
-.mu-top-card,
-.mu-tile,
-.mu-genre-tile,
-.mu-folder-card,
-.mu-similar-item,
-.mu-suggestions {
-    border-radius: var(--mu-radius);
+.pl-settings-section,
+.pl-top-card,
+.pl-tile,
+.pl-genre-tile,
+.pl-folder-card,
+.pl-similar-item,
+.pl-suggestions {
+    border-radius: var(--pl-radius);
 }
 
-.mu-search-input {
+.pl-search-input {
     border-radius: 999px;
 }

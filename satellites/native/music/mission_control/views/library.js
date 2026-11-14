@@ -15,27 +15,27 @@ function matches(text, filter) {
 
 export async function render({ node, parts, alive }) {
     const tab = TABS.some(([key]) => key === parts[0]) ? parts[0] : "playlists";
-    const tabs = el("div", "mu-tabs mu-library-tabs");
+    const tabs = el("div", "pl-tabs pl-library-tabs");
     tabs.setAttribute("role", "tablist");
     for (const [key, label] of TABS) {
-        const entry = button(label, `mu-tab${key === tab ? " active" : ""}`, () => go(`library/${key}`));
+        const entry = button(label, `pl-tab${key === tab ? " active" : ""}`, () => go(`library/${key}`));
         entry.setAttribute("role", "tab");
         entry.setAttribute("aria-selected", String(key === tab));
         tabs.append(entry);
     }
-    const tools = el("div", "mu-library-tools");
-    const filter = el("input", "mu-input");
+    const tools = el("div", "pl-library-tools");
+    const filter = el("input", "pl-input");
     filter.type = "search";
     filter.placeholder = "Filter";
     filter.setAttribute("aria-label", "Filter this list");
-    const content = el("div", "mu-library-content");
-    node.append(el("h1", "mu-page-title", "Your Library"), tabs, tools, content);
+    const content = el("div", "pl-library-content");
+    node.append(el("h1", "pl-page-title", "Your Library"), tabs, tools, content);
 
     const renderers = { playlists, liked, albums, artists, recent, folders, genres };
     await renderers[tab]();
 
     async function playlists() {
-        const folderFilter = el("select", "mu-select");
+        const folderFilter = el("select", "pl-select");
         folderFilter.setAttribute("aria-label", "Playlist folder");
         tools.append(filter, folderFilter, button("New playlist", "button button-primary", () => createPlaylist()),
             button("Smart playlist", "button", () => smartPlaylist()), button("Import M3U", "button", () => importPlaylist()));
@@ -63,13 +63,13 @@ export async function render({ node, parts, alive }) {
             const blocks = [];
             for (const [folder, items] of [...groups.entries()].sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)))) {
                 if (folder) {
-                    blocks.push(el("h3", "mu-folder-title", folder));
+                    blocks.push(el("h3", "pl-folder-title", folder));
                 }
                 blocks.push(grid(items.map((playlist) => {
                     const card = playlistCard(playlist);
                     if (playlist.pinned) {
                         card.classList.add("pinned");
-                        card.querySelector(".mu-card-title").prepend(icon("pin", 12), " ");
+                        card.querySelector(".pl-card-title").prepend(icon("pin", 12), " ");
                     }
                     return card;
                 })));
@@ -83,7 +83,7 @@ export async function render({ node, parts, alive }) {
     }
 
     async function liked() {
-        const sort = el("select", "mu-select");
+        const sort = el("select", "pl-select");
         for (const [value, label] of TRACK_SORTS) {
             sort.append(new Option(label, value));
         }
@@ -94,7 +94,7 @@ export async function render({ node, parts, alive }) {
         }
         const tracks = payload.tracks;
         const head = header({
-            art: (() => { const art = el("div", "mu-art mu-liked-art mu-hero-art"); art.append(icon("heart", 64)); return art; })(),
+            art: (() => { const art = el("div", "pl-art pl-liked-art pl-hero-art"); art.append(icon("heart", 64)); return art; })(),
             kind: "Playlist", title: "Liked Songs", meta: [totals(tracks)],
             actions: playButtons(async () => tracks, "liked:all"),
         });
@@ -117,18 +117,18 @@ export async function render({ node, parts, alive }) {
     }
 
     async function albums() {
-        const sort = el("select", "mu-select");
+        const sort = el("select", "pl-select");
         for (const [value, label] of ALBUM_SORTS) {
             sort.append(new Option(label, value));
         }
-        const type = el("select", "mu-select");
+        const type = el("select", "pl-select");
         for (const [value, label] of [["", "All releases"], ["saved", "Saved albums"], ["album", "Albums"], ["ep", "EPs"], ["single", "Singles"], ["compilation", "Compilations"]]) {
             type.append(new Option(label, value));
         }
         tools.append(filter, sort, type);
         let payload = null;
         const load = async () => {
-            content.replaceChildren(el("div", "mu-skeleton mu-skeleton-grid"));
+            content.replaceChildren(el("div", "pl-skeleton pl-skeleton-grid"));
             const release = type.value === "saved" ? "" : type.value;
             payload = await api.get(`albums${api.query({ sort: sort.value, order: ["added", "released", "quality"].includes(sort.value) ? "desc" : "asc", type: release })}`);
             if (alive()) {
@@ -152,11 +152,11 @@ export async function render({ node, parts, alive }) {
     }
 
     async function artists() {
-        const which = el("select", "mu-select");
+        const which = el("select", "pl-select");
         for (const [value, label] of [["", "Album artists"], ["featured", "All artists"], ["followed", "Following"]]) {
             which.append(new Option(label, value));
         }
-        const sort = el("select", "mu-select");
+        const sort = el("select", "pl-select");
         for (const [value, label] of [["name", "Name"], ["tracks", "Most songs"], ["added", "Recently added"]]) {
             sort.append(new Option(label, value));
         }
@@ -209,7 +209,7 @@ export async function render({ node, parts, alive }) {
                 return;
             }
             content.replaceChildren(payload.sources.length ? grid(payload.sources.map((entry) => {
-                const card = button(null, "mu-folder-card", () => go(`library/folders/${entry.index}`));
+                const card = button(null, "pl-folder-card", () => go(`library/folders/${entry.index}`));
                 card.append(icon("library", 28), el("strong", null, entry.name), el("span", null, entry.configured ? "Music folder" : "Previously scanned"));
                 return card;
             })) : emptyState("No folders indexed yet", "Add a music folder in Settings and scan it."));
@@ -220,7 +220,7 @@ export async function render({ node, parts, alive }) {
         if (!alive()) {
             return;
         }
-        const crumbs = el("div", "mu-crumbs");
+        const crumbs = el("div", "pl-crumbs");
         crumbs.append(link("Folders", "library/folders"));
         const trail = [];
         crumbs.append(" / ", link(listing.source === Number(source) && !listing.path ? listing.name : "…", `library/folders/${source}`));
@@ -231,13 +231,13 @@ export async function render({ node, parts, alive }) {
         const blocks = [crumbs];
         if (listing.folders.length) {
             blocks.push(grid(listing.folders.map((folder) => {
-                const card = button(null, "mu-folder-card", () => go(`library/folders/${source}/${folder.path.split("/").map(encode).join("/")}`));
+                const card = button(null, "pl-folder-card", () => go(`library/folders/${source}/${folder.path.split("/").map(encode).join("/")}`));
                 card.append(icon("library", 22), el("strong", null, folder.name), el("span", null, plural(folder.tracks, "song")));
                 return card;
             })));
         }
         if (listing.tracks.length) {
-            blocks.push(el("div", "mu-hero-actions", null));
+            blocks.push(el("div", "pl-hero-actions", null));
             blocks[blocks.length - 1].append(...playButtons(async () => listing.tracks, `folder:${source}-${listing.path.replace(/\//g, "-")}`));
             blocks.push(trackList(listing.tracks, { art: true, context: `folder:${source}` }));
         }
@@ -253,9 +253,9 @@ export async function render({ node, parts, alive }) {
         const draw = () => {
             const text = filter.value.trim().toLowerCase();
             const shown = payload.genres.filter((genre) => matches(genre.name, text));
-            const tiles = el("div", "mu-genre-grid");
+            const tiles = el("div", "pl-genre-grid");
             shown.forEach((genre, index) => {
-                const tile = button(null, `mu-genre-tile mu-hue-${index % 8}`, () => go(`genre/${encode(genre.name)}`));
+                const tile = button(null, `pl-genre-tile pl-hue-${index % 8}`, () => go(`genre/${encode(genre.name)}`));
                 tile.append(el("strong", null, genre.name), el("span", null, `${plural(genre.tracks, "song")} · ${plural(genre.albums, "album")}`));
                 tiles.append(tile);
             });

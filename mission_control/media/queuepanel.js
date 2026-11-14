@@ -5,18 +5,18 @@ import { button, duration, el, emptyState, icon, iconButton } from "./dom.js";
 import { player } from "./player.js";
 
 export function queuePanel() {
-    const node = el("div", "mu-queue");
+    const node = el("div", "pl-queue");
     const stops = [player().on("queue", render), player().on("remote", render)];
 
     function row(track, position, label) {
-        const item = el("div", `mu-queue-row${position === player().index ? " current" : ""}`);
+        const item = el("div", `pl-queue-row${position === player().index ? " current" : ""}`);
         item.draggable = position !== player().index;
         item.tabIndex = 0;
-        const handle = el("span", "mu-drag-handle");
+        const handle = el("span", "pl-drag-handle");
         handle.appendChild(icon("drag", 14));
-        const info = el("div", "mu-queue-info");
-        info.append(el("span", "mu-track-title", track.title), el("span", "mu-track-sub", track.artist || track.album_artist || ""));
-        item.append(handle, artwork(track.album_id, 96, "mu-art mu-queue-art"), info, el("span", "mu-track-duration", duration(track.duration)));
+        const info = el("div", "pl-queue-info");
+        info.append(el("span", "pl-track-title", track.title), el("span", "pl-track-sub", track.artist || track.album_artist || ""));
+        item.append(handle, artwork(track.album_id, 96, "pl-art pl-queue-art"), info, el("span", "pl-track-duration", duration(track.duration)));
         if (position !== player().index) {
             item.append(iconButton("close", `Remove ${track.title} from the queue`, () => player().remove(position)));
         }
@@ -74,8 +74,8 @@ export function queuePanel() {
             node.replaceChildren(emptyState("Your queue is empty", "Play something, or use “Add to queue” on any song."));
             return;
         }
-        const head = el("div", "mu-queue-head");
-        head.append(el("h4", null, "Now playing"), button("Clear queue", "mu-text-button", () => instance.clear()));
+        const head = el("div", "pl-queue-head");
+        head.append(el("h4", null, "Now playing"), button("Clear queue", "pl-text-button", () => instance.clear()));
         const current = instance.current;
         const items = [head];
         if (current) {
@@ -87,12 +87,12 @@ export function queuePanel() {
             next.forEach((track, offset) => items.push(row(track, instance.index + 1 + offset, `${offset + 1}: ${track.title}`)));
         }
         if (instance.repeat === "all" && instance.index > 0) {
-            items.push(el("p", "mu-queue-note", `Repeat is on: ${instance.index} earlier song${instance.index === 1 ? "" : "s"} play again after these.`));
+            items.push(el("p", "pl-queue-note", `Repeat is on: ${instance.index} earlier song${instance.index === 1 ? "" : "s"} play again after these.`));
         }
-        const footer = el("div", "mu-queue-foot");
+        const footer = el("div", "pl-queue-foot");
         const openAlbum = extension("openAlbum");
         if (current && current.album_id && openAlbum) {
-            footer.append(button("Go to album", "mu-text-button", () => openAlbum(current.album_id)));
+            footer.append(button("Go to album", "pl-text-button", () => openAlbum(current.album_id)));
         }
         items.push(footer);
         node.replaceChildren(...items);

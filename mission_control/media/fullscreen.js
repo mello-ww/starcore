@@ -21,7 +21,7 @@ function jump(text, action) {
     if (!action) {
         return text;
     }
-    const node = el("a", "mu-link", text);
+    const node = el("a", "pl-link", text);
     node.href = "#";
     node.addEventListener("click", (event) => {
         event.preventDefault();
@@ -32,7 +32,7 @@ function jump(text, action) {
 }
 
 function artistLine(track) {
-    const wrap = el("span", "mu-artists");
+    const wrap = el("span", "pl-artists");
     const artists = track.artists && track.artists.length ? track.artists : [{ id: track.artist_id, name: track.artist || track.album_artist || "Unknown artist" }];
     const open = extension("openArtist");
     artists.forEach((artist, index) => {
@@ -64,30 +64,30 @@ export async function openFullscreen(tab = "lyrics") {
     }
     const { transport } = await import("./bar.js");
     const { sleepMenu } = await import("./bar.js");
-    const root = el("div", "mu-full");
+    const root = el("div", "pl-full");
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-label", "Now playing");
     register(root);
-    const backdrop = el("div", "mu-full-backdrop");
-    const close = iconButton("collapse", "Close (Esc)", closeFullscreen, "mu-icon-button mu-full-close");
+    const backdrop = el("div", "pl-full-backdrop");
+    const close = iconButton("collapse", "Close (Esc)", closeFullscreen, "pl-icon-button pl-full-close");
 
-    const stage = el("div", "mu-full-stage");
-    const cover = el("div", "mu-full-cover");
-    const canvas = el("canvas", "mu-visualizer");
-    const titles = el("div", "mu-full-titles");
-    const seek = seekBar("mu-seek mu-seek-large");
-    const controls = transport("mu-transport mu-transport-large");
-    const extras = el("div", "mu-full-extras");
+    const stage = el("div", "pl-full-stage");
+    const cover = el("div", "pl-full-cover");
+    const canvas = el("canvas", "pl-visualizer");
+    const titles = el("div", "pl-full-titles");
+    const seek = seekBar("pl-seek pl-seek-large");
+    const controls = transport("pl-transport pl-transport-large");
+    const extras = el("div", "pl-full-extras");
     stage.append(cover, canvas, titles, seek, controls, extras);
 
-    const side = el("div", "mu-full-side");
-    const tabs = el("div", "mu-tabs");
+    const side = el("div", "pl-full-side");
+    const tabs = el("div", "pl-tabs");
     tabs.setAttribute("role", "tablist");
-    const panel = el("div", "mu-full-panel");
+    const panel = el("div", "pl-full-panel");
     side.append(tabs, panel);
     root.append(backdrop, close, stage, side);
     document.body.appendChild(root);
-    document.body.classList.add("mu-full-open");
+    document.body.classList.add("pl-full-open");
 
     let current = null;
     let content = null;
@@ -96,12 +96,12 @@ export async function openFullscreen(tab = "lyrics") {
     // Lyrics only from a provider that offers them, Devices only with its session's Connect
     const offered = TABS.filter(([key]) => (key !== "lyrics" || library.offers("lyrics")) && (key !== "devices" || library.offersSession("connect")));
     for (const [key, label] of offered) {
-        const node = button(label, "mu-tab", () => select(key));
+        const node = button(label, "pl-tab", () => select(key));
         node.setAttribute("role", "tab");
         buttons.set(key, node);
         tabs.append(node);
     }
-    const karaokeButton = button("Karaoke", "mu-tab", () => {
+    const karaokeButton = button("Karaoke", "pl-tab", () => {
         karaoke = !karaoke;
         root.classList.toggle("karaoke", karaoke);
         karaokeButton.classList.toggle("active", karaoke);
@@ -143,9 +143,9 @@ export async function openFullscreen(tab = "lyrics") {
         if (!track) {
             return emptyState("Nothing playing", "");
         }
-        const node = el("div", "mu-info");
+        const node = el("div", "pl-info");
         const engine = player().engine;
-        node.append(el("p", "mu-info-path", engine.effects.describe()));
+        node.append(el("p", "pl-info-path", engine.effects.describe()));
         node.append(trackDetails(track, engine.plan));
         return node;
     }
@@ -158,37 +158,37 @@ export async function openFullscreen(tab = "lyrics") {
         const track = instance.remote ? instance.remote.track : instance.engine.track;
         if (!track) {
             titles.replaceChildren(el("h2", null, instance.remote ? `Connected to ${instance.remote.device.name}` : "Nothing playing"));
-            cover.replaceChildren(artwork(null, 600, "mu-art mu-full-art"));
+            cover.replaceChildren(artwork(null, 600, "pl-art pl-full-art"));
             return;
         }
         if (cover.dataset.album !== track.album_id) {
             cover.dataset.album = track.album_id || "";
-            cover.replaceChildren(artwork(track.album_id, 600, "mu-art mu-full-art"));
+            cover.replaceChildren(artwork(track.album_id, 600, "pl-art pl-full-art"));
         }
-        const title = el("h2", "mu-full-title", track.title);
-        const line = el("div", "mu-full-sub");
+        const title = el("h2", "pl-full-title", track.title);
+        const line = el("div", "pl-full-sub");
         line.append(artistLine(track));
         if (track.album_id) {
             line.append(" · ", jump(track.album || "", extension("openAlbum") && (() => extension("openAlbum")(track.album_id))));
         }
-        const badges = el("div", "mu-full-badges");
+        const badges = el("div", "pl-full-badges");
         const badge = qualityBadge(track.quality);
         if (badge) {
             badges.append(badge);
         }
         const plan = instance.engine.plan;
         if (plan && !instance.remote) {
-            badges.append(el("span", "mu-badge mu-badge-plain", plan.delivery === "original"
+            badges.append(el("span", "pl-badge pl-badge-plain", plan.delivery === "original"
                 ? `Original ${(plan.format || "").toUpperCase()}`
                 : `Streaming ${plan.codec} ${Math.round(plan.bitrate / 1000)} kbps`));
         }
         if (instance.remote) {
-            badges.append(el("span", "mu-badge mu-badge-plain", `On ${instance.remote.device.name}`));
+            badges.append(el("span", "pl-badge pl-badge-plain", `On ${instance.remote.device.name}`));
         }
         titles.replaceChildren(title, line, badges);
         const add = extension("addToPlaylist");
         extras.replaceChildren(likeButton("track", track.id), ...(add ? [iconButton("plus", "Add to playlist", () => add([track]))] : []),
-            button(`${instance.engine.speed}×`, "mu-chip", (event) => speedMenu(event), "Playback speed"),
+            button(`${instance.engine.speed}×`, "pl-chip", (event) => speedMenu(event), "Playback speed"),
             iconButton("timer", "Sleep timer", (event) => sleepMenu(event)));
         canvas.hidden = session.preference("visualizer", "off") === "off";
     }
@@ -224,7 +224,7 @@ export async function openFullscreen(tab = "lyrics") {
             seek.dispose();
             controls.dispose();
             root.remove();
-            document.body.classList.remove("mu-full-open");
+            document.body.classList.remove("pl-full-open");
         },
     };
 }

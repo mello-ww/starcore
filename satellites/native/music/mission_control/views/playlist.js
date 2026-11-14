@@ -55,10 +55,10 @@ export function importPlaylist() {
             const result = await api.post("playlists/import", { name: file.name.replace(/\.m3u8?$/i, ""), content });
             await store.refreshPlaylists();
             const body = el("div");
-            body.append(el("p", "mu-modal-text", `${plural(result.matched, "song")} matched from your library.`));
+            body.append(el("p", "pl-modal-text", `${plural(result.matched, "song")} matched from your library.`));
             if (result.unmatched.length) {
-                body.append(el("p", "mu-modal-text", `${result.unmatched.length} could not be found here:`));
-                const list = el("ul", "mu-unmatched");
+                body.append(el("p", "pl-modal-text", `${result.unmatched.length} could not be found here:`));
+                const list = el("ul", "pl-unmatched");
                 for (const entry of result.unmatched.slice(0, 50)) {
                     list.append(el("li", null, [entry.artist, entry.title].filter(Boolean).join(" - ") || entry.path));
                 }
@@ -73,16 +73,16 @@ export function importPlaylist() {
 }
 
 function ruleRow(rule, onRemove) {
-    const row = el("div", "mu-rule");
-    const field = el("select", "mu-select");
+    const row = el("div", "pl-rule");
+    const field = el("select", "pl-select");
     for (const [key, [label]] of Object.entries(FIELDS)) {
         field.append(new Option(label, key));
     }
     field.value = rule.field || "genre";
-    const operator = el("select", "mu-select");
-    const value = el("input", "mu-input");
-    const second = el("input", "mu-input");
-    const boolean = el("select", "mu-select");
+    const operator = el("select", "pl-select");
+    const value = el("input", "pl-input");
+    const second = el("input", "pl-input");
+    const boolean = el("select", "pl-select");
     boolean.append(new Option("yes", "true"), new Option("no", "false"));
     const sync = () => {
         const kind = FIELDS[field.value][1];
@@ -129,17 +129,17 @@ function ruleRow(rule, onRemove) {
 
 export function smartPlaylist(existing) {
     const rules = existing && existing.rules ? existing.rules : { match: "all", rules: [{ field: "genre", op: "contains", value: "" }], sort: "added", order: "desc", limit: 100 };
-    const body = el("div", "mu-smart");
-    const name = el("input", "mu-input");
+    const body = el("div", "pl-smart");
+    const name = el("input", "pl-input");
     name.value = existing ? existing.name : "Smart playlist";
-    const nameField = el("label", "mu-field");
+    const nameField = el("label", "pl-field");
     nameField.append(el("span", null, "Name"), name);
-    const match = el("select", "mu-select");
+    const match = el("select", "pl-select");
     match.append(new Option("all of these rules", "all"), new Option("any of these rules", "any"));
     match.value = rules.match;
-    const matchLine = el("div", "mu-smart-line");
+    const matchLine = el("div", "pl-smart-line");
     matchLine.append(el("span", null, "Include songs matching"), match);
-    const list = el("div", "mu-rules");
+    const list = el("div", "pl-rules");
     const rows = [];
     const addRule = (rule) => {
         const row = ruleRow(rule, () => {
@@ -150,33 +150,33 @@ export function smartPlaylist(existing) {
         list.append(row);
     };
     rules.rules.forEach(addRule);
-    const sort = el("select", "mu-select");
+    const sort = el("select", "pl-select");
     for (const [value, label] of SORTS) {
         sort.append(new Option(label, value));
     }
     sort.value = rules.sort;
-    const order = el("select", "mu-select");
+    const order = el("select", "pl-select");
     order.append(new Option("newest / highest first", "desc"), new Option("oldest / lowest first", "asc"));
     order.value = rules.order;
-    const limit = el("input", "mu-input mu-input-short");
+    const limit = el("input", "pl-input pl-input-short");
     limit.type = "number";
     limit.min = "1";
     limit.max = "2000";
     limit.value = String(rules.limit || 100);
-    const sortLine = el("div", "mu-smart-line");
+    const sortLine = el("div", "pl-smart-line");
     sortLine.append(el("span", null, "Order by"), sort, order, el("span", null, "limit"), limit);
-    const preview = el("div", "mu-smart-preview");
+    const preview = el("div", "pl-smart-preview");
     const read = () => ({ match: match.value, rules: rows.map((row) => row.read()), sort: sort.value, order: order.value, limit: Number(limit.value) || 100 });
     const previewButton = button("Preview", "button", async () => {
         try {
             const payload = await api.post("playlists/preview", { rules: read() });
-            preview.replaceChildren(el("p", "mu-hint", `${plural(payload.tracks.length, "song")} match right now`),
+            preview.replaceChildren(el("p", "pl-hint", `${plural(payload.tracks.length, "song")} match right now`),
                 trackList(payload.tracks.slice(0, 12), { album: false }));
         } catch (error) {
-            preview.replaceChildren(el("p", "mu-error-text", error.message));
+            preview.replaceChildren(el("p", "pl-error-text", error.message));
         }
     });
-    body.append(nameField, matchLine, list, button("+ Add rule", "mu-text-button", () => addRule({ field: "artist", op: "contains", value: "" })), sortLine, previewButton, preview);
+    body.append(nameField, matchLine, list, button("+ Add rule", "pl-text-button", () => addRule({ field: "artist", op: "contains", value: "" })), sortLine, previewButton, preview);
     modal(existing ? "Edit smart playlist" : "New smart playlist", body, [
         { label: "Cancel", action: () => {} },
         { label: existing ? "Save" : "Create", primary: true, action: async () => {
@@ -197,13 +197,13 @@ export function smartPlaylist(existing) {
 }
 
 function editDetails(playlist, refresh) {
-    const body = el("div", "mu-edit");
-    const name = el("input", "mu-input");
+    const body = el("div", "pl-edit");
+    const name = el("input", "pl-input");
     name.value = playlist.name;
-    const description = el("textarea", "mu-input");
+    const description = el("textarea", "pl-input");
     description.rows = 3;
     description.value = playlist.description;
-    const folder = el("input", "mu-input");
+    const folder = el("input", "pl-input");
     folder.value = playlist.folder;
     folder.placeholder = "No folder";
     const cover = el("input");
@@ -211,12 +211,12 @@ function editDetails(playlist, refresh) {
     cover.accept = "image/png,image/jpeg";
     const fields = [["Name", name], ["Description", description], ["Folder", folder], ["Cover image (PNG or JPEG, 4 MB)", cover]];
     for (const [label, input] of fields) {
-        const field = el("label", "mu-field");
+        const field = el("label", "pl-field");
         field.append(el("span", null, label), input);
         body.append(field);
     }
     if (playlist.cover) {
-        body.append(button("Use automatic mosaic cover", "mu-text-button", async () => {
+        body.append(button("Use automatic mosaic cover", "pl-text-button", async () => {
             await api.post(`playlists/${encode(playlist.id)}`, { cover: null });
             refresh();
         }));
@@ -265,16 +265,16 @@ export async function render({ node, parts, alive }) {
             } },
         ], event);
         const hero = header({
-            art: mosaic(playlist.mosaic, playlist.cover, "mu-art mu-hero-art", 600),
+            art: mosaic(playlist.mosaic, playlist.cover, "pl-art pl-hero-art", 600),
             kind: playlist.smart ? "Smart playlist" : "Playlist",
             title: playlist.name,
             description: playlist.description,
             meta: [playlist.folder ? `Folder: ${playlist.folder}` : null, `${plural(playlist.track_count - playlist.unavailable, "song")}, ${longDuration(playlist.duration)}`,
                 playlist.unavailable ? `${playlist.unavailable} unavailable` : null],
-            actions: [...playButtons(async () => playlist.tracks, context), button("Edit", "mu-chip", () => (playlist.smart ? smartPlaylist(playlist) : editDetails(playlist, refresh))),
+            actions: [...playButtons(async () => playlist.tracks, context), button("Edit", "pl-chip", () => (playlist.smart ? smartPlaylist(playlist) : editDetails(playlist, refresh))),
                 iconButton("more", "More options", moreMenu)],
         });
-        hero.querySelector(".mu-hero-title").addEventListener("dblclick", () => editDetails(playlist, refresh));
+        hero.querySelector(".pl-hero-title").addEventListener("dblclick", () => editDetails(playlist, refresh));
         const options = { art: true, context };
         if (!playlist.smart) {
             options.onReorder = async (from, to) => {
@@ -298,7 +298,7 @@ export async function render({ node, parts, alive }) {
                 playlist.smart ? button("Edit rules", "button", () => smartPlaylist(playlist)) : button("Search", "button", () => go("search")));
         node.replaceChildren(hero, list);
         if (!playlist.smart && playlist.tracks.length) {
-            node.append(el("p", "mu-hint", "Drag songs by the handle to reorder them."));
+            node.append(el("p", "pl-hint", "Drag songs by the handle to reorder them."));
         }
     };
     await draw();

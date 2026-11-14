@@ -6,7 +6,7 @@ import { el } from "/media/dom.js";
 
 export { artwork };
 
-export function mosaic(albumIds, cover, className = "mu-art", size = 300) {
+export function mosaic(albumIds, cover, className = "pl-art", size = 300) {
     if (cover) {
         const frame = el("div", className);
         const image = el("img");
@@ -20,7 +20,7 @@ export function mosaic(albumIds, cover, className = "mu-art", size = 300) {
     if (ids.length < 4) {
         return artwork(ids[0], size, className);
     }
-    const frame = el("div", `${className} mu-mosaic`);
+    const frame = el("div", `${className} pl-mosaic`);
     for (const id of ids.slice(0, 4)) {
         const image = el("img");
         image.alt = "";

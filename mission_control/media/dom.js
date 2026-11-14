@@ -58,7 +58,7 @@ const ICONS = {
 export function icon(name, size = 18) {
     if (name === "settings") {
         // StarCore's one Settings gear (.sc-gear in Mission Control's core.css)
-        const gear = el("i", "sc-gear mu-icon");
+        const gear = el("i", "sc-gear pl-icon");
         gear.setAttribute("aria-hidden", "true");
         gear.style.width = `${size}px`;
         gear.style.height = `${size}px`;
@@ -70,7 +70,7 @@ export function icon(name, size = 18) {
     svg.setAttribute("width", String(size));
     svg.setAttribute("height", String(size));
     svg.setAttribute("aria-hidden", "true");
-    svg.classList.add("mu-icon");
+    svg.classList.add("pl-icon");
     const path = document.createElementNS(ns, "path");
     path.setAttribute("d", ICONS[name] || ICONS.info);
     if (name === "play" || name === "pause" || name === "next" || name === "previous") {
@@ -86,7 +86,7 @@ export function icon(name, size = 18) {
     return svg;
 }
 
-export function iconButton(name, title, onClick, className = "mu-icon-button") {
+export function iconButton(name, title, onClick, className = "pl-icon-button") {
     const node = button(null, className, onClick, title);
     node.appendChild(icon(name));
     return node;
@@ -133,16 +133,16 @@ export function debounce(fn, wait) {
     return wrapped;
 }
 
-export function skeletonRows(count, className = "mu-skeleton-row") {
+export function skeletonRows(count, className = "pl-skeleton-row") {
     const fragment = document.createDocumentFragment();
     for (let index = 0; index < count; index += 1) {
-        fragment.appendChild(el("div", `mu-skeleton ${className}`));
+        fragment.appendChild(el("div", `pl-skeleton ${className}`));
     }
     return fragment;
 }
 
 export function emptyState(title, detail, action) {
-    const node = el("div", "mu-empty");
+    const node = el("div", "pl-empty");
     node.append(el("h3", null, title));
     if (detail) {
         node.append(el("p", null, detail));
@@ -154,7 +154,7 @@ export function emptyState(title, detail, action) {
 }
 
 export function errorState(error, retry) {
-    const node = el("div", "mu-empty mu-error");
+    const node = el("div", "pl-empty pl-error");
     node.append(el("h3", null, "Something went wrong"), el("p", null, error && error.message ? error.message : String(error)));
     if (retry) {
         node.append(button("Try again", "button", retry));

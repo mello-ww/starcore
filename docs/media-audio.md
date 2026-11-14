@@ -142,11 +142,11 @@ controls, the global accent for active states, restrained motion.
 
 | Element | Behaviour to keep | Web reference | Android reference |
 |---|---|---|---|
-| Floating bar | a rounded bubble clear of the edges, drawn over content (no backing rectangle); cover, title, artist, like, transport, seek; the cover opens the full player | `bar.js`, `styles/player.css` (`.mu-bar`) | `MiniPlayer.tsx`, mounted over the screens in `MainTabs.tsx` |
+| Floating bar | a rounded bubble clear of the edges, drawn over content (no backing rectangle); cover, title, artist, like, transport, seek; the cover opens the full player | `bar.js`, `styles/player.css` (`.pl-bar`) | `MiniPlayer.tsx`, mounted over the screens in `MainTabs.tsx` |
 | Retract | a chevron (and a swipe down on Android) puts the bar away; the choice is remembered | `starcore.player.collapsed` | `starcore_player_collapsed` (`dock.ts`) |
 | Top-bar disc | the playing cover as a disc, spinning while playing, with an accent ring while the bar is open; tap toggles the bar | `#topbar-extras` slot (`index.html`) | `TopBarSlot` in every header |
 | Transition | the cover flies between the disc and the bar, between measured positions; skipped when reduced motion is on | Web Animations in `bar.js` | `MusicFlight`, `dock.ts` anchors |
-| Scroll space | screens keep their last row clear of the bar, using the bar's measured height, only while it shows | `body.mu-has-bar` padding | `FloatingPlayerInset` / `FloatingPlayerSpacer` |
+| Scroll space | screens keep their last row clear of the bar, using the bar's measured height, only while it shows | `body.pl-has-bar` padding | `FloatingPlayerInset` / `FloatingPlayerSpacer` |
 | Full player | artwork, lyrics, queue, devices and info as pill tabs | `fullscreen.js` | `FullPlayer.tsx` |
 
 The full player's lyrics tab appears when the track's provider offers `lyrics`, and the devices
@@ -227,7 +227,7 @@ What it is now:
 - `mission_control/media/` holds the host: `host.js` (started by the shell after sign-in),
   `library.js` (provider resolution and requests by operation), `session.js` (preferences,
   likes, notices and the event bus), the controller, audio engine and effects, Connect, the
-  bar, seek, full screen, queue, devices, lyrics, keys, and `media.css` (the `--mu-*` tokens,
+  bar, seek, full screen, queue, devices, lyrics, keys, and `media.css` (the `--pl-*` tokens,
   shared pieces and the player's styles, loaded on every page).
 - Music's page keeps its library views. It shares the host's event bus. Its preferences and
   likes are the host's session when the host plays from Music, and its own routes otherwise.

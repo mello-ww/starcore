@@ -12,7 +12,7 @@ session.on("favorites", () => {
 });
 
 export function likeButton(kind, id, label = "Like") {
-    const node = iconButton("heart", label, () => session.toggleLiked(kind, id).catch((error) => session.toast(error.message, "error")), "mu-icon-button mu-like");
+    const node = iconButton("heart", label, () => session.toggleLiked(kind, id).catch((error) => session.toast(error.message, "error")), "pl-icon-button pl-like");
     node.dataset.likeKind = kind;
     node.dataset.likeId = id;
     node.hidden = !session.offersLikes();
@@ -26,7 +26,7 @@ export function qualityBadge(quality) {
     if (!quality || !(quality.lossless || quality.hires)) {
         return null;
     }
-    const node = el("span", `mu-badge ${quality.hires ? "mu-badge-hires" : "mu-badge-lossless"}`, quality.hires ? "Hi-Res" : "Lossless");
+    const node = el("span", `pl-badge ${quality.hires ? "pl-badge-hires" : "pl-badge-lossless"}`, quality.hires ? "Hi-Res" : "Lossless");
     node.title = quality.label;
     return node;
 }

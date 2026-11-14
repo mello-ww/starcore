@@ -10,8 +10,8 @@ function row(list, label, value) {
 }
 
 export function trackDetails(track, plan) {
-    const node = el("div", "mu-details");
-    const technical = el("dl", "mu-facts");
+    const node = el("div", "pl-details");
+    const technical = el("dl", "pl-facts");
     row(technical, "Quality", track.quality && track.quality.label);
     row(technical, "Format", `${(track.format || "").toUpperCase()}${track.codec && track.codec !== track.format ? ` (${track.codec})` : ""}`);
     row(technical, "Sample rate", track.sample_rate ? `${(track.sample_rate / 1000).toFixed(1)} kHz` : null);
@@ -29,7 +29,7 @@ export function trackDetails(track, plan) {
     const gain = track.replaygain || {};
     row(technical, "ReplayGain", [gain.track_gain !== null && gain.track_gain !== undefined ? `track ${gain.track_gain} dB` : null,
         gain.album_gain !== null && gain.album_gain !== undefined ? `album ${gain.album_gain} dB` : null].filter(Boolean));
-    const credits = el("dl", "mu-facts");
+    const credits = el("dl", "pl-facts");
     row(credits, "Artists", (track.artists || []).map((artist) => artist.name));
     row(credits, "Album artist", track.album_artist);
     row(credits, "Album", track.album);

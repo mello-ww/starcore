@@ -2,11 +2,11 @@ import { duration, el } from "./dom.js";
 import { player } from "./player.js";
 
 // a seek bar that follows playback (or the remote device) and only seeks once the drag is released
-export function seekBar(className = "mu-seek") {
+export function seekBar(className = "pl-seek") {
     const node = el("div", className);
-    const elapsed = el("span", "mu-time", "0:00");
-    const total = el("span", "mu-time", "0:00");
-    const range = el("input", "mu-range");
+    const elapsed = el("span", "pl-time", "0:00");
+    const total = el("span", "pl-time", "0:00");
+    const range = el("input", "pl-range");
     range.type = "range";
     range.min = "0";
     range.max = "1000";

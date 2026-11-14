@@ -147,7 +147,7 @@ and the Android screens against what the contract can draw.
 - [ ] **The player's additions declared by the document:** its track menu, Add to playlist and
   the links to an album or artist, instead of `MUSIC_AUDIO_EXTENSIONS` and `setExtensions`.
 - [ ] **The web player's keyboard shortcuts** active wherever the host plays, not only on
-  Music's page (`mission_control/media/keys.js` looks for `.mu-root`).
+  Music's page (`mission_control/media/keys.js` looks for `.pl-root`).
 - [ ] Then remove Music's `page.js`, `page.css`, `views/`, `ui/`, `mobile/src/music/`,
   `builtins.tsx`'s Music entries and its `DEDICATED_SCREENS` entry; `builtins.tsx` goes when
   empty.
@@ -169,9 +169,8 @@ user-facing text.
   `starcore_music_downloads` and the `files/music/` folder, so the copies on the phone survive.
 - [x] **The Kotlin package** `com.starcore.mobile.music` renamed to `media` (`MusicPackage` is
   `MediaPackage`); `:app:compileDebugKotlin` builds with JDK 17.
-- [ ] **The web player's `mu-` CSS prefix** (`.mu-bar`, `--mu-*`, `data-mu-theme`) is shared by
-  the player and Music's page; renaming it means renaming Music's page styles too, so it goes
-  with Music's own migration (stage 5).
+- [x] **The web player's CSS prefix** `mu-` is now `pl-` (`.pl-bar`, `--pl-*`, `data-pl-theme`), in the
+  player and in Music's page styles that share it.
 - [ ] **The guard's code check extended to the Engine** (the CLI's `Status` column label and
   its help examples need rewording or an allowance).
 

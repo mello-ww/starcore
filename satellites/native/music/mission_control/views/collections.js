@@ -41,7 +41,7 @@ export async function render({ node, view, parts, alive }) {
     const tracks = payload.tracks || [];
     const ids = payload.mosaic || [...new Set(tracks.filter((track) => track.has_artwork).map((track) => track.album_id))].slice(0, 4);
     node.append(header({
-        art: mosaic(ids, null, "mu-art mu-hero-art", 600),
+        art: mosaic(ids, null, "pl-art pl-hero-art", 600),
         kind,
         title: payload.name,
         description,

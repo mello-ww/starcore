@@ -6,9 +6,9 @@ import { player } from "./player.js";
 const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export function lyricsPanel({ karaoke = false } = {}) {
-    const node = el("div", `mu-lyrics${karaoke ? " mu-lyrics-karaoke" : ""}`);
-    const toolbar = el("div", "mu-lyrics-tools");
-    const body = el("div", "mu-lyrics-body");
+    const node = el("div", `pl-lyrics${karaoke ? " pl-lyrics-karaoke" : ""}`);
+    const toolbar = el("div", "pl-lyrics-tools");
+    const body = el("div", "pl-lyrics-body");
     node.append(toolbar, body);
     let data = null;
     let trackId = null;
@@ -34,7 +34,7 @@ export function lyricsPanel({ karaoke = false } = {}) {
         }
         trackId = track.id;
         data = undefined;
-        body.replaceChildren(el("div", "mu-skeleton mu-skeleton-lyrics"));
+        body.replaceChildren(el("div", "pl-skeleton pl-skeleton-lyrics"));
         try {
             data = await library.get("operations", "lyrics", `/${encodeURIComponent(track.id)}${library.query({ language })}`);
         } catch (error) {
@@ -57,7 +57,7 @@ export function lyricsPanel({ karaoke = false } = {}) {
         }
         offset = Number(data.offset || 0) + Number(session.preference("lyrics_offset", 0));
         if (data.languages && data.languages.length > 1) {
-            const select = el("select", "mu-select");
+            const select = el("select", "pl-select");
             select.setAttribute("aria-label", "Lyrics language");
             for (const code of data.languages) {
                 const option = el("option", null, code.toUpperCase());
@@ -73,7 +73,7 @@ export function lyricsPanel({ karaoke = false } = {}) {
             toolbar.append(select);
         }
         if (data.synced) {
-            const label = el("span", "mu-lyrics-offset", offsetLabel());
+            const label = el("span", "pl-lyrics-offset", offsetLabel());
             const change = (delta) => {
                 const own = Number(data.offset || 0) + delta;
                 data.offset = own;
@@ -81,13 +81,13 @@ export function lyricsPanel({ karaoke = false } = {}) {
                 label.textContent = offsetLabel();
                 library.post("operations", "lyrics", `/${encodeURIComponent(trackId)}`, { offset: own }).catch((error) => session.toast(error.message, "error"));
             };
-            toolbar.append(button("−0.25s", "mu-chip", () => change(-250), "Show lyrics later"), label,
-                button("+0.25s", "mu-chip", () => change(250), "Show lyrics earlier"));
+            toolbar.append(button("−0.25s", "pl-chip", () => change(-250), "Show lyrics later"), label,
+                button("+0.25s", "pl-chip", () => change(250), "Show lyrics earlier"));
         }
-        toolbar.append(el("span", "mu-lyrics-source", data.source === "sidecar" ? `From ${data.format.toUpperCase()} file` : "From the file's tags"));
+        toolbar.append(el("span", "pl-lyrics-source", data.source === "sidecar" ? `From ${data.format.toUpperCase()} file` : "From the file's tags"));
 
         if (!data.synced) {
-            const plain = el("div", "mu-lyrics-plain");
+            const plain = el("div", "pl-lyrics-plain");
             for (const text of (data.plain || "").split("\n")) {
                 plain.append(el("p", null, text || " "));
             }
@@ -96,17 +96,17 @@ export function lyricsPanel({ karaoke = false } = {}) {
             return;
         }
         lines = data.lines.map((line) => {
-            const row = el("p", "mu-lyric-line");
+            const row = el("p", "pl-lyric-line");
             if (line.words && line.words.length) {
                 const timed = line.words.map((word) => word.text).join("").trim();
                 const lead = line.text.endsWith(timed) ? line.text.slice(0, line.text.length - timed.length) : "";
                 if (lead.trim()) {
-                    const span = el("span", "mu-lyric-word", lead);
+                    const span = el("span", "pl-lyric-word", lead);
                     span.dataset.time = String(line.time);
                     row.append(span);
                 }
                 for (const word of line.words) {
-                    const span = el("span", "mu-lyric-word", word.text);
+                    const span = el("span", "pl-lyric-word", word.text);
                     span.dataset.time = String(word.time);
                     row.append(span);
                 }
@@ -114,15 +114,15 @@ export function lyricsPanel({ karaoke = false } = {}) {
                 row.append(el("span", null, line.text || "♪"));
             }
             if (line.translation) {
-                row.append(el("span", "mu-lyric-translation", line.translation));
+                row.append(el("span", "pl-lyric-translation", line.translation));
             }
             row.tabIndex = 0;
             const seek = () => player().seek(Math.max(0, (line.time - offset) / 1000));
             row.addEventListener("click", seek);
             row.addEventListener("keydown", (event) => event.key === "Enter" && seek());
-            return { line, row, words: [...row.querySelectorAll(".mu-lyric-word")] };
+            return { line, row, words: [...row.querySelectorAll(".pl-lyric-word")] };
         });
-        body.replaceChildren(...lines.map((entry) => entry.row), el("div", "mu-lyrics-spacer"));
+        body.replaceChildren(...lines.map((entry) => entry.row), el("div", "pl-lyrics-spacer"));
     }
 
     function offsetLabel() {

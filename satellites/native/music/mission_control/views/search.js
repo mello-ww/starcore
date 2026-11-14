@@ -8,27 +8,27 @@ import { player } from "/media/player.js";
 const QUALITIES = [["", "Any quality"], ["lossless", "Lossless"], ["hires", "Hi-Res"], ["lossy", "Lossy"]];
 
 export async function render({ node, params, alive }) {
-    const bar = el("div", "mu-searchbar");
-    const input = el("input", "mu-input mu-search-input");
+    const bar = el("div", "pl-searchbar");
+    const input = el("input", "pl-input pl-search-input");
     input.type = "search";
     input.placeholder = "What do you want to listen to?";
     input.setAttribute("aria-label", "Search your library");
     input.autocomplete = "off";
     input.value = params.get("q") || "";
-    const genre = el("select", "mu-select");
+    const genre = el("select", "pl-select");
     genre.setAttribute("aria-label", "Genre");
     genre.append(new Option("Any genre", ""));
-    const quality = el("select", "mu-select");
+    const quality = el("select", "pl-select");
     quality.setAttribute("aria-label", "Quality");
     for (const [value, label] of QUALITIES) {
         quality.append(new Option(label, value));
     }
-    const suggestions = el("div", "mu-suggestions");
+    const suggestions = el("div", "pl-suggestions");
     suggestions.hidden = true;
-    const field = el("div", "mu-search-field");
+    const field = el("div", "pl-search-field");
     field.append(input, suggestions);
     bar.append(field, genre, quality);
-    const results = el("div", "mu-search-results");
+    const results = el("div", "pl-search-results");
     node.append(bar, results);
     input.focus();
 
@@ -64,7 +64,7 @@ export async function render({ node, params, alive }) {
     function renderResults(payload) {
         const blocks = [];
         if (payload.corrected) {
-            blocks.push(el("p", "mu-hint", `No exact matches. Showing results for “${payload.corrected}”.`));
+            blocks.push(el("p", "pl-hint", `No exact matches. Showing results for “${payload.corrected}”.`));
         }
         const total = payload.tracks.length + payload.albums.length + payload.artists.length + payload.playlists.length;
         if (!total && !payload.genres.length) {
@@ -72,27 +72,27 @@ export async function render({ node, params, alive }) {
             results.replaceChildren(...blocks);
             return;
         }
-        const top = el("div", "mu-search-top");
+        const top = el("div", "pl-search-top");
         if (payload.top) {
-            const best = el("section", "mu-top-result");
+            const best = el("section", "pl-top-result");
             best.append(el("h3", null, "Top result"));
             const item = payload.top.item;
-            const card = el("div", "mu-top-card");
+            const card = el("div", "pl-top-card");
             if (payload.top.kind === "track") {
-                card.append(artwork(item.album_id, 300, "mu-art"), el("h2", null, item.title), el("p", null, `Song · ${item.artist || item.album_artist || ""}`));
-                card.append(iconButton("play", "Play", () => player().play([item], 0, `search:${slugOf(payload.query)}`), "mu-card-play mu-top-play"));
+                card.append(artwork(item.album_id, 300, "pl-art"), el("h2", null, item.title), el("p", null, `Song · ${item.artist || item.album_artist || ""}`));
+                card.append(iconButton("play", "Play", () => player().play([item], 0, `search:${slugOf(payload.query)}`), "pl-card-play pl-top-play"));
             } else if (payload.top.kind === "album") {
-                card.append(artwork(item.id, 300, "mu-art"), el("h2", null, item.album), el("p", null, `Album · ${item.artist}`));
+                card.append(artwork(item.id, 300, "pl-art"), el("h2", null, item.album), el("p", null, `Album · ${item.artist}`));
                 card.addEventListener("click", () => go(`album/${encode(item.id)}`));
             } else {
-                card.append(artwork(item.artwork, 300, "mu-art mu-art-round"), el("h2", null, item.name), el("p", null, "Artist"));
+                card.append(artwork(item.artwork, 300, "pl-art pl-art-round"), el("h2", null, item.name), el("p", null, "Artist"));
                 card.addEventListener("click", () => go(`artist/${encode(item.id)}`));
             }
             best.append(card);
             top.append(best);
         }
         if (payload.tracks.length) {
-            const songs = el("section", "mu-top-songs");
+            const songs = el("section", "pl-top-songs");
             songs.append(el("h3", null, "Songs"), trackList(payload.tracks.slice(0, 5), { art: true, album: false, context: `search:${slugOf(payload.query)}` }));
             top.append(songs);
         }
@@ -107,16 +107,16 @@ export async function render({ node, params, alive }) {
             blocks.push(shelf("Playlists", payload.playlists.map((playlist) => playlistCard(playlist))));
         }
         if (payload.genres.length) {
-            const chips = el("div", "mu-chips");
+            const chips = el("div", "pl-chips");
             for (const entry of payload.genres) {
-                chips.append(button(entry.name, "mu-chip", () => go(`genre/${encode(entry.name)}`)));
+                chips.append(button(entry.name, "pl-chip", () => go(`genre/${encode(entry.name)}`)));
             }
-            const section = el("section", "mu-shelf");
+            const section = el("section", "pl-shelf");
             section.append(el("h3", null, "Genres"), chips);
             blocks.push(section);
         }
         if (payload.tracks.length > 5) {
-            const section = el("section", "mu-shelf");
+            const section = el("section", "pl-shelf");
             section.append(el("h3", null, "All songs"), trackList(payload.tracks, { art: true, context: `search:${slugOf(payload.query)}` }));
             blocks.push(section);
         }
@@ -133,15 +133,15 @@ export async function render({ node, params, alive }) {
         }
         const blocks = [];
         if (recent.recent.length) {
-            const section = el("section", "mu-shelf");
-            const head = el("div", "mu-shelf-head");
-            head.append(el("h3", null, "Recent searches"), button("Clear", "mu-text-button", async () => {
+            const section = el("section", "pl-shelf");
+            const head = el("div", "pl-shelf-head");
+            head.append(el("h3", null, "Recent searches"), button("Clear", "pl-text-button", async () => {
                 await api.post("search/recent", { clear: true });
                 showBrowse();
             }));
-            const chips = el("div", "mu-chips");
+            const chips = el("div", "pl-chips");
             for (const query of recent.recent) {
-                chips.append(button(query, "mu-chip", () => {
+                chips.append(button(query, "pl-chip", () => {
                     input.value = query;
                     search(true);
                 }));
@@ -150,11 +150,11 @@ export async function render({ node, params, alive }) {
             blocks.push(section);
         }
         if (genres.genres.length) {
-            const section = el("section", "mu-shelf");
+            const section = el("section", "pl-shelf");
             section.append(el("h3", null, "Browse genres"));
-            const tiles = el("div", "mu-genre-grid");
+            const tiles = el("div", "pl-genre-grid");
             genres.genres.slice(0, 40).forEach((entry, index) => {
-                const tile = button(null, `mu-genre-tile mu-hue-${index % 8}`, () => go(`genre/${encode(entry.name)}`));
+                const tile = button(null, `pl-genre-tile pl-hue-${index % 8}`, () => go(`genre/${encode(entry.name)}`));
                 tile.append(el("strong", null, entry.name), el("span", null, `${entry.tracks} songs`));
                 tiles.append(tile);
             });
@@ -178,7 +178,7 @@ export async function render({ node, params, alive }) {
             return;
         }
         suggestions.replaceChildren(...payload.suggestions.map((entry) => {
-            const item = button(null, "mu-suggestion", () => {
+            const item = button(null, "pl-suggestion", () => {
                 suggestions.hidden = true;
                 input.value = entry.text;
                 search(true);

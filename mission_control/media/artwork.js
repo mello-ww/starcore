@@ -1,7 +1,7 @@
 import * as library from "./library.js";
 import { el, icon } from "./dom.js";
 
-export function artwork(albumId, size = 300, className = "mu-art") {
+export function artwork(albumId, size = 300, className = "pl-art") {
     const frame = el("div", className);
     if (albumId) {
         const image = el("img");
@@ -11,12 +11,12 @@ export function artwork(albumId, size = 300, className = "mu-art") {
         image.src = library.artworkUrl(albumId, size);
         image.addEventListener("error", () => {
             image.remove();
-            frame.classList.add("mu-art-empty");
+            frame.classList.add("pl-art-empty");
             frame.appendChild(icon("library", 28));
         });
         frame.appendChild(image);
     } else {
-        frame.classList.add("mu-art-empty");
+        frame.classList.add("pl-art-empty");
         frame.appendChild(icon("library", 28));
     }
     return frame;

@@ -22,13 +22,13 @@ export function startRadio(kind, id, label) {
 export async function addToPlaylist(tracks) {
     const list = Array.isArray(tracks) ? tracks : [tracks];
     const playlists = (await store.refreshPlaylists().catch(() => store.state.playlists)).filter((playlist) => !playlist.smart);
-    const body = el("div", "mu-choose");
+    const body = el("div", "pl-choose");
     const choose = async (playlistId) => {
         try {
             let result = await api.post(`playlists/${playlistId}/add`, { tracks: list.map((track) => track.id) });
             if (result.duplicates.length && result.added < list.length) {
                 const again = await new Promise((resolve) => {
-                    modal("Already in this playlist", el("p", "mu-modal-text",
+                    modal("Already in this playlist", el("p", "pl-modal-text",
                         `${result.duplicates.length === 1 ? "This song is" : `${result.duplicates.length} of these songs are`} already in "${result.playlist.name}".`), [
                         { label: "Skip", action: () => resolve(false) },
                         { label: "Add anyway", primary: true, action: () => resolve(true) },
@@ -45,7 +45,7 @@ export async function addToPlaylist(tracks) {
         }
     };
     const handle = modal(`Add ${list.length === 1 ? `"${list[0].title}"` : `${list.length} songs`} to playlist`, body, [{ label: "Close", action: () => {} }]);
-    body.appendChild(button("+ New playlist", "mu-choose-item mu-choose-new", async () => {
+    body.appendChild(button("+ New playlist", "pl-choose-item pl-choose-new", async () => {
         handle.close();
         const name = await prompt("New playlist", "Name");
         if (name) {
@@ -55,7 +55,7 @@ export async function addToPlaylist(tracks) {
         }
     }));
     for (const playlist of playlists) {
-        body.appendChild(button(`${playlist.name} · ${playlist.tracks}`, "mu-choose-item", () => {
+        body.appendChild(button(`${playlist.name} · ${playlist.tracks}`, "pl-choose-item", () => {
             handle.close();
             choose(playlist.id);
         }));

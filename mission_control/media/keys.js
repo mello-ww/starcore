@@ -5,10 +5,10 @@ import { player } from "./player.js";
 
 let installed = false;
 
-// only while the audio provider's own page (.mu-root) or the full player is on screen, so other
+// only while the audio provider's own page (.pl-root) or the full player is on screen, so other
 // Mission Control pages keep their own keys (tied to that page for now: docs/remaining-work.md)
 function active() {
-    return isFullscreenOpen() || Boolean(document.querySelector(".mu-root"));
+    return isFullscreenOpen() || Boolean(document.querySelector(".pl-root"));
 }
 
 export function installKeys(focusSearch, toggleQueue) {
@@ -20,7 +20,7 @@ export function installKeys(focusSearch, toggleQueue) {
         if (!active() || isTyping(event) || event.ctrlKey || event.metaKey || event.altKey) {
             return;
         }
-        if (document.querySelector(".mu-modal-backdrop, .mu-menu")) {
+        if (document.querySelector(".pl-modal-backdrop, .pl-menu")) {
             return;
         }
         const instance = player();

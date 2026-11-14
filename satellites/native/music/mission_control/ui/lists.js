@@ -8,7 +8,7 @@ import { button, duration, el, icon, iconButton, longDuration, plural } from "/m
 function markPlaying() {
     const current = player().engine.track;
     const playing = player().engine.playing;
-    for (const row of document.querySelectorAll(".mu-track[data-track-id]")) {
+    for (const row of document.querySelectorAll(".pl-track[data-track-id]")) {
         const active = Boolean(current) && row.dataset.trackId === current.id;
         row.classList.toggle("active", active);
         row.classList.toggle("paused", active && !playing);
@@ -30,7 +30,7 @@ import { likeButton, qualityBadge } from "/media/widgets.js";
 
 export { likeButton, qualityBadge };
 
-export function link(text, path, className = "mu-link") {
+export function link(text, path, className = "pl-link") {
     const node = el("a", className, text);
     node.href = `#`;
     node.addEventListener("click", (event) => {
@@ -42,7 +42,7 @@ export function link(text, path, className = "mu-link") {
 }
 
 export function artistLinks(track) {
-    const wrap = el("span", "mu-artists");
+    const wrap = el("span", "pl-artists");
     const artists = track.artists && track.artists.length ? track.artists : [{ id: track.artist_id, name: track.artist || track.album_artist || "Unknown artist" }];
     artists.forEach((artist, index) => {
         if (index) {
@@ -84,7 +84,7 @@ export function progressive(container, items, build, size = 120) {
             stop();
             return;
         }
-        sentinel = el("div", "mu-more");
+        sentinel = el("div", "pl-more");
         sentinel.setAttribute("aria-hidden", "true");
         container.appendChild(sentinel);
         observer = observer || new IntersectionObserver((entries) => {
@@ -103,13 +103,13 @@ export function progressive(container, items, build, size = 120) {
 // options: context, numbered, art, album, reason, onReorder(from, to), extras(track, index) -> menu items, onRemove
 export function trackList(tracks, options = {}) {
     watch();
-    const list = el("div", "mu-tracklist");
+    const list = el("div", "pl-tracklist");
     list.setAttribute("role", "list");
     const playable = tracks.filter((track) => !track.missing);
     let dragged = null;
 
     const build = (track, index) => {
-        const row = el("div", `mu-track${track.missing ? " missing" : ""}`);
+        const row = el("div", `pl-track${track.missing ? " missing" : ""}`);
         row.setAttribute("role", "listitem");
         row.tabIndex = 0;
         if (track.id) {
@@ -123,14 +123,14 @@ export function trackList(tracks, options = {}) {
             const position = playable.indexOf(track);
             player().play(playable, Math.max(position, 0), options.context);
         };
-        const number = el("span", "mu-track-number");
-        number.append(el("span", "mu-track-index", options.numbered === "track" ? String(track.track || "") : String(index + 1)));
-        const playIcon = iconButton("play", `Play ${track.title || ""}`, start, "mu-track-play");
-        number.append(playIcon, el("span", "mu-eq-bars"));
+        const number = el("span", "pl-track-number");
+        number.append(el("span", "pl-track-index", options.numbered === "track" ? String(track.track || "") : String(index + 1)));
+        const playIcon = iconButton("play", `Play ${track.title || ""}`, start, "pl-track-play");
+        number.append(playIcon, el("span", "pl-eq-bars"));
         row.append(number);
 
         if (options.onReorder) {
-            const handle = el("span", "mu-drag-handle");
+            const handle = el("span", "pl-drag-handle");
             handle.appendChild(icon("drag", 16));
             handle.title = "Drag to reorder";
             row.draggable = true;
@@ -158,13 +158,13 @@ export function trackList(tracks, options = {}) {
         }
 
         if (options.art) {
-            row.append(artwork(track.album_id, 96, "mu-art mu-track-art"));
+            row.append(artwork(track.album_id, 96, "pl-art pl-track-art"));
         }
-        const main = el("div", "mu-track-main");
-        const title = el("span", "mu-track-title", track.title || "Unavailable track");
+        const main = el("div", "pl-track-main");
+        const title = el("span", "pl-track-title", track.title || "Unavailable track");
         main.append(title);
         if (!track.missing) {
-            const sub = el("span", "mu-track-sub");
+            const sub = el("span", "pl-track-sub");
             const badge = qualityBadge(track.quality);
             if (badge) {
                 sub.append(badge);
@@ -173,21 +173,21 @@ export function trackList(tracks, options = {}) {
             main.append(sub);
         }
         if (options.reason && track.reason) {
-            main.append(el("span", "mu-track-reason", track.reason));
+            main.append(el("span", "pl-track-reason", track.reason));
         }
         row.append(main);
         if (options.album !== false) {
-            const album = el("span", "mu-track-album");
+            const album = el("span", "pl-track-album");
             if (track.album_id && !track.missing) {
                 album.append(link(track.album || "Unknown album", `album/${encode(track.album_id)}`));
             }
             row.append(album);
         }
-        const actions = el("span", "mu-track-actions");
+        const actions = el("span", "pl-track-actions");
         if (track.id && !track.missing) {
             actions.append(likeButton("track", track.id));
         }
-        actions.append(el("span", "mu-track-duration", track.duration ? duration(track.duration) : ""));
+        actions.append(el("span", "pl-track-duration", track.duration ? duration(track.duration) : ""));
         const more = iconButton("more", "More options", (event) => openMenu(event));
         actions.append(more);
         row.append(actions);
@@ -226,18 +226,18 @@ export function trackList(tracks, options = {}) {
 }
 
 function card(art, title, subtitle, onOpen, onPlay, onMenu, round = false) {
-    const node = el("div", `mu-card${round ? " mu-card-round" : ""}`);
+    const node = el("div", `pl-card${round ? " pl-card-round" : ""}`);
     node.tabIndex = 0;
     node.setAttribute("role", "link");
     node.setAttribute("aria-label", title);
-    const frame = el("div", "mu-card-art");
+    const frame = el("div", "pl-card-art");
     frame.append(art);
     if (onPlay) {
-        frame.append(iconButton("play", `Play ${title}`, onPlay, "mu-card-play"));
+        frame.append(iconButton("play", `Play ${title}`, onPlay, "pl-card-play"));
     }
-    node.append(frame, el("div", "mu-card-title", title));
+    node.append(frame, el("div", "pl-card-title", title));
     if (subtitle) {
-        node.append(el("div", "mu-card-sub", subtitle));
+        node.append(el("div", "pl-card-sub", subtitle));
     }
     node.addEventListener("click", onOpen);
     node.addEventListener("keydown", (event) => {
@@ -280,8 +280,8 @@ export function playlistCard(playlist) {
 
 export function mixCard(mix) {
     const art = mosaic(mix.mosaic, null);
-    art.classList.add("mu-mix-art");
-    art.append(el("span", "mu-mix-label", mix.name));
+    art.classList.add("pl-mix-art");
+    art.append(el("span", "pl-mix-label", mix.name));
     return card(art, mix.name, mix.description, () => go(`mix/${encode(mix.id)}`),
         async () => {
             const detail = await (await import("../api.js")).get(`mixes/${encode(mix.id)}`);
@@ -290,16 +290,16 @@ export function mixCard(mix) {
 }
 
 export function shelf(title, items, options = {}) {
-    const section = el("section", "mu-shelf");
-    const head = el("div", "mu-shelf-head");
+    const section = el("section", "pl-shelf");
+    const head = el("div", "pl-shelf-head");
     head.append(el("h3", null, title));
     if (options.subtitle) {
-        head.append(el("p", "mu-shelf-sub", options.subtitle));
+        head.append(el("p", "pl-shelf-sub", options.subtitle));
     }
     if (options.more) {
-        head.append(button("Show all", "mu-text-button", options.more));
+        head.append(button("Show all", "pl-text-button", options.more));
     }
-    const row = el("div", options.grid ? "mu-grid" : "mu-row");
+    const row = el("div", options.grid ? "pl-grid" : "pl-row");
     for (const item of items) {
         row.append(item);
     }
@@ -308,7 +308,7 @@ export function shelf(title, items, options = {}) {
 }
 
 export function grid(items, build) {
-    const node = el("div", "mu-grid");
+    const node = el("div", "pl-grid");
     if (build) {
         progressive(node, items, (item) => node.append(build(item)), 96);
         return node;
@@ -320,17 +320,17 @@ export function grid(items, build) {
 }
 
 export function header({ art, kind, title, meta, description, actions }) {
-    const node = el("header", "mu-hero");
-    const info = el("div", "mu-hero-info");
+    const node = el("header", "pl-hero");
+    const info = el("div", "pl-hero-info");
     if (kind) {
-        info.append(el("span", "mu-hero-kind", kind));
+        info.append(el("span", "pl-hero-kind", kind));
     }
-    info.append(el("h1", "mu-hero-title", title));
+    info.append(el("h1", "pl-hero-title", title));
     if (description) {
-        info.append(el("p", "mu-hero-description", description));
+        info.append(el("p", "pl-hero-description", description));
     }
     if (meta) {
-        const line = el("div", "mu-hero-meta");
+        const line = el("div", "pl-hero-meta");
         for (const part of meta.filter(Boolean)) {
             line.append(typeof part === "string" ? el("span", null, part) : part);
         }
@@ -338,7 +338,7 @@ export function header({ art, kind, title, meta, description, actions }) {
     }
     node.append(art, info);
     if (actions) {
-        const bar = el("div", "mu-hero-actions");
+        const bar = el("div", "pl-hero-actions");
         bar.append(...actions.filter(Boolean));
         node.append(bar);
     }
@@ -346,13 +346,13 @@ export function header({ art, kind, title, meta, description, actions }) {
 }
 
 export function playButtons(getTracks, context) {
-    const play = button(null, "mu-play-big", async () => {
+    const play = button(null, "pl-play-big", async () => {
         const tracks = await getTracks();
         player().shuffle = false;
         player().play(tracks, 0, context);
     }, "Play");
     play.append(icon("play", 22));
-    const shuffle = iconButton("shuffle", "Shuffle play", async () => player().shufflePlay(await getTracks(), context), "mu-icon-button mu-icon-large");
+    const shuffle = iconButton("shuffle", "Shuffle play", async () => player().shufflePlay(await getTracks(), context), "pl-icon-button pl-icon-large");
     return [play, shuffle];
 }
 
