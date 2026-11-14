@@ -49,7 +49,7 @@ def list_satellites(ctx):
 
 def _render_list(data: dict) -> str:
     rows = [{**item, "commands": ", ".join(item["commands"]) or "-"} for item in data["satellites"]]
-    return table(rows, [("name", "Name"), ("version", "Version"), ("type", "Type"), ("status", "Status"),
+    return table(rows, [("name", "Name"), ("version", "Version"), ("type", "Type"), ("status", "State"),
                         ("commands", "Commands")])
 
 
@@ -92,16 +92,16 @@ COMMANDS = [
     Command("list", "List every Satellite with its state and commands", list_satellites, READ,
             render=_render_list, examples=("satellites", "satellites list --json")),
     Command("show", "Show one Satellite's details and published state", show, READ, arguments=(NAME,),
-            render=_render_show, examples=("satellites show Status",)),
+            render=_render_show, examples=("satellites show <name>",)),
     Command("enable", "Enable a Satellite and start its service", lambda ctx, name: _lifecycle(ctx, name, "enable"),
             MANAGE, arguments=(NAME,), mutates=True, requires_live=True, render=_render_lifecycle("enabled"),
-            examples=("satellites enable Status",)),
+            examples=("satellites enable <name>",)),
     Command("disable", "Stop a Satellite's service and disable it",
             lambda ctx, name: _lifecycle(ctx, name, "disable"), MANAGE, arguments=(NAME,), mutates=True,
             requires_live=True, confirm="Disable this Satellite? Its features stop until it is enabled again.",
-            render=_render_lifecycle("disabled"), examples=("satellites disable Status --yes",)),
+            render=_render_lifecycle("disabled"), examples=("satellites disable <name> --yes",)),
     Command("reload", "Reload a Satellite from disk and restart it",
             lambda ctx, name: _lifecycle(ctx, name, "reload"), MANAGE, arguments=(NAME,), mutates=True,
             requires_live=True, confirm="Reload this Satellite? Its service restarts.",
-            render=_render_lifecycle("reloaded"), examples=("satellites reload Status --yes",)),
+            render=_render_lifecycle("reloaded"), examples=("satellites reload <name> --yes",)),
 ]

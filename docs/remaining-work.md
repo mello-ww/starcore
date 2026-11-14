@@ -171,8 +171,9 @@ user-facing text.
   `MediaPackage`); `:app:compileDebugKotlin` builds with JDK 17.
 - [x] **The web player's CSS prefix** `mu-` is now `pl-` (`.pl-bar`, `--pl-*`, `data-pl-theme`), in the
   player and in Music's page styles that share it.
-- [ ] **The guard's code check extended to the Engine** (the CLI's `Status` column label and
-  its help examples need rewording or an allowance).
+- [x] **The guard's code check extended to the Engine**: `engine/starcore/**/*.py` names no
+  Satellite in a literal or key, with no exception list (the CLI's column is "State" and its
+  help examples use `<name>`).
 
 ## Order (validated by the owner on 2026-11-13)
 

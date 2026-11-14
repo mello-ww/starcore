@@ -184,6 +184,18 @@ class ClientModularityTest(unittest.TestCase):
                                 f"lower its KNOWN_COUPLINGS entry to {len(found)} so it can't creep back")
         self.assertEqual(problems, [])
 
+    def test_the_engine_names_no_satellite_in_its_code(self):
+        """The Engine loads Satellites by manifest: no string literal or object key in its
+        code is a Satellite's name (a CLI column or help example uses a placeholder). No
+        exception list."""
+        names = satellite_names()
+        problems = []
+        for path in sorted(REPO.glob("engine/starcore/**/*.py")):
+            found = references(path, names)
+            if found:
+                problems.append(f"{path.relative_to(REPO).as_posix()}: {found}")
+        self.assertEqual(problems, [])
+
     def test_generic_mobile_code_imports_no_satellite_folder_beyond_the_known_ones(self):
         problems = []
         for path in generic_client_files():
