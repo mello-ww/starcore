@@ -94,6 +94,17 @@ def _content_disposition(filename: str) -> str:
     return f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{encoded}'
 
 
+# a Satellite's file opened in a browser tab is a document on Mission Control's own origin: one
+# that can run script (HTML, SVG, XML) is sandboxed, so it can show but never act with the
+# session. The media type is never sniffed, so nothing else turns into one.
+ACTIVE_DOCUMENT_TYPES = {"text/html", "application/xhtml+xml", "image/svg+xml", "text/xml", "application/xml"}
+
+
+def _is_active_document(content_type: str) -> bool:
+    media_type = (content_type or "").split(";")[0].strip().lower()
+    return media_type in ACTIVE_DOCUMENT_TYPES or media_type.endswith("+xml")
+
+
 class ApiServer:
     def __init__(self, engine, host: str, port: int, web_root: Path,
                  https_enabled: bool = False, https_cert: Path = None, https_key: Path = None):
@@ -825,6 +836,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(length))
         self.send_header("Accept-Ranges", "bytes")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        if _is_active_document(content_type):
+            self.send_header("Content-Security-Policy", "sandbox")
         self.send_header("Cache-Control", cache or "no-store")
         if length != size:
             self.send_header("Content-Range", f"bytes {start}-{end}/{size}")

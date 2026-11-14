@@ -391,6 +391,22 @@ class FileExplorerApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertNotIn("Content-Disposition", headers)
         self.assertIn("text/plain", headers.get("Content-Type", ""))
+        self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
+        self.assertNotIn("Content-Security-Policy", headers)
+
+    def test_a_page_or_drawing_opened_in_a_tab_is_sandboxed(self):
+        # opened in a new tab, it would be a document on Mission Control's origin: it may show,
+        # never run script with the session
+        (self.directory / "page.html").write_text("<script>alert(1)</script>", encoding="utf-8")
+        (self.directory / "drawing.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'/>", encoding="utf-8")
+        for name in ("page.html", "drawing.svg"):
+            status, headers, body = self.request(self.with_path("content", self.directory / name))
+            self.assertEqual(status, 200)
+            self.assertEqual(headers.get("Content-Security-Policy"), "sandbox", name)
+            self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff", name)
+        (self.directory / "photo.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+        status, headers, body = self.request(self.with_path("content", self.directory / "photo.png"))
+        self.assertNotIn("Content-Security-Policy", headers)
 
     def test_downloading_a_nonexistent_file_is_404(self):
         status, payload = self.json_request(self.with_path("content", self.directory / "nope.txt"))

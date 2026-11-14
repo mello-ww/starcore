@@ -221,6 +221,10 @@ without downloading all of it. A Satellite route can also ask for the response t
 as an attachment (`file_response(path, content_type, download_name="report.pdf")`) - the File
 Explorer Satellite (`docs/api.md` below, `satellites/native/file_explorer/`) is the first to
 use this; nothing else has needed to yet.
+Every such file is sent with `X-Content-Type-Options: nosniff`, and one that a browser would
+run as a document with script (HTML, SVG, XML) also with `Content-Security-Policy: sandbox`:
+opened in a tab, it is on Mission Control's own origin, so it may show but never act with the
+session.
 
 A `POST` to a Satellite route is parsed as JSON the same way it always has been, *unless* the
 request's `Content-Type` isn't `application/json` - in which case `request.body` is `None`
