@@ -560,6 +560,9 @@ class FileExplorerApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertFalse((self.directory / "old.txt").exists())
         self.assertTrue((self.directory / "new.txt").exists())
+        # the answer says where the entry now is, so a page can open it or its folder
+        self.assertEqual(payload["path"], str(self.directory / "new.txt"))
+        self.assertEqual(payload["folder"], str(self.directory))
 
     def test_renaming_over_an_existing_name_is_a_conflict(self):
         (self.directory / "a.txt").write_text("a", encoding="utf-8")

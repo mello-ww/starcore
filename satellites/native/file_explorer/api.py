@@ -514,6 +514,7 @@ def rename(request):
     return json_response({
         "name": destination.name,
         "path": str(destination),
+        "folder": str(destination.parent),
         "type": "dir" if destination.is_dir() else "file",
     })
 
