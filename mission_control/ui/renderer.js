@@ -20,6 +20,7 @@ import { icon } from "./icons.js";
 import { createMaps } from "./map.js";
 import { pickMedia } from "./picker.js";
 import { promptPin, runSecure, secureProvider } from "./secure.js";
+import { chooseFiles, runUploads, sendFile, uploadReport } from "./upload.js";
 
 const STYLESHEET = "/ui/ui.css";
 const TONE_LEVEL = { warn: "warning", danger: "critical" };
@@ -573,7 +574,8 @@ export function mount(context) {
         clearTimeout(state.noticeTimer);
         state.notice = text ? { text, kind } : null;
         renderNotice();
-        if (text) {
+        // a progress notice ("Uploading 2 of 5") stays until what follows replaces it
+        if (text && kind !== "progress") {
             state.noticeTimer = setTimeout(() => setNotice(null), kind === "error" ? 8000 : 3500);
         }
     }
@@ -627,6 +629,9 @@ export function mount(context) {
                 setNotice(error.message, "error");
                 return false;
             }
+        }
+        if (action.upload !== undefined) {
+            return runUpload(action, bindings);
         }
         if (action.play) {
             // 1.2: played by the shell's audio host, from whichever Satellite provides audio.library
@@ -696,6 +701,41 @@ export function mount(context) {
             loadData({ background: false });
         }
         return true;
+    }
+
+    /** The upload action (1.2): files picked with the browser's own dialog, each streamed as
+     * the raw body of a POST to the Satellite's route, a conflict asked about file by file, then
+     * one report of every file. True once at least one file arrived. */
+    async function runUpload(action, bindings) {
+        const files = await chooseFiles({ multiple: Boolean(action.upload && action.upload.multiple === true) });
+        if (!files.length) {
+            return false;  // the dialog was closed: nothing runs
+        }
+        const result = await runUploads(files, action, {
+            url: (template, value) => {
+                const route = resolveTemplate(template, { ...bindings, value });
+                return isSafeRoute(route) ? `${satelliteBase}/${route}` : null;
+            },
+            send: sendFile,
+            confirm: (value, message) => {
+                const asked = message === undefined ? "" : String(resolve(message, { ...bindings, value }) ?? "");
+                return window.confirm(`${value.name}\n\n${asked || "It is already there. Replace it?"}`);
+            },
+            progress: (index, total, value) => setNotice(
+                total > 1 ? `Uploading ${index + 1} of ${total}: ${value.name}…` : `Uploading ${value.name}…`, "progress"),
+        });
+        const report = uploadReport(result);
+        setNotice(report.text, report.kind);
+        if (result.uploaded.length) {
+            if (action.then === "back") {
+                goBack();
+            } else {
+                loadData({ background: false });
+            }
+        } else if (result.failed.length) {
+            loadData({ background: true });  // show what's actually true now
+        }
+        return result.uploaded.length > 0;
     }
 
     /** The secure action (1.2) on `items` - one request and one prompt for all of them. True once
