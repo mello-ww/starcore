@@ -33,9 +33,9 @@ Legend: as in `photos-parity-audit.md`.
 | 9 | Download | ✅ | ✅ action exists (M12) | ✅ fixed in F3: on the file page (`content?download=1`) | F3 | S |
 | 10 | Share | ✗ | ✅ action exists (M12) | ✅ fixed in F3: on the file page | F3 | S |
 | 11 | Open with the system (new tab / Android viewer) | ✅ new tab | ✗ | ✅ fixed in F3: `download` with `open: true` (web: new tab; Android: `ACTION_VIEW` through the `FileProvider`); the Engine sandboxes an HTML, SVG or XML file opened in a tab | F3 | M |
-| 12 | New folder | ✅ prompt | ✗ | J: `form` then `refresh` | F4 | S |
-| 13 | Rename file or folder | ✅ prompt | ✗ | J: `form` on the file or folder page, then navigate to the parent | F4 | S |
-| 14 | Delete (confirm) | ✅ two-tap | ✗ | J: `confirm`, then `back` | F4 | S |
+| 12 | New folder | ✅ prompt | ✗ | ✅ fixed in F4: a `form` on the folder page (`mkdir`), then `refresh` | F4 | S |
+| 13 | Rename file or folder | ✅ prompt | ✗ | ✅ fixed in F4: a `form` on the file page and the folder page (`rename`), prefilled with the name, then `back` to the folder, which reloads | F4 | S |
+| 14 | Delete (confirm) | ✅ two-tap | ✗ | ✅ fixed in F4: a `danger` button with a `confirm` (`delete`), then `back` | F4 | S |
 | 15 | Upload, several files, overwrite on conflict | ✅ | ✗ | C: `upload` action (below); S: unchanged route | F5 | L |
 | 16 | Errors as notices | ✅ | ✅ generic | – | – | – |
 
@@ -103,7 +103,14 @@ the existing actions.
   Tests: the route's details, preview limit and errors; the document's actions; the app's
   module and the page's buttons; the web's new tab; the sandbox headers.
 - **F4 - Management.** New folder, rename, delete through forms and confirms; the guard
-  refuses inside a locked Locked Folder exactly as today.
+  refuses inside a locked Locked Folder exactly as today. **Done.** No new route or contract
+  feature: the folder page has a New folder form (`mkdir`) and, below a drive's root, a
+  prefilled Rename form and a confirmed Delete; the file page has the same Rename and Delete.
+  A rename or delete goes `back` to the folder, which reloads, so no page for a path that no
+  longer exists stays in the history. A page's forms are told apart by their field keys, so two
+  forms on one page must not both ask for `name` (the create form's key is `folder`). Tests:
+  the document's routes, confirms and root rule; the app's forms and its confirm; the guard's
+  and the routes' own tests are unchanged.
 - **F5 - Upload.** The `upload` action on both clients, with conflicts and per-file reporting.
 - **F6 - Default.** Drop `preview`; `page.js` stays as the Developer Mode fallback. Checked on
   the web, the emulator and the phone. New `docs/satellites/file_explorer.md`, CHANGELOG.

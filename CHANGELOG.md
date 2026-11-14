@@ -7,6 +7,12 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Managing files in File Explorer's shared interface**, on both clients: a folder's page
+  creates a folder, renames it and deletes it; a file's page renames and deletes it. A delete
+  asks first, and a rename or delete returns to the folder, which reloads. They use the same
+  routes and Locked Folder guard as the web page, and a drive's root can be neither renamed nor
+  deleted (`docs/file-explorer-migration.md`, F4). The rename route now also answers with the
+  renamed entry's folder.
 - **A file's page in File Explorer's shared interface**, on both clients: a file's row opens its
   size, date, type and folder, a preview for a picture, and **Open**, **Download** and **Share**.
   Open is **UI contract 1.2's `open` on a download**, for any Satellite: Mission Control opens

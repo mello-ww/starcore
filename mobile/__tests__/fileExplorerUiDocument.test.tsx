@@ -1,6 +1,6 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {Image, NativeModules, Pressable, Text} from 'react-native';
+import {Alert, Image, NativeModules, Pressable, Text, TextInput} from 'react-native';
 import {SatelliteUiScreen} from '../src/screens/SatelliteUiScreen';
 
 jest.mock('../src/auth/AuthContext', () => ({useAuth: jest.fn(() => ({client: {}}))}));
@@ -248,6 +248,61 @@ describe('File Explorer, drawn from its ui.json by the shared screen', () => {
       const shown = texts(tree);
       expect(shown).toEqual(expect.arrayContaining(['Open', 'Share']));
       expect(shown).not.toContain('Download');
+    });
+  });
+
+  describe('management (F4)', () => {
+    const folderRoute = {params: {name: 'FileExplorer', page: 'folder', params: {path: '/home/demo'}, revision: 'rev1'}};
+    const fileRoute = {params: {name: 'FileExplorer', page: 'file', params: {path: '/home/demo/notes.txt'}, revision: 'rev1'}};
+
+    it('creates a folder in the one shown, then reloads it', async () => {
+      __mocks.act.mockResolvedValue({name: 'New', path: '/home/demo/New'});
+      const {tree} = await mount(folderRoute);
+      await act(async () => {
+        tree.root.findAllByType(TextInput)[0].props.onChangeText('New');
+      });
+      await press(tree, 'Create folder');
+      expect(__mocks.act).toHaveBeenCalledWith('FileExplorer', 'mkdir', 'POST', {path: '/home/demo', name: 'New'});
+    });
+
+    it('renames a file, then goes back to its folder', async () => {
+      __mocks.act.mockResolvedValue({name: 'renamed.txt', path: '/home/demo/renamed.txt', folder: '/home/demo'});
+      const {tree, navigation} = await mount(fileRoute);
+      const input = tree.root.findAllByType(TextInput)[0];
+      expect(input.props.value).toBe('notes.txt');
+      await act(async () => {
+        input.props.onChangeText('renamed.txt');
+      });
+      await press(tree, 'Rename');
+      expect(__mocks.act).toHaveBeenCalledWith('FileExplorer', 'rename', 'POST', {path: '/home/demo/notes.txt', name: 'renamed.txt'});
+      expect(navigation.goBack).toHaveBeenCalled();
+    });
+
+    it('asks before deleting, deletes only when confirmed, then goes back', async () => {
+      __mocks.act.mockResolvedValue({deleted: '/home/demo/notes.txt'});
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+        buttons?.find(button => button.style === 'cancel')?.onPress?.();
+      });
+      const {tree, navigation} = await mount(fileRoute);
+      await press(tree, 'Delete this file');
+      expect(alert).toHaveBeenCalledWith(expect.stringContaining('cannot be undone'), undefined, expect.any(Array), expect.any(Object));
+      expect(__mocks.act).not.toHaveBeenCalled();
+      alert.mockImplementation((_title, _message, buttons) => {
+        buttons?.find(button => button.style !== 'cancel')?.onPress?.();
+      });
+      await press(tree, 'Delete this file');
+      expect(__mocks.act).toHaveBeenCalledWith('FileExplorer', 'delete', 'POST', {path: '/home/demo/notes.txt'});
+      expect(navigation.goBack).toHaveBeenCalled();
+      alert.mockRestore();
+    });
+
+    it('offers no rename or delete for a drive root', async () => {
+      __mocks.read.mockResolvedValue({...FOLDER, path: '/', name: '/', parent: null, at_drive_root: true});
+      const {tree} = await mount({params: {...folderRoute.params, params: {path: '/'}}});
+      const shown = texts(tree);
+      expect(shown).toContain('Create folder');
+      expect(shown).not.toContain('Rename');
+      expect(shown).not.toContain('Delete this folder');
     });
   });
 

@@ -274,6 +274,41 @@ class FileDocumentTest(unittest.TestCase):
         [image] = [block for block in page["blocks"] if block["type"] == "image"]
         self.assertEqual((image["src"], image["visible"]), ("content?path={$params.path}", "$.preview"))
 
+    def test_management_uses_the_existing_routes_and_confirms_a_delete(self):
+        document = ui_contract.load(FILE_EXPLORER_DIR / "ui.json")
+
+        def controls(page):
+            found = []
+            for block in page["blocks"]:
+                found.extend(block.get("blocks", [block]))
+            return found
+
+        folder = controls(document["pages"]["folder"])
+        [create] = [b for b in folder if b["type"] == "form" and b["submit"]["label"] == "Create folder"]
+        self.assertEqual(create["submit"]["action"]["route"], "mkdir")
+        self.assertEqual(create["submit"]["action"]["body"], {"path": "$params.path", "name": "$form.folder"})
+        self.assertEqual(create["submit"]["action"]["then"], "refresh")
+        # a page's forms are told apart by their field keys: two forms asking for a `name` would
+        # share what was typed
+        [rename] = [b for b in folder if b["type"] == "form" and b["submit"]["label"] == "Rename"]
+        self.assertNotEqual([f["key"] for f in create["fields"]], [f["key"] for f in rename["fields"]])
+        # a drive's root has no parent: it shows no rename and no delete
+        [manage] = [b for b in document["pages"]["folder"]["blocks"] if b.get("title") == "This folder"]
+        self.assertEqual(manage["visible"], "$.parent")
+
+        # after a rename or a delete the page's path is gone: both go back to the folder, which
+        # reloads and shows what is there now
+        for name in ("folder", "file"):
+            blocks = controls(document["pages"][name]) if name == "file" else manage["blocks"]
+            [rename] = [b for b in blocks if b["type"] == "form" and b["submit"]["label"] == "Rename"]
+            action = rename["submit"]["action"]
+            self.assertEqual((action["route"], action["then"]), ("rename", "back"))
+            [delete] = [b for b in blocks if b["type"] == "button" and b["label"].startswith("Delete")]
+            self.assertEqual(delete["style"], "danger")
+            self.assertEqual(delete["action"]["route"], "delete")
+            self.assertEqual(delete["action"]["then"], "back")
+            self.assertIn("cannot be undone", delete["action"]["confirm"])
+
 
 class FolderViewTest(unittest.TestCase):
     def test_a_locked_folder_shows_a_lock_and_says_so(self):
