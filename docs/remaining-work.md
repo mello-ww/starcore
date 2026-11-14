@@ -38,7 +38,7 @@ Clients implement the UI contract and capability protocols, never a Satellite.
 |---|---|---|
 | Status | ✅ its only interface on both clients (1.1) | none |
 | Photos | ✅ default on both clients (1.2) | web `page.js` for settings and the Locked Folder; Android `src/photo/` for settings, phone sync and the Locked Folder; background sync started by `App.tsx` |
-| File Explorer | ◐ default interface (F1-F6): browsing, a file's page (open, download, share), management (new folder, rename, delete) and upload, on both clients; the web's `page.js` stays in Developer Mode | web `page.js` and `page.css` |
+| File Explorer | ✅ its shared interface alone on both clients (F1-F7): browsing, a file's page (open, download, share), management (new folder, rename, delete) and upload | none: its `page.js` and `page.css` are removed |
 | Music | ◐ only the player: the shared audio host on both clients, and `play` for any Satellite. No `ui.json` | web `page.js` with its views (home, library, album, artist, playlist, search, settings, stats); Android `src/music/` (11 screen and tab files), wired by `builtins.tsx` |
 | Locked Folder | ◐ only moving photos in, from Photos (`secure` + `media.vault`) | web `page.js` (about 1,200 lines: browsing, PIN, encryption, recovery), hosted by Photo's page; Android `src/lockedFolder/` (its screens and the unlock prompt) |
 | Docker | – a placeholder with no interface | none |
@@ -85,8 +85,8 @@ From [`file-explorer-migration.md`](file-explorer-migration.md). F1 is done.
 - [x] **F5 - Upload:** the `upload` action on both clients (pick files, stream them, confirm a
   replacement on `409`, report each file).
 - [x] **F6 - Default:** drop `preview`; `docs/satellites/file_explorer.md`; CHANGELOG.
-- [ ] **F7 - Remove** `page.js` and `page.css`.
-- [ ] Decide: the storage themes (classic, bar, donut, orbital) go with `page.js`
+- [x] **F7 - Remove** `page.js` and `page.css`.
+- [x] Decided: the storage themes (classic, bar, donut, orbital) went with `page.js`
   (recommended), or become a shared block.
 - [ ] Optional: a clickable breadcrumb (a horizontal list in the contract).
 
@@ -178,7 +178,7 @@ user-facing text.
 ## Order (validated by the owner on 2026-11-13)
 
 1. Stages 1 and 6: the cleanup, small and safe, so there is less code to carry.
-2. File Explorer (2): under way; its paging, upload and open serve Music and the Locked Folder.
+2. File Explorer (2): done (F1-F7); its paging, upload and open serve Music and the Locked Folder.
 3. The Locked Folder (4): a security audit first. It unblocks the end of Photos.
 4. Photos (3): settings, phone sync and icons, then its own interface goes.
 5. Music (5): the largest, last, reusing everything built before. An audit first.

@@ -5,6 +5,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ## Unreleased
 
+### Removed
+
+- **File Explorer's own Mission Control page** (`page.js`, `page.css` and its four storage themes):
+  its shared interface is now the only one, on the web as on Android, and the storage is shown
+  by the shared `metric` bars. The "own page" switch in Developer Mode no longer appears for it
+  (`docs/file-explorer-migration.md`, F7).
+
 ### Added
 
 - **File Explorer opens in its shared interface by default** in Mission Control, as it

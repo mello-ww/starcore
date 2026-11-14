@@ -6,8 +6,8 @@ system's permissions are the only boundary (`satellites/native/file_explorer/pat
 Locked Folder's guard still refuses anything inside a locked Locked Folder.
 
 Its interface is described once, in `ui.json` (UI contract 1.2, see
-[docs/ui-contract.md](../ui-contract.md)), and drawn by both clients' shared renderers. Since F6
-it is File Explorer's **default** interface on both clients; the migration's history is in
+[docs/ui-contract.md](../ui-contract.md)), and drawn by both clients' shared renderers. Since F7
+it is File Explorer's only interface on both clients; the migration's history is in
 [docs/file-explorer-migration.md](../file-explorer-migration.md).
 
 ## What it does
@@ -35,7 +35,7 @@ satellites/native/file_explorer/
     paths.py                path resolution and safety
     locked_folder_guard.py  refuses a locked Locked Folder's contents
     ui.json                 the interface, for every client (UI contract 1.2)
-    mission_control/        its icon, and the previous page (page.js, page.css)
+    mission_control/icon.svg  its icon (no page of its own: the interface is ui.json)
 ```
 
 It provides the `files.browse` capability (`list` → `entries`), which any interface's
@@ -43,10 +43,9 @@ file-browser block and Mission Control's folder picker use without naming this S
 
 ## Previous web page
 
-`mission_control/page.js` and `page.css` are File Explorer's previous Mission Control page. It
-stays one switch away in Developer Mode (the button beside the Satellite's title) until the
-shared interface has been validated in use; F7 of the migration then removes it, with its
-storage themes. The Android app never had a File Explorer screen of its own.
+File Explorer's own Mission Control page (`page.js`, `page.css`, with its four storage themes) was
+retired in F7: the web and the Android app draw the same `ui.json`, and the shared `metric` bars
+show the storage. The migration's history is in `docs/file-explorer-migration.md`.
 
 ## Tests
 

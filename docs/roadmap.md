@@ -17,8 +17,8 @@ each step until then are in this file's history (`git log -p docs/roadmap.md`).
   `preview` (`docs/ui-contract.md`).
 - **Status** (1.1) and **Photos** (1.2) open their shared interface by default on both clients.
 - **File Explorer** opens in its shared interface by default on both clients (browsing, a file's
-  page, management and upload; `docs/file-explorer-migration.md`, F1-F6). Its `page.js` stays
-  in Developer Mode until F7.
+  page, management and upload; `docs/file-explorer-migration.md`, F1-F6). Its own `page.js` and
+  `page.css` are retired (F7).
 - **Music** plays through the shared audio host on both clients, and keeps its own library
   screens. The **Locked Folder** keeps its own screens; photos move into it from the shared
   interface through `media.vault`.
@@ -196,8 +196,8 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
     - [ ] Retire Photo's own page and screens once the shared interface is validated
     - [ ] Move File Explorer onto its `ui.json`, giving Android a file browser (`docs/file-explorer-migration.md`)
         - [x] F1: read-only browsing, as a preview (Android opens it; the web keeps its own page)
-        - [ ] F2-F5: list paging, the file page (download, share, open), management, upload
-        - [ ] F6-F7: shared by default, then retire its own page
+        - [x] F2-F5: list paging, the file page (download, share, open), management, upload
+        - [x] F6-F7: shared by default, then retire its own page
     - [ ] The Locked Folder through `media.vault`, and Music on `ui.json` (R3 and R4 of `docs/remaining-work.md`)
 - [ ] Light theme (after the stable release)
 - [ ] Icons instead of text glyphs for the remaining Music controls

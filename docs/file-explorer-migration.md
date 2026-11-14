@@ -24,7 +24,7 @@ Legend: as in `photos-parity-audit.md`.
 |---|---|---|---|---|---|---|
 | 1 | Locations: roots and drives | ✅ | ✗ | ✅ fixed in F1: `locations` page, a `list` from `view/locations` | F1 | S |
 | 2 | Storage dashboard: machine total and per-drive usage | ✅ 4 themes | ✗ | ◐ F1: the machine total as a `metric` bar, each drive's free space and percentage in its row | F1 | S |
-| 3 | Storage themes (classic, bar, donut, orbital; per-browser preference) | ✅ | ✗ | Decision pending; recommended: replaced by the shared `metric` bars, retired with `page.js` | F7 | – |
+| 3 | Storage themes (classic, bar, donut, orbital; per-browser preference) | ✅ | ✗ | Decided in F7: replaced by the shared `metric` bars and retired with `page.js` | F7 | – |
 | 4 | Folder listing: icon, name, size, date | ✅ | ✗ | ✅ fixed in F1: `folder` page with a `path` param; `view/folder?path=` returns display-ready rows, folders then files | F1 | M |
 | 5 | Breadcrumb and Up | ✅ | ✗ | ◐ F1: the full path and an Up button (All locations at a drive's root); clickable segments would need a horizontal list (C, later) | F1 | S |
 | 6 | Locked Folder entry shown with a lock | ✅ badge | ✗ | ✅ fixed in F1: a lock icon and "Locked" in place of the date; the server guard stays what protects it | F1 | S |
@@ -133,6 +133,11 @@ the existing actions.
   by default and Developer Mode switches to `page.js`; the app already opened it. Checked on the
   web and the emulator (the phone is the owner's).
 - **F7 - Retire `page.js` and `page.css`**, once validated in use, with the storage themes.
+  **Done.** Both files are removed (1,513 lines), with the four storage themes (classic, bar,
+  donut, orbital): the shared `metric` bars replace them, as recommended. File Explorer's
+  `mission_control/` now holds only its icon, so Mission Control shows no switch to a previous
+  page for it, and the web and Android draw the same `ui.json`. Nothing outside the Satellite
+  referenced the page.
 
 ## What this leaves outside Satellite folders
 

@@ -46,8 +46,8 @@ move (1.1; its page is gone since). Photo follows in 1.2: its document was a **p
 [The document](#the-document)) until it reached parity, and is now its default interface, with
 its own page and screens kept in Developer Mode until they are retired. Music keeps its
 dedicated, hand-written page and screens until the shared blocks reach parity with them.
-File Explorer's document, a preview until F6, is now its default interface on both clients, with
-its `page.js` kept in Developer Mode until retired (see [Migration](#migration)). Those
+File Explorer's document, a preview until F6, is now its only interface on both clients; its
+`page.js` was retired in F7 (see [Migration](#migration)). Those
 implementations are the behavioural reference for the capabilities still to come, not code
 to be thrown away.
 
@@ -908,10 +908,9 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 ## Migration
 
 Every step replaces a hand-written screen only once the shared one reaches parity and the
-owner has validated it. Music keeps its dedicated screens until then, and File
-Explorer's `page.js` stays the web's default while its preview catches up
-([its plan](file-explorer-migration.md), F1 done); Photos and Status open their
-shared interfaces and keep their previous screens in Developer Mode until they are retired.
+owner has validated it. Music keeps its dedicated screens until then. File Explorer
+and Status open their shared interfaces alone ([File Explorer's plan](file-explorer-migration.md),
+F1-F7 done), and Photos keeps its previous screens in Developer Mode until they are retired.
 Retiring all of them is planned in [Remaining work](remaining-work.md).
 
 1. **Done:** the first document format (a `mobile` route, removed since) and `page.js`; the modularity guard.

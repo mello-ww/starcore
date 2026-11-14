@@ -28,7 +28,7 @@ class FileExplorerUiDocumentTest(unittest.TestCase):
         self.document = ui_contract.load(FILE_EXPLORER_DIR / "ui.json")
 
     def test_the_document_is_valid_and_no_longer_a_preview(self):
-        # F6: both clients draw it by default; page.js stays in Developer Mode until F7
+        # F6: both clients draw it by default; F7 retired its page.js
         self.assertEqual(self.document["contract"], "starcore.ui/1.2")
         self.assertNotIn("preview", self.document)
         self.assertNotIn("preview", ui_contract.UiDefinition(self.document).describe())
@@ -249,14 +249,14 @@ class FileExplorerViewTest(unittest.TestCase):
         status, view = self.page(path=str(self.directory), limit=10_000)
         self.assertEqual(len(view["files"]), 500)  # at most a page of 500
 
-    def test_the_listing_offers_the_document_as_the_default_beside_the_page(self):
+    def test_the_listing_offers_the_document_alone_with_no_page_of_its_own(self):
         status, listing = self.json_request("/api/satellites")
         self.assertEqual(status, 200)
         entries = listing["satellites"] if isinstance(listing, dict) else listing
         explorer = next(entry for entry in entries if entry["name"] == "FileExplorer")
         self.assertTrue(explorer["ui"]["revision"])
         self.assertNotIn("preview", explorer["ui"])
-        self.assertTrue(explorer["page"])
+        self.assertFalse(explorer["page"])  # F7: its page.js is retired
 
 
 class FileDocumentTest(unittest.TestCase):
