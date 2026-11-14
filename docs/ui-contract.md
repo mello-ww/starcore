@@ -518,6 +518,31 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
   read-only through its `FileProvider`, to whichever app on the phone views that kind of file
   (`ACTION_VIEW`), saying so when none does; opening needs no storage permission, so it works
   where saving doesn't. The route should answer inline, without `Content-Disposition`.
+- **`upload`** (1.2), with a `route`: the person picks one or more files on the device, and each
+  is sent in turn as the **raw body** of a POST to the route.
+
+  ```json
+  {"upload": {"multiple": true}, "route": "upload?path={$params.path}&name={$value.name}",
+   "conflict": {"confirm": "A file with this name is already here. Replace it?",
+                "route": "upload?path={$params.path}&name={$value.name}&overwrite=1"},
+   "then": "refresh"}
+  ```
+
+  - `multiple` (default `false`) allows more than one file. While a file is sent, `$value` is
+    `{name, size}`: its name made safe by the same rule as a download's, and its size in bytes.
+  - The body is the file itself, as `application/octet-stream` whatever its kind, so a route
+    tells an upload from a JSON request by its type alone. It is streamed, never held whole in
+    memory, and its length is always declared.
+  - A **`409`** answer means the file is already there. With `conflict`, the client asks its
+    `confirm` (text or a binding), naming the file, then sends it again to `conflict.route`;
+    declining skips that file. Without `conflict`, a `409` is that file's failure.
+  - Each file is reported: what arrived, what was skipped and what failed, with the route's
+    error. Part of a selection is never shown as all of it. `then` (`refresh`, the default, or
+    `back`) runs once at least one file arrived.
+  - There is no `body`, `method` or `confirm`: nothing reaches the Satellite but those POSTs.
+    Mission Control picks with the browser's own file dialog; the app with the system document
+    picker, and sends from its own module with the session. A client that can't pick files
+    hides the control. One action for the page: not in a selection or a tile's `quick` actions.
 - **`secure`** (1.2), in a media viewer's or selection's `actions` only: runs one protected
   operation on the items shown or selected, behind the **client's own** unlock prompt.
 
@@ -873,7 +898,7 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 |---|---|---|
 | Blocks | the 21 above, including `chart`, `table`, `image`, `media-list`, `media-grid`, `search` and `map`; the `dashboard` template | more, minor by minor: `tabs`; templates `list-detail`, `settings`, `media-library` |
 | Satellite capabilities | `files.browse` (File Explorer), `audio.library` and `audio.session` (Music), `media.gallery` (Photo), `media.vault` (Locked Folder, `move_in` only through the `secure` action) | browsing the Locked Folder from the shared interface; more pickable capabilities (files) |
-| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action; saving and sharing files (`download`, `share`) | `device.background-tasks` (phone sync) - a native module written once in the app, behind a shared block |
+| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action; saving, sharing and opening files (`download`, `share`); sending files (`upload`) | `device.background-tasks` (phone sync) - a native module written once in the app, behind a shared block |
 | Home | `widgets` in each document, drawn by both clients | |
 | Sections | `section_of`, but Photo still names the Locked Folder | the host discovers its sections from the catalog |
 | Icons | `icon_name` from the shared set, a neutral circle without one | Satellite-provided icons |

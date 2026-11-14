@@ -1041,6 +1041,9 @@ class _Validator:
             if kind in action:
                 self.check_file_action(where, action, kind)
                 return
+        if "upload" in action:
+            self.check_upload(where, action)
+            return
         known = {"route", "method", "body", "confirm", "then"}
         if "pick" in action:
             self.check_pick(where, action["pick"])
@@ -1081,6 +1084,38 @@ class _Validator:
             self.error(f"{where}.open", "must be true or false")
         if self.in_bulk:
             self.error(f"{where}.{kind}", "is one file at a time: not in a selection or a tile's quick actions")
+
+    def check_upload(self, where: str, action: dict):
+        """{upload: {multiple}, route, conflict?: {confirm?, route}, then?} (1.2): the person
+        picks files on the device, and each is sent, one after another, as the raw body of a POST
+        to `route`, with $value the file's {name, size} (the name made safe, as a download's).
+        A 409 answer asks `conflict.confirm`, the client naming the file, then retries on
+        `conflict.route`; declining skips that file. Without `conflict` a 409 is a failure. Each
+        file is reported, and `then` runs once something arrived. Nothing reaches the Satellite
+        but those POSTs; a client that can't pick files hides the control."""
+        self.since(f"{where}.upload", "the upload action", 2)
+        self.unknown_keys(where, action, {"upload", "route", "conflict", "then"})
+        upload = action["upload"]
+        if not isinstance(upload, dict):
+            self.error(f"{where}.upload", "must be {multiple}")
+        else:
+            self.unknown_keys(f"{where}.upload", upload, {"multiple"})
+            if "multiple" in upload and not isinstance(upload["multiple"], bool):
+                self.error(f"{where}.upload.multiple", "must be true or false")
+        self.check_route(f"{where}.route", action.get("route"))
+        if "conflict" in action:
+            conflict = action["conflict"]
+            if not isinstance(conflict, dict):
+                self.error(f"{where}.conflict", "must be {confirm, route}")
+            else:
+                self.unknown_keys(f"{where}.conflict", conflict, {"confirm", "route"})
+                self.check_route(f"{where}.conflict.route", conflict.get("route"))
+                if "confirm" in conflict:
+                    self.check_text(f"{where}.conflict.confirm", conflict["confirm"])
+        if action.get("then", "refresh") not in ("refresh", "back"):
+            self.error(f"{where}.then", "must be 'refresh' or 'back'")
+        if self.in_bulk:
+            self.error(f"{where}.upload", "is a page's own action: not in a selection or a tile's quick actions")
 
     def check_play(self, where: str, action: dict):
         """{play: {search}} (1.2): the client searches the audio.library provider for `search`

@@ -71,6 +71,11 @@ export interface UiAction {
    * the app's own unlock prompt; `item` binds each item's id. */
   secure?: {capability: string; operation: string};
   item?: string;
+  /** 1.2: pick files on the phone, each sent as the raw body of a POST to `route` with $value
+   * its {name, size}; a 409 asks `conflict.confirm`, naming the file, then retries on
+   * `conflict.route`. */
+  upload?: {multiple?: boolean};
+  conflict?: {confirm?: Json; route: string};
 }
 
 /** One block. Deliberately loose: a document is network data, so every

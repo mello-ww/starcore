@@ -57,6 +57,21 @@
       }}
     },
     {
+      "name": "upload-action",
+      "_why": "1.2: upload - the person picks files, each sent as a raw POST body to the route with $value its {name, size}; a 409 asks, naming the file, then retries on the conflict route.",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {
+        "home": {"blocks": [{"type": "button", "label": "Open", "action": {"navigate": "folder", "params": {"path": "/"}}}]},
+        "folder": {"params": ["path"], "source": {"route": "folder?path={$params.path}"}, "blocks": [
+          {"type": "button", "label": "Upload", "style": "primary",
+           "action": {"upload": {"multiple": true}, "route": "upload?path={$params.path}&name={$value.name}",
+                      "conflict": {"confirm": "A file with this name is already here. Replace it?",
+                                   "route": "upload?path={$params.path}&name={$value.name}&overwrite=1"},
+                      "then": "refresh"}},
+          {"type": "button", "label": "Send one", "action": {"upload": {}, "route": "inbox?name={$value.name}"}}
+        ]}
+      }}
+    },
+    {
       "name": "media-grid",
       "_why": "1.2: a gallery of images and videos from the Satellite's own routes, grouped, with the shared viewer and selection; a preview document, so a client with the Satellite's own interface keeps it.",
       "document": {"contract": "starcore.ui/1.2", "preview": true, "entry": "home", "pages": {
@@ -417,6 +432,48 @@
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "button", "label": "Open", "action": {"download": "file", "open": "yes"}}]}}},
       "error": "must be true or false"
+    },
+    {
+      "name": "upload-in-a-selection",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": [], "item": {"image": "t"}, "selection": {"actions": [{"label": "Add", "action": {"upload": {}, "route": "inbox"}}]}}]}}},
+      "error": "not in a selection"
+    },
+    {
+      "name": "upload-outside-the-satellite",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Upload", "action": {"upload": {}, "route": "../other/upload"}}]}}},
+      "error": "route"
+    },
+    {
+      "name": "upload-conflict-outside-the-satellite",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Upload", "action": {"upload": {}, "route": "inbox", "conflict": {"route": "/api/shutdown"}}}]}}},
+      "error": "conflict.route"
+    },
+    {
+      "name": "upload-with-a-body",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Upload", "action": {"upload": {}, "route": "inbox", "body": {"a": 1}}}]}}},
+      "error": "unknown key"
+    },
+    {
+      "name": "upload-then-navigate",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Upload", "action": {"upload": {}, "route": "inbox", "then": {"navigate": "home"}}}]}}},
+      "error": "must be 'refresh' or 'back'"
+    },
+    {
+      "name": "upload-multiple-not-a-flag",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Upload", "action": {"upload": {"multiple": "yes"}, "route": "inbox"}}]}}},
+      "error": "must be true or false"
+    },
+    {
+      "name": "upload-in-1.1",
+      "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Upload", "action": {"upload": {}, "route": "inbox"}}]}}},
+      "error": "needs starcore.ui/1.2"
     },
     {
       "name": "download-in-1.1",
