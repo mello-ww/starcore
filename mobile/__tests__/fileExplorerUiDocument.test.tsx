@@ -1,6 +1,6 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {Pressable, Text} from 'react-native';
+import {Image, NativeModules, Pressable, Text} from 'react-native';
 import {SatelliteUiScreen} from '../src/screens/SatelliteUiScreen';
 
 jest.mock('../src/auth/AuthContext', () => ({useAuth: jest.fn(() => ({client: {}}))}));
@@ -47,6 +47,16 @@ const FOLDER = {
   storage: '120 GB free of 500 GB',
 };
 
+const FILE = {
+  name: 'notes.txt',
+  path: '/home/demo/notes.txt',
+  folder: '/home/demo',
+  size: 1536,
+  modified: 1794477600,
+  kind: 'TXT file',
+  preview: false,
+};
+
 const mounted: ReturnType<typeof renderer.create>[] = [];
 
 async function mount(route: any) {
@@ -91,6 +101,7 @@ describe('File Explorer, drawn from its ui.json by the shared screen', () => {
     __mocks.read.mockImplementation(async (_satellite: string, route: string) => {
       if (route === 'view/locations') return LOCATIONS;
       if (route.startsWith('view/folder?path=')) return FOLDER;
+      if (route.startsWith('view/file?path=')) return FILE;
       throw new Error(`unexpected route ${route}`);
     });
   });
@@ -178,6 +189,66 @@ describe('File Explorer, drawn from its ui.json by the shared screen', () => {
     await press(tree, 'Try again');
     expect(texts(tree)).toContain('z.txt');
     expect(texts(tree)).not.toContain('Server unreachable');
+  });
+
+  it("opens a file's page from its row", async () => {
+    const {tree, navigation} = await mount({
+      params: {name: 'FileExplorer', page: 'folder', params: {path: '/home/demo'}, revision: 'rev1'},
+    });
+    await press(tree, 'notes.txt');
+    expect(navigation.push).toHaveBeenLastCalledWith('SatelliteUi', {
+      name: 'FileExplorer', page: 'file', params: {path: '/home/demo/notes.txt'}, revision: 'rev1',
+    });
+  });
+
+  describe("a file's page", () => {
+    afterEach(() => {
+      delete (NativeModules as any).StarCoreFiles;
+    });
+
+    const route = {params: {name: 'FileExplorer', page: 'file', params: {path: '/home/demo/notes.txt'}, revision: 'rev1'}};
+
+    it('shows the details, and no picture for a file that is not one', async () => {
+      const {tree, navigation} = await mount(route);
+      expect(__mocks.read).toHaveBeenCalledWith('FileExplorer', 'view/file?path=%2Fhome%2Fdemo%2Fnotes.txt');
+      expect(navigation.setOptions).toHaveBeenLastCalledWith({title: 'notes.txt'});
+      expect(texts(tree)).toEqual(expect.arrayContaining(['Size', '1.5 KB', 'Type', 'TXT file', 'Folder', '/home/demo']));
+      expect(tree.root.findAllByType(Image)).toHaveLength(0);
+      // under Jest there is no native module: the file controls are hidden
+      expect(texts(tree)).not.toEqual(expect.arrayContaining(['Open']));
+    });
+
+    it('previews a picture from the content route', async () => {
+      __mocks.read.mockResolvedValue({...FILE, name: 'photo.jpg', path: '/home/demo/photo.jpg', kind: 'JPEG image', preview: true});
+      const {tree} = await mount({params: {...route.params, params: {path: '/home/demo/photo.jpg'}}});
+      const sources = tree.root.findAllByType(Image).map((node: any) => node.props.source?.uri);
+      expect(sources).toEqual(expect.arrayContaining([expect.stringContaining('/api/satellites/FileExplorer/content?path=%2Fhome%2Fdemo%2Fphoto.jpg')]));
+    });
+
+    it("opens, downloads and shares the file through the app's own module", async () => {
+      const files = {
+        canSave: true, canShare: true, canOpen: true,
+        open: jest.fn(async () => true), save: jest.fn(async () => ({name: 'notes.txt'})), share: jest.fn(async () => true),
+      };
+      (NativeModules as any).StarCoreFiles = files;
+      const {tree} = await mount(route);
+      await press(tree, 'Open');
+      expect(files.open).toHaveBeenCalledWith(
+        expect.stringMatching(/\/api\/satellites\/FileExplorer\/content\?path=%2Fhome%2Fdemo%2Fnotes\.txt$/), expect.anything(), 'notes.txt');
+      await press(tree, 'Download');
+      expect(files.save).toHaveBeenCalledWith(
+        expect.stringMatching(/content\?path=%2Fhome%2Fdemo%2Fnotes\.txt&download=1$/), expect.anything(), 'notes.txt');
+      await press(tree, 'Share');
+      expect(files.share).toHaveBeenCalledWith(expect.stringMatching(/content\?path=%2Fhome%2Fdemo%2Fnotes\.txt$/), expect.anything(), 'notes.txt');
+    });
+
+    it('offers Open where saving is not possible (an Android older than 10)', async () => {
+      (NativeModules as any).StarCoreFiles = {canSave: false, canShare: true, canOpen: true, open: jest.fn(), share: jest.fn()};
+      const {tree} = await mount(route);
+      const shown = texts(tree);
+      expect(shown).toEqual(expect.arrayContaining(['Open', 'Share']));
+      expect(shown).not.toContain('Download');
+    });
   });
 
   it('goes back to the locations from a drive root', async () => {

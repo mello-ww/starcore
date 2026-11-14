@@ -29,10 +29,10 @@ Legend: as in `photos-parity-audit.md`.
 | 5 | Breadcrumb and Up | ✅ | ✗ | ◐ F1: the full path and an Up button (All locations at a drive's root); clickable segments would need a horizontal list (C, later) | F1 | S |
 | 6 | Locked Folder entry shown with a lock | ✅ badge | ✗ | ✅ fixed in F1: a lock icon and "Locked" in place of the date; the server guard stays what protects it | F1 | S |
 | 7 | Large folders (thousands of entries) | ◐ every row in the DOM | ✗ | ✅ fixed in F2: `more` on `list`; `view/folder` pages each list 200 rows at a time (`part`, `cursor`, `limit`) | F2 | M |
-| 8 | File details | ✗ | ✗ | J: `file` page: size, date, type, `image` preview for pictures | F3 | S |
-| 9 | Download | ✅ | ✅ action exists (M12) | J | F3 | S |
-| 10 | Share | ✗ | ✅ action exists (M12) | J | F3 | S |
-| 11 | Open with the system (new tab / Android viewer) | ✅ new tab | ✗ | C: `download` with `open: true` (web: new tab; Android: `ACTION_VIEW` through the existing `FileProvider`) | F3 | M |
+| 8 | File details | ✗ | ✗ | ✅ fixed in F3: `file` page from a file's row, `view/file?path=`: size, date, type, folder; an `image` preview for a picture up to 20 MB | F3 | S |
+| 9 | Download | ✅ | ✅ action exists (M12) | ✅ fixed in F3: on the file page (`content?download=1`) | F3 | S |
+| 10 | Share | ✗ | ✅ action exists (M12) | ✅ fixed in F3: on the file page | F3 | S |
+| 11 | Open with the system (new tab / Android viewer) | ✅ new tab | ✗ | ✅ fixed in F3: `download` with `open: true` (web: new tab; Android: `ACTION_VIEW` through the `FileProvider`); the Engine sandboxes an HTML, SVG or XML file opened in a tab | F3 | M |
 | 12 | New folder | ✅ prompt | ✗ | J: `form` then `refresh` | F4 | S |
 | 13 | Rename file or folder | ✅ prompt | ✗ | J: `form` on the file or folder page, then navigate to the parent | F4 | S |
 | 14 | Delete (confirm) | ✅ two-tap | ✗ | J: `confirm`, then `back` | F4 | S |
@@ -93,7 +93,15 @@ the existing actions.
   continuous flings, with no page failing; the JavaScript thread went back to idle as soon as
   the flinging stopped, at about 400 MB.
 - **F3 - File page.** Details, picture preview, Download, Share, Open (`download` + `open`).
-  Kotlin `open` in `StarCoreFilesModule.kt`; web new tab.
+  Kotlin `open` in `StarCoreFilesModule.kt`; web new tab. **Done.** A file's row opens the
+  `file` page (`view/file?path=`, behind the same guard as `content`). Open is a download with
+  `open: true`: Mission Control opens the route in a new tab with no handle on its page, and
+  the app fetches the file into its private `cache/opened` and hands it read-only to the
+  phone's viewer (`ACTION_VIEW`), so Open shows even where saving to Downloads can't. Since an
+  opened file is a document on Mission Control's origin, the Engine now sends every Satellite
+  file with `nosniff`, and an HTML, SVG or XML one with `Content-Security-Policy: sandbox`.
+  Tests: the route's details, preview limit and errors; the document's actions; the app's
+  module and the page's buttons; the web's new tab; the sandbox headers.
 - **F4 - Management.** New folder, rename, delete through forms and confirms; the guard
   refuses inside a locked Locked Folder exactly as today.
 - **F5 - Upload.** The `upload` action on both clients, with conflicts and per-file reporting.

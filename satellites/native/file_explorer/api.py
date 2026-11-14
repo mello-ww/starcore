@@ -85,8 +85,8 @@ def entries(request):
 
 def view(request):
     """The interface's own read-only routes, shaped for ui.json (see views.py):
-    `view/locations` and `view/folder?path=`. Every action there goes to the
-    routes below, unchanged."""
+    `view/locations`, `view/folder?path=` and `view/file?path=`. Every action
+    there goes to the routes below, unchanged."""
     if request.method != "GET":
         return error_response("only GET is supported here", status=405)
 
@@ -95,6 +95,8 @@ def view(request):
         return json_response(views.locations_view(_roots_listing()))
     if where == ("folder",):
         return _folder_view(request)
+    if where == ("file",):
+        return _file_view(request)
     return error_response(f"unknown endpoint 'view/{'/'.join(where)}'")
 
 
@@ -134,6 +136,25 @@ def _folder_view(request):
         _disk_usage(target) if part == "" else None,
         folders_next=following.get("folders"), files_next=following.get("files"),
         totals=(len(folders), len(files))))
+
+
+def _file_view(request):
+    """view/file?path=: one file's details, behind the same guard as its content."""
+    try:
+        target = paths.resolve_path(request.query.get("path", ""))
+    except paths.PathError as error:
+        return error_response(str(error), status=400)
+
+    blocked = locked_folder_guard.guard(request, target)
+    if blocked is not None:
+        return blocked
+
+    status, failure = _stat(target)
+    if failure is not None:
+        return failure
+    if not S_ISREG(status.st_mode):
+        return error_response("that path is not a file", status=400)
+    return json_response(views.file_view(target, status.st_size, status.st_mtime))
 
 
 def _sort_key(name: str):

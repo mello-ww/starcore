@@ -7,6 +7,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **A file's page in File Explorer's shared interface**, on both clients: a file's row opens its
+  size, date, type and folder, a preview for a picture, and **Open**, **Download** and **Share**.
+  Open is **UI contract 1.2's `open` on a download**, for any Satellite: Mission Control opens
+  the file in a new tab, the app hands it to whichever app on the phone views that kind of file
+  (`docs/file-explorer-migration.md`, F3).
 - **Large folders in File Explorer's shared interface**, on both clients: a folder's folders and
   files arrive 200 at a time as you scroll (or with "Show more"), with the folder's totals
   ("250 folders, 10,000 files"); the server reads only the rows it sends. Through **UI contract
@@ -236,6 +241,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Fixed
 
+- **A web page or drawing opened from a Satellite can no longer act as you.** An HTML, SVG or
+  XML file opened in a browser tab (File Explorer's Open) ran on Mission Control's own origin,
+  with the session. The Engine now sends such files sandboxed, and never lets a browser guess a
+  file's type (`docs/api.md`).
 - **File Explorer lists large folders about 13 times faster.** A folder of 10,000 entries took
   about 6 seconds on Windows: each entry was read from disk three times and the Locked
   Folder's path resolved again for it. It now reads the folder once (`os.scandir`) and resolves

@@ -1,7 +1,7 @@
 """What File Explorer's shared interface (ui.json) shows, shaped from the same
-listings the `entries` route answers with (api.py). Read-only: every action in
-the document goes to the existing routes (mkdir, rename, delete, upload,
-content), unchanged.
+listings the `entries` route answers with (api.py), and one file's details.
+Read-only: every action in the document goes to the existing routes (mkdir,
+rename, delete, upload, content), unchanged.
 
 Dates are epoch seconds, sizes bytes, so each client formats them its own way
 (the contract's `datetime` and `bytes` formats). Only the drive summaries are
@@ -119,3 +119,31 @@ def _summary(folders: int, files: int) -> str:
     if files:
         parts.append(f"{files:,} {'file' if files == 1 else 'files'}")
     return ", ".join(parts) or "Empty"
+
+
+# what the file page previews with an `image` block: pictures both clients draw from the
+# `content` route (an <img>, the app's Image), small enough to load whole. Others show no
+# picture, only their details.
+PICTURES = {".png": "PNG image", ".jpg": "JPEG image", ".jpeg": "JPEG image", ".gif": "GIF image",
+            ".webp": "WebP image"}
+PREVIEW_LIMIT = 20 * 1024 * 1024
+
+
+def _kind(name: str) -> str:
+    suffix = Path(name).suffix
+    if suffix.lower() in PICTURES:
+        return PICTURES[suffix.lower()]
+    return f"{suffix[1:].upper()} file" if suffix else "File"
+
+
+def file_view(target: Path, size: int, modified: float) -> dict:
+    """One file's page: its details, its folder, and whether it is a picture to preview."""
+    return {
+        "name": target.name,
+        "path": str(target),
+        "folder": str(target.parent),
+        "size": size,
+        "modified": int(modified),
+        "kind": _kind(target.name),
+        "preview": target.suffix.lower() in PICTURES and size <= PREVIEW_LIMIT,
+    }
