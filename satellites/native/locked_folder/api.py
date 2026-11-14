@@ -124,7 +124,9 @@ def _require_idle(live):
 
 def configuration_route(request):
     if request.method == "GET":
-        return json_response(configuration.describe(request.satellite))
+        live = runtime(request.satellite)
+        hidden = _protected(live) and not live.is_unlocked(request.token)
+        return json_response(configuration.describe(request.satellite, hide_location=hidden))
 
     if request.method != "POST":
         return error_response("only GET and POST are supported here", status=405)
@@ -159,7 +161,9 @@ def status(request):
 
     return json_response({
         "configured": root is not None,
-        "path": str(root) if root is not None else None,
+        # where the vault is, only for a session that may open it (or while no PIN guards it
+        # yet, during setup): it is what a locked session would need to look for it elsewhere
+        "path": str(root) if root is not None and (unlocked or not _protected(live)) else None,
         # None when nothing is configured at all (there is no directory to
         # ask about); otherwise whether the configured path actually still
         # exists on disk - a directory deleted outside StarCore (Windows

@@ -809,6 +809,152 @@ class LockedFolderSecurityTest(unittest.TestCase):
         self.assertFalse(self.lf("status")[1]["unlocked"])
         self.assertEqual(self.move([first], payload["grant"])[0], 200)
 
+    # ---------- the guard does not depend on the Satellite being enabled (A1) ----------
+
+    def entries(self, path, token=None):
+        return self.call(f"/api/satellites/FileExplorer/entries?path={path}", token=token)[0]
+
+    def test_disabling_the_locked_folder_keeps_the_vault_guarded(self):
+        (self.vault / "private.txt").write_text("private", encoding="utf-8")
+        backups = self.vault / ".starcore-vault" / "backups"
+        backups.mkdir(parents=True)
+        (backups / "original.png").write_bytes(png(4, 4))
+        self.setup_vault()
+
+        status, _ = self.call("/api/satellites/LockedFolder/disable", "POST", {})
+        self.assertEqual(status, 200)
+        self.assertFalse(self.engine.registry.get("LockedFolder").enabled)
+
+        file = self.vault / "private.txt"
+        for path in (self.vault, backups):
+            self.assertEqual(self.entries(path), 403, path)
+        self.assertEqual(self.call(f"/api/satellites/FileExplorer/content?path={file}")[0], 403)
+        self.assertEqual(self.call("/api/satellites/FileExplorer/delete", "POST", {"path": str(file)})[0], 403)
+        self.assertEqual(self.call("/api/satellites/FileExplorer/rename", "POST",
+                                   {"path": str(self.directory), "name": "moved"})[0], 403)
+        self.assertEqual(self.call("/api/satellites/Photo/import", "POST", {"source": str(self.vault)})[0], 400)
+        self.assertTrue(file.is_file())
+
+        # the owner can still unlock it, and then File Explorer opens it as before
+        self.assertEqual(self.unlock()[0], 200)
+        self.assertEqual(self.entries(self.vault), 200)
+
+    def test_a_disabled_locked_folder_guards_from_a_cold_start(self):
+        # disabled, with no runtime created yet: the configuration a restart would read
+        self.locked_folder.config.data.update({"locked_folder_path": str(self.vault), "enabled": False})
+        if hasattr(self.locked_folder, "locked_folder_runtime"):
+            del self.locked_folder.locked_folder_runtime
+        self.assertEqual(self.entries(self.vault), 403)
+
+    # ---------- a locked session is not told where the vault is (A5) ----------
+
+    def test_a_locked_status_and_configuration_do_not_name_the_vault(self):
+        self.setup_vault()
+        where = str(self.vault.resolve()).encode("utf-8")
+        status, payload = self.lf("status")
+        self.assertEqual(status, 200)
+        self.assertTrue(payload["configured"])
+        self.assertIsNone(payload["path"])
+        for route in ("status", "configuration"):
+            status, raw, _ = self.request(f"/api/satellites/LockedFolder/{route}")
+            self.assertEqual(status, 200)
+            self.assertNotIn(where, raw, route)
+            self.assertNotIn(json.dumps(str(self.vault))[1:-1].encode("utf-8"), raw, route)
+        keys = [setting["key"] for setting in self.lf("configuration")[1]["settings"]]
+        self.assertNotIn("locked_folder_path", keys)
+
+        self.unlock()
+        self.assertEqual(self.lf("status")[1]["path"], str(self.vault.resolve()))
+        settings = {setting["key"]: setting["value"] for setting in self.lf("configuration")[1]["settings"]}
+        self.assertEqual(settings["locked_folder_path"], str(self.vault))
+
+    def test_before_a_pin_is_set_the_location_is_shown_for_setup(self):
+        self.lf("configuration", {"key": "locked_folder_path", "value": str(self.vault)})
+        self.assertEqual(self.lf("status")[1]["path"], str(self.vault.resolve()))
+
+    # ---------- a reload keeps the guard and the routes on one runtime (A9) ----------
+
+    def reload_locked_folder(self, **on_disk):
+        """Reloads the Satellite through the Engine, as Mission Control's reload button does; the
+        rebuilt Satellite gets this test's configuration instead of the checkout's config.toml,
+        with `on_disk` standing for what was edited in config.toml before the reload."""
+        loader = self.engine.loader
+        original = loader.reload
+        settings = dict(self.locked_folder.config.data, **on_disk)
+        path = self.locked_folder.config.path
+
+        def rebuild(satellite):
+            rebuilt = original(satellite)
+            rebuilt.config.data.clear()
+            rebuilt.config.data.update(settings)
+            rebuilt.config.path = path
+            return rebuilt
+
+        with mock.patch.object(loader, "reload", side_effect=rebuild):
+            status, payload = self.call("/api/satellites/LockedFolder/reload", "POST", {})
+        self.assertEqual(status, 200, payload)
+        reloaded = self.engine.registry.get("LockedFolder")
+        self.assertIsNot(reloaded, self.locked_folder)
+        self.locked_folder = reloaded
+        return reloaded
+
+    def test_after_a_reload_the_guard_and_the_routes_agree(self):
+        self.setup_vault()
+        other = self.engine.auth.create_session("admin")
+        self.unlock()
+        self.reload_locked_folder()
+
+        self.assertTrue(self.lf("status")[1]["unlocked"])
+        self.assertEqual(self.entries(self.vault), 200)
+        self.assertEqual(self.entries(self.vault, token=other), 403)
+
+        self.lf("lock", {})
+        self.assertFalse(self.lf("status")[1]["unlocked"])
+        self.assertEqual(self.entries(self.vault), 403)
+
+    def test_after_a_reload_a_new_location_is_the_one_guarded(self):
+        self.setup_vault()
+        elsewhere = self.directory / "elsewhere"
+        elsewhere.mkdir()
+        other = self.engine.auth.create_session("admin")
+        self.reload_locked_folder()
+        self.unlock()
+
+        status, _ = self.lf("configuration", {"key": "locked_folder_path", "value": str(elsewhere)})
+        self.assertEqual(status, 200)
+        self.assertEqual(self.entries(elsewhere, token=other), 403)
+        self.assertEqual(self.entries(self.vault, token=other), 200)
+        self.assertFalse(self.lf("status")[1]["unlocked"], "a new location starts locked")
+
+    def test_a_reload_that_changed_the_location_on_disk_ends_every_unlock(self):
+        self.setup_vault()
+        self.unlock()
+        elsewhere = self.directory / "elsewhere"
+        elsewhere.mkdir()
+        self.reload_locked_folder(locked_folder_path=str(elsewhere))
+        self.assertFalse(self.lf("status")[1]["unlocked"])
+        self.assertEqual(self.entries(elsewhere), 403)
+
+    # ---------- the unlock table (A9) ----------
+
+    def test_an_unlock_expiring_under_concurrent_checks_never_raises(self):
+        live = self.runtime()
+        failures = []
+        for round_number in range(200):
+            token = f"session-{round_number}"
+            live.unlock(token, -1)  # already expired: every check below races to remove it
+
+            def check(_):
+                try:
+                    return live.is_unlocked(token)
+                except Exception as error:  # noqa: BLE001 - any exception is the failure
+                    failures.append(error)
+                    return None
+
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                self.assertEqual(set(pool.map(check, range(8))), {False})
+        self.assertEqual(failures, [])
+
 
 class SignatureTest(unittest.TestCase):
     def test_verify_accepts_only_the_exact_signature(self):

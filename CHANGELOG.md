@@ -5,6 +5,21 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ## Unreleased
 
+### Security
+
+- **Disabling the Locked Folder no longer opens it to File Explorer.** Disabling a Satellite
+  needs only a session, not the PIN, and File Explorer's guard used to skip a disabled Locked
+  Folder: a session that never gave the PIN could then list, read, rename and delete what was in
+  the vault, including the unencrypted backups an encryption run keeps. The guard now protects
+  the vault whether the Satellite is enabled or not, and the owner can still unlock it while it
+  is disabled (`docs/satellites/locked_folder.md`, audit finding A1).
+- **A locked session is no longer told where the vault is**: the Locked Folder's `status`
+  answers `"path": null` and its settings leave the location out, with a note to unlock first.
+  Before a PIN is set the location is shown as before, for setup (A5).
+- **After a reload of the Locked Folder, File Explorer guards its current location.** The
+  shared runtime kept reading the configuration from before the reload, so a location set after
+  it was not the one guarded. The unlock table is also changed only under its lock now (A9).
+
 ### Removed
 
 - **File Explorer's own Mission Control page** (`page.js`, `page.css` and its four storage themes):

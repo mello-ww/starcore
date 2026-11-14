@@ -93,18 +93,29 @@ From [`file-explorer-migration.md`](file-explorer-migration.md). F1 is done.
 
 ## 3. Photos without its own interface (R2)
 
-From [`photos-parity-audit.md`](photos-parity-audit.md).
+From [`photos-parity-audit.md`](photos-parity-audit.md), which holds the inventory of the old
+phone sync, the design of the new one and each milestone's files and tests (plan approved by
+the owner 2026-11-15).
 
-- [ ] **Settings (#29):** repeatable form rows in the contract, so the `source_paths` mappings
-  are a `form`; the `own: "settings"` entry goes.
-- [ ] **Phone sync (#28):** a generic client capability (for example `media.sync`): the app
-  uploads the phone's new photos to whichever Satellite provides it, with Wi-Fi only, Sync now
-  and the permission screen as shared app code. `App.tsx` no longer imports `src/photo/`; the
-  manifest's permissions belong to the capability.
+- [ ] **Phone sync (#28):** the old sync is removed whole, then a real automatic backup is
+  built as a generic capability (`media.sync` from a Satellite, `device.media-sync` in the app).
+  - [ ] **S0** - remove the old sync: the standalone listener, `sync_upload`, the `sync_*`
+    settings, the app's background task, its tests and docs.
+  - [ ] **S1** - `media.sync` v1 in Photo: `check`, a resumable `upload` streamed to disk,
+    `status`, `devices`; the Engine's device credential.
+  - [ ] **S2** - the `sync` action (contract change 3); Photo's button and Devices page.
+  - [ ] **S3** - the app's sync: WorkManager, MediaStore detection, the local index, folders,
+    Wi-Fi and charging rules, progress and errors. `App.tsx` no longer imports `src/photo/`.
+  - [ ] **S4** - emulator runs, then the owner's phone.
+  - [ ] **S5** - security review.
+- [ ] **P1 - Settings (#29):** the `source_paths` mappings as repeatable form rows (the `rows`
+  field kind arrives with contract change 2, in the Locked Folder's L4); the `own: "settings"`
+  entry goes.
 - [ ] **The Locked Folder (#37):** stage 4.
-- [ ] **Icons shipped by the Satellite (#38):** a declared `icons/` folder, validated by the
-  Engine (single colour, no script), drawn by both clients with a shared icon as fallback.
-- [ ] Then remove `satellites/native/photo/mission_control/page.js` and `page.css`,
+- [ ] **P2 - Icons shipped by the Satellite (#38):** a declared `icons/` folder, validated by
+  the Engine (single colour, no script), drawn by both clients with a shared icon as fallback
+  (contract change 4).
+- [ ] **P3** - then remove `satellites/native/photo/mission_control/page.js` and `page.css`,
   `mobile/src/photo/`, its routes in `MainTabs.tsx` and its `DEDICATED_SCREENS` entry.
 - [ ] Optional, from the audit: the summary's tools note (#5), album group hints (#6), bulk
   remove from an album (#10), map cluster preview (#15), exposure details and map link (#20),
@@ -112,8 +123,27 @@ From [`photos-parity-audit.md`](photos-parity-audit.md).
 
 ## 4. The Locked Folder through `media.vault` (R3)
 
-Needs its own security audit before implementation, as M5 had
-([`archive/m5-locked-folder-actions-audit.md`](archive/m5-locked-folder-actions-audit.md)).
+Its security audit is done (2026-11-15): findings by severity, the design and each milestone's
+files and tests are in [`satellites/locked_folder.md`](satellites/locked_folder.md), "Security
+audit and plan". The owner approved the plan on 2026-11-15. The audit found one
+high-severity gap: disabling the Locked Folder Satellite removed File Explorer's guard. L0
+closed it.
+
+- [x] **L0** - that gap closed; `status` and the settings without the vault's path while
+  locked; the unlock table under its lock; after a reload the guard follows the rebuilt
+  Satellite.
+- [ ] **L1** - `files.protected`: one Engine check every Satellite that takes a path asks.
+- [ ] **L2** - protected documents, the `section` action, an unlock that ends when idle, the
+  generic unlock prompt on both clients (contract change 1).
+- [ ] **L3** - the Locked Folder's own `ui.json`: browse, view, move out, delete, upload.
+- [ ] **L4** - client-owned prompts for typing and showing secrets, and repeatable form rows
+  (contract change 2); the vault's settings and setup pages.
+- [ ] **L5** - end to end on the local demo; the owner validates on the web and the phone.
+- [ ] **L6** - the vault and the library move files through capabilities.
+- [ ] **L7** - security review.
+- [ ] **L8** - remove the Locked Folder's `page.js` and `mobile/src/lockedFolder/`.
+
+What those milestones cover, as first listed:
 
 - [ ] **Browse, view and move out** from the shared interface while unlocked, through
   `media.vault` operations that answer only with a grant, never a listing without one.
@@ -185,6 +215,30 @@ user-facing text.
 5. Music (5): the largest, last, reusing everything built before. An audit first.
 6. Stabilisation before the stable release: the bugs, security points and checks listed in
    [`roadmap.md`](roadmap.md) (not the light theme, which waits until after it).
+
+**Stages 3 and 4 together (approved by the owner 2026-11-15; L0 is done).** The
+contract changes four times in all, each time in the Engine, both clients, the documents and
+the fixtures together:
+
+| Order | Milestones | Contract | Model and effort |
+|---|---|---|---|
+| 1 | L0, L1 | vocabulary only (`files.protected`) | Opus 5.5 high |
+| 2 | L2 | change 1: `protected`, `section`, `keep` | Opus 5.5 xhigh |
+| 3 | L3 | none (the Locked Folder's `ui.json`) | Opus 5.5 high |
+| 4 | L4, then P1 | change 2: `secrets`, `reveal`, form `rows` | Opus 5.5 xhigh, then high |
+| 5 | L5, L6 | vocabulary only (optional operations) | Opus 5.5 high, then xhigh |
+| 6 | L7 | none (security review) | Fable 5.2 high |
+| 7 | L8 | none (removal) | Sonnet 5.5 medium |
+| 8 | S0 | none (removal) | Sonnet 5.5 high |
+| 9 | S1 | vocabulary only (`media.sync`) | Opus 5.5 xhigh |
+| 10 | S2 | change 3: the `sync` action | Opus 5.5 high |
+| 11 | S3, S4 | none (the app's sync, then devices) | Opus 5.5 xhigh, then high |
+| 12 | S5 | none (security review) | Fable 5.2 high |
+| 13 | P2 | change 4: Satellite icons | Opus 5.5 high |
+| 14 | P3 | none (removal) | Sonnet 5.5 medium |
+
+The sync (8 to 12) depends on nothing in the Locked Folder's milestones except L1's check for
+protected media; it can run before them if the phone's backup matters more.
 
 **Method:** one piece at a time. Each piece starts with a plan in the existing docs (no new
 files), which the owner approves before any code. Then small milestones, one commit each,

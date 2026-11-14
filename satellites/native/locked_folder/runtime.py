@@ -94,6 +94,8 @@ def runtime(satellite):
     if root not in _runtimes:
         _runtimes[root] = LockedFolderRuntime(satellite, root)
     instance = _runtimes[root]
+    if instance.satellite is not satellite:
+        instance.rebind(satellite)
     satellite.locked_folder_runtime = instance
     return instance
 
@@ -196,6 +198,18 @@ class LockedFolderRuntime:
                 return False
 
         return protects
+
+    def rebind(self, satellite):
+        """A reload rebuilds the Satellite (and its configuration) from disk, while this runtime,
+        with every unlock, grant and counter, lives on in the cached module. From now on it reads
+        the rebuilt Satellite's configuration, so the routes, File Explorer's guard and Photo all
+        see the same location. A location that changed on disk ends every unlock, as a change
+        through the settings does."""
+        previous = self.configured_root
+        self.satellite = satellite
+        if self.configured_root != previous:
+            self.forget_all_unlocks()
+            self.reset_attempts()
 
     def ensure_root_exists(self):
         root = self.configured_root
@@ -338,31 +352,36 @@ class LockedFolderRuntime:
 
     # ---------- unlock state (session-aware, memory only) ----------
 
+    # Every read and change of the unlock table is made under the runtime's lock: an unlock
+    # expiring while several requests check it is removed once, never raised over.
+
     def is_unlocked(self, token: str) -> bool:
         if not token:
             return False
-        expires = self._unlocked.get(token)
-        if expires is None:
-            return False
-        if expires < time.time():
-            del self._unlocked[token]
-            if not self._unlocked:
-                self.thumbnails.clear()
-            return False
-        return True
+        with self._lock:
+            expires = self._unlocked.get(token)
+            if expires is None:
+                return False
+            if expires < time.time():
+                del self._unlocked[token]
+                if not self._unlocked:
+                    self.thumbnails.clear()
+                return False
+            return True
 
     def unlock(self, token: str, timeout_seconds: int):
-        self._unlocked[token] = time.time() + timeout_seconds
-        self._attempts.pop(token, None)
+        # the attempt counters are reset by record_success(), which every unlock route calls
+        with self._lock:
+            self._unlocked[token] = time.time() + timeout_seconds
 
     def lock(self, token: str):
         with self._lock:
             # a lock ends everything this session holds: its unlock, and any grant not used yet
             for grant_id in [grant_id for grant_id, grant in self._grants.items() if grant["token"] == token]:
                 del self._grants[grant_id]
-        self._unlocked.pop(token, None)
-        if not self._unlocked:
-            self.thumbnails.clear()
+            self._unlocked.pop(token, None)
+            if not self._unlocked:
+                self.thumbnails.clear()
 
     # ---------- single-use grants (memory only) ----------
 
@@ -404,7 +423,8 @@ class LockedFolderRuntime:
     def expires_at(self, token: str):
         """An ISO timestamp for when this session's unlock expires, or None
         if it isn't (or no longer is) unlocked at all."""
-        expires = self._unlocked.get(token)
+        with self._lock:
+            expires = self._unlocked.get(token)
         if expires is None or expires < time.time():
             return None
         return datetime.fromtimestamp(expires, tz=timezone.utc).isoformat(timespec="seconds")

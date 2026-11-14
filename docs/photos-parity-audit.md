@@ -138,3 +138,154 @@ each must move to the contract or to a generic capability before the stable rele
 - Bulk remove from album (#10).
 - One album save per pick (#32).
 - Repeatable form rows (#29).
+
+## Phone sync (#28): what exists, and the design of its replacement (2026-11-15)
+
+**Status: approved by the owner (2026-11-15). Nothing below is implemented yet**; the decisions
+at the end stay open until the milestone that needs them. Read from
+the code at `5b716a9`. The old sync is removed entirely, then a real automatic backup is built
+as a generic capability. The common order with the Locked Folder is in
+[Remaining work](remaining-work.md).
+
+### Inventory of the old sync
+
+There are two of them, sharing one ingestion (`SyncService.accept()`):
+
+1. **The standalone listener** (`satellites/native/photo/sync.py`): its own HTTP server on
+   `sync_host`:`sync_port`, one shared token accepted in a header **or in the URL**, an HTML
+   upload page, plain HTTP only. Each upload is read whole into memory.
+2. **The app's background sync:** `POST sync_upload` on the main API with the session, called
+   every 15 minutes or more by `react-native-background-fetch` in headless JavaScript, reading
+   the phone with `@react-native-camera-roll/camera-roll`.
+
+What the second one does not do, and why it isn't a backup: it runs on a timer, not when a
+photo is taken; its cursor is one timestamp, so one file that fails blocks everything newer;
+an upload restarts from zero, and the server holds it whole in memory (up to 512 MB); every
+folder is sent, with no choice; "Wi-Fi only" doesn't apply when the app is opened; nothing shows
+progress or errors; it uses the app's session, which ends 7 days after sign-in; and the manifest
+has no `ACCESS_MEDIA_LOCATION`, so Android may hand over photos with their GPS position removed
+(to check on a real phone).
+
+| Where | What goes |
+|---|---|
+| Server code | `photo/sync.py` whole (listener, handler, page, token, activity log); in `photo/api.py` the `sync` and `sync_upload` routes; in `configuration.py` `sync_host`, `sync_port`, the listener restart and its "pending restart" logic; `state.py`'s `sync`; `satellite.py`'s `start`/`stop` hooks; in `commands/photo.py` `photo sync`, the sync line of `photo stats`, the `sync_*` keys of `photo config` |
+| Server config | `sync_enabled`, `sync_host`, `sync_port`, `sync_token`, `sync_max_bytes` in `config.default.toml` and `config.toml`; the `data/sync_token` file; the `incoming/` folder |
+| Kept | `source_paths` and `sync_default_path` (which album a phone folder joins): the new sync uses them; `library.add_file()` and its `private` check |
+| Web | Photo's `page.js`: the "Phone sync" panel, tile and listener log (about 60 lines), and their styles in `page.css` |
+| App code | `mobile/src/photo/backgroundSync.ts`, `backgroundSyncTask.ts`, `syncState.ts`, `mediaPermission.ts`; the "Automatic phone sync" section of `PhotoConfigurationScreen.tsx`; `uploadSync` in `photo/api.ts`; `postFile` in `api/client.ts` (nothing else uses it); the two calls in `App.tsx`; the headless task in `index.js` |
+| App build | `react-native-background-fetch` and `@react-native-camera-roll/camera-roll` in `package.json`; in the manifest `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK` and the comments that go with them (the media permissions come back with the new sync) |
+| App storage | `starcore_photo_sync_state:<server>`, removed once at start |
+| Tests | `engine/tests/test_photo_sync.py` whole; the sync parts of `test_photo.py` (`photo config sync_*`, about 1448-1546), `test_cli.py` (37, 397-407), `test_developer_mode.py` (73, 97, 115-122), `test_configuration.py` (114), `test_locked_folder_security.py` (428-443, rewritten against the new route); `mobile/__tests__/backgroundSync.test.ts`, `lockedBackgroundSync.test.tsx`, `startupSync.test.tsx`, the sync part of `serverListStartup.test.tsx`; `KNOWN_IMPORTS`' `App.tsx` line |
+| Docs | `satellites/photo.md` ("Phone synchronization", "Configuring Photo Sync", "Real automatic phone sync", the route table, the CLI list); `api.md` (342-345); `deployment.md` (167, 318-319); `cli.md` (171, 174); `mission_control.md` (164); `satellites.md` (82, 270, 319, 367); `mobile/README.md` (21, 180); `roadmap.md` (230); `ui-contract.md`'s target row |
+| CHANGELOG | a "Removed" entry under Unreleased; the two entries that say settings and phone sync "open Photo's own screens" (174, 250) reworded when that stops being true |
+
+### Design
+
+**Two halves, as for audio.** A Satellite capability, `media.sync` v1, that any Satellite
+holding media can provide (Photo does); and a client capability, `device.media-sync`, written
+once in the Android app (it replaces the reserved, unclaimed name `device.background-tasks`).
+The app finds the provider in the catalog and never names it.
+
+**`media.sync` v1, the provider's side:**
+
+| Operation | Request and answer |
+|---|---|
+| `status` | `GET ?device=` -> `{accepts: ["image", "video"], max_bytes, chunk_bytes, device: {name, last_seen, received}}` |
+| `check` | `POST {device, items: [{sha256, size}]}` (at most 500) -> `{known: [sha256], wanted: [sha256]}`. Known means: in the library, in the bin, erased earlier, or moved somewhere protected. The answer never says which. |
+| `upload` | `GET /<sha256>` -> `{offset}`, the bytes already held for this digest. `POST /<sha256>?offset=&size=&name=&folder=&taken=`, the raw body from that offset, at most `chunk_bytes` -> `{offset}`, or at the last byte `{status: "imported" or "duplicate", id}`. Written straight to disk; the whole file's SHA-256 must match before it is taken in; a wrong offset answers `409` with the right one. |
+| `devices` (optional) | `GET` -> the devices that sync, for a status page on any client |
+
+**The app's side** (`mobile/src/sync/` and a Kotlin package `sync`, both generic):
+
+- **Detection:** a WorkManager job triggered by MediaStore content changes (images and
+  videos), so a new photo starts a run within seconds; a periodic job every 6 hours and a run
+  when the app opens catch what a trigger missed (a reboot, a force stop). No timer loop, no
+  foreground service left running.
+- **The local index** (SQLite, app-private, per server): for each media its MediaStore id,
+  folder, size, modification time and generation, then its SHA-256 and a state (`pending`,
+  `uploading` with an offset, `done`, `failed` with a reason and a retry count). Items fail
+  one by one: a file that can't be read or is refused never blocks the others.
+- **Duplicates:** the MediaStore id with size and time says what changed on the phone; the
+  SHA-256 says what the server has. A file is hashed once, `check` is asked, and only wanted
+  files are sent. After a reinstall or on a new phone, everything is hashed again and nothing
+  is sent twice.
+- **Folders:** the phone's own folders (MediaStore buckets: Camera, Screenshots, Downloads,
+  each app's folder), listed with counts; Camera is on by default, the rest off. The folder's
+  path travels as `folder`, which Photo maps to an album with `source_paths`.
+- **When:** Wi-Fi only by default, with "Use mobile data" as a switch; "Only while charging"
+  off by default; never on a low battery. These are WorkManager constraints, so the system
+  enforces them, also for "Sync now" and for opening the app.
+- **Cuts:** chunks of `chunk_bytes` (8 MiB by default, set by the provider so it fits the
+  proxy in front of it). After any cut the app asks the offset and goes on from there. A run
+  stopped by the system (10 minutes, Doze) is rescheduled with backoff; a long run shows a
+  progress notification as a `dataSync` foreground job.
+- **What the person sees:** on Android the sync screen (reached from the document and from the
+  app's settings): on or off, folders, the two switches, and a state line: "Backing up 12 of
+  80", "Up to date, 2 min ago", "Waiting for Wi-Fi", "Waiting for the charger", "Permission
+  needed", "Sign in again", and the failed items with their reason and "Try again". On the
+  web, a Devices page in Photo's own `ui.json` from the provider's `devices` route: each device,
+  when it last synced and how much. The web can't sync in the background; uploading from a
+  browser is the existing `upload` action.
+- **In the contract:** one action, `{"sync": {"capability": "media.sync"}}`, opens the client's
+  own sync screen for that provider. A client without `device.media-sync` hides the control.
+  The document supplies no text, no route and no setting of the sync itself.
+- **Permissions:** `READ_MEDIA_IMAGES` and `READ_MEDIA_VIDEO` (Android 13 and later),
+  `READ_EXTERNAL_STORAGE` up to Android 12, `ACCESS_MEDIA_LOCATION` so originals keep their
+  position, `POST_NOTIFICATIONS` for the progress notification, `FOREGROUND_SERVICE_DATA_SYNC`.
+  Asked when sync is turned on, never from the background. On Android 14 and later "selected
+  photos only" is not enough: the screen says so and offers the system setting. No exemption
+  from battery optimisation is requested.
+- **Authentication:** see decision 1. Recommended: a **device credential** the Engine issues
+  for one capability (`POST /api/auth/devices`, with a full session): it can call only the
+  routes of that capability's provider, so a sync credential can add media and read nothing;
+  it has no 7-day end; it is stored hashed on the server, listed and revoked with the
+  sessions, and kept on the phone under an Android Keystore key. Signing out revokes it and
+  removes the local index.
+- **Transfer:** the same origin the app uses, never another host after a redirect; the screen
+  warns when the server address is plain HTTP; integrity by the SHA-256 the server checks; the
+  provider limits size, partial uploads per device (4) and their age (7 days).
+- **Deleted media:** it is a one-way backup. Deleted or edited on the phone: the server keeps
+  what it has (an edit is a new file). Moved to the bin on the server: not sent again. Erased
+  on the server: not sent again either, because the provider keeps the digest (decision 2).
+  Moved somewhere protected: answered as known. Nothing is ever deleted from the phone.
+
+### What is tested where
+
+| Where | What |
+|---|---|
+| Engine tests | the protocol: `check`, resuming, a wrong offset, a wrong digest, limits, stale partials, erased and protected digests answered as known, a large file without holding it in memory, the device credential reaching only its capability's routes |
+| Jest | the sync screen's states and switches against a fake native module, the permission flow, the `sync` action hidden without the capability or a provider, the contract fixtures |
+| JVM unit tests (new for the app) | the index's state machine, chunk planning and backoff, without a device |
+| Emulator | a pushed file is detected and sent; folders respected; airplane mode in the middle of a video, then it resumes; the app killed and the run still happens; a reboot; a metered network and the charger simulated with `adb`; Doze forced; Android 13 and 14 permission dialogs |
+| A real phone only | the camera's own files (HEIC, motion photos, 4K video); position kept in the original; a night in Doze; the maker's battery saver killing the app; Wi-Fi to mobile data while sending; a reboot with the phone not yet unlocked; hours of backlog and heat |
+
+### Milestones
+
+| # | What | Contract | Main files | Model |
+|---|---|---|---|---|
+| S0 | Remove the old sync (the inventory above) | none; the reserved client name changes in S2 | as listed | Sonnet 5.5 high |
+| S1 | `media.sync` v1 in the vocabulary and in Photo: the four routes, streamed to disk, digests of erased items; the Engine's device credentials if decision 1 says so | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `photo/backup.py` (new) and `api.py`, `library.py` (erase records the digest), `engine/starcore/auth.py` and `api/server.py` | Opus 5.5 xhigh |
+| S2 | The `sync` action and `device.media-sync`; Photo's button and Devices page | **contract change 3** | `ui_contract.py`, fixtures, both clients' contract and action runners, `photo/ui.json` | Opus 5.5 high |
+| S3 | The app's sync: the Kotlin package (workers, MediaStore, index, uploader, notification), `mobile/src/sync/` (screen, state), the manifest, `App.tsx` | none | `mobile/android/app/src/main/java/.../sync/`, `mobile/src/sync/`, `AndroidManifest.xml` | Opus 5.5 xhigh |
+| S4 | Emulator runs from the table above; then the owner's phone | none | none | Opus 5.5 high |
+| S5 | Security review of S1 to S3 (the credential, the upload route, what the phone stores) | none | none | Fable 5.2 high |
+
+### Decisions for the owner
+
+1. **Credential:** a device credential limited to `media.sync` (recommended: backup goes on
+   without signing in every week, and a stolen one reads nothing), or the app's session as
+   today (no Engine change; backup stops 7 days after each sign-in until the app is opened and
+   signed in again).
+2. **Erased photos:** the server remembers their digest so a phone never sends them back
+   (recommended), or forgets them, so a reinstalled app uploads them again.
+3. **Defaults:** Camera only, Wi-Fi only, charging not required (recommended).
+4. **When the old sync goes:** first, in S0 (recommended: one code path; production keeps the
+   old one until the whole stage is pushed and deployed), or only once S3 works.
+
+## The rest of Photos, after the Locked Folder and the sync
+
+| # | What | Contract | Main files | Tests | Model |
+|---|---|---|---|---|---|
+| P1 | Settings (#29) as forms: the `source_paths` mappings as repeatable rows (the `rows` field kind arrives with the Locked Folder's L4), retention, default import folder, default album; `own: "settings"` goes | uses contract change 2 | `photo/ui.json`, `photo/api.py` (a `view/settings` route), `configuration.py` | Engine: the document's routes; both clients' form tests with rows added, removed and refused | Opus 5.5 high |
+| P2 | Icons shipped by a Satellite (#38): an `icons/` folder named in the manifest; the Engine validates each SVG (no DOCTYPE, an allow-list of shape elements and attributes, `currentColor` only, no `style`, `script`, `use`, `image`, `href` or event attribute, 8 KB each, 32 at most) and serves it with a revision; a document names `{"own": "<name>", "fallback": "<shared icon>"}`; both clients check again and tint it; Android gets its SVG renderer | **contract change 4** | `satellite_loader.py`, `ui_contract.py`, `api/server.py`, fixtures, `mission_control/ui/icons.js`, `mobile/src/satellites/ui/` | Engine: every refused construct as a fixture; both clients draw the fallback for a refused or missing icon | Opus 5.5 high |
+| P3 | Remove Photo's `page.js`, `page.css`, `mobile/src/photo/`, its routes in `MainTabs.tsx` and its `DEDICATED_SCREENS` entry, once the owner has validated L5, S4 and P1 | none | those | the suites; `KNOWN_IMPORTS` loses `MainTabs.tsx` and `KNOWN_COUPLINGS` its Photo count | Sonnet 5.5 medium |

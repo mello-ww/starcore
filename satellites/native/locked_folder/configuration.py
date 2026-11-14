@@ -89,9 +89,17 @@ def validate(key: str, value):
     return setting["validate"](value)
 
 
-def describe(satellite) -> dict:
+LOCATION_HIDDEN = "Unlock the Locked Folder to see or change its location."
+
+
+def describe(satellite, hide_location: bool = False) -> dict:
+    """The settings, as every Satellite's configuration route answers them. `hide_location`
+    (a PIN guards the vault and this session hasn't unlocked it) leaves the location out
+    altogether: a locked session can't change it anyway, and must not learn it."""
     settings = []
     for key, meta in SETTINGS.items():
+        if hide_location and key == "locked_folder_path":
+            continue
         value = satellite.config.get(key, DEFAULTS[key])
         setting = {
             "key": key,
@@ -108,7 +116,7 @@ def describe(satellite) -> dict:
             setting["type"] = meta["type"]
         settings.append(setting)
 
-    return {"settings": settings, "restart_required": False, "note": None}
+    return {"settings": settings, "restart_required": False, "note": LOCATION_HIDDEN if hide_location else None}
 
 
 def update(engine, satellite, key: str, value) -> dict:

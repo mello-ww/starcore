@@ -7,8 +7,10 @@ some particular UI flow". See docs/satellites/locked_folder.md.
 
 File Explorer works exactly as it always has - unbounded, no configured
 root of its own (see paths.py) - when no LockedFolder satellite is present,
-disabled, or hasn't been given a path yet: there is nothing to guard
-against, so every function below is a no-op in that case.
+or it hasn't been given a path yet: there is nothing to guard against, so
+every function below is a no-op in that case. A *disabled* LockedFolder
+satellite is still guarded: disabling it needs only a session, never the
+PIN, so it must not open the vault.
 """
 
 from pathlib import Path
@@ -20,11 +22,12 @@ LOCKED_FOLDER_NAME = "LockedFolder"
 
 def _runtime(engine):
     """The LockedFolder satellite's live runtime object, or None if there is
-    nothing to guard against (satellite absent or disabled). A runtime that
+    nothing to guard against (satellite absent). Enabled or not makes no
+    difference: its files are just as private either way. A runtime that
     hasn't been created yet is created here, so the first request after a
     restart is guarded like every other."""
     satellite = engine.registry.get(LOCKED_FOLDER_NAME)
-    if satellite is None or not satellite.enabled:
+    if satellite is None:
         return None
     live = getattr(satellite, "locked_folder_runtime", None)
     if live is None and satellite.state_provider is not None:

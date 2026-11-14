@@ -178,7 +178,10 @@ still apply to it (see "What it protects, and how" above) - which means it can b
 moved from outside StarCore entirely: Windows File Explorer, `rm -rf`, a script, another
 program. `GET /status` reports this distinctly rather than pretending everything is still
 fine: `"path_exists"` is `true` when the configured path is there, `false` when it no longer
-is, and `null` only when nothing is configured at all. StarCore never recreates a directory
+is, and `null` only when nothing is configured at all. `"path"` itself is given only to a
+session that has the vault unlocked, or while no PIN guards it yet (during setup); a locked
+session gets `null`, and the configuration route leaves the location out of its settings, with
+a note to unlock first. StarCore never recreates a directory
 that disappeared this way, and nothing here crashes over it - the same routes that would
 normally serve its contents simply report the same `404` File Explorer already gives for any
 other path that isn't there.
@@ -626,7 +629,15 @@ and kept warm by its `state.py`, which the Core already calls whenever a Satelli
 queried). File Explorer's guard reads that attribute, and when nothing has created the
 runtime yet - the first request after a restart - it runs the Locked Folder's state provider
 to create it, rather than letting the request through unguarded. Photo's `private_media.py`
-does the same. Only an absent or disabled Locked Folder Satellite means "nothing to guard".
+does the same. Only an absent Locked Folder Satellite, or one with no location, means "nothing
+to guard". A **disabled** one is guarded exactly like an enabled one: disabling a Satellite
+needs only a session, never the PIN, so it must not open the vault. Its routes stay served
+while it is disabled, so the owner can still unlock it.
+
+After a **reload** of the Satellite, the routes, the guard and Photo still share one runtime:
+it lives in the cached `runtime.py` module, keeps every unlock, grant and counter, and from then
+on reads the rebuilt Satellite's configuration. A location that changed in `config.toml` before
+the reload ends every unlock, as a change through the settings does.
 
 Renaming or deleting a folder that **contains** the vault is refused while it is locked too
 (`guard_tree()`), since either would move the vault out from under its configured path or
@@ -725,3 +736,136 @@ from Photo's own web page: locking again after a successful and after a failed m
 already unlocked session moving without a prompt, cancelling or a missing PIN moving nothing,
 and a lock that can't be sent being reported with when the vault locks by itself, then tried
 again once when back online or as the page goes away.
+
+## Security audit and plan: the Locked Folder in the shared interface (2026-11-15)
+
+**Status: approved by the owner (2026-11-15). L0 is done: A1, A5 and A9 are fixed. Nothing
+else below is implemented yet**, and the decisions at the end stay open until the milestone that
+needs them. Read from the code at `5b716a9`. It is the audit stage 4 of [Remaining work](../remaining-work.md)
+asks for, as M5 had ([its audit](../archive/m5-locked-folder-actions-audit.md)). The common
+order with Photos and the phone sync is in Remaining work.
+
+### What protects the vault today
+
+- **The server decides, per session.** Every route that reads or changes the vault (`media`,
+  `media/file`, `upload`, `delete`, `move_in`, `move_out`, `encryption`) asks
+  `is_unlocked(token)`. An unlock belongs to one session token, lasts a fixed
+  `session_timeout_seconds` (900), lives in memory only, and is dropped by a PIN change, a new
+  location, a recovery or a restart.
+- **The PIN** is PBKDF2-HMAC-SHA256 (260,000 rounds, per-PIN salt). An attempt is counted and
+  saved to disk before the PIN is looked at; five wrong ones lock the session, twenty lock the
+  account, doubling up to 24 hours. Damaged security state keeps the vault locked.
+- **Biometrics** are a server-verified RSA signature over a single-use challenge of this
+  session. A client that only claims a match gets nothing.
+- **`media.vault`** offers `status`, `unlock`, `lock`, `move_in` and `biometric`: nothing that
+  lists or reads.
+- **The `secure` action** is accepted by the Engine only in a media viewer's or selection's
+  actions, only for `media.vault` / `move_in`, only in a document whose Satellite provides
+  `media.gallery`, and with no route, body or form. The client builds the references from the
+  catalog and asks for the PIN in its own prompt (`mission_control/ui/secure.js`; on Android a
+  native prompt that hands shared code only the grant). The PIN buys a grant: one session, one
+  operation, exactly those items, 60 seconds, used up by the first request. A grant opens
+  nothing else.
+- **File Explorer's guard** refuses, for a path inside the vault and a session that hasn't
+  unlocked it: `entries`, `view/folder`, `view/file`, `content`, `upload`, `mkdir`, `rename` and
+  `delete`; renaming or deleting a folder that contains the vault; and everything inside an
+  encrypted or encrypting vault, even unlocked. Paths are resolved first (`..`, symlinks).
+- **Photo** refuses to import the vault and answers a file that was moved in as a duplicate.
+- **At rest:** see "Encryption at rest". Off until the owner turns it on.
+- **In transit:** the session cookie (`HttpOnly`, `SameSite=Lax`) or bearer token; the PIN in
+  the JSON body of `unlock`, `pin`, `biometric/enroll`, `recover` and the two encryption
+  confirmations; the recovery key once, in the answer of `encryption/start` or
+  `encryption/recovery_key`. Vault files are sent `no-store`. The Android app sends the token
+  as a header, never in a URL, and holds vault images in memory.
+
+### Findings
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| A1 | **Disabling the Locked Folder Satellite removes File Explorer's guard.** `locked_folder_guard._runtime()` answers "nothing to guard" for a disabled Satellite, and `POST /api/satellites/LockedFolder/disable` needs only a session. Checked with a throwaway test on temporary folders: for a session that never gave the PIN, listing the vault and reading a file in it went from `403` to `200`. For an encrypted vault the same step shows only ciphertext, but also the unencrypted originals in `.starcore-vault/backups/` until that backup is deleted, and lets all of it be renamed or deleted. Photo's `private_media.py` already ignores `enabled`; the guard doesn't. | **High** | Fixed in L0: the guard protects whether the Satellite is enabled or not. Then L1: protection is asked of the Engine, which asks every provider, enabled or not. |
+| A2 | **Protection is opt-in per Satellite.** File Explorer and Photo ask; any other Satellite that takes a server path doesn't. Music's `scan` accepts any `source` and never asks, so a signed-in session can index and stream the audio files of an unencrypted vault (read in the code, not exercised). | Medium | L1: one Engine check (`files.protected`) that every route taking a path calls, Music included. |
+| A3 | **A full unlock opens everything for 900 seconds and outlives a dead client.** Accepted in M5 (its F3) because the shared interface never unlocked. Browsing the vault from the shared interface makes the full unlock the ordinary path on both clients, and locking on leaving is best effort: a crash, a lost connection or a killed app leaves the session open, also to File Explorer for an unencrypted vault. | Medium | L2: an unlock also ends after a short idle time, kept alive only by a client that is showing the vault. |
+| A4 | **What a session is worth bounds what the PIN is worth.** Session tokens are stored unhashed in `auth.json`, last 7 days, and the cookie is `Secure` only when the Engine itself serves HTTPS (not behind a TLS proxy). The app allows cleartext to any host. On plain HTTP the token, the PIN and the recovery key are readable on the network, so the PIN adds nothing against someone who can listen. | Medium, Engine-wide | Not the Locked Folder's to fix: the hashed tokens of Stabilisation, plus `Secure` on the cookie behind an HTTPS proxy. Until then this page says the vault's guarantees assume HTTPS. |
+| A5 | **`status` tells any signed-in session the vault's absolute path**, with the lockout counters and encryption state, before any unlock. The path is what A1 and A2 need. | Low | Fixed in L0: the path, in `status` and in the settings, only for an unlocked session, or while no PIN is set (setup). |
+| A6 | **A biometric signature isn't bound to what it is for.** `for` travels beside the signed challenge, not in it, so one signature is good for a grant or for a full unlock, whichever the request says. | Low | L2: the purpose is given when the challenge is asked for and kept with it on the server. |
+| A7 | **Secrets in the shared interface could become document inputs** (M5's F4, now concrete: setting a PIN and recovery move to the shared interface). A form field that takes a PIN teaches people to type it into whatever a document draws. | Low, design rule | L4: secrets are typed and shown only in prompts the client owns, and only for a protected document. |
+| A8 | **Unlocks and grants stay in memory after a sign-out** or a revoked session. Nothing can use them: authentication refuses the token first. | Low, accepted | Lapses by itself with A3's idle time. |
+| A9 | **Robustness:** `is_unlocked()` and `unlock()` change the unlock table outside the runtime's lock (a concurrent expiry can raise and answer `500`, never open anything); `unlock()` clears a counter by the raw token while the table is keyed by its hash (a no-op, `record_success()` does the real reset). After a Satellite **reload**, whether the guard and the routes still share one runtime has not been checked. | Low | Fixed in L0. Checking the reload found a real gap: the cached runtime kept reading the old Satellite's configuration, so a location set after a reload was not the one File Explorer guarded. It now follows the rebuilt Satellite. |
+
+**Who can do what.** A Satellite's Python has full rights on the server: installing one is the
+trust decision, and no contract protects the vault from it. A **document** can do nothing to
+the vault: its routes stay inside its own Satellite, and it never sees a PIN or a grant. A
+**client holding a session but not the PIN** could use A1, A2 and A5, and guess within the
+attempt limits; since L0 it has A2 and the guessing, and after L1 only the guessing is left. A client holding both is the owner.
+
+### Design
+
+Five rules, each testable:
+
+1. **The Locked Folder gets its own `ui.json`**, drawn by the shared renderers, over its own
+   routes. Nothing about the vault is added to Photo's document.
+2. **A document can declare itself protected** (contract, L2):
+   `"protected": {"capability": "media.vault", "setup": "<page>"}`. The Engine accepts it only
+   when the document's own Satellite provides that capability. For such a document the client:
+   - asks `status` before any page. Not configured, no PIN, or a security problem: it opens
+     the `setup` page, whose routes the server already serves without an unlock (a first PIN, a
+     location while nothing is protected, recovery). Locked: its own prompt (PIN; biometrics
+     on Android), asking `unlock` for this session;
+   - treats a `403` from any of the document's routes as "locked again": the prompt, not an
+     error;
+   - locks when the document closes, when the tab is hidden or the page goes away, when the app
+     goes to the background and when the server changes;
+   - keeps the unlock alive only while it shows the document (`keep`, below);
+   - keeps nothing: no offline page, no widget, no share, images and videos never in a disk
+     cache (on Android fetched into memory, as `PrivateImage` does today), and on Android the
+     window can't be captured (the reserved `secure.screen`, claimed then).
+3. **The idle time is the server's** (L2): an unlock ends at `session_timeout_seconds` or after
+   90 seconds without a request to a vault route or to `keep` (a new optional operation of
+   `media.vault` v1: `POST keep` -> `{expires_at}`, only for a session that is unlocked).
+   `status` never extends anything. A client that dies leaves at most 90 seconds.
+4. **Secrets belong to client prompts** (contract, L4): an action of a protected document may
+   declare `secrets` (`{"pin": {"kind": "pin", "new": true}}`: the client asks in its own
+   prompt, twice for a new one, and puts the value in the request body under that key, never
+   in `$form` or `$state`) and `reveal` (`"reveal": "recovery_key"`: the client shows that field
+   of the answer once, in its own dialog, with a confirmation that it was stored, and keeps it
+   nowhere). Kinds are a closed list (`pin`, `recovery-key`); the prompt's words are the
+   client's and name the Satellite that asks. The Engine refuses both outside a protected
+   document, so no other document can raise a PIN prompt.
+5. **Satellites reach each other through the Engine** (L1, L6): `files.protected` v1 (`check`:
+   `GET ?path=` -> `{protected, open}` for this session), asked through an Engine helper that
+   consults every provider, enabled or not; later `media.vault`'s optional `sealed` and
+   `media.gallery`'s optional `original`, `release` and `adopt`, so the vault and the library
+   move files without importing each other.
+
+Sections: a client opens another Satellite's document from inside its host with the **`section`**
+action (contract, L2): `{"section": "$.section"}` opens the document of a Satellite whose
+manifest says `section_of` this one, and nothing else. Photo's albums route lists its sections
+from the Engine's registry (title and `icon_name` from each manifest), so the Locked Folder's
+tile stays where it is and Photo names nothing.
+
+### Milestones
+
+| # | What | Contract | Main files | Tests | Model |
+|---|---|---|---|---|---|
+| L0 (done) | Close A1; `status` and the settings without the path while locked (A5); the unlock table under the lock, the reload case (A9) | none | `file_explorer/locked_folder_guard.py`, `locked_folder/api.py`, `configuration.py`, `runtime.py` | `test_locked_folder_security.py`: a disabled Satellite still guards, also from a cold start; a locked `status` and configuration have no path; after a reload the guard and routes agree, and a new location is the one guarded; concurrent expiry never raises | Opus 5.5 high |
+| L1 | `files.protected` v1 and the Engine's check; File Explorer, Photo and Music ask it (A2) | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `engine/starcore/capabilities.py`, the guard (becomes `protection.py`), `photo/private_media.py`, `music/routes_catalog.py`, `locked_folder/satellite.toml` | Engine: provider disabled, no provider, Music's scan refused inside the vault; the three contract suites still agree on the vocabulary | Opus 5.5 high |
+| L2 | Protected documents, the `section` action, `keep` and the idle time, purpose-bound challenges (A3, A6); the generic unlock prompt on Android (`mobile/src/vault/`) and the web's prompt for a full unlock | **contract change 1** | `engine/starcore/ui_contract.py`, fixtures, `mission_control/ui/` (contract, renderer, `secure.js`), `mobile/src/satellites/ui/`, `mobile/src/vault/` (from `src/lockedFolder/`), `builtins.tsx`, `locked_folder/runtime.py` and `api.py` | fixtures valid and invalid (protected without the capability, with `offline`, `secrets` outside it); Engine idle expiry with a fake clock; both clients: gate, `403`, lock on leave, nothing cached | Opus 5.5 xhigh |
+| L3 | The Locked Folder's `ui.json`: grid, viewer, move to Photos, delete, upload, download; Photo's tile through sections | data only | `locked_folder/ui.json`, `views.py` (new), `photo/gallery.py`, `photo/ui.json` | Engine: the document validates, every route it names exists and refuses a locked session; app: the document renders | Opus 5.5 high |
+| L4 | `secrets` and `reveal`, and repeatable form rows (`rows` field kind) in the same change; then the vault's settings and setup pages | **contract change 2** | as L2's contract files, the form renderers on both clients, `locked_folder/ui.json` | fixtures; both clients: a secret never in form state, storage or logs, a revealed value gone after closing; Engine: every management route still needs what it needs today | Opus 5.5 xhigh |
+| L5 | End to end on the local demo (web and emulator) with a generated PIN; the owner validates on the web and the phone | none | none | the M5 list, plus: kill the client while unlocked and see it lock by itself | Opus 5.5 high |
+| L6 | Moves through capabilities (`sealed`, `original`, `release`, `adopt`); comments that name the other Satellite go | vocabulary: optional operations | `locked_folder/vault.py`, `photo/private_media.py`, `photo/api.py`, `capabilities.py` (POST calls) | the existing move tests unchanged; `KNOWN_CROSS_SATELLITE` loses three lines | Opus 5.5 xhigh |
+| L7 | Security review of L0 to L6 | none | none | findings fixed before L8 | Fable 5.2 high |
+| L8 | Remove `locked_folder/mission_control/page.js`, `mobile/src/lockedFolder/`, Photo's `LockedFolderTab` | none | those | the suites | Sonnet 5.5 medium |
+
+Until L8 the Locked Folder's own page and screens keep working; in L2 they get the same `keep`
+call, so the idle time doesn't lock them while they are open.
+
+### Decisions for the owner
+
+1. **Idle time (rule 3):** 90 seconds kept alive by the client (recommended), or the fixed 900
+   seconds as today with locking on leave only.
+2. **Secrets (rule 4):** client prompts on the protected document's own routes (recommended:
+   generic, and nothing but the vault's own Satellite can ask), or every management step as an
+   operation of `media.vault` (no secret ever reaches a document route, but the capability
+   then carries encryption, recovery and backups, which are this Satellite's own features).
+3. **A1 now:** L0 is small and independent. It can go first, before anything else in this plan.
