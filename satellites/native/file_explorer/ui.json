@@ -1,5 +1,5 @@
 {
-  "_about": "File Explorer's shared interface (UI contract 1.2), a preview while it reaches parity with the web page (docs/file-explorer-migration.md): Mission Control keeps page.js by default and offers this in Developer Mode; the Android app, which has no File Explorer screen of its own, opens it. F1 browses read-only: the locations with their storage, and each folder's folders and files. F2 pages them: each list loads 200 rows at a time (`more`). F3 opens a file's page: its details, a picture's preview, and Open, Download and Share from the `content` route. F4 manages: new folder, rename and delete (with a confirm) through the `mkdir`, `rename` and `delete` routes, behind the same guards as the web page. The pages bind to the read-only view routes (views.py).",
+  "_about": "File Explorer's shared interface (UI contract 1.2), a preview while it reaches parity with the web page (docs/file-explorer-migration.md): Mission Control keeps page.js by default and offers this in Developer Mode; the Android app, which has no File Explorer screen of its own, opens it. F1 browses read-only: the locations with their storage, and each folder's folders and files. F2 pages them: each list loads 200 rows at a time (`more`). F3 opens a file's page: its details, a picture's preview, and Open, Download and Share from the `content` route. F4 manages: new folder, rename and delete (with a confirm) through the `mkdir`, `rename` and `delete` routes, behind the same guards as the web page. F5 uploads: files picked on the device, each streamed to the `upload` route, a file already there replaced only once confirmed. The pages bind to the read-only view routes (views.py).",
   "contract": "starcore.ui/1.2",
   "title": "Files",
   "preview": true,
@@ -29,6 +29,11 @@
          "action": {"navigate": "folder", "params": {"path": "$.parent"}}},
         {"type": "button", "label": "All locations", "style": "secondary", "visible": "$.at_drive_root",
          "action": {"navigate": "locations"}},
+        {"type": "button", "label": "Upload files", "style": "primary",
+         "action": {"upload": {"multiple": true}, "route": "upload?path={$params.path}&name={$value.name}",
+                    "conflict": {"confirm": "A file with this name is already in this folder. Replace it?",
+                                 "route": "upload?path={$params.path}&name={$value.name}&overwrite=1"},
+                    "then": "refresh"}},
         {"type": "text", "style": "caption", "text": "This folder is empty.", "visible": "$.empty"},
         {"type": "list", "id": "folders", "visible": "$.has_folders", "items": "$.folders",
          "item": {"title": "$.name", "subtitle": "$.subtitle", "format": {"subtitle": "datetime"}, "icon": "$.icon"},

@@ -38,7 +38,7 @@ Clients implement the UI contract and capability protocols, never a Satellite.
 |---|---|---|
 | Status | ✅ its only interface on both clients (1.1) | none |
 | Photos | ✅ default on both clients (1.2) | web `page.js` for settings and the Locked Folder; Android `src/photo/` for settings, phone sync and the Locked Folder; background sync started by `App.tsx` |
-| File Explorer | ◐ preview (F1-F4): browsing, a file's page (open, download, share) and management (new folder, rename, delete); Android opens it, the web keeps `page.js` | web `page.js` and `page.css` |
+| File Explorer | ◐ preview (F1-F5): browsing, a file's page (open, download, share), management (new folder, rename, delete) and upload; Android opens it, the web keeps `page.js` | web `page.js` and `page.css` |
 | Music | ◐ only the player: the shared audio host on both clients, and `play` for any Satellite. No `ui.json` | web `page.js` with its views (home, library, album, artist, playlist, search, settings, stats); Android `src/music/` (11 screen and tab files), wired by `builtins.tsx` |
 | Locked Folder | ◐ only moving photos in, from Photos (`secure` + `media.vault`) | web `page.js` (about 1,200 lines: browsing, PIN, encryption, recovery), hosted by Photo's page; Android `src/lockedFolder/` (its screens and the unlock prompt) |
 | Docker | – a placeholder with no interface | none |
@@ -82,7 +82,7 @@ From [`file-explorer-migration.md`](file-explorer-migration.md). F1 is done.
   `StarCoreFilesModule.kt`); an HTML, SVG or XML file opened in a tab is sandboxed.
 - [x] **F4 - Management:** new folder, rename, delete, through forms and confirms; the Locked
   Folder's guard still refuses.
-- [ ] **F5 - Upload:** the `upload` action on both clients (pick files, stream them, confirm a
+- [x] **F5 - Upload:** the `upload` action on both clients (pick files, stream them, confirm a
   replacement on `409`, report each file).
 - [ ] **F6 - Default:** drop `preview`; `docs/satellites/file_explorer.md`; CHANGELOG.
 - [ ] **F7 - Remove** `page.js` and `page.css`.

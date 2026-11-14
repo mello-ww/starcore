@@ -36,7 +36,7 @@ Legend: as in `photos-parity-audit.md`.
 | 12 | New folder | ✅ prompt | ✗ | ✅ fixed in F4: a `form` on the folder page (`mkdir`), then `refresh` | F4 | S |
 | 13 | Rename file or folder | ✅ prompt | ✗ | ✅ fixed in F4: a `form` on the file page and the folder page (`rename`), prefilled with the name, then `back` to the folder, which reloads | F4 | S |
 | 14 | Delete (confirm) | ✅ two-tap | ✗ | ✅ fixed in F4: a `danger` button with a `confirm` (`delete`), then `back` | F4 | S |
-| 15 | Upload, several files, overwrite on conflict | ✅ | ✗ | C: `upload` action (below); S: unchanged route | F5 | L |
+| 15 | Upload, several files, overwrite on conflict | ✅ | ✗ | ✅ fixed in F5: an Upload files button on the folder page (`upload` action, below), the unchanged `upload` route, a replacement only once confirmed, then `refresh` | F5 | L |
 | 16 | Errors as notices | ✅ | ✅ generic | – | – | – |
 
 ## Contract additions (UI contract 1.2, unreleased, additive)
@@ -52,13 +52,18 @@ Legend: as in `photos-parity-audit.md`.
 
    ```json
    {"upload": {"multiple": true}, "route": "upload?path={$params.path}&name={$value.name}",
-    "conflict": {"confirm": "Replace {$value.name}?", "route": "upload?path={$params.path}&name={$value.name}&overwrite=1"},
+    "conflict": {"confirm": "A file with this name is already in this folder. Replace it?",
+                 "route": "upload?path={$params.path}&name={$value.name}&overwrite=1"},
     "then": "refresh"}
    ```
 
    - `$value.name` is the picked file's name, cleaned by the same rule as `download` names.
-   - A `409` answer asks `conflict.confirm`, then retries on `conflict.route`; cancelling skips
-     that file. Each file is reported; partial success is never shown as complete.
+   - A `409` answer asks `conflict.confirm`, which the client shows under the file's name (the
+     contract has no text templates), then retries on `conflict.route`; cancelling skips that
+     file. Without `conflict`, a `409` is a failure. Each file is reported; partial success is
+     never shown as complete.
+   - `then` is `refresh` or `back`; the action has no `body`, `method` or `confirm`, and is a
+     page's own: not in a selection or a tile's quick actions.
    - Web: a hidden `<input type=file>` and a streamed `fetch`. Android: the system document
      picker and a streamed POST in `StarCoreFilesModule.kt`, with the session header.
    - A client that can't pick files hides the control. Nothing reaches the Satellite but the
@@ -112,6 +117,16 @@ the existing actions.
   the document's routes, confirms and root rule; the app's forms and its confirm; the guard's
   and the routes' own tests are unchanged.
 - **F5 - Upload.** The `upload` action on both clients, with conflicts and per-file reporting.
+  **Done.** The contract's `upload` is validated by the Engine with shared fixtures. Mission
+  Control picks with a hidden file input and streams each file as a `fetch` body
+  (`mission_control/ui/upload.js`); the app picks with the system document picker and streams
+  from `StarCoreFilesModule.kt` with a fixed length, copying a document of unknown size to its
+  cache first (`mobile/src/files/upload.ts`). Both send files one after another, ask before
+  each replacement and end with one report ("Uploaded 2 of 3 files. Kept the existing
+  notes.txt."). The folder page's Upload files button uses the existing route, so its 2 GB
+  limit, `.part` file and Locked Folder guard are unchanged. Tests: the contract's fixtures,
+  both clients' runners and reports, the app's module wrappers and button, the document's
+  routes.
 - **F6 - Default.** Drop `preview`; `page.js` stays as the Developer Mode fallback. Checked on
   the web, the emulator and the phone. New `docs/satellites/file_explorer.md`, CHANGELOG.
 - **F7 - Retire `page.js` and `page.css`**, once validated in use, with the storage themes.

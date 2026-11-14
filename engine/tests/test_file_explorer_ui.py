@@ -309,6 +309,21 @@ class FileDocumentTest(unittest.TestCase):
             self.assertEqual(delete["action"]["then"], "back")
             self.assertIn("cannot be undone", delete["action"]["confirm"])
 
+    def test_a_folder_uploads_into_itself_and_asks_before_replacing_a_file(self):
+        document = ui_contract.load(FILE_EXPLORER_DIR / "ui.json")
+        [upload] = [block for block in document["pages"]["folder"]["blocks"]
+                    if block["type"] == "button" and "upload" in block.get("action", {})]
+        action = upload["action"]
+        self.assertEqual(upload["label"], "Upload files")
+        self.assertEqual(action["upload"], {"multiple": True})
+        # the existing raw-body route; a file already there answers 409 and is replaced only
+        # once the person confirms, by the same route with `overwrite`
+        self.assertEqual(action["route"], "upload?path={$params.path}&name={$value.name}")
+        self.assertEqual(action["conflict"]["route"], action["route"] + "&overwrite=1")
+        self.assertIn("Replace it?", action["conflict"]["confirm"])
+        self.assertEqual(action["then"], "refresh")
+        self.assertNotIn("upload", json.dumps(document["pages"]["file"]))
+
 
 class FolderViewTest(unittest.TestCase):
     def test_a_locked_folder_shows_a_lock_and_says_so(self):

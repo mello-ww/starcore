@@ -7,6 +7,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Uploading files in File Explorer's shared interface**, on both clients: a folder's
+  **Upload files** picks one or more files (the browser's file dialog, the phone's document
+  picker) and sends them one after another, asking before replacing a file already there and
+  reporting each one ("Uploaded 2 of 3 files. Kept the existing notes.txt."). It is **UI
+  contract 1.2's `upload` action**, for any Satellite: each file is streamed as the raw body of
+  a POST to one of the Satellite's routes, with a `conflict` route for a `409`
+  (`docs/ui-contract.md`, `docs/file-explorer-migration.md`, F5).
 - **Managing files in File Explorer's shared interface**, on both clients: a folder's page
   creates a folder, renames it and deletes it; a file's page renames and deletes it. A delete
   asks first, and a rename or delete returns to the folder, which reloads. They use the same
