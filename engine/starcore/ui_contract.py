@@ -1068,14 +1068,17 @@ class _Validator:
     def check_file_action(self, where: str, action: dict, kind: str):
         """{download: route, name?} and {share: route, name?} (1.2): the client fetches one of
         the Satellite's own routes with its own session, then saves the file (download) or hands
-        it to the system share sheet (share), named `name`. Nothing is sent to the Satellite but
-        that GET; a client that can't do it hides the control. One file at a time: not in a
-        selection, and not in a tile's quick actions."""
+        it to the system share sheet (share), named `name`. A download with `open: true` opens the
+        file with the platform instead: a new browser tab, the phone's own viewer. Nothing is sent
+        to the Satellite but that GET; a client that can't do it hides the control. One file at a
+        time: not in a selection, and not in a tile's quick actions."""
         self.since(f"{where}.{kind}", f"the {kind} action", 2)
-        self.unknown_keys(where, action, {kind, "name"})
+        self.unknown_keys(where, action, {kind, "name", "open"} if kind == "download" else {kind, "name"})
         self.check_route(f"{where}.{kind}", action[kind])
         if "name" in action:
             self.check_text(f"{where}.name", action["name"])
+        if "open" in action and not isinstance(action["open"], bool):
+            self.error(f"{where}.open", "must be true or false")
         if self.in_bulk:
             self.error(f"{where}.{kind}", "is one file at a time: not in a selection or a tile's quick actions")
 

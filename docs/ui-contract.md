@@ -509,6 +509,12 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
   (Android 10 and later) or opens the share sheet with the file itself. A client that can't do
   one hides its control. Nothing reaches the Satellite but that GET. One file at a time: not in
   a selection or a tile's `quick` actions.
+
+  A `download` with **`open: true`** opens the file with the platform instead of saving it:
+  `{"download": "content?path={$.path}", "name": "$.name", "open": true}`. Mission Control
+  opens the route in a new tab with no handle on its page, where the browser shows what it can
+  and saves the rest; the Engine sandboxes a file that could run script there (HTML, SVG, XML,
+  see [the API](api.md)). The route should answer inline, without `Content-Disposition`.
 - **`secure`** (1.2), in a media viewer's or selection's `actions` only: runs one protected
   operation on the items shown or selected, behind the **client's own** unlock prompt.
 

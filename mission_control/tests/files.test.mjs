@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { canShareFiles, fileName } from "../ui/files.js";
+import { canShareFiles, fileName, openFile } from "../ui/files.js";
 
 test("a file is named from the document, made safe, else from its route", () => {
     assert.equal(fileName("IMG_0042.jpg", "originals/abc"), "IMG_0042.jpg");
@@ -24,4 +24,27 @@ test("sharing files needs a browser that says it can share them", () => {
     assert.equal(canShareFiles({ share: () => {}, canShare: () => false }), false);
     assert.equal(canShareFiles({ share: () => {}, canShare: ({ files }) => files.length === 1 }), true);
     assert.equal(canShareFiles({ share: () => {}, canShare: () => { throw new Error("no"); } }), false);
+});
+
+test("opening a file is a new tab with no handle on this page", () => {
+    const appended = [];
+    const doc = {
+        createElement: (tag) => {
+            const element = { tag, style: {}, clicked: 0, removed: false };
+            element.click = () => { element.clicked += 1; };
+            element.remove = () => { element.removed = true; };
+            return element;
+        },
+        body: { appendChild: (element) => appended.push(element) },
+    };
+    openFile("/api/satellites/Any/content?path=a.pdf", doc);
+    assert.equal(appended.length, 1);
+    const [link] = appended;
+    assert.equal(link.tag, "a");
+    assert.equal(link.href, "/api/satellites/Any/content?path=a.pdf");
+    assert.equal(link.target, "_blank");
+    assert.equal(link.rel, "noopener noreferrer");
+    assert.equal(link.download, undefined);
+    assert.equal(link.clicked, 1);
+    assert.equal(link.removed, true);
 });

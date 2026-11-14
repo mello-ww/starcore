@@ -1,6 +1,7 @@
 // The download and share actions (UI contract 1.2) in Mission Control: a file from one of the
-// Satellite's own routes, fetched with this browser's session, saved or handed to the system
-// share sheet. It knows the contract, never a Satellite.
+// Satellite's own routes, fetched with this browser's session, saved, opened in a new tab
+// (a download with `open`) or handed to the system share sheet. It knows the contract, never a
+// Satellite.
 
 const UNSAFE = /[\\/:*?"<>|\u0000-\u001f]/g;
 const LONGEST = 120;
@@ -41,6 +42,20 @@ export function downloadFile(url, name) {
     link.rel = "noopener";
     link.style.display = "none";
     document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
+
+/** Opens the file at `url` (the Satellite's own route) in a new tab, where the browser shows
+ * what it can and saves the rest. The tab gets no handle on this page; the Engine sandboxes a
+ * file that could run script there (HTML, SVG, XML). */
+export function openFile(url, doc = document) {
+    const link = doc.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.style.display = "none";
+    doc.body.appendChild(link);
     link.click();
     link.remove();
 }

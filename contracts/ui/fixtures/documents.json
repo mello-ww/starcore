@@ -44,14 +44,15 @@
     },
     {
       "name": "file-actions",
-      "_why": "1.2: download and share - the client fetches the Satellite's own route with its session, then saves the file or hands it to the system share sheet, named from the item.",
+      "_why": "1.2: download and share - the client fetches the Satellite's own route with its session, then saves the file or hands it to the system share sheet, named from the item; a download with open: true opens it with the platform instead.",
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {
         "home": {"source": {"route": "items"}, "blocks": [
           {"type": "media-grid", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"},
            "viewer": {"image": "full/{$.id}",
                       "actions": [{"label": "Download", "icon": "download", "action": {"download": "originals/{$.id}", "name": "$.name"}},
                                   {"label": "Share", "icon": "share-2", "action": {"share": "originals/{$.id}", "name": "$.name"}}]}},
-          {"type": "button", "label": "Download the report", "action": {"download": "reports/latest", "name": "report.pdf"}}
+          {"type": "button", "label": "Download the report", "action": {"download": "reports/latest", "name": "report.pdf"}},
+          {"type": "button", "label": "Open the report", "action": {"download": "reports/latest", "name": "report.pdf", "open": true}}
         ]}
       }}
     },
@@ -404,6 +405,18 @@
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "button", "label": "Share", "action": {"share": "file", "then": "refresh"}}]}}},
       "error": "unknown key"
+    },
+    {
+      "name": "share-cannot-open",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Share", "action": {"share": "file", "open": true}}]}}},
+      "error": "unknown key"
+    },
+    {
+      "name": "download-open-not-a-flag",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Open", "action": {"download": "file", "open": "yes"}}]}}},
+      "error": "must be true or false"
     },
     {
       "name": "download-in-1.1",

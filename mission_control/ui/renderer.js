@@ -13,7 +13,7 @@ import {
     BLOCK_TYPES, checkDocument, findProvider, formatValue, isSafeRoute, isVisible,
     missingRequirements, resolve, resolveTemplate, toneOf,
 } from "./contract.js";
-import { canShareFiles, downloadFile, fileName, shareFile } from "./files.js";
+import { canShareFiles, downloadFile, fileName, openFile, shareFile } from "./files.js";
 import { createGallery, holdsCollection } from "./gallery.js";
 import { createListPaging } from "./listpaging.js";
 import { icon } from "./icons.js";
@@ -603,8 +603,8 @@ export function mount(context) {
             return true;
         }
         if (action.download !== undefined || action.share !== undefined) {
-            // 1.2: a file from the Satellite's own route, with this session: saved, or handed to
-            // the system share sheet
+            // 1.2: a file from the Satellite's own route, with this session: saved, opened in a
+            // new tab (`open`), or handed to the system share sheet
             const sharing = action.share !== undefined;
             const route = resolveTemplate(sharing ? action.share : action.download, bindings);
             if (!route || !isSafeRoute(route)) {
@@ -613,6 +613,10 @@ export function mount(context) {
             }
             const url = `${satelliteBase}/${route}`;
             const name = fileName(action.name !== undefined ? resolve(action.name, bindings) : null, route);
+            if (!sharing && action.open === true) {
+                openFile(url);
+                return true;
+            }
             if (!sharing) {
                 downloadFile(url, name);
                 return true;
