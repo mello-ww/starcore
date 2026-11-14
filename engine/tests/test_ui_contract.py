@@ -153,6 +153,11 @@ class DocumentFixturesTest(unittest.TestCase):
         changed = {**document, "title": "x"}
         self.assertNotEqual(ui_contract.revision(document), ui_contract.revision(changed))
 
+    def test_the_listing_reports_a_preview_document_and_only_that(self):
+        base = {"contract": "starcore.ui/1.2", "entry": "a", "pages": {"a": {"blocks": []}}}
+        self.assertIs(ui_contract.UiDefinition({**base, "preview": True}).describe()["preview"], True)
+        self.assertNotIn("preview", ui_contract.UiDefinition(base).describe())
+
     def test_oversized_and_broken_files_are_refused(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "ui.json"
@@ -291,7 +296,7 @@ class UiApiTest(unittest.TestCase):
                                        "error": None})
         explorer = next(item for item in payload["satellites"] if item["name"] == "FileExplorer")
         self.assertEqual(explorer["provides"]["files.browse"]["operations"], {"list": "entries"})
-        self.assertIs(explorer["ui"]["preview"], True)
+        self.assertNotIn("preview", explorer["ui"])  # F6: its default interface on every client
         # a Satellite without a ui.json still has an entry, with no definition
         locked = next(item for item in payload["satellites"] if item["name"] == "LockedFolder")
         self.assertIsNone(locked["ui"])

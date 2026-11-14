@@ -16,8 +16,9 @@ each step until then are in this file's history (`git log -p docs/roadmap.md`).
   `search`, `map`, `play`, `pick`, `own`, `secure`, `download`, `share`, offline pages and
   `preview` (`docs/ui-contract.md`).
 - **Status** (1.1) and **Photos** (1.2) open their shared interface by default on both clients.
-- **File Explorer** has a read-only shared interface as a preview: the Android app's first file
-  browser (`docs/file-explorer-migration.md`, F1).
+- **File Explorer** opens in its shared interface by default on both clients (browsing, a file's
+  page, management and upload; `docs/file-explorer-migration.md`, F1-F6). Its `page.js` stays
+  in Developer Mode until F7.
 - **Music** plays through the shared audio host on both clients, and keeps its own library
   screens. The **Locked Folder** keeps its own screens; photos move into it from the shared
   interface through `media.vault`.

@@ -46,8 +46,8 @@ move (1.1; its page is gone since). Photo follows in 1.2: its document was a **p
 [The document](#the-document)) until it reached parity, and is now its default interface, with
 its own page and screens kept in Developer Mode until they are retired. Music keeps its
 dedicated, hand-written page and screens until the shared blocks reach parity with them.
-File Explorer's document is a read-only preview: the Android app opens it, Mission Control
-keeps File Explorer's `page.js` by default (see [Migration](#migration)). Those
+File Explorer's document, a preview until F6, is now its default interface on both clients, with
+its `page.js` kept in Developer Mode until retired (see [Migration](#migration)). Those
 implementations are the behavioural reference for the capabilities still to come, not code
 to be thrown away.
 

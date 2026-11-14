@@ -1,4 +1,4 @@
-"""File Explorer's shared interface (UI contract 1.2, a preview - F1 of
+"""File Explorer's shared interface (UI contract 1.2, F1-F6 of
 docs/file-explorer-migration.md): its ui.json, and the read-only view routes it
 binds to. The listing itself is the `entries` route's (test_file_explorer.py)."""
 
@@ -27,11 +27,11 @@ class FileExplorerUiDocumentTest(unittest.TestCase):
     def setUp(self):
         self.document = ui_contract.load(FILE_EXPLORER_DIR / "ui.json")
 
-    def test_the_document_is_a_valid_preview(self):
-        # the web keeps page.js by default until the shared interface reaches parity
+    def test_the_document_is_valid_and_no_longer_a_preview(self):
+        # F6: both clients draw it by default; page.js stays in Developer Mode until F7
         self.assertEqual(self.document["contract"], "starcore.ui/1.2")
-        self.assertIs(self.document["preview"], True)
-        self.assertTrue(ui_contract.UiDefinition(self.document).describe()["preview"])
+        self.assertNotIn("preview", self.document)
+        self.assertNotIn("preview", ui_contract.UiDefinition(self.document).describe())
 
     def test_every_route_it_names_is_one_of_file_explorers_own(self):
         from satellites.native.file_explorer import api
@@ -249,13 +249,13 @@ class FileExplorerViewTest(unittest.TestCase):
         status, view = self.page(path=str(self.directory), limit=10_000)
         self.assertEqual(len(view["files"]), 500)  # at most a page of 500
 
-    def test_the_listing_offers_the_document_as_a_preview_beside_the_page(self):
+    def test_the_listing_offers_the_document_as_the_default_beside_the_page(self):
         status, listing = self.json_request("/api/satellites")
         self.assertEqual(status, 200)
         entries = listing["satellites"] if isinstance(listing, dict) else listing
         explorer = next(entry for entry in entries if entry["name"] == "FileExplorer")
         self.assertTrue(explorer["ui"]["revision"])
-        self.assertIs(explorer["ui"]["preview"], True)
+        self.assertNotIn("preview", explorer["ui"])
         self.assertTrue(explorer["page"])
 
 

@@ -7,6 +7,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **File Explorer opens in its shared interface by default** in Mission Control, as it
+  already did in the Android app: browsing, a file's page, management and upload now come from
+  its `ui.json` on both clients. Its previous web page stays one switch away in Developer Mode
+  until it is retired (`docs/satellites/file_explorer.md`, F6).
 - **Uploading files in File Explorer's shared interface**, on both clients: a folder's
   **Upload files** picks one or more files (the browser's file dialog, the phone's document
   picker) and sends them one after another, asking before replacing a file already there and

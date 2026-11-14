@@ -38,7 +38,7 @@ Clients implement the UI contract and capability protocols, never a Satellite.
 |---|---|---|
 | Status | ✅ its only interface on both clients (1.1) | none |
 | Photos | ✅ default on both clients (1.2) | web `page.js` for settings and the Locked Folder; Android `src/photo/` for settings, phone sync and the Locked Folder; background sync started by `App.tsx` |
-| File Explorer | ◐ preview (F1-F5): browsing, a file's page (open, download, share), management (new folder, rename, delete) and upload; Android opens it, the web keeps `page.js` | web `page.js` and `page.css` |
+| File Explorer | ◐ default interface (F1-F6): browsing, a file's page (open, download, share), management (new folder, rename, delete) and upload, on both clients; the web's `page.js` stays in Developer Mode | web `page.js` and `page.css` |
 | Music | ◐ only the player: the shared audio host on both clients, and `play` for any Satellite. No `ui.json` | web `page.js` with its views (home, library, album, artist, playlist, search, settings, stats); Android `src/music/` (11 screen and tab files), wired by `builtins.tsx` |
 | Locked Folder | ◐ only moving photos in, from Photos (`secure` + `media.vault`) | web `page.js` (about 1,200 lines: browsing, PIN, encryption, recovery), hosted by Photo's page; Android `src/lockedFolder/` (its screens and the unlock prompt) |
 | Docker | – a placeholder with no interface | none |
@@ -84,7 +84,7 @@ From [`file-explorer-migration.md`](file-explorer-migration.md). F1 is done.
   Folder's guard still refuses.
 - [x] **F5 - Upload:** the `upload` action on both clients (pick files, stream them, confirm a
   replacement on `409`, report each file).
-- [ ] **F6 - Default:** drop `preview`; `docs/satellites/file_explorer.md`; CHANGELOG.
+- [x] **F6 - Default:** drop `preview`; `docs/satellites/file_explorer.md`; CHANGELOG.
 - [ ] **F7 - Remove** `page.js` and `page.css`.
 - [ ] Decide: the storage themes (classic, bar, donut, orbital) go with `page.js`
   (recommended), or become a shared block.

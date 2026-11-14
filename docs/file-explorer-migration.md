@@ -129,6 +129,9 @@ the existing actions.
   routes.
 - **F6 - Default.** Drop `preview`; `page.js` stays as the Developer Mode fallback. Checked on
   the web, the emulator and the phone. New `docs/satellites/file_explorer.md`, CHANGELOG.
+  **Done.** `ui.json` no longer says `preview`, so Mission Control draws the shared interface
+  by default and Developer Mode switches to `page.js`; the app already opened it. Checked on the
+  web and the emulator (the phone is the owner's).
 - **F7 - Retire `page.js` and `page.css`**, once validated in use, with the storage themes.
 
 ## What this leaves outside Satellite folders
