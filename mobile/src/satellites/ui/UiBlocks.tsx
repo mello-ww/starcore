@@ -661,8 +661,9 @@ function ButtonBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
   if (block.action?.own !== undefined && !context.hasOwnScreens) {
     return null; // opens native screens this app doesn't have for the Satellite
   }
-  if ((block.action?.download !== undefined || block.action?.share !== undefined) && !context.canRun?.(block.action)) {
-    return null; // a file this phone can't save or share here
+  const files = block.action?.download !== undefined || block.action?.share !== undefined || block.action?.upload !== undefined;
+  if (files && !context.canRun?.(block.action)) {
+    return null; // files this phone can't save, share or send here
   }
   const label = asText(resolve(block.label, scope));
   const danger = block.style === 'danger';
@@ -1179,10 +1180,11 @@ function CodeBlock({block, scope}: {block: UiBlock; scope: Scope}) {
   );
 }
 
-/** Asks before an action that says to - resolves false when cancelled. */
-export function confirmAction(message: string, label = 'Continue'): Promise<boolean> {
+/** Asks before an action that says to - resolves false when cancelled. `detail`, when given, is
+ * shown beneath `message`. */
+export function confirmAction(message: string, label = 'Continue', detail?: string): Promise<boolean> {
   return new Promise(done => {
-    Alert.alert(message, undefined, [
+    Alert.alert(message, detail, [
       {text: 'Cancel', style: 'cancel', onPress: () => done(false)},
       {text: label, onPress: () => done(true)},
     ], {cancelable: true, onDismiss: () => done(false)});

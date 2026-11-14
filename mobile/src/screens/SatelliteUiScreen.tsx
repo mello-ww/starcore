@@ -27,7 +27,19 @@ import {
 import {BUILTIN_SECURE_PROMPTS} from '../satellites/builtins';
 import {runSecure, secureRunner, type GrantRequest, type SecurePromptProps} from '../satellites/ui/secure';
 import {privacy} from '../platform/privacy';
-import {canOpenFiles, canSaveFiles, canShareFiles, fileName, openFile, saveFile, shareFile} from '../files';
+import {
+  canOpenFiles,
+  canSaveFiles,
+  canShareFiles,
+  canUploadFiles,
+  fileName,
+  openFile,
+  pickFiles,
+  saveFile,
+  shareFile,
+  uploadFile,
+} from '../files';
+import {runUploads, uploadReport} from '../files/upload';
 import {BlockContext, confirmAction, UiBlocks, UiPageBlocks} from '../satellites/ui/UiBlocks';
 import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
@@ -97,7 +109,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   // a choice's selections, for the page they were made on; the page's own defaults otherwise
   const [choices, setChoices] = useState<{page: string | undefined; values: Record<string, any>}>({page: undefined, values: {}});
   const [refreshing, setRefreshing] = useState(false);
-  const [toast, setToast] = useState<{text: string; error: boolean} | null>(null);
+  const [toast, setToast] = useState<{text: string; error: boolean; progress?: boolean} | null>(null);
   const [now, setNow] = useState(Date.now());
   const forms = useRef<Record<string, Record<string, any>>>({}).current;
   // 1.2's media-grid: a floating bar over the bottom edge, and the "near the end" signal that
@@ -190,12 +202,13 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     setUpdatedAt(null);
   }, [page, paramsKey]);
 
-  const showToast = useCallback((text: string | null, error = false) => {
-    setToast(text ? {text, error} : null);
+  // a progress toast ("Uploading 2 of 5") stays until what follows replaces it
+  const showToast = useCallback((text: string | null, error = false, progress = false) => {
+    setToast(text ? {text, error, progress} : null);
   }, []);
 
   useEffect(() => {
-    if (!toast) {
+    if (!toast || toast.progress) {
       return;
     }
     const timer = setTimeout(() => setToast(null), toast.error ? 8000 : 3500);
@@ -471,6 +484,49 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           return false;
         }
       }
+      if (action.upload !== undefined) {
+        // 1.2: files chosen with the system document picker, each streamed by the app's own
+        // module as the raw body of a POST to the Satellite's route, a conflict asked about file
+        // by file, then one report of every file
+        let picked;
+        try {
+          picked = await pickFiles(action.upload?.multiple === true);
+        } catch (err: any) {
+          showToast(err?.message || 'Could not choose files.', true);
+          return false;
+        }
+        if (!picked.length) {
+          return false; // the picker was closed: nothing runs
+        }
+        const result = await runUploads(picked, action, {
+          url: (template, fileValue) => {
+            const route = resolveTemplate(template, {...scoped, value: fileValue});
+            return isSafeRoute(route) ? mediaSource(route).uri : null;
+          },
+          send: (url, file) => uploadFile(file, {uri: url, headers: mediaSource('').headers}),
+          confirm: (fileValue, message) => {
+            const asked = message === undefined ? '' : String(resolve(message as any, {...scoped, value: fileValue}) ?? '');
+            return confirmAction(fileValue.name, 'Replace', asked || 'It is already there. Replace it?');
+          },
+          progress: (index, total, fileValue) =>
+            showToast(total > 1 ? `Uploading ${index + 1} of ${total}: ${fileValue.name}…` : `Uploading ${fileValue.name}…`, false, true),
+        });
+        const report = uploadReport(result);
+        showToast(report.text, report.error);
+        if (result.uploaded.length) {
+          // what was kept for this Satellite no longer shows what is there
+          kept.current = null;
+          await store.forgetSatellite();
+          if (action.then === 'back') {
+            navigation.goBack();
+          } else {
+            loadData();
+          }
+        } else if (result.failed.length) {
+          loadData(); // show what's actually true now
+        }
+        return result.uploaded.length > 0;
+      }
       if (action.play) {
         // 1.2: played by the app's audio host, from whichever Satellite provides audio.library
         try {
@@ -543,7 +599,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       }
       return true;
     },
-    [api, name, go, loadData, navigation, showToast, audio, providers, store],
+    [api, name, go, loadData, navigation, showToast, audio, providers, store, mediaSource],
   );
 
   /** The secure action (1.2) on these items: one request, and one prompt when the session
@@ -604,11 +660,12 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const runSecureRef = useRef(runSecureAction);
   runSecureRef.current = runSecureAction;
   // whether an action's control is drawn here: a secure action only where it can run, and
-  // download, open or share only where this phone can (saving needs Android 10 or later)
+  // download, open, share or upload only where this phone can (saving needs Android 10 or later)
   const canRun = useCallback(
     (action: UiAction | undefined) =>
       (action?.download === undefined || (action.open === true ? canOpenFiles() : canSaveFiles())) &&
       (action?.share === undefined || canShareFiles()) &&
+      (action?.upload === undefined || canUploadFiles()) &&
       (!action?.secure || Boolean(secureRunner(action, providers, name, BUILTIN_SECURE_PROMPTS))),
     [providers, name],
   );

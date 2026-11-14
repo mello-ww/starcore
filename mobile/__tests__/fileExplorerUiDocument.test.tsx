@@ -306,6 +306,78 @@ describe('File Explorer, drawn from its ui.json by the shared screen', () => {
     });
   });
 
+  describe('upload (F5)', () => {
+    const folderRoute = {params: {name: 'FileExplorer', page: 'folder', params: {path: '/home/demo'}, revision: 'rev1'}};
+
+    afterEach(() => {
+      delete (NativeModules as any).StarCoreFiles;
+    });
+
+    it('hides Upload files where the phone cannot pick files', async () => {
+      const {tree} = await mount(folderRoute);
+      expect(texts(tree)).not.toContain('Upload files');
+    });
+
+    it('sends each picked file to the upload route, asks before replacing one, then reloads', async () => {
+      const answers = [
+        {status: 200, body: '{"name": "a.txt"}'},
+        {status: 409, body: '{"error": "\'notes.txt\' already exists"}'},
+        {status: 200, body: '{"name": "notes.txt"}'},
+      ];
+      const files = {
+        canUpload: true,
+        pick: jest.fn(async () => [
+          {uri: 'content://docs/1', name: 'a.txt', size: 3},
+          {uri: 'content://docs/2', name: 'notes.txt', size: 5},
+        ]),
+        upload: jest.fn(async () => answers.shift()),
+      };
+      (NativeModules as any).StarCoreFiles = files;
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+        buttons?.find(button => button.style !== 'cancel')?.onPress?.();
+      });
+      const {tree} = await mount(folderRoute);
+      const reads = __mocks.read.mock.calls.length;
+      await press(tree, 'Upload files');
+      expect(files.pick).toHaveBeenCalledWith(true);
+      expect(files.upload.mock.calls.map(([uri, url]: any[]) => [uri, url])).toEqual([
+        ['content://docs/1', '/api/satellites/FileExplorer/upload?path=%2Fhome%2Fdemo&name=a.txt'],
+        ['content://docs/2', '/api/satellites/FileExplorer/upload?path=%2Fhome%2Fdemo&name=notes.txt'],
+        ['content://docs/2', '/api/satellites/FileExplorer/upload?path=%2Fhome%2Fdemo&name=notes.txt&overwrite=1'],
+      ]);
+      // the file is named as the title, the document's question beneath it
+      expect(alert).toHaveBeenCalledWith('notes.txt', expect.stringContaining('Replace it?'), expect.any(Array), expect.any(Object));
+      expect(texts(tree)).toContain('Uploaded 2 files.');
+      expect(__mocks.read.mock.calls.length).toBeGreaterThan(reads);
+      expect(__mocks.act).not.toHaveBeenCalled();
+      alert.mockRestore();
+    });
+
+    it('reports a file kept or failed, never the whole selection as uploaded', async () => {
+      const answers = [{status: 409, body: '{}'}, {status: 413, body: '{"error": "too large"}'}];
+      (NativeModules as any).StarCoreFiles = {
+        canUpload: true,
+        pick: jest.fn(async () => [{uri: 'content://docs/1', name: 'a.txt', size: 1}, {uri: 'content://docs/2', name: 'big.iso', size: 9}]),
+        upload: jest.fn(async () => answers.shift()),
+      };
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+        buttons?.find(button => button.style === 'cancel')?.onPress?.();
+      });
+      const {tree} = await mount(folderRoute);
+      await press(tree, 'Upload files');
+      expect(texts(tree)).toContain('Uploaded 0 of 2 files. Kept the existing a.txt. Could not upload big.iso (too large).');
+      alert.mockRestore();
+    });
+
+    it('runs nothing when the picker is closed', async () => {
+      const files = {canUpload: true, pick: jest.fn(async () => []), upload: jest.fn()};
+      (NativeModules as any).StarCoreFiles = files;
+      const {tree} = await mount(folderRoute);
+      await press(tree, 'Upload files');
+      expect(files.upload).not.toHaveBeenCalled();
+    });
+  });
+
   it('goes back to the locations from a drive root', async () => {
     __mocks.read.mockResolvedValue({...FOLDER, path: '/', name: '/', parent: null, at_drive_root: true});
     const {tree} = await mount({params: {name: 'FileExplorer', page: 'folder', params: {path: '/'}, revision: 'rev1'}});
