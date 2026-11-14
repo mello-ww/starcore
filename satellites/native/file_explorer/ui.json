@@ -1,5 +1,5 @@
 {
-  "_about": "File Explorer's shared interface (UI contract 1.2), the default on both clients since F6 (docs/file-explorer-migration.md): Mission Control draws it, with its own page.js one switch away in Developer Mode until it is retired; the Android app, which has no File Explorer screen of its own, opens it. F1 browses read-only: the locations with their storage, and each folder's folders and files. F2 pages them: each list loads 200 rows at a time (`more`). F3 opens a file's page: its details, a picture's preview, and Open, Download and Share from the `content` route. F4 manages: new folder, rename and delete (with a confirm) through the `mkdir`, `rename` and `delete` routes, behind the same guards as the web page. F5 uploads: files picked on the device, each streamed to the `upload` route, a file already there replaced only once confirmed. The pages bind to the read-only view routes (views.py).",
+  "_about": "File Explorer's shared interface (UI contract 1.2), the default on both clients since F6 (docs/file-explorer-migration.md): Mission Control draws it, with its own page.js one switch away in Developer Mode until it is retired; the Android app, which has no File Explorer screen of its own, opens it. F1 browses read-only: the locations with their storage, and each folder's folders and files. F2 pages them: each list loads 200 rows at a time (`more`). F3 opens a file's page: its details, a picture's preview, and Open, Download and Share from the `content` route. F4 manages: new folder, rename and delete (with a confirm) through the `mkdir`, `rename` and `delete` routes, behind the same guards as the web page. The folder page's path is a clickable breadcrumb. F5 uploads: files picked on the device, each streamed to the `upload` route, a file already there replaced only once confirmed. The pages bind to the read-only view routes (views.py).",
   "contract": "starcore.ui/1.2",
   "title": "Files",
   "entry": "locations",
@@ -22,7 +22,8 @@
       "params": ["path"],
       "source": {"route": "view/folder?path={$params.path}"},
       "blocks": [
-        {"type": "text", "style": "mono", "text": "$.path"},
+        {"type": "breadcrumb", "items": "$.crumbs", "item": {"title": "$.name"},
+         "action": {"navigate": "folder", "params": {"path": "$.path"}}},
         {"type": "text", "style": "caption", "text": "$.summary"},
         {"type": "button", "label": "Up", "style": "secondary", "visible": "$.parent",
          "action": {"navigate": "folder", "params": {"path": "$.parent"}}},

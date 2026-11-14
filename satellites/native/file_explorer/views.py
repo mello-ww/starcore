@@ -69,6 +69,16 @@ def locations_view(listing: dict) -> dict:
     }
 
 
+def _crumbs(target: Path) -> list:
+    """The way down to `target`, one entry per level: the drive (or `/`), then each folder,
+    each with the path it opens. The last is `target` itself."""
+    crumbs, path = [], None
+    for part in target.parts:
+        path = Path(part) if path is None else path / part
+        crumbs.append({"name": part.rstrip("\\/") or part, "path": str(path)})
+    return crumbs
+
+
 def folder_view(target: Path, parent, items: list, storage, folders_next=None, files_next=None,
                 totals=None) -> dict:
     """One folder: its folders, then its files, and the way back up. `parent`
@@ -97,6 +107,7 @@ def folder_view(target: Path, parent, items: list, storage, folders_next=None, f
         "path": str(target),
         "name": target.name or str(target),
         "parent": parent or None,
+        "crumbs": _crumbs(target),
         "at_drive_root": parent == "",
         "folders": folders,
         "files": files,

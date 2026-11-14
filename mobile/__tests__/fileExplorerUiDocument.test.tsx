@@ -34,6 +34,7 @@ const FOLDER = {
   path: '/home/demo',
   name: 'demo',
   parent: '/home',
+  crumbs: [{name: '/', path: '/'}, {name: 'home', path: '/home'}, {name: 'demo', path: '/home/demo'}],
   at_drive_root: false,
   folders: [
     {name: 'Documents', path: '/home/demo/Documents', modified: 1794477600, subtitle: 1794477600, icon: 'folder'},
@@ -123,7 +124,7 @@ describe('File Explorer, drawn from its ui.json by the shared screen', () => {
     expect(__mocks.read).toHaveBeenCalledWith('FileExplorer', 'view/folder?path=%2Fhome%2Fdemo');
     expect(navigation.setOptions).toHaveBeenLastCalledWith({title: 'demo'});
     const shown = texts(tree);
-    expect(shown).toEqual(expect.arrayContaining(['/home/demo', '2 folders, 1 file', 'Documents', 'vault', 'Locked', 'notes.txt', '1.5 KB']));
+    expect(shown).toEqual(expect.arrayContaining(['/', 'home', 'demo', '2 folders, 1 file', 'Documents', 'vault', 'Locked', 'notes.txt', '1.5 KB']));
     expect(shown).not.toContain('All locations');
     expect(shown).not.toContain('—');
 

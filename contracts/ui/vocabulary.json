@@ -23,7 +23,8 @@
     "media-list": {"required": ["items", "item"], "optional": ["empty", "action", "size", "shape"]},
     "media-grid": {"required": ["items", "item"], "optional": ["empty", "action", "open", "quick", "viewer", "selection", "size", "shape", "more"]},
     "search": {"required": ["key"], "optional": ["label", "placeholder"]},
-    "map": {"required": ["items", "item"], "optional": ["empty", "action", "viewer", "viewport", "bounds"]}
+    "map": {"required": ["items", "item"], "optional": ["empty", "action", "viewer", "viewport", "bounds"]},
+    "breadcrumb": {"required": ["items", "item"], "optional": ["action"]}
   },
   "since": {
     "_note": "The minor each block, key or format arrived in. A document that declares an older minor may not use them.",
@@ -35,7 +36,7 @@
       "bindings": ["$state.", "$sources."]
     },
     "1.2": {
-      "blocks": ["image", "media-list", "media-grid", "search", "map"],
+      "blocks": ["image", "media-list", "media-grid", "search", "map", "breadcrumb"],
       "actions": ["play", "pick", "own", "secure", "download", "share", "upload"],
       "keys": ["document.preview", "list.more", "download.open", "media-grid.more", "media-grid.open", "media-grid.item.icon", "media-grid.quick", "map.viewport", "map.bounds", "map.item.count", "map.item.bounds", "page.offline"],
       "bindings": ["$value."],

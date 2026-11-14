@@ -88,7 +88,8 @@ From [`file-explorer-migration.md`](file-explorer-migration.md). F1 is done.
 - [x] **F7 - Remove** `page.js` and `page.css`.
 - [x] Decided: the storage themes (classic, bar, donut, orbital) went with `page.js`
   (recommended), or become a shared block.
-- [ ] Optional: a clickable breadcrumb (a horizontal list in the contract).
+- [x] A clickable breadcrumb: the new `breadcrumb` block (UI contract 1.2), on one scrolling row; the folder page's
+  path is drawn with it on both clients.
 
 ## 3. Photos without its own interface (R2)
 

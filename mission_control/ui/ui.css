@@ -2087,3 +2087,53 @@ body.ui-viewer-open {
 @media (prefers-reduced-motion: reduce) {
     .ui-unlock { animation: none; }
 }
+
+.ui-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    white-space: nowrap;
+}
+
+.ui-breadcrumb::-webkit-scrollbar {
+    display: none;
+}
+
+.ui-breadcrumb-item {
+    flex: none;
+    min-height: 32px;
+    padding: 4px 12px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--sc-text-2, var(--sc-text));
+    font: inherit;
+    font-size: 0.875rem;
+}
+
+button.ui-breadcrumb-item {
+    cursor: pointer;
+}
+
+button.ui-breadcrumb-item:hover {
+    background: var(--sc-card);
+    color: var(--sc-text);
+}
+
+button.ui-breadcrumb-item:focus-visible {
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 1px;
+}
+
+.ui-breadcrumb-here {
+    background: var(--sc-card);
+    color: var(--sc-text);
+}
+
+.ui-breadcrumb-sep {
+    display: inline-flex;
+    flex: none;
+    color: var(--sc-text-icon);
+}

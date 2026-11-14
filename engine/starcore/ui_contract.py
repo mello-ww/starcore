@@ -585,6 +585,8 @@ class _Validator:
             self.check_map(where, block)
         elif kind == "list":
             self.check_list(where, block)
+        elif kind == "breadcrumb":
+            self.check_breadcrumb(where, block)
         elif kind == "form":
             self.check_form(where, block)
         elif kind == "chart":
@@ -715,6 +717,25 @@ class _Validator:
             if not is_binding(items):
                 self.error(f"{where}.more", "needs `items` bound to the page's data")
             self.check_more(f"{where}.more", block["more"])
+
+    def check_breadcrumb(self, where: str, block: dict):
+        """{type: breadcrumb, items, item: {title}, action?} (1.2): the way down to the current
+        place, one entry after another on a single row. Each entry but the last runs `action`
+        with itself as the scope; the last is where the person is, shown and not pressable."""
+        items = block.get("items")
+        if not (isinstance(items, list) or is_binding(items)):
+            self.error(f"{where}.items", "must be a list or a binding")
+        elif is_binding(items):
+            self.check_binding(f"{where}.items", items)
+        item = block.get("item")
+        if not isinstance(item, dict):
+            self.error(f"{where}.item", "must be an object")
+            return
+        self.unknown_keys(f"{where}.item", item, {"title"})
+        if "title" not in item:
+            self.error(f"{where}.item", "needs 'title'")
+        else:
+            self.check_text(f"{where}.item.title", item["title"])
 
     def check_media_options(self, where: str, block: dict):
         """size, shape and fit, shared by image and media-list: fixed words, never bindings,

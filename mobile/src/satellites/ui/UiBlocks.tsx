@@ -1,5 +1,5 @@
 import React, {memo, useCallback, useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, Alert, Animated, Clipboard, Image, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, Alert, Animated, Clipboard, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {Bars, ChartScale, ColumnChart, Meter, Sparkline} from '../../components/charts';
 import {PrimaryButton} from '../../components/PrimaryButton';
@@ -236,6 +236,8 @@ function UiBlockView({block, scope, context}: {block: UiBlock; scope: Scope; con
       );
     case 'list':
       return <ListBlock block={block} scope={scope} context={context} />;
+    case 'breadcrumb':
+      return <BreadcrumbBlock block={block} scope={scope} context={context} />;
     case 'button':
       return <ButtonBlock block={block} scope={scope} context={context} />;
     case 'toggle':
@@ -420,6 +422,45 @@ export function ListFooter({status, scope, onMore}: {status: ListPagingStatus; s
     );
   }
   return null;
+}
+
+/** A breadcrumb (1.2): the way down to the current place on one scrolling row of pills. Every
+ * entry but the last runs the block's action; the last is where the person is, and the row
+ * starts scrolled to it when the trail is longer than the screen. */
+function BreadcrumbBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const scroller = useRef<ScrollView>(null);
+  const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
+  const trail: any[] = Array.isArray(items) ? items : [];
+  return (
+    <ScrollView
+      ref={scroller}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      onContentSizeChange={() => scroller.current?.scrollToEnd({animated: false})}
+      contentContainerStyle={styles.crumbs}
+      testID="breadcrumb">
+      {trail.map((item, index) => {
+        const itemScope = {...scope, data: item};
+        const title = asText(resolve(block.item.title, itemScope));
+        const last = index === trail.length - 1;
+        const step = last || !block.action ? undefined : () => context.runAction(block.action, itemScope);
+        return (
+          <React.Fragment key={index}>
+            {index > 0 && <Icon name="chevron-right" size={14} color={palette.text3} />}
+            <Pressable
+              onPress={step}
+              disabled={!step}
+              accessibilityRole={step ? 'button' : 'text'}
+              accessibilityLabel={title}
+              accessibilityState={{selected: last}}
+              style={({pressed}) => [styles.crumb, last && styles.crumbHere, pressed && {opacity: 0.7}]}>
+              <Text style={[styles.crumbLabel, last && {color: palette.text}]} numberOfLines={1}>{title}</Text>
+            </Pressable>
+          </React.Fragment>
+        );
+      })}
+    </ScrollView>
+  );
 }
 
 function ListBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
@@ -1307,6 +1348,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: palette.control,
   },
+  crumbs: {flexDirection: 'row', alignItems: 'center', gap: 2},
+  crumb: {minHeight: TOUCH_TARGET - 8, justifyContent: 'center', paddingHorizontal: space.md, borderRadius: 999},
+  crumbHere: {backgroundColor: palette.card},
+  crumbLabel: {...type.caption, color: palette.text2},
   codeToggle: {flexDirection: 'row', alignItems: 'center', gap: space.xs, minHeight: TOUCH_TARGET},
   code: {padding: space.md, borderRadius: radii.control, backgroundColor: palette.field},
 });

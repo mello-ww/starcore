@@ -99,6 +99,13 @@ class FileExplorerViewTest(unittest.TestCase):
         self.assertEqual(view["name"], self.directory.name)
         self.assertEqual(view["parent"], str(self.directory.parent))
         self.assertFalse(view["at_drive_root"])
+        # the way down, one entry per level, each with the path it opens: the last is this folder
+        crumbs = view["crumbs"]
+        self.assertEqual(crumbs[-1], {"name": self.directory.name, "path": str(self.directory)})
+        self.assertEqual(crumbs[0]["path"], self.directory.parts[0])
+        self.assertEqual([crumb["path"] for crumb in crumbs][-2], str(self.directory.parent))
+        self.assertEqual(len(crumbs), len(self.directory.parts))
+        self.assertNotIn("\\", "".join(crumb["name"] for crumb in crumbs))
         self.assertEqual([row["name"] for row in view["folders"]], ["alpha", "Beta"])
         self.assertEqual(view["folders"][0]["path"], str(self.directory / "alpha"))
         self.assertEqual(view["folders"][0]["icon"], "folder")

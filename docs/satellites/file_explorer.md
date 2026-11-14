@@ -15,7 +15,7 @@ it is File Explorer's only interface on both clients; the migration's history is
 | Where | What |
 | --- | --- |
 | Locations | every drive (or `/`) with its free space, and the machine's total |
-| A folder | its folders then its files, loaded 200 at a time as you scroll; New folder, Rename and Delete (with a confirm) for the folder itself, and **Upload files** |
+| A folder | a clickable breadcrumb of its path, its folders then its files, loaded 200 at a time as you scroll; New folder, Rename and Delete (with a confirm) for the folder itself, and **Upload files** |
 | A file | its details, a preview for a picture, **Open**, **Download** and **Share**, Rename and Delete |
 
 - **Open** hands the file to the browser (a new tab, sandboxed for HTML, SVG and XML) or to the

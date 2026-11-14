@@ -14,7 +14,7 @@ export const BLOCK_TYPES = new Set([
     // 1.1
     "chart", "table", "choice", "status", "code",
     // 1.2
-    "image", "media-list", "media-grid", "search", "map",
+    "image", "media-list", "media-grid", "search", "map", "breadcrumb",
 ]);
 export const FORMATS = new Set([
     "text", "number", "integer", "percent", "bytes", "duration",

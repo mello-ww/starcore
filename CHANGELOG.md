@@ -14,6 +14,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **A clickable breadcrumb in File Explorer's folder page**, on both clients: each level of the
+  path is a pill that opens that folder, the current one is shown and not pressable, and the
+  row scrolls to the end when the path is long. It is **UI contract 1.2's `breadcrumb` block**,
+  for any Satellite (`docs/ui-contract.md`).
 - **File Explorer opens in its shared interface by default** in Mission Control, as it
   already did in the Android app: browsing, a file's page, management and upload now come from
   its `ui.json` on both clients. Its previous web page stays one switch away in Developer Mode

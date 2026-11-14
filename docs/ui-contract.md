@@ -166,6 +166,7 @@ Keys starting with `_` are comments and are ignored.
 | `media-list` (1.2) | `items`, `item` | `empty`, `action`, `size`, `shape` | rows with a thumbnail; `item` maps `title`, `subtitle`, `meta`, `image` and `format` (`{subtitle, meta}`) - see [Media](#media-image-and-media-list) |
 | `media-grid` (1.2) | `items`, `item` | `empty`, `action` or `viewer`, `selection`, `size`, `shape` | a grid of images and videos with the shared viewer and selection - see [Media gallery](#media-gallery-media-grid) |
 | `search` (1.2) | `key` | `label`, `placeholder` | a search field that sets the page state `key` as the person types - see [Search and map](#search-and-map) |
+| `breadcrumb` (1.2) | `items`, `item` | `action` | the way down to the current place on one scrolling row: `item` maps `title`; every entry but the last runs `action` with itself as the scope, the last is where the person is and is not pressable. A client draws pills (web) or a horizontally scrolling row of pills (Android), kept scrolled to the end |
 | `map` (1.2) | `items`, `item` | `empty`, `action` or `viewer` | located items on an interactive map, in clusters, opening the shared viewer - see [Search and map](#search-and-map) |
 
 1.1 also adds:
@@ -896,7 +897,7 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 
 | | Now (contract 1.2) | Target |
 |---|---|---|
-| Blocks | the 21 above, including `chart`, `table`, `image`, `media-list`, `media-grid`, `search` and `map`; the `dashboard` template | more, minor by minor: `tabs`; templates `list-detail`, `settings`, `media-library` |
+| Blocks | the 22 above, including `chart`, `table`, `image`, `media-list`, `media-grid`, `search`, `map` and `breadcrumb`; the `dashboard` template | more, minor by minor: `tabs`; templates `list-detail`, `settings`, `media-library` |
 | Satellite capabilities | `files.browse` (File Explorer), `audio.library` and `audio.session` (Music), `media.gallery` (Photo), `media.vault` (Locked Folder, `move_in` only through the `secure` action) | browsing the Locked Folder from the shared interface; more pickable capabilities (files) |
 | Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action; saving, sharing and opening files (`download`, `share`); sending files (`upload`) | `device.background-tasks` (phone sync) - a native module written once in the app, behind a shared block |
 | Home | `widgets` in each document, drawn by both clients | |

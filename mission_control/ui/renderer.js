@@ -935,6 +935,44 @@ export function mount(context) {
             return block.more ? pagedList(block, scope, list) : list;
         },
 
+        // The way down to the current place on one row: every entry but the last runs the
+        // action; the last is where the person is.
+        breadcrumb: (block, scope) => {
+            const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
+            const nav = el("nav", "ui-breadcrumb");
+            nav.setAttribute("aria-label", "Breadcrumb");
+            const trail = Array.isArray(items) ? items : [];
+            trail.forEach((item, index) => {
+                const itemScope = { ...scope, data: item };
+                const title = text(block.item.title, itemScope);
+                const last = index === trail.length - 1;
+                if (index > 0) {
+                    const sep = icon("chevron-right", 14);
+                    const holder = el("span", "ui-breadcrumb-sep");
+                    holder.setAttribute("aria-hidden", "true");
+                    if (sep) {
+                        holder.appendChild(sep);
+                    }
+                    nav.appendChild(holder);
+                }
+                if (last || !block.action) {
+                    const here = el("span", "ui-breadcrumb-item ui-breadcrumb-here", title);
+                    if (last) {
+                        here.setAttribute("aria-current", "page");
+                    }
+                    nav.appendChild(here);
+                } else {
+                    const step = el("button", "ui-breadcrumb-item", title);
+                    step.type = "button";
+                    step.addEventListener("click", () => runAction(block.action, itemScope));
+                    nav.appendChild(step);
+                }
+            });
+            // the current place stays in view when the trail is longer than the row
+            requestAnimationFrame(() => { nav.scrollLeft = nav.scrollWidth; });
+            return nav;
+        },
+
         image: (block, scope) => {
             const figure = el("figure", `ui-image ui-image-${block.size || "medium"} ui-shape-${block.shape || "square"} ui-fit-${block.fit || "cover"}`);
             figure.appendChild(mediaFrame(block.src, scope, "ui-image-frame", block.alt !== undefined ? text(block.alt, scope) : ""));
