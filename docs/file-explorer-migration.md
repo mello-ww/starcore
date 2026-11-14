@@ -82,8 +82,16 @@ the existing actions.
   repeats or skips what was already shown. Only the page's rows are examined (one stat each on
   Linux). Tests: a folder of 10,000 files and 250 folders, a folder that changes between pages,
   names differing only by case, bad parameters; both clients' paging rules. Checked on the
-  demo: the web pages through 2,500 files in order, none twice; Android pages too, but past
-  about 1,500 rows its page saturates - virtualized lists are F2b (`remaining-work.md`).
+  demo: the web pages through 2,500 files in order, none twice; on Android, past about 1,500
+  rows mounted in the page's own scrolling, the page saturated.
+- **F2b - Virtualized lists on Android.** A page with a paged list among its own blocks is drawn
+  as one virtualized list (`mobile/src/satellites/ui/VirtualListPage.tsx`): its blocks and the
+  rows of each list, folders then files, with each list loading its next page as its own end
+  nears the screen. Rows are memoized, so a page arriving redraws none already shown. **Done.**
+  Checked on the emulator (2026-11-14, software rendering, development build): flinging
+  through 300 folders and 10,000 files reached the last file in about nine minutes of
+  continuous flings, with no page failing; the JavaScript thread went back to idle as soon as
+  the flinging stopped, at about 400 MB.
 - **F3 - File page.** Details, picture preview, Download, Share, Open (`download` + `open`).
   Kotlin `open` in `StarCoreFilesModule.kt`; web new tab.
 - **F4 - Management.** New folder, rename, delete through forms and confirms; the guard

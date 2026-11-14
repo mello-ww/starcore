@@ -347,9 +347,12 @@ cursor and appends the rows of the answer, which has the page data's shape. As f
 client loads one page at a time, drops a page that arrives after the page data changed, never
 shows a row twice, shows "Loading…" or an error with "Try again", and keeps the loaded pages
 across a refresh of the same collection. Several lists on a page page independently, each
-with its own cursor (a folder's folders, then its files). On Android the rows stay in the
-page's own scrolling (not a separate virtualized list), so a provider should keep its pages
-small (a few hundred rows).
+with its own cursor (a folder's folders, then its files). On Android a page with a paged list
+among its own blocks becomes one virtualized list - its blocks, and each list's rows one by
+one - so only the lines near the screen are mounted however many rows have loaded, and each
+list loads its next page as its own end nears the screen, as on the web. A paged list inside a
+card stays in the page's own scrolling. A provider still keeps its pages small (a few hundred
+rows), as each is one request.
 
 ## Search and map
 

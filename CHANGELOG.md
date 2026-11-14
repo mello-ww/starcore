@@ -11,7 +11,8 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   files arrive 200 at a time as you scroll (or with "Show more"), with the folder's totals
   ("250 folders, 10,000 files"); the server reads only the rows it sends. Through **UI contract
   1.2's `more` on a list**, the same paging as a media-grid's: any Satellite's long list can use
-  it (docs/file-explorer-migration.md, F2).
+  it (docs/file-explorer-migration.md, F2). On Android such a page is a virtualized list, so
+  scrolling through 10,000 files no longer stalls it (F2b).
 - **File Explorer on Android**, read-only for now: the locations with their free space and the
   machine's total, then each folder's folders and files, with Up and back. It is File Explorer's
   first shared interface (`ui.json`, UI contract 1.2), drawn by the app's shared screen with no

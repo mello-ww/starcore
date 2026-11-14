@@ -71,13 +71,10 @@ From [`file-explorer-migration.md`](file-explorer-migration.md). F1 is done.
 
 - [x] **F2 - List paging:** `more` on `list` in the contract (Engine, both clients, fixtures);
   `view/folder` with `part`, `cursor` and `limit`; tested on 10,000 entries.
-- [ ] **F2b - Virtualized lists on Android.** Measured on the emulator (2026-11-13): paging
-  works, but past about 1,500 rows mounted in the page's own scrolling the app's JavaScript
-  thread saturates (a page then times out and the screen stops answering). A page whose main
-  content is a list must become a virtualized list, as a page whose main content is a
-  media-grid already does (`SatelliteUiScreen`), with File Explorer's two lists (folders, then
-  files) as one virtualized sequence. Needed before large folders are usable on a phone; the
-  web is fine (2,500 rows checked).
+- [x] **F2b - Virtualized lists on Android:** a page with a paged list among its own blocks is
+  one virtualized list (`VirtualListPage`), its lists' rows one by one, each list loading its
+  next page as its end nears; 10,000 files flung through on the emulator with no page failing
+  and the JavaScript thread idle afterwards (2026-11-14).
 - [ ] **Unify the web's paging:** the media-grid and the list each keep their own paging code
   on the web (`ui/gallery.js`, `ui/listpaging.js`); one shared helper, once both are stable.
 - [ ] **F3 - File page:** details, picture preview, Download, Share, and Open (`download` with

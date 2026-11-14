@@ -126,6 +126,60 @@ describe('File Explorer, drawn from its ui.json by the shared screen', () => {
     });
   });
 
+  it('draws a folder as one virtualized list, and a page without a paged list as before', async () => {
+    const {tree} = await mount({params: {name: 'FileExplorer', page: 'folder', params: {path: '/home/demo'}, revision: 'rev1'}});
+    expect(tree.root.findAllByProps({testID: 'ui-list-page'})).not.toHaveLength(0);
+    const locations = await mount({params: {name: 'FileExplorer', revision: 'rev1'}});
+    expect(locations.tree.root.findAllByProps({testID: 'ui-list-page'})).toHaveLength(0);
+  });
+
+  it('loads the next page of each list once its end is near, until there is none', async () => {
+    __mocks.read.mockImplementation(async (_satellite: string, route: string) => {
+      if (route.includes('part=folders')) return {folders: [{name: 'Zeta', path: '/home/demo/Zeta', icon: 'folder'}], folders_next: null};
+      if (route.includes('part=files')) return {files: [{name: 'z.txt', path: '/home/demo/z.txt', icon: 'file', size: 1}], files_next: null};
+      return {...FOLDER, folders_next: 'vault', files_next: 'notes.txt'};
+    });
+    const {tree} = await mount({params: {name: 'FileExplorer', page: 'folder', params: {path: '/home/demo'}, revision: 'rev1'}});
+    const routes = __mocks.read.mock.calls.map(([, route]) => route);
+    expect(routes).toEqual(expect.arrayContaining([
+      'view/folder?path=%2Fhome%2Fdemo&part=folders&cursor=vault',
+      'view/folder?path=%2Fhome%2Fdemo&part=files&cursor=notes.txt',
+    ]));
+    const shown = texts(tree);
+    expect(shown.indexOf('Zeta')).toBeGreaterThan(shown.indexOf('vault'));
+    expect(shown.indexOf('notes.txt')).toBeGreaterThan(shown.indexOf('Zeta'));
+    expect(shown.indexOf('z.txt')).toBeGreaterThan(shown.indexOf('notes.txt'));
+    expect(tree.root.findAllByProps({testID: 'list-more'})).toHaveLength(0);
+  });
+
+  it('leaves a list far below the screen alone', async () => {
+    const many = Array.from({length: 60}, (_, index) => ({name: `folder-${index}`, path: `/home/demo/folder-${index}`, icon: 'folder'}));
+    __mocks.read.mockResolvedValue({...FOLDER, folders: many, folders_next: 'folder-59', files_next: 'notes.txt'});
+    const {tree} = await mount({params: {name: 'FileExplorer', page: 'folder', params: {path: '/home/demo'}, revision: 'rev1'}});
+    expect(__mocks.read.mock.calls.map(([, route]) => route).filter((route: string) => route.includes('part='))).toEqual([]);
+    expect(texts(tree)).toContain('folder-0');
+    expect(texts(tree)).not.toContain('folder-59'); // not mounted
+  });
+
+  it('says why a page failed, and tries again on request', async () => {
+    let fail = true;
+    __mocks.read.mockImplementation(async (_satellite: string, route: string) => {
+      if (route.includes('part=files')) {
+        if (fail) {
+          fail = false;
+          throw new Error('Server unreachable');
+        }
+        return {files: [{name: 'z.txt', path: '/home/demo/z.txt', icon: 'file', size: 1}], files_next: null};
+      }
+      return {...FOLDER, files_next: 'notes.txt'};
+    });
+    const {tree} = await mount({params: {name: 'FileExplorer', page: 'folder', params: {path: '/home/demo'}, revision: 'rev1'}});
+    expect(texts(tree)).toContain('Server unreachable');
+    await press(tree, 'Try again');
+    expect(texts(tree)).toContain('z.txt');
+    expect(texts(tree)).not.toContain('Server unreachable');
+  });
+
   it('goes back to the locations from a drive root', async () => {
     __mocks.read.mockResolvedValue({...FOLDER, path: '/', name: '/', parent: null, at_drive_root: true});
     const {tree} = await mount({params: {name: 'FileExplorer', page: 'folder', params: {path: '/'}, revision: 'rev1'}});

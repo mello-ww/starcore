@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {memo, useCallback, useEffect, useRef, useState} from 'react';
 import {ActivityIndicator, Alert, Animated, Clipboard, Image, Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {Bars, ChartScale, ColumnChart, Meter, Sparkline} from '../../components/charts';
@@ -9,7 +9,7 @@ import {Surface} from '../../components/Surface';
 import {TOUCH_TARGET, tokens, useAccent} from '../../theme';
 import {MapBlock} from './MapBlock';
 import {ActionPill, MediaGridBlock} from './MediaGrid';
-import {createListPaging} from './listPaging';
+import {createListPaging, type ListPagingStatus} from './listPaging';
 import {
   BLOCK_TYPES, findProvider, formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate, toneOf,
   type Providers, type Scope, type UiAction, type UiBlock,
@@ -87,7 +87,7 @@ const DOT_COLORS: Record<string, string> = {neutral: palette.text3, ok: palette.
 const METER_LEVELS: Record<string, 'warning' | 'critical' | null> = {neutral: null, ok: null, warn: 'warning', danger: 'critical'};
 
 /** Whether a block is drawn at all - Developer Mode and `visible`. */
-function isShown(block: UiBlock, scope: Scope, context: BlockContext): boolean {
+export function isShown(block: UiBlock, scope: Scope, context: BlockContext): boolean {
   if (!block || typeof block !== 'object') {
     return false;
   }
@@ -358,23 +358,68 @@ function MetricBlock({
   );
 }
 
+/** One row of a list block. A row is drawn again only when its item, the list, what the page
+ * binds to or the way actions run changed - not when a further page of rows arrives. */
+export const ListRow = memo(
+  function ListRow({block, item, scope, context}: {block: UiBlock; item: any; scope: Scope; context: BlockContext}) {
+    const formats = block.item?.format ?? {};
+    const itemScope = {...scope, data: item};
+    const iconName = resolve(block.item?.icon, itemScope);
+    const title = asText(resolve(block.item?.title, itemScope));
+    const subtitle = block.item?.subtitle !== undefined ? resolve(block.item.subtitle, itemScope) : undefined;
+    return (
+      <Row
+        icon={typeof iconName === 'string' && ICONS.has(iconName) ? iconName : undefined}
+        tone={block.item?.tone !== undefined ? resolve(block.item.tone, itemScope) : undefined}
+        title={title}
+        subtitle={subtitle !== undefined && subtitle !== null && subtitle !== '' ? formatValue(subtitle, formats.subtitle) : undefined}
+        value={block.item?.value !== undefined ? formatValue(resolve(block.item.value, itemScope), formats.value) : undefined}
+        onPress={block.action ? () => context.runAction(block.action, itemScope) : undefined}
+      />
+    );
+  },
+  (before, after) =>
+    before.block === after.block &&
+    before.item === after.item &&
+    before.context.runAction === after.context.runAction &&
+    before.scope.data === after.scope.data &&
+    before.scope.page === after.scope.page &&
+    before.scope.params === after.scope.params &&
+    before.scope.state === after.scope.state &&
+    before.scope.sources === after.scope.sources,
+);
+
 function listRow(block: UiBlock, item: any, index: number, scope: Scope, context: BlockContext) {
-  const formats = block.item?.format ?? {};
-  const itemScope = {...scope, data: item};
-  const iconName = resolve(block.item?.icon, itemScope);
-  const title = asText(resolve(block.item?.title, itemScope));
-  const subtitle = block.item?.subtitle !== undefined ? resolve(block.item.subtitle, itemScope) : undefined;
-  return (
-    <Row
-      key={item?.id ?? index}
-      icon={typeof iconName === 'string' && ICONS.has(iconName) ? iconName : undefined}
-      tone={block.item?.tone !== undefined ? resolve(block.item.tone, itemScope) : undefined}
-      title={title}
-      subtitle={subtitle !== undefined && subtitle !== null && subtitle !== '' ? formatValue(subtitle, formats.subtitle) : undefined}
-      value={block.item?.value !== undefined ? formatValue(resolve(block.item.value, itemScope), formats.value) : undefined}
-      onPress={block.action ? () => context.runAction(block.action, itemScope) : undefined}
-    />
-  );
+  return <ListRow key={item?.id ?? index} block={block} item={item} scope={scope} context={context} />;
+}
+
+/** Below a list that loads further pages: the error and "Try again", "Loading…" while a page
+ * comes, "Show more" while there is one, else nothing. */
+export function ListFooter({status, scope, onMore}: {status: ListPagingStatus; scope: Scope; onMore: () => void}) {
+  const {color: accent} = useAccent();
+  if (status.error) {
+    return (
+      <View style={styles.listFoot} testID="list-more-error">
+        <Text style={type.caption}>{status.error}</Text>
+        <ActionPill entry={{label: 'Try again'}} scope={scope} onPress={onMore} />
+      </View>
+    );
+  }
+  if (status.loading) {
+    return (
+      <View style={styles.listFoot} testID="list-more-loading">
+        <ActivityIndicator color={accent} accessibilityLabel="Loading…" />
+      </View>
+    );
+  }
+  if (status.more) {
+    return (
+      <View style={styles.listFoot} testID="list-more">
+        <ActionPill entry={{label: 'Show more'}} scope={scope} onPress={onMore} />
+      </View>
+    );
+  }
+  return null;
 }
 
 function ListBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
@@ -388,11 +433,11 @@ function ListBlock({block, scope, context}: {block: UiBlock; scope: Scope; conte
   return <View style={styles.list}>{items.map((item: any, index: number) => listRow(block, item, index, scope, context))}</View>;
 }
 
-/** A list with `more` (1.2): its rows, then the next page - loaded as the screen scrolls near
- * its end, or with "Show more" - "Loading…" while it comes, or the error and "Try again". The
- * rows stay in the page's own scrolling (docs/ui-contract.md, "Paging a list"). */
+/** A list with `more` (1.2) drawn in place, inside a page that scrolls as a whole (in a card):
+ * its rows, then the next page - loaded as the screen scrolls near its end, or with "Show
+ * more". A paged list among a page's own blocks makes the page a virtualized list instead
+ * (VirtualListPage; docs/ui-contract.md, "Paging a list"). */
 function PagedListBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
-  const {color: accent} = useAccent();
   const paging = useRef(createListPaging({load: context.load})).current;
   const [, setVersion] = useState(0);
   // the screen reached its end while a page was on its way: it sends no more scroll events once
@@ -442,20 +487,7 @@ function PagedListBlock({block, scope, context}: {block: UiBlock; scope: Scope; 
   return (
     <View style={styles.list}>
       {rows.map((item: any, index: number) => listRow(block, item, index, scope, context))}
-      {status.error ? (
-        <View style={styles.listFoot} testID="list-more-error">
-          <Text style={type.caption}>{status.error}</Text>
-          <ActionPill entry={{label: 'Try again'}} scope={scope} onPress={next} />
-        </View>
-      ) : status.loading ? (
-        <View style={styles.listFoot} testID="list-more-loading">
-          <ActivityIndicator color={accent} accessibilityLabel="Loading…" />
-        </View>
-      ) : status.more ? (
-        <View style={styles.listFoot} testID="list-more">
-          <ActionPill entry={{label: 'Show more'}} scope={scope} onPress={next} />
-        </View>
-      ) : null}
+      <ListFooter status={status} scope={scope} onMore={next} />
     </View>
   );
 }

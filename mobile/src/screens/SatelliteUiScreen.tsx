@@ -1,7 +1,9 @@
 import {useIsFocused} from '@react-navigation/native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {
+  ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
 import {useDeveloperMode} from '../developer/DeveloperModeContext';
@@ -14,6 +16,7 @@ import {
 } from '../satellites/ui/contract';
 import {MediaPicker, type MediaReference, type PickRequest} from '../satellites/ui/MediaPicker';
 import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
+import {hasPagedList, VirtualListPage} from '../satellites/ui/VirtualListPage';
 import {DEDICATED_SCREENS} from './HomeScreen';
 import {uiPreferences} from '../satellites/ui/preferences';
 import {
@@ -709,6 +712,17 @@ export function SatelliteUiScreen({route, navigation}: Props) {
             (!('visible' in block) || isVisible(resolve(block.visible, scope))),
         )
       : -1;
+  // 1.2: so is a page with a list that loads further pages among its own blocks - its blocks
+  // and its lists' rows as one virtualized list
+  const listPage = template === 'stack' && data !== null && gridIndex < 0 && hasPagedList(blocks, scope, context);
+  // the screen nears its end: a grid or a paged list drawn in place reveals or loads more
+  const nearEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
+    if (nearEndListeners.size && layoutMeasurement.height + contentOffset.y >= contentSize.height - 900) {
+      nearEndListeners.forEach(listener => listener());
+    }
+  };
+  const hasTop = Boolean(headerBlocks) || tabs.length > 1 || offline || stale;
   const top = (
     <>
       {headerBlocks && (
@@ -769,17 +783,25 @@ export function SatelliteUiScreen({route, navigation}: Props) {
             </View>
           }
         />
+      ) : listPage ? (
+        <VirtualListPage
+          key={`${pageId}:${paramsKey}`}
+          blocks={blocks}
+          scope={scope}
+          context={context}
+          refreshControl={refreshControl}
+          contentContainerStyle={styles.listContent}
+          onScroll={nearEnd}
+          dim={stale}
+          header={hasTop ? <View style={styles.listTop}>{top}</View> : null}
+          footer={<FloatingPlayerSpacer />}
+        />
       ) : (
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         scrollEventThrottle={100}
-        onScroll={event => {
-          const {layoutMeasurement, contentOffset, contentSize} = event.nativeEvent;
-          if (nearEndListeners.size && layoutMeasurement.height + contentOffset.y >= contentSize.height - 900) {
-            nearEndListeners.forEach(listener => listener());
-          }
-        }}
+        onScroll={nearEnd}
         refreshControl={refreshControl}>
         {top}
         {data === null && dataError ? (
@@ -863,6 +885,9 @@ const styles = StyleSheet.create({
   offlineTitle: {color: palette.warn},
   page: {gap: space.md},
   virtualTop: {gap: space.md},
+  // a list page spaces its own lines (VirtualListPage), so its content has no gap
+  listContent: {padding: space.lg, paddingBottom: space.xxl * 2},
+  listTop: {gap: space.md, marginBottom: space.md},
   stalePage: {opacity: 0.6},
   loading: {gap: space.md},
   skeleton: {height: 120, borderRadius: radii.card, backgroundColor: palette.card},
