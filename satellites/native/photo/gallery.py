@@ -522,3 +522,18 @@ def import_view(satellite) -> dict:
         "formats": f"Takes in {', '.join(name.upper() for name in formats)} files. Originals are never moved, "
                    "changed or deleted, and importing the same folder twice is safe.",
     }
+
+
+def settings_view(satellite) -> dict:
+    """What the shared Settings page edits (configuration.py's own settings, each saved through
+    the configuration route, one at a time): the phone folder -> server path mappings as rows,
+    each keeping its id so its album keeps its own, the recycle bin's retention, the default
+    folder to import from and the folder synced photos land in when no mapping matches."""
+    mappings = satellite.config.get("source_paths", configuration.DEFAULTS["source_paths"]) or []
+    return {
+        "source_paths": [{key: str(entry.get(key) or "") for key in ("id", "phone_path", "server_path", "name")}
+                         for entry in mappings if isinstance(entry, dict)],
+        "trash_retention_days": configuration.trash_retention_days(satellite),
+        "photo_directory": satellite.config.get("photo_directory", "") or "",
+        "sync_default_path": str(satellite.config.get("sync_default_path", configuration.DEFAULTS["sync_default_path"])),
+    }

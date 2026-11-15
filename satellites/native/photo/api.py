@@ -68,6 +68,8 @@ def gallery_route(request):
                                                      limit, cursor))
         if path == ("import",):
             return json_response(gallery.import_view(request.satellite))
+        if path == ("settings",):
+            return json_response(gallery.settings_view(request.satellite))
         if path == ("map",):
             return json_response(gallery.map_view(request.satellite, gallery.viewport(request.query),
                                                   overview=request.query.get("overview") == "1"))
@@ -158,9 +160,12 @@ def configuration_route(request):
         return error_response("'key' must be a string", status=400)
 
     try:
-        return json_response(configuration.update(request.engine, request.satellite, key, value))
+        result = configuration.update(request.engine, request.satellite, key, value)
     except configuration.ConfigurationError as error:
         return error_response(str(error), status=400)
+    # the note, also as the message a shared interface shows as its notice
+    result["message"] = result.get("note")
+    return json_response(result)
 
 
 def summary(request):

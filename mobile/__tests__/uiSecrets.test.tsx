@@ -269,4 +269,17 @@ describe('the secret and form rules (pure)', () => {
     expect(formBody(values).f[0]).not.toBe(values.f[0]);
     expect(formProblem([{...fields[0], required: true}], {f: []})).toBe('F needs at least one row.');
   });
+
+  it('keeps what a bound row holds besides its inputs, such as its id, and a removed row takes it along', () => {
+    const fields = [{key: 'folders', label: 'Folders', kind: 'rows', value: '$.folders',
+      fields: [{key: 'path', label: 'Path', kind: 'text', required: true}, {key: 'name', label: 'Name', kind: 'text'}]}];
+    const values = formValues(fields, {data: {folders: [{id: 'a1', path: 'one'}, {id: 'b2', path: 'two', name: 'Two'}]}});
+    values.folders.splice(0, 1);
+    values.folders.push(emptyRow(fields[0].fields));
+    expect(formProblem(fields, values)).toBe('Folders, row 2: Path is required.');
+    values.folders[1].path = 'three';
+    expect(formProblem(fields, values)).toBeNull();
+    expect(formBody(values)).toEqual({folders: [{id: 'b2', path: 'two', name: 'Two'}, {path: 'three', name: ''}]});
+    expect(formProblem(fields, {folders: []})).toBeNull();
+  });
 });

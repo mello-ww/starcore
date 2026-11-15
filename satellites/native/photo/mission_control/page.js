@@ -13,13 +13,13 @@ const TABS = ["photos", "albums", "map", "locked", "config"];
 const LOCKED_FOLDER = "LockedFolder";
 const LOCKED_URL = `/api/satellites/${LOCKED_FOLDER}`;
 
-// the sections the shared interface's own action opens (ui.json: {"own": "settings"}), and the
+// the sections the shared interface's own action opens (ui.json: {"own": "sync"}), and the
 // Locked Folder's own name, which is how Mission Control links to it as a section of this page
 function tabFor(section) {
     if (section === LOCKED_FOLDER || section === "locked") {
         return "locked";
     }
-    return section === "settings" ? "config" : "photos";
+    return section === "sync" ? "config" : "photos";
 }
 
 function tabLabel(name) {

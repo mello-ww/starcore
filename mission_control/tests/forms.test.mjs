@@ -50,3 +50,18 @@ test("a rows field is refused without a row, or with a required input empty", ()
     assert.equal(formProblem(plain, { name: "" }), "Name is required.");
     assert.equal(formProblem([{ ...fields[0], required: false }], { mappings: [] }), null);
 });
+
+test("a bound row keeps what is not one of its inputs, such as its id, and a removed row takes it along", () => {
+    const rows = [{
+        key: "folders", label: "Folders", kind: "rows", value: "$.folders",
+        fields: [{ key: "path", label: "Path", kind: "text", required: true }, { key: "name", label: "Name", kind: "text" }],
+    }];
+    const values = formValues(rows, { data: { folders: [{ id: "a1", path: "one" }, { id: "b2", path: "two", name: "Two" }] } });
+    values.folders.splice(0, 1);
+    values.folders.push(emptyRow(rows[0].fields));
+    assert.equal(formProblem(rows, values), "Folders, row 2: Path is required.");
+    values.folders[1].path = "three";
+    assert.equal(formProblem(rows, values), null);
+    assert.deepEqual(formBody(values), { folders: [{ id: "b2", path: "two", name: "Two" }, { path: "three", name: "" }] });
+    assert.equal(formProblem(rows, { folders: [] }), null, "an optional rows field may be emptied");
+});

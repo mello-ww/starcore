@@ -75,6 +75,12 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   removes the recovery key, restores or deletes a backup, and delinks. It reads a new
   `settings` view, served only while unlocked, and every route still needs what it did. Enrolling
   a phone for biometric unlock stays in the app's own screens (`docs/satellites/locked_folder.md`).
+- **Photos' settings in its shared interface:** Settings on Albums edits the phone folders as
+  repeatable rows (each keeping its album), the default album for synced photos, the recycle
+  bin's retention and the default import folder, through the existing `configuration` route,
+  whose answer now carries a `message`. It reads a new `gallery/settings` view. Phone sync is
+  still Photo's own screen, now opened from Settings (`{"own": "sync"}`, which replaces
+  `{"own": "settings"}`) (`docs/satellites/photo.md`).
 - **A host lists the Satellites it hosts from the Engine** (`starcore.sections`): Photo's
   albums show each as a tile, with its title and icon, that opens through the `section` action.
   Photo's document no longer names the Locked Folder, and in the app a hosted Satellite's own

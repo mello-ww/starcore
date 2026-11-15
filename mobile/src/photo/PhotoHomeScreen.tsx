@@ -45,7 +45,7 @@ export function PhotoHomeScreen({navigation, route}: Props) {
   const {api: lockedApi} = useLockedFolder();
   const [hasLockedFolder, setHasLockedFolder] = useState(false);
   const [lockedChecked, setLockedChecked] = useState(false);
-  // opened by the shared interface's own action ({"own": "settings"} in Photo's ui.json), or by
+  // opened by the shared interface's own action ({"own": "sync"} in Photo's ui.json), or by
   // its section action at the Locked Folder (named after its Satellite): one destination on its
   // own, pushed over the shared screen, so Back returns there
   const opened = route.params?.section === LOCKED_FOLDER ? 'locked' : route.params?.section;
@@ -61,7 +61,7 @@ export function PhotoHomeScreen({navigation, route}: Props) {
   }, [lockedApi]);
 
   useLayoutEffect(() => {
-    if (opened === 'settings') {
+    if (opened === 'sync') {
       navigation.replace('PhotoConfiguration');
     }
   }, [opened, navigation]);
@@ -77,7 +77,7 @@ export function PhotoHomeScreen({navigation, route}: Props) {
     navigation.navigate('PhotoAlbum', {albumId: album.id, name: album.name});
   };
 
-  if (opened === 'settings') {
+  if (opened === 'sync') {
     return <View style={styles.screen} />;
   }
   if (opened === 'locked') {

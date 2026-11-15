@@ -1,5 +1,5 @@
 {
-  "_about": "Photo's shared interface (UI contract 1.2): Library, Albums, Search, Map, the recycle bin and import from a server folder, in the shared media-grid, viewer, search and map. Both clients open it by default; Photo's own page and screens stay in Developer Mode until it is validated (docs/satellites/photo.md, \"Shared interface\"). Library, Albums and an album are kept to show while StarCore can't be reached (\"offline\"); the recycle bin, Search and Map are not. Phone sync and settings stay on Photo's own screens, which Albums opens through the own action (\"settings\", from a button). The Satellites Photo hosts (section_of) are folders among the others: gallery/albums lists them from the Engine's registry, with their own title and icon, and a tile opens one through the section action - its shared interface, or the client's own screens for it, which keep their own PIN. Moving photos into the Locked Folder runs here, from the viewer and a selection, through the secure action: the client's own unlock prompt asks the media.vault provider for a single-use grant for exactly those photos, so the Locked Folder never opens. It binds to the read-only gallery routes (gallery.py); every action goes to Photo's existing routes.",
+  "_about": "Photo's shared interface (UI contract 1.2): Library, Albums, Search, Map, the recycle bin and import from a server folder, in the shared media-grid, viewer, search and map. Both clients open it by default; Photo's own page and screens stay in Developer Mode until it is validated (docs/satellites/photo.md, \"Shared interface\"). Library, Albums and an album are kept to show while StarCore can't be reached (\"offline\"); the recycle bin, Search and Map are not. Settings (Albums' Settings button) edits Photo's own settings as forms, each saved through the configuration route: the phone folder -> server path mappings as repeatable rows (each keeping its id, so its album keeps its own), the recycle bin's retention, the default import folder and the folder synced photos land in. Phone sync stays on Photo's own screens, which Settings opens through the own action (\"sync\"). The Satellites Photo hosts (section_of) are folders among the others: gallery/albums lists them from the Engine's registry, with their own title and icon, and a tile opens one through the section action - its shared interface, or the client's own screens for it, which keep their own PIN. Moving photos into the Locked Folder runs here, from the viewer and a selection, through the secure action: the client's own unlock prompt asks the media.vault provider for a single-use grant for exactly those photos, so the Locked Folder never opens. It binds to the read-only gallery routes (gallery.py); every action goes to Photo's existing routes.",
   "contract": "starcore.ui/1.2",
   "title": "Photos",
   "entry": "library",
@@ -214,7 +214,60 @@
           ]
         },
         {"type": "button", "label": "Recycle bin", "style": "secondary", "action": {"navigate": "trash"}},
-        {"type": "button", "label": "Settings and phone sync", "style": "secondary", "action": {"own": "settings"}}
+        {"type": "button", "label": "Settings", "style": "secondary", "action": {"navigate": "settings"}}
+      ]
+    },
+    "settings": {
+      "title": "Settings",
+      "source": {"route": "gallery/settings"},
+      "blocks": [
+        {
+          "type": "card",
+          "title": "Phone folders",
+          "blocks": [
+            {"type": "text", "style": "caption", "text": "Each phone folder synced into its own album, under its folder in the library. The folder in the library is never assumed to match the phone's."},
+            {"type": "form",
+             "fields": [{"key": "source_paths", "label": "Phone folders", "kind": "rows", "add": "Add a phone folder", "value": "$.source_paths",
+                         "fields": [{"key": "phone_path", "label": "On the phone", "kind": "text", "placeholder": "/Pictures/Screenshots", "required": true},
+                                    {"key": "server_path", "label": "In the library", "kind": "text", "placeholder": "screenshots", "required": true},
+                                    {"key": "name", "label": "Album name", "kind": "text", "placeholder": "Screenshots"}]}],
+             "submit": {"label": "Save phone folders",
+                        "action": {"route": "configuration", "body": {"key": "source_paths", "value": "$form.source_paths"}, "then": "refresh"}}}
+          ]
+        },
+        {
+          "type": "card",
+          "title": "Synced photos",
+          "blocks": [
+            {"type": "text", "style": "caption", "text": "Where a synced photo or video lands, and which album it joins, when its phone folder isn't one of the above."},
+            {"type": "form",
+             "fields": [{"key": "path", "label": "Default album folder", "kind": "text", "value": "$.sync_default_path", "placeholder": "camera", "required": true}],
+             "submit": {"label": "Save",
+                        "action": {"route": "configuration", "body": {"key": "sync_default_path", "value": "$form.path"}, "then": "refresh"}}},
+            {"type": "button", "label": "Phone sync", "style": "secondary", "action": {"own": "sync"}}
+          ]
+        },
+        {
+          "type": "card",
+          "title": "Recycle bin",
+          "blocks": [
+            {"type": "form",
+             "fields": [{"key": "days", "label": "Days a deleted item is kept", "kind": "number", "value": "$.trash_retention_days", "required": true}],
+             "submit": {"label": "Save",
+                        "action": {"route": "configuration", "body": {"key": "trash_retention_days", "value": "$form.days"}, "then": "refresh"}}}
+          ]
+        },
+        {
+          "type": "card",
+          "title": "Import",
+          "blocks": [
+            {"type": "text", "style": "caption", "text": "The folder on the StarCore server an import starts from. Leave it empty to name one each time."},
+            {"type": "form",
+             "fields": [{"key": "directory", "label": "Default folder", "kind": "text", "value": "$.photo_directory", "placeholder": "/absolute/path"}],
+             "submit": {"label": "Save",
+                        "action": {"route": "configuration", "body": {"key": "photo_directory", "value": "$form.directory"}, "then": "refresh"}}}
+          ]
+        }
       ]
     },
     "album": {

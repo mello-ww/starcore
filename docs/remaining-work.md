@@ -108,9 +108,10 @@ the owner 2026-11-15).
     Wi-Fi and charging rules, progress and errors. `App.tsx` no longer imports `src/photo/`.
   - [ ] **S4** - emulator runs, then the owner's phone.
   - [ ] **S5** - security review.
-- [ ] **P1 - Settings (#29):** the `source_paths` mappings as repeatable form rows (the `rows`
+- [x] **P1 - Settings (#29):** the `source_paths` mappings as repeatable form rows (the `rows`
   field kind arrives with contract change 2, in the Locked Folder's L4); the `own: "settings"`
-  entry goes.
+  entry goes. Phone sync is reached from Settings with `{"own": "sync"}` until S0 to S4
+  replace it.
 - [ ] **The Locked Folder (#37):** stage 4.
 - [ ] **P2 - Icons shipped by the Satellite (#38):** a declared `icons/` folder, validated by
   the Engine (single colour, no script), drawn by both clients with a shared icon as fallback

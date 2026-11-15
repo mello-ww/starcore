@@ -182,7 +182,7 @@ GET  /api/satellites/photo/originals/<id>     the stored original
 POST /api/satellites/photo/scan               preview a directory  {"source": "..."}; the answer includes a readable "message"
 POST /api/satellites/photo/import             import a directory   {"source": "..."}; the answer includes a readable "message"
 GET  /api/satellites/photo/configuration      current sync_host/sync_port/trash_retention_days/source_paths/... settings
-POST /api/satellites/photo/configuration      change one            {"key": ..., "value": ...}
+POST /api/satellites/photo/configuration      change one            {"key": ..., "value": ...}; the answer's "message" says what was saved
 POST /api/satellites/photo/sync_upload        upload one photo/video, authenticated (see "Real automatic phone sync")
 GET  /api/satellites/photo/albums             every physical album, Favorites, and every custom album
 GET  /api/satellites/photo/albums/<id>        one album's photos ("physical:<id>" for a physical album)
@@ -200,6 +200,8 @@ GET  /api/satellites/photo/gallery/albums     every album as a tile with its cov
 GET  /api/satellites/photo/gallery/albums/<id>   one album's photos in the album's own order, for the shared gallery
 GET  /api/satellites/photo/gallery/trash      the recycle bin, with the days each item has left ("left")
 GET  /api/satellites/photo/gallery/import     the default import folder and the formats an import takes in
+GET  /api/satellites/photo/gallery/settings   what the shared Settings page edits: source_paths (each with its id), trash_retention_days,
+                                              photo_directory and sync_default_path
 GET  /api/satellites/photo/media?kinds=       media.gallery's list: what a media picker may offer
 GET  /api/satellites/photo/media/resolve/<id>  media.gallery's resolve: {id, kind} for a photo of the active library, 404 otherwise
 GET  /api/satellites/photo/gallery/search?q=&kind=   photos and albums matching a search, for the shared Search page
@@ -294,7 +296,8 @@ What it covers:
 | Map: located photos, opening the viewer | yes | yes (see below) |
 | Map clustering | web only, by rounded coordinates | both clients, a grid about 64 px wide on screen |
 | Import from a folder on the server: check, then import | web only | yes, both clients ("Import from a folder" on Library) |
-| Phone sync, settings | yes | opens Photo's own: "Settings and phone sync" on Albums (the web's Configuration tab, the app's Photo configuration) |
+| Settings: phone folders (`source_paths`), the default album for synced photos, the recycle bin's retention, the default import folder | yes | yes, both clients: Settings on Albums, one form each, the phone folders as repeatable rows (see below) |
+| Phone sync | yes | opens Photo's own: "Phone sync" on Settings (the web's Configuration tab, the app's Photo configuration) |
 | Locked Folder | yes | its tile among the folders on Albums (a lock, shown while the Locked Folder is enabled) opens it with the `section` action: its own page or screen by default, its shared interface (a preview, [the Locked Folder](locked_folder.md#shared-interface)) in Developer Mode |
 | Move a photo into the Locked Folder | yes, from the viewer | yes: the viewer (Library, Search, Map, an album) and a selection (Library, an album), through the secure action - see below |
 | Offline cache of the library (Android) | yes, the whole list (metadata only) | yes: Library, Albums and an album, with up to 600 items each (`offline` pages, see the UI contract's "Offline pages"), only the fields they show, and never an item's GPS location or its folder on the server; never the recycle bin, Search or Map |
@@ -310,9 +313,21 @@ one the map area stays blank and the Library, Search and viewer work as usual. D
 remain: on Android a cluster opens the viewer directly (the web shows its thumbnails first), and
 the web's single-photo popup is replaced by opening the viewer at once.
 
-"Settings and phone sync" on Albums uses the contract's `own` action (`{"own": "settings"}`):
-Photo's own web page opens its Configuration tab, and the app pushes Photo configuration over
-the shared one, so Back returns there. The Locked Folder's tile uses the `section` action
+**Settings** (Albums' Settings button) reads `gallery/settings` and saves each setting through
+the `configuration` route, one form each, as Photo's own page and screen do: the phone folders
+(`source_paths`) as a form field of repeatable rows (UI contract 1.2, "Repeatable rows"), each
+row the folder on the phone, the folder in the library and an optional album name; the default
+album folder for synced photos (`sync_default_path`); the days a deleted item stays in the
+recycle bin; the default folder an import starts from. A row keeps the id it was read with, so
+a mapping that is edited keeps its album's id; a new row gets one from `configuration.py`. A
+refused value (an absolute or `..` path in the library, a phone folder mapped twice, fewer than
+one day) changes nothing and its error shows as the form's notice. The listener's own address
+and port stay in the generic configuration (Developer Mode).
+
+"Phone sync" on Settings uses the contract's `own` action (`{"own": "sync"}`): Photo's own web
+page opens its Configuration tab, and the app pushes Photo configuration over the shared one,
+so Back returns there. It goes once the phone sync capability replaces it (S0 to S4 in
+[the parity audit](../photos-parity-audit.md)). The Locked Folder's tile uses the `section` action
 (`{"section": "$.section"}`), and Photo's document names no Satellite it hosts: the albums route
 lists them from the Engine. By default it opens the Locked Folder's own interface - Photo's own
 web page at `#/satellite/Photo/LockedFolder`, and in the app the Locked Folder on its own

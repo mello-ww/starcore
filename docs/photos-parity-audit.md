@@ -49,7 +49,7 @@ Legend:
 | 26 | Import from a server folder (scan / import) | ✅ | ✗ (empty text wrongly says "Import some from your Albums tab") | ✅ fixed in M1 | ✅ fixed in M1 | Lost on web. | J: a form with `source` and Scan / Import → existing `scan`/`import` routes. S: add a `message` to their answers. Optional: `file-browser` | P0 | S |
 | 27 | Upload, download, share, export (download and share fixed in M12; upload and export not) | ✗ upload, ✗ download | ◐ Share sends a bare authenticated URL (the recipient can't open it) | ✅ download, ◐ share where the browser can | ✅ (share; download on Android 10+) | Nothing worked well anywhere before M12. | C: `download`/`share` action (web: authenticated fetch → save; Android: download → share the file) | P1 | M |
 | 28 | Phone sync (background, Wi-Fi only, Sync now, permission) | status only (Dev Mode log) | ✅ | ✗ | ◐ M2: opens the own screen (`own`) | Device-side; registered in `App.tsx`, so it doesn't depend on the Photos screen. | N: reach `PhotoConfigurationScreen` from the shared interface | P0 | S |
-| 29 | Settings (source_paths mappings, default sync folder, retention, default import directory) | ✅ tab | ✅ screen | ◐ M2: opens the own page (`own`) | ◐ M2: opens the own screen (`own`) | `source_paths` is a list of objects; the contract's form has no repeatable rows. | N for now (entry point, as #28). C later: repeatable form rows | P0 entry / P2 C | S / M |
+| 29 | Settings (source_paths mappings, default sync folder, retention, default import directory) | ✅ tab | ✅ screen | ✅ fixed in P1: a Settings page of forms | ✅ fixed in P1 | `source_paths` is a list of objects: since L4 the contract's form has repeatable rows. | C: repeatable form rows (contract change 2), then J+S: `gallery/settings` and the forms | P0 entry / P2 C | S / M |
 | 30 | Offline cache (Android) | n/a | ✅ cached list, "Showing cached photos - offline" | n/a | ✅ fixed in M4 (offline pages) | **Lost.** | C: opt-in per-server page-data cache, forgotten on a Locked Folder move (as `forgetCachedPhoto`) | P0 (Android) | M |
 | 31 | Deep link `#/satellite/Photo/LockedFolder` (web) | ✅ | n/a | ✅ fixed in M2 | n/a | Breaks if the shared interface becomes the default. | Client wiring with #25 | P0 | S |
 | 32 | Large libraries | ◐ every tile in the DOM | ✗ 50k never loaded | ✅ paged | ✅ virtualized | Shared is far ahead. Picker add of N items saves the album file N times. | S (optional): one album save | P2 | S |
@@ -123,7 +123,6 @@ These still need client code written for Photo or the Locked Folder. To reach th
 each must move to the contract or to a generic capability before the stable release:
 - The Locked Folder internals: PIN, biometrics, encryption, recovery, move-out (#25, then #37).
 - Phone sync and its background task (#28): a generic device-sync capability.
-- The `source_paths` mappings editor (#29), until repeatable form rows exist.
 - The dedicated web's sync listener log (Developer Mode).
 
 **Towards the stable release**
@@ -137,7 +136,6 @@ each must move to the contract or to a generic capability before the stable rele
 - Select all, bulk unfavorite, add selection to album, bulk routes (#23).
 - Bulk remove from album (#10).
 - One album save per pick (#32).
-- Repeatable form rows (#29).
 
 ## Phone sync (#28): what exists, and the design of its replacement (2026-11-15)
 
@@ -286,6 +284,6 @@ The app finds the provider in the catalog and never names it.
 
 | # | What | Contract | Main files | Tests | Model |
 |---|---|---|---|---|---|
-| P1 | Settings (#29) as forms: the `source_paths` mappings as repeatable rows (the `rows` field kind arrives with the Locked Folder's L4), retention, default import folder, default album; `own: "settings"` goes | uses contract change 2 | `photo/ui.json`, `photo/api.py` (a `view/settings` route), `configuration.py` | Engine: the document's routes; both clients' form tests with rows added, removed and refused | Opus 5.5 high |
+| P1 (done) | Settings (#29) as forms: the `source_paths` mappings as repeatable rows (the `rows` field kind arrives with the Locked Folder's L4), retention, default import folder, default album; `own: "settings"` goes | uses contract change 2 | `photo/ui.json`, `photo/api.py` (a `view/settings` route), `configuration.py` | Engine: the document's routes; both clients' form tests with rows added, removed and refused | Opus 5.5 high |
 | P2 | Icons shipped by a Satellite (#38): an `icons/` folder named in the manifest; the Engine validates each SVG (no DOCTYPE, an allow-list of shape elements and attributes, `currentColor` only, no `style`, `script`, `use`, `image`, `href` or event attribute, 8 KB each, 32 at most) and serves it with a revision; a document names `{"own": "<name>", "fallback": "<shared icon>"}`; both clients check again and tint it; Android gets its SVG renderer | **contract change 4** | `satellite_loader.py`, `ui_contract.py`, `api/server.py`, fixtures, `mission_control/ui/icons.js`, `mobile/src/satellites/ui/` | Engine: every refused construct as a fixture; both clients draw the fallback for a refused or missing icon | Opus 5.5 high |
 | P3 | Remove Photo's `page.js`, `page.css`, `mobile/src/photo/`, its routes in `MainTabs.tsx` and its `DEDICATED_SCREENS` entry, once the owner has validated L5, S4 and P1 | none | those | the suites; `KNOWN_IMPORTS` loses `MainTabs.tsx` and `KNOWN_COUPLINGS` its Photo count | Sonnet 5.5 medium |

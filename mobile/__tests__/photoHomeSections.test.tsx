@@ -37,9 +37,9 @@ const texts = (tree: ReturnType<typeof renderer.create>) =>
 describe('PhotoHomeScreen sections', () => {
   beforeEach(() => mockStatus.mockReset());
 
-  it('opens Photo configuration in its place for "settings", so Back returns to the shared screen', async () => {
+  it('opens Photo configuration in its place for "sync", so Back returns to the shared screen', async () => {
     mockStatus.mockResolvedValue({configured: true});
-    const {navigation} = await mount({section: 'settings'});
+    const {navigation} = await mount({section: 'sync'});
     expect(navigation.replace).toHaveBeenCalledWith('PhotoConfiguration');
   });
 

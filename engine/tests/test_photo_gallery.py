@@ -156,11 +156,23 @@ class PhotoUiDocumentTest(unittest.TestCase):
                   ("Unfavorite", "$.favorite", "albums/favorites/photos/remove")]
         self.assertEqual(hearts, {"library": toggle, "search": toggle, "album": toggle})
 
-    def test_settings_open_photos_own_screens_and_a_section_tile_its_section(self):
+    def test_phone_sync_opens_photos_own_screens_and_a_section_tile_its_section(self):
+        # P1: the settings are shared forms; only phone sync still opens Photo's own screens
+        owns = []
+        def walk(value):
+            if isinstance(value, dict):
+                if isinstance(value.get("action"), dict) and "own" in value["action"]:
+                    owns.append((value.get("label"), value["action"]["own"]))
+                for item in value.values():
+                    walk(item)
+            elif isinstance(value, list):
+                for item in value:
+                    walk(item)
+        walk(self.document["pages"])
+        self.assertEqual(owns, [("Phone sync", "sync")])
         blocks = self.document["pages"]["albums"]["blocks"]
-        opened = {block["label"]: block["action"]["own"] for block in blocks
-                  if block["type"] == "button" and "own" in block.get("action", {})}
-        self.assertEqual(opened, {"Settings and phone sync": "settings"})
+        settings = [block for block in blocks if block.get("label") == "Settings"]
+        self.assertEqual(settings[0]["action"], {"navigate": "settings"})
         # a Satellite Photo hosts is a tile among the albums, opened through the section action:
         # the document names none of them, and nothing about the vault is in it
         grid = next(block for block in blocks if block["type"] == "media-grid")
@@ -172,8 +184,40 @@ class PhotoUiDocumentTest(unittest.TestCase):
         self.assertEqual(grid["item"]["icon"], "$.icon")
         # Photo's own web page knows both sections, and the Locked Folder's link as well
         page = (PHOTO_DIR / "mission_control" / "page.js").read_text(encoding="utf-8")
-        self.assertIn('section === "settings" ? "config"', page)
+        self.assertIn('section === "sync" ? "config"', page)
         self.assertIn('section === LOCKED_FOLDER || section === "locked"', page)
+
+
+    def test_settings_are_forms_saved_through_the_configuration_route(self):
+        from satellites.native.photo import configuration
+
+        page = self.document["pages"]["settings"]
+        self.assertEqual(page["source"], {"route": "gallery/settings"})
+        forms = []
+        def walk(blocks):
+            for block in blocks:
+                if block["type"] == "form":
+                    forms.append(block)
+                walk(block.get("blocks", []))
+        walk(page["blocks"])
+        saved = {}
+        for form in forms:
+            action = form["submit"]["action"]
+            self.assertEqual(action["route"], "configuration")
+            self.assertEqual(action["then"], "refresh")
+            key, value = action["body"]["key"], action["body"]["value"]
+            self.assertIn(key, configuration.SETTINGS)
+            self.assertEqual([field["key"] for field in form["fields"]], [value.removeprefix("$form.")])
+            saved[key] = form["fields"][0]
+        # the listener's own address and port stay in the generic configuration
+        self.assertEqual(set(saved), {"source_paths", "sync_default_path", "trash_retention_days", "photo_directory"})
+        rows = saved["source_paths"]
+        self.assertEqual((rows["kind"], rows["value"], rows.get("required")), ("rows", "$.source_paths", None))
+        self.assertEqual([(field["key"], field.get("required", False)) for field in rows["fields"]],
+                         [("phone_path", True), ("server_path", True), ("name", False)])
+        self.assertEqual(saved["trash_retention_days"]["kind"], "number")
+        self.assertTrue(saved["sync_default_path"]["required"])
+        self.assertNotIn("required", saved["photo_directory"], "an empty default import folder is allowed")
 
 
 class PhotoGalleryApiTest(unittest.TestCase):
@@ -350,6 +394,76 @@ class PhotoGalleryApiTest(unittest.TestCase):
         self.assertIn("JPEG", view["formats"])
         self.satellite.config.data["photo_directory"] = str(self.source)
         self.assertEqual(self.json_request("/api/satellites/photo/gallery/import")[1]["directory"], str(self.source))
+
+    def save(self, key, value):
+        return self.json_request("/api/satellites/photo/configuration", "POST", {"key": key, "value": value})
+
+    def test_the_settings_page_reads_and_saves_each_setting(self):
+        self.satellite.config.data["sync_default_path"] = "camera"
+        status, view = self.json_request("/api/satellites/photo/gallery/settings")
+        self.assertEqual(status, 200)
+        self.assertEqual(view, {"source_paths": [], "trash_retention_days": 30, "photo_directory": "",
+                                "sync_default_path": "camera"})
+        self.assertEqual(self.json_request("/api/satellites/photo/gallery/settings", "POST", {})[0], 405)
+
+        status, answer = self.save("trash_retention_days", "14")
+        self.assertEqual(status, 200)
+        self.assertIn("14 day(s)", answer["message"])
+        status, answer = self.save("photo_directory", str(self.source))
+        self.assertEqual(status, 200)
+        status, answer = self.save("sync_default_path", "phone/camera")
+        self.assertEqual(status, 200)
+        view = self.json_request("/api/satellites/photo/gallery/settings")[1]
+        self.assertEqual((view["trash_retention_days"], view["photo_directory"], view["sync_default_path"]),
+                         (14, str(self.source), "phone/camera"))
+        self.assertEqual(self.save("trash_retention_days", "0")[0], 400)
+        self.assertEqual(self.save("photo_directory", "relative/path")[0], 400)
+        self.assertEqual(self.save("sync_default_path", "")[0], 400)
+        self.assertEqual(self.json_request("/api/satellites/photo/gallery/settings")[1], view, "a refused value changes nothing")
+
+    def test_phone_folders_are_rows_added_removed_and_refused(self):
+        # as the shared form sends them: every input of each row, and a bound row's id kept
+        status, answer = self.save("source_paths", [
+            {"phone_path": "/Pictures/Screenshots", "server_path": "screenshots", "name": ""},
+            {"phone_path": "/DCIM/WhatsApp", "server_path": "whatsapp", "name": "Chats"},
+        ])
+        self.assertEqual(status, 200)
+        self.assertEqual(answer["message"], "Saved 2 phone -> server path mapping(s).")
+        rows = self.json_request("/api/satellites/photo/gallery/settings")[1]["source_paths"]
+        self.assertEqual([(row["phone_path"], row["server_path"], row["name"]) for row in rows],
+                         [("/Pictures/Screenshots", "screenshots", "screenshots"), ("/DCIM/WhatsApp", "whatsapp", "Chats")])
+        ids = [row["id"] for row in rows]
+        self.assertTrue(all(ids))
+        albums = {album["title"]: album["id"] for album in self.json_request("/api/satellites/photo/gallery/albums")[1]["albums"]}
+        self.assertEqual(albums["Chats"], f"physical:{ids[1]}")
+
+        # a row removed and one added: the kept row keeps its id, so its album keeps its own
+        kept = dict(rows[1], name="Chats renamed")
+        status, _ = self.save("source_paths", [kept, {"phone_path": "/Movies", "server_path": "movies", "name": "Films"}])
+        self.assertEqual(status, 200)
+        rows = self.json_request("/api/satellites/photo/gallery/settings")[1]["source_paths"]
+        self.assertEqual([row["name"] for row in rows], ["Chats renamed", "Films"])
+        self.assertEqual(rows[0]["id"], ids[1])
+        self.assertNotIn(rows[1]["id"], ids)
+        albums = {album["title"]: album["id"] for album in self.json_request("/api/satellites/photo/gallery/albums")[1]["albums"]}
+        self.assertEqual(albums["Chats renamed"], f"physical:{ids[1]}")
+
+        # refused: nothing changes
+        before = rows
+        for refused in ([{"phone_path": "/a", "server_path": "/srv/absolute", "name": ""}],
+                        [{"phone_path": "/a", "server_path": "../out", "name": ""}],
+                        [{"phone_path": "", "server_path": "a", "name": ""}],
+                        [{"phone_path": "/a", "server_path": "a", "name": ""}, {"phone_path": "/a", "server_path": "b", "name": ""}],
+                        "not rows"):
+            status, answer = self.save("source_paths", refused)
+            self.assertEqual(status, 400, refused)
+            self.assertIn("error", answer)
+        self.assertEqual(self.json_request("/api/satellites/photo/gallery/settings")[1]["source_paths"], before)
+
+        # every row removed
+        status, answer = self.save("source_paths", [])
+        self.assertEqual(status, 200)
+        self.assertEqual(self.json_request("/api/satellites/photo/gallery/settings")[1]["source_paths"], [])
 
     def test_unknown_gallery_paths_and_albums_are_refused(self):
         self.assertEqual(self.json_request("/api/satellites/photo/gallery/albums/deadbeef")[0], 404)
