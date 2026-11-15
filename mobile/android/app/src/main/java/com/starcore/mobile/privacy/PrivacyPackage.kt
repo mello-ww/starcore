@@ -9,5 +9,6 @@ class PrivacyPackage : ReactPackage {
     override fun createNativeModules(context: ReactApplicationContext): List<NativeModule> =
         listOf(PrivacyModule(context))
 
-    override fun createViewManagers(context: ReactApplicationContext): List<ViewManager<*, *>> = emptyList()
+    override fun createViewManagers(context: ReactApplicationContext): List<ViewManager<*, *>> =
+        listOf(SecureWindowManager())
 }

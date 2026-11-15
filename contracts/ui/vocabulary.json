@@ -148,7 +148,7 @@
       "operations": {
         "check": "GET ?path=<absolute path>[&tree=1] -> {protected, open, message?}: protected when the path is inside an area the provider guards (with tree=1, also a folder that contains one); open when this session may reach it through other Satellites now; message, the provider's words for a refusal"
       },
-      "_note": "Server-side only: what the Engine asks before any Satellite serves, lists, indexes, renames or deletes a path on disk (starcore.capabilities.protection). Every provider is asked, enabled or not, and a path is open only when each one says so; a provider that fails or answers anything else keeps the path closed. No client reads it."
+      "_note": "Server-side only: what the Engine asks before any Satellite serves, lists, indexes, renames or deletes a path on disk (starcore.capabilities.protection). Every provider is asked, enabled or not, and a path is open only when each one says so; a provider that fails or answers anything else keeps the path closed. No client reads it: a provider refuses a request that doesn't come through the Engine."
     }
   },
   "client_capabilities": {

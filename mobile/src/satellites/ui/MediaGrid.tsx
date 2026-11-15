@@ -1,4 +1,4 @@
-import React, {memo, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState} from 'react';
+import React, {memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState} from 'react';
 import {
   AccessibilityInfo, ActivityIndicator, Animated, FlatList, Image, Modal, Pressable, ScrollView, StatusBar, StyleSheet,
   Text, useWindowDimensions, View,
@@ -7,8 +7,9 @@ import {GestureDetector, GestureHandlerRootView, type GestureType} from 'react-n
 import Icon from 'react-native-vector-icons/Feather';
 import Video from 'react-native-video';
 import {usePinchColumnsGesture} from '../../components/pinchColumns';
+import {SecureWindow} from '../../components/SecureWindow';
 import {ZoomableImage} from '../../components/ZoomableImage';
-import {useImageSource} from './memoryImages';
+import {MemoryImages, useImageSource} from './memoryImages';
 import {keptPages} from './offline';
 import {tokens, useAccent} from '../../theme';
 import {formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate, type Scope, type UiAction, type UiBlock} from './contract';
@@ -1012,6 +1013,8 @@ export function MediaViewer({
 }) {
   const {width, height} = useWindowDimensions();
   const spec = (block.viewer ?? {}) as Record<string, any>;
+  // a protected document's viewer: its window can't be captured either
+  const guarded = useContext(MemoryImages);
   const [key, setKey] = useState(startKey);
   const [info, setInfo] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1057,6 +1060,7 @@ export function MediaViewer({
       <StatusBar barStyle="light-content" />
       {/* a Modal is a window of its own: gestures inside it need their own root */}
       <GestureHandlerRootView style={styles.viewer} testID="media-viewer">
+        <SecureWindow secure={guarded} />
         <FlatList
           ref={list}
           data={entries}

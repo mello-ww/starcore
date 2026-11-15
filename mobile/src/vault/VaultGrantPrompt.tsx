@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useRef} from 'react';
 import {Modal, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {SecureWindow} from '../components/SecureWindow';
 import type {SecurePrompt, SecurePromptProps} from '../satellites/ui/secure';
 import {palette, space, type} from '../theme/tokens';
 import {grantWithBiometrics} from './biometricUnlock';
@@ -49,6 +50,7 @@ export function VaultGrantPrompt({count, wanted, provider, onGrant, onCancel}: S
   return (
     <Modal transparent animationType="fade" onRequestClose={() => settle(null)} statusBarTranslucent>
       <View style={styles.backdrop}>
+        <SecureWindow />
         <ScrollView contentContainerStyle={styles.center} keyboardShouldPersistTaps="handled">
           <VaultUnlock
             biometricDeps={biometricDeps}

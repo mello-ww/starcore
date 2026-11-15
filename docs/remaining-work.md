@@ -153,7 +153,19 @@ closed it.
   `sealed` and `media.gallery`'s `original`, `release` and `adopt`, for the server alone
   (a request through the Engine carries its `caller`). `KNOWN_CROSS_SATELLITE` lost the vault's
   and `private_media.py`'s entries; Photo's `page.js` (the Locked Folder tab) stays until L8.
-- [ ] **L7** - security review.
+- [x] **L7** - security review of L0 to L6 (`docs/satellites/locked_folder.md`, "Security review
+  of L0 to L6"). Fixed: on a Windows server another name for the vault's folder
+  (`\\?\C:\...`, the drive's loopback share) got past `files.protected`, which now tells the
+  vault by its identity on disk; on Android the viewer and the secret prompts, drawn in Modals,
+  could be captured, and now set `FLAG_SECURE` on their own windows; `check` answered clients,
+  and now answers the server alone. Accepted and documented: an unreadable `sealed.json` reads
+  as empty.
+- [ ] **L7 follow-up - the phone check** (with L5's): a screenshot of the vault's viewer, of a
+  PIN prompt and of the recovery-key dialog comes out black. The fix is built but was not seen
+  on a device.
+- [ ] **L7 follow-up - a browser's cache after a move in:** Mission Control asks the browser to
+  fetch a moved item's thumbnail and original again, which replaces the copies it cached (the
+  Android app already evicts its image cache).
 - [ ] **L8** - remove the Locked Folder's `page.js` and `mobile/src/lockedFolder/`.
 
 What those milestones cover, as first listed:

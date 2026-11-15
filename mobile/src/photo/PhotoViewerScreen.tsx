@@ -15,6 +15,7 @@ import {
 import {canShareFiles, fileName, shareFile} from '../files';
 import Video from 'react-native-video';
 import {PrimaryButton} from '../components/PrimaryButton';
+import {SecureWindow} from '../components/SecureWindow';
 import {ZoomableImage} from '../components/ZoomableImage';
 import {LockedFolderUnlock} from '../lockedFolder/LockedFolderUnlock';
 import {useLockedFolder} from '../lockedFolder/useLockedFolder';
@@ -239,6 +240,7 @@ export function PhotoViewerScreen({route, navigation}: Props) {
       {unlockFor && (
         <Modal visible transparent animationType="fade" onRequestClose={() => setUnlockFor(null)}>
           <View style={styles.unlockBackdrop}>
+            <SecureWindow />
             <View style={styles.unlockSheet}>
               <LockedFolderUnlock
                 api={lockedApi}

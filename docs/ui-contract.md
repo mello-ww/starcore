@@ -183,7 +183,8 @@ The client, not the document, decides what of it shows:
     and shown as a data URI, never through the image loader's disk cache
     (`src/satellites/ui/memoryImages.tsx`).
   - The app's window is `FLAG_SECURE` (`secure.screen`): no screenshots, and a blank card in
-    recent apps.
+    recent apps. A Modal is a window of its own, so the media viewer and the app's prompts for
+    secrets set the flag on theirs (`src/components/SecureWindow.tsx`).
   - The app hides a `download` with `open`, because handing the file to a viewer leaves a copy
     in its cache. A plain download stays: saving a file is the person's own choice.
   - Mission Control hides `share` and opens files as for any document.
@@ -802,7 +803,7 @@ says so in place, and a document that `requires` it is not opened.
 | `media.gallery` | 1 | `list`: `GET ?kinds=image,video[&limit=N&cursor=C]` -> `{items: [{id, kind, title, duration, group}], next}` (with `limit`, one page and the next cursor; without it, everything); `thumbnail`: `GET /<id>` -> an image; optional `resolve`: `GET /<id>` -> `{id, kind}` for an item that may be acted on now, `404` otherwise; optional, for the server alone, `original`, `release` and `adopt` (what a `media.vault` provider moves media in and out with) | the client's media picker (the `pick` action), which pages through a provider that pages |
 | `audio.session` | 1 | `queue`; optional `history`, `radio`, `preferences`, `favorites`, `stream`, `connect` - see [Audio playback](media-audio.md) | none; the audio host uses it beside the same Satellite's `audio.library` |
 | `media.vault` | 1 | `status`, `unlock` (`for` asks for a single-use grant for one move; without it, an unlock of this session that ends after `idle_seconds` without use), `lock`, `move_in` (`{items: [reference], grant?}`); optional `keep` (`POST` -> `{expires_at}`, restarts the idle time), `biometric` (`challenge {key_id, for?}`: the purpose is fixed with the challenge, never beside the signature) and, for the server alone, `sealed` (`GET /<sha256>` -> `{sealed}`, asked of every provider by `starcore.capabilities.sealed`) - see "Moves from a shared interface" in [the Locked Folder](satellites/locked_folder.md) | none: the `secure` action and protected documents use it, through each client's own unlock prompt. It has no operation that lists or reads what it holds |
-| `files.protected` | 1 | `check`: `GET ?path=<absolute path>[&tree=1]` -> `{protected, open, message?}`: whether the path is in a protected area (with `tree=1`, or contains one), and whether this session may reach it now - see "Every Satellite asks the Engine" in [the Locked Folder](satellites/locked_folder.md) | none: server-side only. The Engine asks every provider, enabled or not (`starcore.capabilities.protection`), before File Explorer, Photo or Music touch a path; a provider that fails keeps the path closed |
+| `files.protected` | 1 | `check`: `GET ?path=<absolute path>[&tree=1]` -> `{protected, open, message?}`: whether the path is in a protected area (with `tree=1`, or contains one), and whether this session may reach it now - see "Every Satellite asks the Engine" in [the Locked Folder](satellites/locked_folder.md) | none: server-side only, and `check` refuses a client's request (`403`). The Engine asks every provider, enabled or not (`starcore.capabilities.protection`), before File Explorer, Photo or Music touch a path; a provider that fails keeps the path closed |
 
 A capability's operations are required unless the vocabulary lists them under
 `optional_operations`. An operation the version doesn't define is a problem too, so a typo

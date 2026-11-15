@@ -78,6 +78,17 @@ def _empty_counter() -> dict:
     return {"count": 0, "lockouts": 0, "locked_until": 0.0, "last_failure": 0.0}
 
 
+def _identity(path):
+    """What the operating system says a path is, whatever it is called: (device, file id), or
+    None when nothing is there or the filesystem gives no id. Two names for one folder - a
+    Windows extended-length path or a loopback share, a second mount - have the same identity."""
+    try:
+        found = os.stat(path)
+    except (OSError, ValueError):
+        return None
+    return (found.st_dev, found.st_ino) if found.st_ino else None
+
+
 def _session_key(token: str) -> str:
     # counters are kept per session without ever writing the bearer token itself
     return hashlib.sha256(str(token).encode("utf-8")).hexdigest()[:32]
@@ -190,18 +201,40 @@ class LockedFolderRuntime:
 
     def protector(self):
         """protects() for many paths in a row - a directory listing's entries:
-        the configured root is resolved once (resolving touches the disk)."""
+        the configured root is resolved once (resolving touches the disk).
+
+        A path is inside the vault by its name, or by what it is: resolving a path doesn't
+        fold every name the operating system accepts for a folder into one (on Windows,
+        `\\\\?\\C:\\vault` and `\\\\localhost\\C$\\vault` both open `C:\\vault`), so the path and
+        each folder above it are also compared with the vault's own identity on disk."""
         root = self.configured_root
+        identity = _identity(root) if root is not None else None
 
         def protects(path: Path) -> bool:
             if root is None:
                 return False
             try:
-                return path == root or path.is_relative_to(root)
+                if path == root or path.is_relative_to(root):
+                    return True
             except ValueError:
-                return False
+                pass
+            return identity is not None and any(_identity(step) == identity for step in (path, *path.parents))
 
         return protects
+
+    def contains(self, path: Path) -> bool:
+        """True if `path` is a folder above the vault, so that acting on its whole tree would
+        act on the vault: by its name, or - as for protects() - by what it is."""
+        root = self.configured_root
+        if root is None or path == root:
+            return False
+        try:
+            if root.is_relative_to(path):
+                return True
+        except ValueError:
+            pass
+        identity = _identity(path)
+        return identity is not None and any(_identity(step) == identity for step in root.parents)
 
     def rebind(self, satellite):
         """A reload rebuilds the Satellite (and its configuration) from disk, while this runtime,

@@ -16,7 +16,8 @@ It also answers, for every Satellite, whether a path on disk is in a protected a
 (`protection`, the files.protected capability): asked before a Satellite serves, lists, indexes,
 renames or deletes a path, so no Satellite needs to know which one guards it. And whether media
 was moved into a protected store (`sealed`, media.vault's optional `sealed`), so a library never
-takes it back in.
+takes it back in. Both are asked as the Engine (`ENGINE_CALLER`), with the session of the request
+being checked: a provider answers neither to a client.
 
 `call` runs one provider's operation in-process for another Satellite: the Satellites that move
 media between a library and a vault ask each other only this way, never by importing each
@@ -190,7 +191,8 @@ def protection(engine, path, token: str = "", tree: bool = False) -> Protection:
 
 
 def _protection_answer(engine, satellite, entry, query: dict, token: str) -> Protection:
-    response = _run(engine, satellite, entry, PROTECTED_FILES, "check", query=query, token=token)
+    response = _run(engine, satellite, entry, PROTECTED_FILES, "check", query=query, token=token,
+                    caller=ENGINE_CALLER)
     payload = getattr(response, "payload", None)
     if (response is None or response.status != 200 or not isinstance(payload, dict)
             or not isinstance(payload.get("protected"), bool) or not isinstance(payload.get("open"), bool)):

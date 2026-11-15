@@ -6,7 +6,9 @@ import {createContext, useContext, useEffect, useState} from 'react';
  * its headers and shown from memory as a data URI, never handed to the image loader as a URL -
  * which would keep a copy in its disk cache. The server marks a protected store's files
  * `no-store`, so the HTTP layer keeps none either. Nothing outlives the component that drew it.
- * Elsewhere images load as they always do.
+ * Elsewhere images load as they always do. The same provider tells a renderer that opens a
+ * window of its own (the media viewer) that it shows a protected document, so that window can't
+ * be captured either (src/components/SecureWindow.tsx).
  */
 export const MemoryImages = createContext(false);
 

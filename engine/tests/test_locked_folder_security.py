@@ -12,6 +12,7 @@ from http.client import HTTPConnection
 from importlib import import_module
 from pathlib import Path
 from unittest import mock
+from urllib.parse import quote
 import base64
 import hashlib
 import json
@@ -1117,7 +1118,7 @@ class LockedFolderSecurityTest(unittest.TestCase):
         self.unlock()
         clock["now"] += self.idle() - 10
         self.assertTrue(self.lf("status")[1]["unlocked"])
-        self.assertEqual(self.lf(f"check?path={self.vault}")[0], 200)
+        self.assertTrue(self.protection(self.vault).open)
         self.assertEqual(self.lf("configuration")[0], 200)
         self.assertEqual(self.entries(self.vault), 200)
         clock["now"] += 11
@@ -1235,14 +1236,98 @@ class LockedFolderSecurityTest(unittest.TestCase):
                 self.assertEqual(self.entries(unrelated), 403, handler.__name__)
         self.assertEqual(self.entries(unrelated), 200)
 
+    def check(self, query, method="GET", caller=capabilities.ENGINE_CALLER):
+        return capabilities.call(self.engine, "files.protected", "check", query=query, token=self.token,
+                                 method=method, caller=caller)
+
     def test_the_check_operation_needs_an_absolute_path(self):
         self.setup_vault()
-        for query in ("", "?path=relative/folder"):
-            self.assertEqual(self.lf(f"check{query}")[0], 400, query)
-        status, payload = self.lf(f"check?path={self.vault / 'x'}")
-        self.assertEqual(status, 200)
-        self.assertEqual((payload["protected"], payload["open"]), (True, False))
-        self.assertEqual(self.lf("check", {"path": str(self.vault)})[0], 405)
+        for query in ({}, {"path": "relative/folder"}):
+            self.assertEqual(self.check(query).status, 400, query)
+        response = self.check({"path": str(self.vault / "x")})
+        self.assertEqual(response.status, 200)
+        self.assertEqual((response.payload["protected"], response.payload["open"]), (True, False))
+        self.assertEqual(self.check({"path": str(self.vault)}, method="POST").status, 405)
+
+    def test_the_check_operation_is_for_the_server_alone(self):
+        # asked folder by folder with tree=1, it would tell any session where the vault is
+        self.setup_vault()
+        for query in (f"?path={quote(str(self.vault))}", f"?path={quote(str(self.directory))}&tree=1"):
+            self.assertEqual(self.lf(f"check{query}")[0], 403, query)
+        self.unlock()
+        self.assertEqual(self.lf(f"check?path={quote(str(self.vault))}")[0], 403, "an unlocked session too")
+        self.assertEqual(self.check({"path": str(self.vault)}, caller=None).status, 403)
+        self.assertTrue(self.protection(self.vault).open, "the Engine still gets its answer")
+
+    # ---------- another name for the vault's folder is still the vault ----------
+
+    def aliases(self, path):
+        """Other absolute paths the operating system resolves to the folder `path`, which a
+        comparison of names alone doesn't recognise: Windows' extended-length form and the
+        loopback share of its drive (where this account may use it), and a link to it."""
+        found = []
+        text = str(Path(path).resolve())
+        if os.name == "nt":
+            found.append("\\\\?\\" + text)
+            share = "\\\\localhost\\" + text[0] + "$" + text[2:]
+            if os.path.isdir(share):
+                found.append(share)
+        link = self.directory / f"link-{len(os.listdir(self.directory))}"
+        try:
+            os.symlink(text, link, target_is_directory=True)
+            found.append(str(link))
+        except OSError:
+            pass  # links need a privilege on Windows
+        return found
+
+    def test_another_name_for_the_vault_is_still_the_vault(self):
+        (self.vault / "private.txt").write_text("private", encoding="utf-8")
+        parent = self.directory / "parent"
+        (parent / "inner").mkdir(parents=True)
+        unrelated = self.directory / "unrelated"
+        unrelated.mkdir()
+        self.setup_vault()
+        self.lf("configuration", {"key": "locked_folder_path", "value": str(self.vault)})
+        aliases = self.aliases(self.vault)
+        if not aliases:
+            self.skipTest("this system gives a folder no second name")
+
+        for alias in aliases:
+            with self.subTest(alias):
+                answer = self.protection(alias)
+                self.assertEqual((answer.protected, answer.open), (True, False))
+                # a file that isn't there yet, in a folder that isn't either: still inside
+                self.assertTrue(self.protection(os.path.join(alias, "new", "file.txt")).protected)
+                file = os.path.join(alias, "private.txt")
+                self.assertEqual(self.entries(quote(alias)), 403)
+                self.assertEqual(self.call(f"/api/satellites/FileExplorer/content?path={quote(file)}")[0], 403)
+                self.assertEqual(self.call(f"/api/satellites/FileExplorer/view/folder?path={quote(alias)}")[0], 403)
+                self.assertEqual(self.call("/api/satellites/FileExplorer/delete", "POST", {"path": file})[0], 403)
+                self.assertEqual(self.call("/api/satellites/FileExplorer/mkdir", "POST",
+                                           {"path": alias, "name": "planted"})[0], 403)
+                self.assertEqual(self.call("/api/satellites/Photo/import", "POST", {"source": alias})[0], 400)
+        self.assertTrue((self.vault / "private.txt").is_file())
+        self.assertFalse((self.vault / "planted").exists())
+
+        # a folder that contains the vault, under another name, can't be renamed or deleted either
+        for alias in self.aliases(self.directory):
+            with self.subTest(alias):
+                self.assertTrue(self.protection(alias, tree=True).protected)
+                self.assertFalse(self.protection(alias).protected, "only as a tree")
+                self.assertEqual(self.call("/api/satellites/FileExplorer/rename", "POST",
+                                           {"path": alias, "name": "moved"})[0], 403)
+        self.assertTrue(self.vault.is_dir())
+
+        # and nothing else is taken for it: a folder beside it, by any of its names, stays open
+        for alias in [str(unrelated), *self.aliases(unrelated), *self.aliases(parent / "inner")]:
+            with self.subTest(alias):
+                self.assertFalse(self.protection(alias).protected)
+                self.assertFalse(self.protection(alias, tree=True).protected)
+        self.assertEqual(self.entries(quote(str(unrelated))), 200)
+
+        # the owner, once unlocked, reaches it by any name as before
+        self.assertEqual(self.unlock()[0], 200)
+        self.assertEqual(self.entries(quote(aliases[0])), 200)
 
     def test_the_manifest_declares_files_protected(self):
         provides = self.locked_folder.manifest.provides

@@ -7,6 +7,17 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Security
 
+- **Another name for the Locked Folder's folder is still the Locked Folder.** On a Windows
+  server, a path such as `\\?\C:\...` or the drive's loopback share opened the vault's folder
+  without being recognised as it, so File Explorer, Photo and Music let a session without the
+  PIN in. The vault is now told by its identity on disk as well as by its name. Linux servers
+  were not affected (`docs/satellites/locked_folder.md`, "Security review of L0 to L6").
+- **Android: the Locked Folder's viewer and prompts can't be captured.** A Modal is a window of
+  its own and didn't take the app's capture protection, so a vault photo full screen, a PIN
+  prompt or a new recovery key could be in a screenshot or a recording. Each now protects its
+  own window.
+- **`files.protected`'s `check` answers the server alone:** a client that asks gets `403`.
+
 - **The Locked Folder and Photo no longer reach into each other's code.** Moves between the
   vault and the library go through the Engine, as `media.gallery`'s new optional `original`,
   `release` and `adopt`, and Photo asks whether a file was moved into the vault through

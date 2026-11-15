@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Clipboard, Modal, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {PrimaryButton} from '../../components/PrimaryButton';
+import {SecureWindow} from '../../components/SecureWindow';
 import {StarSwitch} from '../../components/StarSwitch';
 import {colors, spacing, tokens, typography, useAccentStyles} from '../../theme';
 import type {SecretAsk} from './secrets';
@@ -11,7 +12,8 @@ import type {SecretAsk} from './secrets';
  * prompt that asks for one secret, and the one that shows a revealed secret once. The document
  * only names what to ask; the words are this app's and name the Satellite asking. What is typed
  * lives only in the field and is handed to the one request; what is revealed lives only in the
- * dialog, until the person says it is stored.
+ * dialog, until the person says it is stored. Both are Modals, windows of their own, so each
+ * makes its window uncapturable itself (SecureWindow).
  */
 
 const WORDS = {
@@ -50,6 +52,7 @@ export function SecretPrompt({ask, satellite, onDone}: {ask: SecretAsk; satellit
   return (
     <Modal transparent animationType="fade" onRequestClose={() => finish(null)} statusBarTranslucent>
       <View style={styles.backdrop}>
+        <SecureWindow />
         <ScrollView contentContainerStyle={styles.center} keyboardShouldPersistTaps="handled">
           <View style={styles.card} testID="secret-prompt" accessibilityViewIsModal>
             <Icon name="lock" size={32} color={accentStyle.color} />
@@ -99,6 +102,7 @@ export function RevealSecret({value, satellite, onDone}: {value: string; satelli
     // never dismissed by Back: only once it is stored
     <Modal transparent animationType="fade" onRequestClose={() => undefined} statusBarTranslucent>
       <View style={styles.backdrop}>
+        <SecureWindow />
         <ScrollView contentContainerStyle={styles.center}>
           <View style={styles.card} testID="secret-reveal" accessibilityViewIsModal>
             <Icon name="lock" size={32} color={accentStyle.color} />

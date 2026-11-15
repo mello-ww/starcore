@@ -542,6 +542,13 @@ Windows password reset (DPAPI's documented behaviour).
   memory (`media/thumbnail`, `media/duration`), never stored, and dropped when the last session
   locks. A failed frame is retried when FFmpeg is installed (no restart) or after 5 minutes.
 - **No key rotation:** changing the vault key would mean re-encrypting everything.
+- **An unreadable `sealed.json`** reads as an empty list: a photo that was moved in, and is
+  still on a phone, would be taken back into Photos by the next sync, and the next move in
+  writes a new list over the damaged one. Refusing everything instead would have Photo answer
+  every new photo as a duplicate, which a phone takes for "synced" (L7's R4).
+- **A browser's cache after a move in:** Photo's thumbnails and originals are served to be
+  cached for a week, so a browser that showed a photo may keep it that long after it was moved
+  into the vault. The Android app evicts its own image cache (L7's R5).
 
 ## Biometric unlock
 
@@ -601,7 +608,8 @@ limit runs out.
 **Android:** Photos has a "Locked" section with the same states (a location is chosen from
 Mission Control), biometric unlock as above, and a private viewer with "Move to Photos"; a
 photo's viewer has "Lock". While the section is open the window is `FLAG_SECURE` (no
-screenshots or screen recording, a blank card in recent apps). Vault images are fetched with
+screenshots or screen recording, a blank card in recent apps). Its viewer and the PIN prompts
+are Modals, windows of their own, which carry the flag themselves (`SecureWindow`, since L7). Vault images are fetched with
 the session token and shown from memory, never through the image loader's disk cache. Moving a
 photo in also drops it from the app's cached photo list and evicts its gallery thumbnail from
 the image cache. The section locks again when it closes, when the app goes to the background,
@@ -798,6 +806,18 @@ GET check?path=<absolute path>[&tree=1]  ->  {protected, open, message?}
   routes reach it, unlocked or not). A folder that contains the vault is open once unlocked.
 - `message`: the words for a refusal, which File Explorer returns with its `403`.
 
+`check` is for the server alone: the Engine asks it as itself, with the session of the request
+it is checking, and a client that asks gets `403` (asked folder by folder with `tree=1`, it
+would say where the vault is).
+
+**By its name, or by what it is.** A path is in the vault when its resolved name is, or when
+it, or a folder above it, *is* the vault's folder on disk (the same device and file id).
+Resolving a path follows links and `..`, but doesn't fold every name an operating system
+accepts for one folder: on Windows `\\?\C:\vault` and `\\localhost\C$\vault` both open
+`C:\vault`, and a second mount does the same elsewhere. `tree=1` is answered the same way for
+a folder that holds the vault. A file or folder that isn't there yet is inside when a folder
+above it is.
+
 The Engine asks **every provider, enabled or not**: disabling a Satellite needs only a session,
 never the PIN, so it must not open the vault. Its routes stay served while it is disabled, so
 the owner can still unlock it, and `check` creates the runtime if nothing has yet, so the first
@@ -948,8 +968,8 @@ again once when back online or as the page goes away.
 
 **Status: approved by the owner (2026-11-15). L0 to L4 are done: A1, A2, A3, A5, A6, A7 and
 A9 are fixed, and the Locked Folder has a shared interface with its setup and settings, a
-preview (see "Shared interface" above). Nothing else below is implemented yet**, and the decisions at the end stay open until
-the milestone that needs them. Read from the code at `5b716a9`. It is the audit stage 4 of [Remaining work](../remaining-work.md)
+preview (see "Shared interface" above). L5 was run on the web, L6 is done, and L7 reviewed L0 to L6 (the review is at the
+end of this page). L8, removing the own page and screens, is what is left.** Read from the code at `5b716a9`. It is the audit stage 4 of [Remaining work](../remaining-work.md)
 asks for, as M5 had ([its audit](../archive/m5-locked-folder-actions-audit.md)). The common
 order with Photos and the phone sync is in Remaining work.
 
@@ -1064,7 +1084,7 @@ tile stays where it is and Photo names nothing.
 | L4 (done) | `secrets` and `reveal`, and repeatable form rows (`rows` field kind) in the same change; then the vault's settings and setup pages | **contract change 2** | as L2's contract files, the form renderers on both clients, `locked_folder/ui.json` | fixtures; both clients: a secret never in form state, storage or logs, a revealed value gone after closing; Engine: every management route still needs what it needs today | Opus 5.5 xhigh |
 | L5 (run on the web) | End to end on the local demo (web and emulator) with a generated PIN; the owner validates on the web and the phone | none | none | the M5 list, plus: kill the client while unlocked and see it lock by itself. Results: "End to end on the local demo (L5)" under "Shared interface"; the emulator part was not run | Opus 5.5 high |
 | L6 (done) | Moves through capabilities (`sealed`, `original`, `release`, `adopt`); comments that name the other Satellite go | vocabulary: optional operations | `locked_folder/vault.py`, `photo/private_media.py`, `photo/api.py`, `capabilities.py` (POST calls) | the existing move tests unchanged; `KNOWN_CROSS_SATELLITE` loses three lines | Opus 5.5 xhigh |
-| L7 | Security review of L0 to L6 | none | none | findings fixed before L8 | Fable 5.2 high |
+| L7 (done) | Security review of L0 to L6: see "Security review of L0 to L6" at the end of this page | none | `locked_folder/runtime.py` and `api.py`, `capabilities.py`, the app's `SecureWindow` | another name for the vault is still the vault; `check` refuses a client; the app's marker is in its prompts | Fable 5.2 high |
 | L8 | Remove `locked_folder/mission_control/page.js`, `mobile/src/lockedFolder/`, Photo's `LockedFolderTab` | none | those | the suites | Sonnet 5.5 medium |
 
 Until L8 the Locked Folder's own page and screens keep working; in L2 they got the same `keep`
@@ -1082,3 +1102,70 @@ widgets or with `share`; the one for `secrets` outside a protected document come
    operation of `media.vault` (no secret ever reaches a document route, but the capability
    then carries encryption, recovery and backups, which are this Satellite's own features).
 3. **A1 now:** L0 is small and independent. It can go first, before anything else in this plan.
+
+## Security review of L0 to L6 (L7, 2026-11-15)
+
+Read from the code at `6beda21`, as the audit above was: every route of the Locked Folder, the
+Engine's capability helpers (`starcore/capabilities.py`) and what File Explorer, Photo and Music
+ask them, the moves between the vault and the library, the contract's validators for protected
+documents, secrets and reveal, and both clients' gate, prompts and renderers. A finding was
+reproduced before it was fixed: R1 and R3 by tests that failed on the real routes with temporary
+folders, R2 from React Native's own source (0.73.6).
+
+### Findings
+
+| # | Finding | Severity | Outcome |
+|---|---|---|---|
+| R1 | **Another name for the vault's folder wasn't the vault.** `files.protected` compared resolved path names, and resolving doesn't fold every name an operating system accepts for one folder. On Windows `\\?\C:\vault` (any account) and `\\localhost\C$\vault` (an account that may use the drive's share) both open `C:\vault` and were not recognised. For a session that never gave the PIN, File Explorer then listed the vault and read a file in it (`200`), deleted in it and created a folder in it, and Photo's import took it as a source: what A1 and A2 had closed. Linux follows links when resolving (`/proc/self/root` included), so nothing was found there; a second mount of the folder would have had the same effect. | **High on a Windows server**; none found on the owner's Linux server | **Fixed.** The vault is recognised by its name or by what it is: `protects()` and `contains()` (`runtime.py`) also compare the path, and each folder above it, with the vault's identity on disk (device and file id). A folder that isn't there yet is inside when a folder above it is. |
+| R2 | **On Android, what a Modal showed could be captured.** `FLAG_SECURE` was set on the app's window, but a React Native Modal is a Dialog with a window of its own, which doesn't take the flag from it (React Native 0.73.6 copies only the fullscreen flag). The shared media viewer (a vault photo full screen), the secret prompt (a recovery key is typed in clear), the dialog that shows a new recovery key, the grant prompt and the own screens' viewer are all Modals. A screenshot or a screen recording showed them, with the screen behind black; a screenshot lands in a phone folder that a sync may send to Photos. | Medium | **Fixed, not yet seen on a device.** A native view, `SecureWindow` (`android/.../privacy/SecureWindowManager.kt`, `src/components/SecureWindow.tsx`), sets the flag on whichever window it is attached to; each of those Modals holds one (the viewer only in a protected document). The release build compiles it; the emulator was offline, so a screenshot coming out black is part of the owner's phone check. |
+| R3 | **`check` answered clients.** The vocabulary says no client reads `files.protected`, but the route answered any session. Asked folder by folder with `tree=1` it says where the vault is, which A5 took out of `status` and the settings. (File Explorer's lock on the folder still shows it to someone browsing its parent: a refusal has to say something.) | Low | **Fixed.** The Engine asks as itself (`ENGINE_CALLER`), with the session of the request it checks; a client gets `403`, as for `sealed`. |
+| R4 | **An unreadable `sealed.json` reads as empty.** The Engine keeps a file out when a provider can't answer, but the store itself answers "not moved in" for everything once its list can't be read, and the next move in writes a new list over it. A photo moved in, still on a phone, would then be taken back into Photos by the next sync. The file is written atomically, so this takes damage from outside StarCore. | Low | **Accepted**, under Limitations. Failing closed here would have Photo answer every new photo as a duplicate, and a phone would take them for synced: losing a backup silently is worse than this. |
+| R5 | **A browser keeps a moved-in photo cached.** Photo serves thumbnails and originals `private, max-age=604800`, so after a move in from Mission Control the browser's HTTP cache may hold that photo for up to a week. The Android app evicts its image cache; Mission Control has nothing equivalent. | Low | **Not fixed**, under Limitations. Listed in Remaining work: Mission Control can ask the browser to fetch a moved item's URLs again, which replaces the cached copies. |
+
+### Checked, and sound
+
+- **Who can ask.** `Request.caller` is set in one place, the Engine's in-process call; the HTTP
+  server never sets it, so `sealed`, `check`, `original`, `release` and `adopt` can't be reached
+  by a client, whatever it sends. A disabled provider is still asked `sealed` and `check`, and
+  one that fails or answers anything else keeps the file out and the path closed.
+- **Moves.** A move in copies, checks the SHA-256, seals, and only then asks `release`, which
+  checks the digest of the stored original again; any failure removes the copy and the seal. A
+  move out unseals, hands the file to `adopt` (the library's ordinary import, with its checks),
+  reads the copy back and compares it, and lets go of what it had just added when it differs.
+- **Unlocks and grants.** The unlock table is read and changed under one lock; `status`,
+  `check`, the settings and other Satellites' questions never restart the idle time. A grant is
+  single-use, bound to the session, the operation and exactly the resolved items, taken out of
+  the table before it is checked, and used up by a request that can't go ahead. An attempt is
+  counted and saved before a PIN or a signature is looked at; a biometric challenge is
+  single-use and carries its purpose.
+- **The vault's own routes.** Every read and change needs the session unlocked; paths are
+  resolved inside the root, and nothing under `.starcore-vault` is reachable but an encrypted
+  object by its exact name. Files are served `no-store` with `nosniff`, as an image or a video
+  or else `application/octet-stream`, so nothing uploaded there runs in Mission Control's origin.
+- **The contract.** `protected` is accepted only from a Satellite that provides the capability,
+  with no offline page, widget or `share`; `secrets` and `reveal` only in such a document, a
+  secret never a form field or a key of the body, and never in a GET.
+- **Mission Control.** Nothing shows before the store's status; a `403` asks it again; locking
+  drops the page's data, state, forms, the viewer and what was still on its way; a secret goes
+  only into the one request's body, and a revealed field is taken out of the answer before a
+  notice or `then` sees it; the lock is sent as the page goes away.
+- **The Android app.** One gate per document, session and server; what the store showed is
+  dropped when it isn't open; images come from memory, never the image loader's disk cache; no
+  offline copy; `download` with `open` is hidden; the capture flag is counted, so two protected
+  screens keep it until both have closed.
+
+### Not verified
+
+- **On a device.** The emulator was still offline: R2's fix on a real window, and everything the
+  L5 run left to the owner's phone check.
+- **R1 beyond this machine.** The share form was tested where this account may use the drive's
+  share; a second mount on Linux was not exercised (it needs root).
+
+### Known, and left as they are
+
+- A session that has the vault open may rename or delete a folder that contains it through File
+  Explorer: it is the owner's own action, as in M5.
+- A4 (what a session is worth: unhashed session tokens, the cookie behind a TLS proxy, cleartext
+  in the app) is Stabilisation's, unchanged.
+- The forgotten-PIN path in the shared interface (the L5 finding) is a contract change, before
+  L8.

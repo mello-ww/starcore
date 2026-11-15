@@ -168,11 +168,17 @@ CONTAINS_LOCKED = "this folder contains the Locked Folder - unlock it from Photo
 
 
 def check(request):
-    """files.protected: whether `path` is inside the vault (with tree=1, also a folder that
-    contains it), and whether this session may reach it through other Satellites now. An
-    encrypted vault, or one being encrypted, is never theirs to reach: they would find only
-    ciphertext, and anything they wrote there would land unencrypted. A configured vault is
-    guarded even before a PIN is set: nobody has unlocked it yet."""
+    """files.protected, for the server alone: whether `path` is inside the vault (with tree=1,
+    also a folder that contains it), and whether this session may reach it through other
+    Satellites now. An encrypted vault, or one being encrypted, is never theirs to reach: they
+    would find only ciphertext, and anything they wrote there would land unencrypted. A
+    configured vault is guarded even before a PIN is set: nobody has unlocked it yet.
+
+    Only the Engine asks (starcore.capabilities.protection), for the session of the request it
+    is checking: answered to a client, folder by folder, it would say where the vault is."""
+    refused = refuse_clients(request)
+    if refused is not None:
+        return refused
     if request.method != "GET":
         return error_response("only GET is supported here", status=405)
     raw = request.query.get("path")
@@ -184,10 +190,8 @@ def check(request):
         return error_response("'path' could not be resolved", status=400)
 
     live = runtime(request.satellite)
-    root = live.configured_root
     inside = live.protects(target)
-    contains = (not inside and root is not None and request.query.get("tree") == "1"
-                and root.is_relative_to(target))
+    contains = not inside and request.query.get("tree") == "1" and live.contains(target)
     if not inside and not contains:
         return json_response({"protected": False, "open": True})
     if inside and _sealed_off(live):

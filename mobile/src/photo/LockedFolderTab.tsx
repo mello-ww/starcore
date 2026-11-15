@@ -17,6 +17,7 @@ import {
 import Icon from 'react-native-vector-icons/Feather';
 import Video from 'react-native-video';
 import {PrimaryButton} from '../components/PrimaryButton';
+import {SecureWindow} from '../components/SecureWindow';
 import {StarSwitch} from '../components/StarSwitch';
 import type {LockedFolderStatus, SecurityProblem, VaultItem} from '../lockedFolder/api';
 import {disable, enroll, isEnrolled} from '../vault/biometricUnlock';
@@ -491,6 +492,7 @@ function PrivateViewer({
   return (
     <Modal visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.viewer}>
+        <SecureWindow />
         {item.media_type === 'video' ? (
           <Video
             source={{uri: url, headers: token ? {Authorization: `Bearer ${token}`} : undefined}}
