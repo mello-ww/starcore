@@ -650,6 +650,62 @@ Satellites list. Nothing about the vault is in Photo's document.
   PIN attempts, lockout and timeouts stay in the Satellite's generic configuration. Both are
   for L5's parity check.
 
+### End to end on the local demo (L5, 2026-11-15)
+
+Run on an isolated demo engine (its own data directory, Satellite copies and generated
+photos; Photo's library imported from a generated folder) in Mission Control, with the
+Locked Folder's shared interface chosen in Developer Mode and generated PINs. The owner's
+validation on the web and the phone is still to come.
+
+Verified on the web:
+
+- **Setup:** "Not set up yet" took the folder; "No PIN yet" asked the new PIN twice in the
+  client's prompt and refused a mismatched confirmation; the unlock card followed.
+- **Move one photo** (Photos' viewer, Move to Locked Folder): the confirmation, then the PIN
+  in the client's prompt ("To move this item into the protected folder. It stays locked.").
+  Afterwards the session was locked (`status`: not unlocked, `media` `403`), the photo was in
+  the vault's `Photos` folder, the library's stored copy was gone, and it was in neither the
+  library nor search; re-importing the folder it was first imported from brought nothing back.
+- **Move a selection** of three: a wrong PIN showed "Incorrect PIN" in the prompt, the right
+  one moved all three; the session was locked afterwards.
+- **The vault page:** the grid, the viewer, Move to Photos (the photo is in the library and
+  search again, and was later moved in a second time), Delete forever (asking first). `media/file`
+  answers `private, no-store`.
+- **Settings:** Change PIN (the current PIN, then the new one twice); the vault was locked
+  after it, the old PIN refused and the new one accepted. Encrypt with a recovery key: the key
+  shown once in the client's dialog, Done only after "I've stored it somewhere safe"; the vault
+  then held only encrypted objects, the originals in a backup. The backup's page: Delete
+  backup, with the PIN. A photo moved into the encrypted vault was stored encrypted, with no
+  plain copy. `recover` refused a wrong key (`401`) and set a new PIN with the right one, which
+  opened the encrypted items.
+- **Locking:** leaving the vault page locked it (the next move asked the PIN again). The vault
+  was unlocked in a second tab, which was then closed without locking: `status` stayed
+  unlocked until the idle time ran out, then answered locked, and `media` `403`, by itself.
+
+Not verified in this run:
+
+- **The emulator:** the Android emulator went offline before its part could run, so the app's
+  side (the generic prompt, biometrics in the prompt, the window that can't be captured, a
+  killed app locking by itself) is left to the owner's phone check.
+- Add files (the browser pane used has no file chooser), the Download button itself (only its
+  route), Delink, Restore originals, and the Map page (the demo photos have no location).
+
+Found:
+
+- **A forgotten PIN can't be reset from the shared interface's locked state.** The own web
+  page's locked screen offers "Forgot your PIN?": the recovery-key form, or what to do without
+  a key. The shared document's locked state is the client's unlock card, which offers only
+  Unlock; Set a new PIN with the recovery key appears only on the setup page, for a damaged
+  security state. It needs the protected document to name a way out of the unlock card (a
+  contract change), before L8 removes the own page.
+- Mission Control's confirmations are the browser's native `confirm()` dialog, unlike the
+  client's own prompts; the browser pane used for the run suppresses it, so it was answered
+  from the page.
+- Cosmetic: the backup page's "Kept since" is a raw ISO time, broken over two lines; the
+  settings page's folder breaks in a narrow column.
+- Re-importing a folder that holds a moved photo counts it among "already in the library"; it
+  is not taken in, and saying so would tell what the vault holds.
+
 **Photo's tile** is no longer Photo's: its albums route lists the Satellites it hosts from the
 Engine's registry (`engine/starcore/sections.py`, every enabled Satellite whose manifest says
 `section_of = "Photo"`), each as a tile under "Folders" with the section action
@@ -981,7 +1037,7 @@ tile stays where it is and Photo names nothing.
 | L2 (done) | Protected documents, the `section` action, `keep` and the idle time, purpose-bound challenges (A3, A6); the generic unlock prompt on Android (`mobile/src/vault/`) and the web's prompt for a full unlock | **contract change 1** | `engine/starcore/ui_contract.py`, fixtures, `mission_control/ui/` (contract, renderer, `secure.js`), `mobile/src/satellites/ui/`, `mobile/src/vault/` (from `src/lockedFolder/`), `builtins.tsx`, `locked_folder/runtime.py` and `api.py` | fixtures valid and invalid (protected without the capability, with `offline`, `secrets` outside it); Engine idle expiry with a fake clock; both clients: gate, `403`, lock on leave, nothing cached | Opus 5.5 xhigh |
 | L3 (done) | The Locked Folder's `ui.json`: grid, viewer, move to Photos, delete, upload, download; Photo's tile through sections | data only | `locked_folder/ui.json`, `views.py` (new), `photo/gallery.py`, `photo/ui.json` | Engine: the document validates, every route it names exists and refuses a locked session; app: the document renders | Opus 5.5 high |
 | L4 (done) | `secrets` and `reveal`, and repeatable form rows (`rows` field kind) in the same change; then the vault's settings and setup pages | **contract change 2** | as L2's contract files, the form renderers on both clients, `locked_folder/ui.json` | fixtures; both clients: a secret never in form state, storage or logs, a revealed value gone after closing; Engine: every management route still needs what it needs today | Opus 5.5 xhigh |
-| L5 | End to end on the local demo (web and emulator) with a generated PIN; the owner validates on the web and the phone | none | none | the M5 list, plus: kill the client while unlocked and see it lock by itself | Opus 5.5 high |
+| L5 (run on the web) | End to end on the local demo (web and emulator) with a generated PIN; the owner validates on the web and the phone | none | none | the M5 list, plus: kill the client while unlocked and see it lock by itself. Results: "End to end on the local demo (L5)" under "Shared interface"; the emulator part was not run | Opus 5.5 high |
 | L6 | Moves through capabilities (`sealed`, `original`, `release`, `adopt`); comments that name the other Satellite go | vocabulary: optional operations | `locked_folder/vault.py`, `photo/private_media.py`, `photo/api.py`, `capabilities.py` (POST calls) | the existing move tests unchanged; `KNOWN_CROSS_SATELLITE` loses three lines | Opus 5.5 xhigh |
 | L7 | Security review of L0 to L6 | none | none | findings fixed before L8 | Fable 5.2 high |
 | L8 | Remove `locked_folder/mission_control/page.js`, `mobile/src/lockedFolder/`, Photo's `LockedFolderTab` | none | those | the suites | Sonnet 5.5 medium |

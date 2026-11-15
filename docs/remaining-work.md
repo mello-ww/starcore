@@ -142,7 +142,13 @@ closed it.
 - [x] **L4** - client-owned prompts for typing and showing secrets, and repeatable form rows
   (contract change 2); the vault's settings and setup pages. Biometric enrolment stays in the
   app's own screens for now.
-- [ ] **L5** - end to end on the local demo; the owner validates on the web and the phone.
+- [ ] **L5** - end to end on the local demo; the owner validates on the web and the phone. Run
+  on the web (2026-11-15, `docs/satellites/locked_folder.md`, "End to end on the local demo");
+  the emulator went offline, so the app's side waits for the owner's phone check.
+- [ ] **L5 finding - a forgotten PIN in the shared interface:** the own page's locked screen
+  offers "Forgot your PIN?" (the recovery-key form); the shared document's unlock card offers
+  only Unlock. The protected document needs a way out of the unlock card (a contract change)
+  before L8.
 - [ ] **L6** - the vault and the library move files through capabilities.
 - [ ] **L7** - security review.
 - [ ] **L8** - remove the Locked Folder's `page.js` and `mobile/src/lockedFolder/`.
