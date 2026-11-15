@@ -132,7 +132,8 @@ closed it.
 - [x] **L0** - that gap closed; `status` and the settings without the vault's path while
   locked; the unlock table under its lock; after a reload the guard follows the rebuilt
   Satellite.
-- [ ] **L1** - `files.protected`: one Engine check every Satellite that takes a path asks.
+- [x] **L1** - `files.protected`: one Engine check every Satellite that takes a path asks
+  (File Explorer, Photo, Music).
 - [ ] **L2** - protected documents, the `section` action, an unlock that ends when idle, the
   generic unlock prompt on both clients (contract change 1).
 - [ ] **L3** - the Locked Folder's own `ui.json`: browse, view, move out, delete, upload.
@@ -157,8 +158,8 @@ What those milestones cover, as first listed:
   (in its `page.js`, which hosts it today, in `gallery.py`'s tile and in its `ui.json`
   labels, which would then come from the provider).
 - [ ] **Between Satellites:** Photo's `private_media.py` and the vault's `vault.py` reach each
-  other through capabilities; File Explorer's `locked_folder_guard.py` becomes a
-  `files.protected` capability. Their comments naming each other go with them (about 130).
+  other through capabilities (File Explorer's guard already did, in L1: it is now
+  `protection.py`, over `files.protected`). Their comments naming each other go with them.
 - [ ] Then remove the Locked Folder's `page.js` and `mobile/src/lockedFolder/`.
 
 Its audit and plan go in [`satellites/locked_folder.md`](satellites/locked_folder.md).

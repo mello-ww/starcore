@@ -12,3 +12,9 @@ section_of = "Photo" # opened as a tab of Photo, not from its own navigation ent
 [provides."media.vault"]
 version = 1
 operations = { status = "status", unlock = "unlock", lock = "lock", move_in = "move_in", biometric = "biometric" }
+
+# what the Engine asks before any Satellite serves, lists, indexes, renames or deletes a path:
+# whether it is in the vault (or contains it), and whether this session may reach it now
+[provides."files.protected"]
+version = 1
+operations = { check = "check" }

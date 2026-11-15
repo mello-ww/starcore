@@ -10,6 +10,8 @@ from threading import Lock, Thread
 import json
 import os
 
+from starcore.capabilities import protection
+
 from . import audio, grouping
 from .catalog import Catalog
 from .collection import Collection
@@ -38,19 +40,23 @@ class MusicScanError(Exception):
     """Raised when a caller asks for a directory the library cannot scan."""
 
 
-def library(satellite):
+def library(satellite, engine=None):
+    """The library of this Satellite's storage. Given the Engine, its scans also keep out of
+    every protected area on disk, as the Engine answers for them (files.protected)."""
     root = storage_root(satellite)
     with _libraries_lock:
         if root not in _libraries:
             _libraries[root] = MusicLibrary(root, satellite.config.get("library", "~/Music"))
         music = _libraries[root]
     music.configure(satellite.config)
+    if engine is not None:
+        music.protects = lambda path, tree=False: protection(engine, path, tree=tree).protected
     return music
 
 
 def library_for(engine):
     satellite = engine.registry.get(SATELLITE_NAME)
-    return library(satellite) if satellite else None
+    return library(satellite, engine) if satellite else None
 
 
 def storage_root(satellite) -> Path:
@@ -70,6 +76,9 @@ class MusicLibrary:
         self.source = str(source)
         self.sources = list(sources)
         self.options = dict(options or {})
+        # path, tree=False -> whether it is in a protected area Music must never index; set by
+        # library() from the Engine, None (nothing protected) for a library built on its own
+        self.protects = None
         self.db = Database(self.index_path)
         self.catalog = Catalog(self.db)
         self.collection = Collection(self.db, self.catalog)
@@ -290,7 +299,7 @@ class MusicLibrary:
 
     def _run_scan(self, roots: list) -> dict:
         started = now()
-        scanner = Scanner(self.db, self.root, self.options)
+        scanner = Scanner(self.db, self.root, self.options, protects=self.protects)
 
         def progress(state):
             self._scan_state["progress"] = state
@@ -328,6 +337,9 @@ class MusicLibrary:
             raise MusicScanError(f"'{path}' does not exist")
         if not path.is_dir():
             raise MusicScanError(f"'{path}' is not a directory")
+        if self.protects is not None and self.protects(path):
+            # even for a session that has it open: what is indexed outlives the unlock
+            raise MusicScanError(f"'{path}' is in a protected area - Music never indexes it")
 
         return path
 

@@ -144,6 +144,6 @@ the existing actions.
 File Explorer's own code already lives in its folder: its web page is under the Satellite, and
 the app has no screen of its own for it. This migration gives Android the feature and adds
 only generic contract features; it removes no entry from `engine/tests/test_client_modularity.py`.
-One thing still names another Satellite: `locked_folder_guard.py`, which becomes a
-`files.protected` capability in R3 of [`remaining-work.md`](remaining-work.md),
-where everything else left outside Satellite folders is listed.
+Its guard for protected areas (`protection.py`) names no Satellite since L1 of the Locked
+Folder: it asks the Engine, over the `files.protected` capability. Everything else left outside
+Satellite folders is listed in [`remaining-work.md`](remaining-work.md).

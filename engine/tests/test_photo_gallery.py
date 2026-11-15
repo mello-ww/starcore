@@ -374,13 +374,16 @@ class PhotoGalleryApiTest(unittest.TestCase):
         self.assertEqual(catalog["contract"]["capabilities"]["media.gallery"], [1])
 
     def test_the_locked_folder_offers_nothing_to_pick_list_or_read(self):
-        # it provides media.vault only - a place to move media into - and nothing in it can
-        # list or read what the vault holds
+        # it provides media.vault - a place to move media into - and files.protected - a yes/no
+        # check on a path - and nothing in either can list or read what the vault holds
         status, catalog = self.json_request("/api/catalog")
         self.assertEqual(status, 200)
         for name, providers in catalog["capabilities"].items():
-            if name != "media.vault":
+            if name not in ("media.vault", "files.protected"):
                 self.assertNotIn("LockedFolder", [provider["satellite"] for provider in providers], name)
+        protected = catalog["capabilities"]["files.protected"]
+        self.assertEqual([provider["satellite"] for provider in protected], ["LockedFolder"])
+        self.assertEqual(protected[0]["operations"], {"check": "check"})
         vault = catalog["capabilities"]["media.vault"]
         self.assertEqual([provider["satellite"] for provider in vault], ["LockedFolder"])
         self.assertEqual(set(vault[0]["operations"]), {"status", "unlock", "lock", "move_in", "biometric"})

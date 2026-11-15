@@ -1,17 +1,18 @@
 """files - storage figures and metadata only. No listing, reading, writing or deleting.
 
-Paths go through File Explorer's own resolve_path() and the same Locked
-Folder guard its routes use, so nothing inside the Locked Folder is ever
-described here, whoever asks.
+Paths go through File Explorer's own resolve_path() and the Engine's check for
+protected areas (files.protected), so nothing inside one is ever described
+here, whoever asks.
 """
 
 from datetime import datetime, timezone
 import stat as stat_module
 
 from starcore.cli.runner import table
+from starcore.capabilities import protection
 from starcore.cli.spec import Argument, Command, CommandError, NotFound, PermissionDenied, UsageError
 
-from .. import locked_folder_guard, paths
+from .. import paths
 from ..api import _roots_listing
 
 NAMESPACE = "files"
@@ -54,9 +55,10 @@ def describe_path(ctx, path):
     except paths.PathError as error:
         raise UsageError(str(error))
 
-    live = locked_folder_guard._runtime(ctx.engine)
-    if live is not None and live.protects(target):
-        raise PermissionDenied("that location is inside the Locked Folder")
+    # the command line has no session: a protected area is never open to it
+    answer = protection(ctx.engine, target)
+    if answer.protected:
+        raise PermissionDenied(answer.message or "that location is in a protected area")
 
     try:
         info = target.stat()
@@ -73,8 +75,7 @@ def describe_path(ctx, path):
         "type": "dir" if is_dir else "file" if stat_module.S_ISREG(info.st_mode) else "other",
         "size": None if is_dir else info.st_size,
         "modified": datetime.fromtimestamp(info.st_mtime, tz=timezone.utc).isoformat(timespec="seconds"),
-        "contains_locked_folder": bool(is_dir and live is not None and live.configured_root is not None
-                                       and live.configured_root.is_relative_to(target)),
+        "contains_protected": bool(is_dir and protection(ctx.engine, target, tree=True).protected),
     }
     if is_dir:
         try:

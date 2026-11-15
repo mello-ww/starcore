@@ -13,7 +13,7 @@ _services = {}
 def start(engine, satellite):
     stop(engine, satellite)
     stopping = Event()
-    thread = Thread(target=_run, args=(satellite, stopping), name="starcore-music-scheduler", daemon=True)
+    thread = Thread(target=_run, args=(engine, satellite, stopping), name="starcore-music-scheduler", daemon=True)
     _services[id(satellite)] = (thread, stopping)
     thread.start()
 
@@ -25,19 +25,19 @@ def stop(engine, satellite):
         service[0].join(timeout=5)
 
 
-def _run(satellite, stopping: Event):
+def _run(engine, satellite, stopping: Event):
     while not stopping.wait(TICK_SECONDS):
         try:
-            _tick(satellite)
+            _tick(engine, satellite)
         except Exception as error:
             print(f"[WARNING]: scheduled music scan failed: {error}")
 
 
-def _tick(satellite):
+def _tick(engine, satellite):
     interval = int(satellite.config.get("scan_interval", 0) or 0)
     if interval <= 0:
         return
-    music = library(satellite)
+    music = library(satellite, engine)
     last = music.last_scan
     if last:
         elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(last)).total_seconds()

@@ -17,7 +17,7 @@ import shutil
 
 from starcore.api.response import error_response, file_response, json_response
 
-from . import locked_folder_guard, paths, views
+from . import paths, protection, views
 
 # a deliberately small, generic guess at content type for inline viewing -
 # anything not listed here still downloads fine, just without a preview
@@ -145,7 +145,7 @@ def _file_view(request):
     except paths.PathError as error:
         return error_response(str(error), status=400)
 
-    blocked = locked_folder_guard.guard(request, target)
+    blocked = protection.guard(request, target)
     if blocked is not None:
         return blocked
 
@@ -196,7 +196,7 @@ def _scan_directory(request, raw_path):
     except paths.PathError as error:
         return None, None, None, error_response(str(error), status=400)
 
-    blocked = locked_folder_guard.guard(request, target)
+    blocked = protection.guard(request, target)
     if blocked is not None:
         return None, None, None, blocked
 
@@ -231,7 +231,7 @@ def _scan_directory(request, raw_path):
 
 
 def _describe(request, target: Path, entries) -> list:
-    """The rows for `entries`, in their order: size, date and the Locked Folder's flag. Only
+    """The rows for `entries`, in their order: size, date and the protected-area flag. Only
     these entries are examined (a stat each on Linux), so a page costs its own rows."""
     rows = []
     for entry in entries:
@@ -244,12 +244,11 @@ def _describe(request, target: Path, entries) -> list:
                        # whole directory over one unreadable entry
         rows.append((is_dir, entry.name, info))
 
-    # flags the Locked Folder itself (or, in principle, anything nested under
-    # it, though a listing never descends into a locked directory in the first
-    # place - see guard() above) so the frontend can show a lock icon; this is
-    # a visibility hint only, never itself what keeps the contents
-    # inaccessible. The vault's root is resolved once for the whole listing.
-    protects = locked_folder_guard.protection(request)
+    # flags a protected area (or, in principle, anything nested in one, though
+    # a listing never descends into a closed one in the first place - see
+    # guard()) so the frontend can show a lock icon; this is a visibility hint
+    # only, never itself what keeps the contents inaccessible
+    protects = protection.marker(request, target)
     items = [{
         "name": name,
         "type": "dir" if is_dir else "file",
@@ -350,7 +349,7 @@ def content(request):
     except paths.PathError as error:
         return error_response(str(error), status=400)
 
-    blocked = locked_folder_guard.guard(request, target)
+    blocked = protection.guard(request, target)
     if blocked is not None:
         return blocked
 
@@ -377,11 +376,11 @@ def upload(request):
     except paths.PathError as error:
         return error_response(str(error), status=400)
 
-    # checked before even looking at the body, so a Locked Folder that isn't
-    # unlocked refuses an upload attempt the same way it refuses anything
+    # checked before even looking at the body, so a protected area that isn't
+    # open refuses an upload attempt the same way it refuses anything
     # else here - never distinguishable from "the request was also malformed
     # some other way"
-    blocked = locked_folder_guard.guard(request, directory)
+    blocked = protection.guard(request, directory)
     if blocked is not None:
         return blocked
 
@@ -452,7 +451,7 @@ def mkdir(request):
     except paths.PathError as error:
         return error_response(str(error), status=400)
 
-    blocked = locked_folder_guard.guard(request, directory)
+    blocked = protection.guard(request, directory)
     if blocked is not None:
         return blocked
 
@@ -492,7 +491,7 @@ def rename(request):
     if paths.is_filesystem_root(source):
         return error_response("a filesystem root cannot be renamed", status=400)
 
-    blocked = locked_folder_guard.guard_tree(request, source)
+    blocked = protection.guard_tree(request, source)
     if blocked is not None:
         return blocked
 
@@ -532,7 +531,7 @@ def delete(request):
     if paths.is_filesystem_root(target):
         return error_response("a filesystem root cannot be deleted", status=400)
 
-    blocked = locked_folder_guard.guard_tree(request, target)
+    blocked = protection.guard_tree(request, target)
     if blocked is not None:
         return blocked
 

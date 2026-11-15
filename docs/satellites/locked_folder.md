@@ -18,11 +18,13 @@ A single configurable path (`locked_folder_path` - see "Configuration" below) is
 Folder's protected root. Nothing about protecting it is special-cased inside File Explorer's
 storage or listing code: every one of File Explorer's routes that touches a real path
 (`entries`, `content`, `upload`, `mkdir`, `rename`, `delete`) resolves the request's path the
-same way it always has, then asks a small guard - `locked_folder_guard.guard(request,
-target)` in `satellites/native/file_explorer/locked_folder_guard.py` - whether that resolved
-path falls inside the configured root and, if so, whether the caller's session has unlocked
-it. A `403` comes back if not; otherwise the route runs exactly as it would for anywhere
-else on disk.
+same way it always has, then asks the Engine - `guard(request, target)` in
+`satellites/native/file_explorer/protection.py`, over `starcore.capabilities.protection` -
+whether that resolved path is in a protected area and, if so, whether the caller's session
+has it open. The Locked Folder answers through the `files.protected` capability (its `check`
+route); File Explorer never names it. A `403` comes back if not; otherwise the route runs
+exactly as it would for anywhere else on disk. Photo's import and Music's scans ask the same
+question (see "Every Satellite asks the Engine" below).
 
 This is deliberate on two counts:
 
@@ -39,10 +41,10 @@ This is deliberate on two counts:
   Explorer can reach. Locked Folder's own Mission Control page (see "Mission Control" below)
   is a thin, root-confined view built entirely on File Explorer's existing routes.
 
-`entries()` also flags every item that falls inside the configured root with `"locked":
-true` in its listing - a visibility hint only (so File Explorer can draw a lock badge next
-to the Locked Folder), never itself what keeps the contents inaccessible; the guard above is
-what does that, independent of anything the frontend chooses to render.
+`entries()` also flags every item in a protected area with `"locked": true` in its listing -
+a visibility hint only (so File Explorer can draw a lock badge next to the Locked Folder),
+never itself what keeps the contents inaccessible; the check above is what does that,
+independent of anything the frontend chooses to render.
 
 Once the vault is **encrypted** (see "Encryption at rest" below), or while it is being
 encrypted, the guard refuses every path inside it even for an unlocked session: there would
@@ -287,11 +289,12 @@ POST /api/satellites/LockedFolder/move_in  { "items": [reference], "grant"? } ->
 
 ### Keeping private media out of Photos
 
-Photo asks the Locked Folder two questions (`satellites/native/photo/private_media.py`),
-whether or not the Locked Folder is currently enabled:
+Photo asks two questions (`satellites/native/photo/private_media.py`), whether or not the
+Locked Folder is currently enabled:
 
-- **Is this path inside the vault?** Importing or scanning the vault itself is refused, and
-  importing a folder that contains the vault (or links into it) skips the vault's files.
+- **Is this path inside the vault?** Asked of the Engine (`files.protected`, see "Every
+  Satellite asks the Engine"). Importing or scanning the vault itself is refused, and importing
+  a folder that contains the vault (or links into it) skips the vault's files.
 - **Was this file moved in from Photos?** Every move in records the file's SHA-256 (only the
   digest, never a name or path) in `sealed.json` next to `pin.json`. Photo answers such a file
   like a duplicate in a directory import, a phone sync upload and the standalone sync
@@ -616,32 +619,56 @@ just labeled so it can be told apart. `GET /api/auth/sessions` and
 unlock always belongs to one session: a phone's unlock never opens the vault for the browser,
 or the other way round.
 
-## Cross-satellite reference: how File Explorer finds the Locked Folder
+## Every Satellite asks the Engine: `files.protected`
 
-File Explorer needs to ask "is this path protected, and is it unlocked for this caller?"
-without a hardcoded Python import of another Satellite's package (fragile the moment a
-directory is renamed). It does this the same way the existing FileExplorer directory-picker
-integration works in reverse (see "Exposing configuration" in `docs/satellites.md`): a lookup
-by manifest name, `engine.registry.get("LockedFolder")`, combined with a live runtime object
-the Locked Folder Satellite stashes on itself as a plain attribute
-(`satellite.locked_folder_runtime`, set inside `runtime.py`'s `runtime(satellite)` factory,
-and kept warm by its `state.py`, which the Core already calls whenever a Satellite's state is
-queried). File Explorer's guard reads that attribute, and when nothing has created the
-runtime yet - the first request after a restart - it runs the Locked Folder's state provider
-to create it, rather than letting the request through unguarded. Photo's `private_media.py`
-does the same. Only an absent Locked Folder Satellite, or one with no location, means "nothing
-to guard". A **disabled** one is guarded exactly like an enabled one: disabling a Satellite
-needs only a session, never the PIN, so it must not open the vault. Its routes stay served
-while it is disabled, so the owner can still unlock it.
+No Satellite that takes a path on disk names the Locked Folder. Each asks the Engine,
+`starcore.capabilities.protection(engine, path, token, tree=False)`, which asks every Satellite
+providing `files.protected` v1 through its `check` operation and combines their answers:
 
-After a **reload** of the Satellite, the routes, the guard and Photo still share one runtime:
-it lives in the cached `runtime.py` module, keeps every unlock, grant and counter, and from then
+```
+GET check?path=<absolute path>[&tree=1]  ->  {protected, open, message?}
+```
+
+- `protected`: the path is the vault or inside it; with `tree=1`, also a folder that contains
+  it (for what acts on a whole tree: renaming, deleting, scanning).
+- `open`: this session may reach it through other Satellites now - it has unlocked the vault,
+  and the vault is neither encrypted nor being encrypted (then only the Locked Folder's own
+  routes reach it, unlocked or not). A folder that contains the vault is open once unlocked.
+- `message`: the words for a refusal, which File Explorer returns with its `403`.
+
+The Engine asks **every provider, enabled or not**: disabling a Satellite needs only a session,
+never the PIN, so it must not open the vault. Its routes stay served while it is disabled, so
+the owner can still unlock it, and `check` creates the runtime if nothing has yet, so the first
+request after a restart is guarded like every other. A provider that fails, or answers anything
+but the protocol, keeps every path closed (with a warning in the log) - File Explorer then
+refuses everything until it is fixed. With no provider at all, nothing is protected.
+
+Who asks:
+
+- **File Explorer** (`file_explorer/protection.py`): every route that touches a path, after
+  resolving it (`..`, symlinks); `tree=1` for `rename` and `delete`. A listing asks once about
+  its folder as a tree, then about each entry only if the folder holds a protected area, to
+  set the `locked` flag. Its `files stat` command refuses any protected path: the command line
+  has no session.
+- **Photo** (`photo/private_media.py`): an import or scan of a protected path is refused, and
+  each file of a folder import is checked on its resolved path, so a link into the vault is
+  skipped. Photo takes nothing in from the vault even for a session that has it open.
+- **Music** (`music/library.py`, `music/scanner.py`): a scan whose source, or one of whose
+  configured folders, is in a protected area is refused; a scan of a folder that contains the
+  vault skips it. Also for an unlocked session: what is indexed outlives the unlock.
+
+A session that hasn't unlocked the vault can learn from `check` whether a path it names is
+protected, as it could already from File Explorer's lock flag and `403`; it never learns the
+vault's path from `status` or the settings (A5).
+
+After a **reload** of the Satellite, `check`, the routes and Photo still share one runtime: it
+lives in the cached `runtime.py` module, keeps every unlock, grant and counter, and from then
 on reads the rebuilt Satellite's configuration. A location that changed in `config.toml` before
 the reload ends every unlock, as a change through the settings does.
 
-Renaming or deleting a folder that **contains** the vault is refused while it is locked too
-(`guard_tree()`), since either would move the vault out from under its configured path or
-erase it without the PIN.
+Whether a photo was moved in from Photos (`sealed.json`) is still asked of the Locked Folder's
+live runtime (`satellite.locked_folder_runtime`, warmed up through its state provider) by
+Photo's `private_media.py`, until L6 moves it to `media.vault`.
 
 ## Tests
 
@@ -731,6 +758,13 @@ and that ordinary tracked source/configuration files are not.
   provider;
 - a biometric unlock asking for a grant.
 
+It covers `files.protected` too (A2, L1): the Engine's answer inside and outside the vault, for
+a folder that contains it, unlocked and for another session; an encrypted vault never open to
+other Satellites; a disabled provider still protecting; no provider protecting nothing; a
+provider that fails or answers nonsense keeping every path closed; `check` needing an absolute
+path; and Music refusing to scan the vault (even unlocked, also in the background, also with
+the provider disabled) while a scan of its parent folder, or of the configured library, skips it.
+
 `satellites/native/photo/tests/lockedMove.test.mjs` (`node --test`) covers moving a photo in
 from Photo's own web page: locking again after a successful and after a failed move, an
 already unlocked session moving without a prompt, cancelling or a missing PIN moving nothing,
@@ -783,7 +817,7 @@ order with Photos and the phone sync is in Remaining work.
 | # | Finding | Severity | Fix |
 |---|---|---|---|
 | A1 | **Disabling the Locked Folder Satellite removes File Explorer's guard.** `locked_folder_guard._runtime()` answers "nothing to guard" for a disabled Satellite, and `POST /api/satellites/LockedFolder/disable` needs only a session. Checked with a throwaway test on temporary folders: for a session that never gave the PIN, listing the vault and reading a file in it went from `403` to `200`. For an encrypted vault the same step shows only ciphertext, but also the unencrypted originals in `.starcore-vault/backups/` until that backup is deleted, and lets all of it be renamed or deleted. Photo's `private_media.py` already ignores `enabled`; the guard doesn't. | **High** | Fixed in L0: the guard protects whether the Satellite is enabled or not. Then L1: protection is asked of the Engine, which asks every provider, enabled or not. |
-| A2 | **Protection is opt-in per Satellite.** File Explorer and Photo ask; any other Satellite that takes a server path doesn't. Music's `scan` accepts any `source` and never asks, so a signed-in session can index and stream the audio files of an unencrypted vault (read in the code, not exercised). | Medium | L1: one Engine check (`files.protected`) that every route taking a path calls, Music included. |
+| A2 | **Protection is opt-in per Satellite.** File Explorer and Photo ask; any other Satellite that takes a server path doesn't. Music's `scan` accepts any `source` and never asks, so a signed-in session can index and stream the audio files of an unencrypted vault (read in the code, not exercised). | Medium | Fixed in L1: one Engine check (`files.protected`) that File Explorer, Photo and Music ask, Music included: a scan source in the vault is refused, a parent folder's scan skips it. |
 | A3 | **A full unlock opens everything for 900 seconds and outlives a dead client.** Accepted in M5 (its F3) because the shared interface never unlocked. Browsing the vault from the shared interface makes the full unlock the ordinary path on both clients, and locking on leaving is best effort: a crash, a lost connection or a killed app leaves the session open, also to File Explorer for an unencrypted vault. | Medium | L2: an unlock also ends after a short idle time, kept alive only by a client that is showing the vault. |
 | A4 | **What a session is worth bounds what the PIN is worth.** Session tokens are stored unhashed in `auth.json`, last 7 days, and the cookie is `Secure` only when the Engine itself serves HTTPS (not behind a TLS proxy). The app allows cleartext to any host. On plain HTTP the token, the PIN and the recovery key are readable on the network, so the PIN adds nothing against someone who can listen. | Medium, Engine-wide | Not the Locked Folder's to fix: the hashed tokens of Stabilisation, plus `Secure` on the cookie behind an HTTPS proxy. Until then this page says the vault's guarantees assume HTTPS. |
 | A5 | **`status` tells any signed-in session the vault's absolute path**, with the lockout counters and encryption state, before any unlock. The path is what A1 and A2 need. | Low | Fixed in L0: the path, in `status` and in the settings, only for an unlocked session, or while no PIN is set (setup). |
@@ -848,7 +882,7 @@ tile stays where it is and Photo names nothing.
 | # | What | Contract | Main files | Tests | Model |
 |---|---|---|---|---|---|
 | L0 (done) | Close A1; `status` and the settings without the path while locked (A5); the unlock table under the lock, the reload case (A9) | none | `file_explorer/locked_folder_guard.py`, `locked_folder/api.py`, `configuration.py`, `runtime.py` | `test_locked_folder_security.py`: a disabled Satellite still guards, also from a cold start; a locked `status` and configuration have no path; after a reload the guard and routes agree, and a new location is the one guarded; concurrent expiry never raises | Opus 5.5 high |
-| L1 | `files.protected` v1 and the Engine's check; File Explorer, Photo and Music ask it (A2) | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `engine/starcore/capabilities.py`, the guard (becomes `protection.py`), `photo/private_media.py`, `music/routes_catalog.py`, `locked_folder/satellite.toml` | Engine: provider disabled, no provider, Music's scan refused inside the vault; the three contract suites still agree on the vocabulary | Opus 5.5 high |
+| L1 (done) | `files.protected` v1 and the Engine's check; File Explorer, Photo and Music ask it (A2) | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `engine/starcore/capabilities.py`, the guard (becomes `protection.py`), `photo/private_media.py`, `music/routes_catalog.py`, `locked_folder/satellite.toml` | Engine: provider disabled, no provider, Music's scan refused inside the vault; the three contract suites still agree on the vocabulary | Opus 5.5 high |
 | L2 | Protected documents, the `section` action, `keep` and the idle time, purpose-bound challenges (A3, A6); the generic unlock prompt on Android (`mobile/src/vault/`) and the web's prompt for a full unlock | **contract change 1** | `engine/starcore/ui_contract.py`, fixtures, `mission_control/ui/` (contract, renderer, `secure.js`), `mobile/src/satellites/ui/`, `mobile/src/vault/` (from `src/lockedFolder/`), `builtins.tsx`, `locked_folder/runtime.py` and `api.py` | fixtures valid and invalid (protected without the capability, with `offline`, `secrets` outside it); Engine idle expiry with a fake clock; both clients: gate, `403`, lock on leave, nothing cached | Opus 5.5 xhigh |
 | L3 | The Locked Folder's `ui.json`: grid, viewer, move to Photos, delete, upload, download; Photo's tile through sections | data only | `locked_folder/ui.json`, `views.py` (new), `photo/gallery.py`, `photo/ui.json` | Engine: the document validates, every route it names exists and refuses a locked session; app: the document renders | Opus 5.5 high |
 | L4 | `secrets` and `reveal`, and repeatable form rows (`rows` field kind) in the same change; then the vault's settings and setup pages | **contract change 2** | as L2's contract files, the form renderers on both clients, `locked_folder/ui.json` | fixtures; both clients: a secret never in form state, storage or logs, a revealed value gone after closing; Engine: every management route still needs what it needs today | Opus 5.5 xhigh |

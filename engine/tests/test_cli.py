@@ -432,7 +432,7 @@ class SatelliteCommandsTest(CommandTestCase):
         (vault / "private.jpg").write_bytes(b"x")
         self.engine.registry.get("LockedFolder").config.data["locked_folder_path"] = str(vault)
         self.assertEqual(self.run_line(f'files stat "{vault / "private.jpg"}"').exit_code, spec.EXIT_DENIED)
-        self.assertTrue(self.run_json(f'files stat "{self.directory}"')[1]["data"]["contains_locked_folder"])
+        self.assertTrue(self.run_json(f'files stat "{self.directory}"')[1]["data"]["contains_protected"])
         self.assertEqual(self.run_line("files storage").exit_code, 0)
 
     def test_locked_folder_reports_state_only(self):

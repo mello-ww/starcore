@@ -3,7 +3,7 @@ from .library import library, readable_size
 
 # read from the in-memory index, so the generic Core status stays cheap
 def state(engine, satellite):
-    music = library(satellite)
+    music = library(satellite, engine)
 
     return {
         "tracks": music.count,

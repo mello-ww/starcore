@@ -16,6 +16,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 - **A locked session is no longer told where the vault is**: the Locked Folder's `status`
   answers `"path": null` and its settings leave the location out, with a note to unlock first.
   Before a PIN is set the location is shown as before, for setup (A5).
+- **No Satellite can reach the Locked Folder by its path any more.** Protection used to be
+  asked only by File Explorer and Photo: Music's scan took any folder, so a signed-in session
+  could index and stream the audio files of an unencrypted vault. Every Satellite that takes a
+  path now asks the Engine, which asks the new `files.protected` capability of every provider,
+  enabled or not, and keeps the path closed if one can't answer. Music refuses to scan the vault
+  and skips it inside a parent folder. File Explorer and Photo name no other Satellite for it
+  (A2). The `files stat` command's `contains_locked_folder` is now `contains_protected`.
 - **After a reload of the Locked Folder, File Explorer guards its current location.** The
   shared runtime kept reading the configuration from before the reload, so a location set after
   it was not the one guarded. The unlock table is also changed only under its lock now (A9).

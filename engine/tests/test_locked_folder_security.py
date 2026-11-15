@@ -955,6 +955,139 @@ class LockedFolderSecurityTest(unittest.TestCase):
                 self.assertEqual(set(pool.map(check, range(8))), {False})
         self.assertEqual(failures, [])
 
+    # ---------- every Satellite asks the Engine, through files.protected (A2) ----------
+
+    def protection(self, path, token=None, tree=False):
+        capabilities = import_module("starcore.capabilities")
+        return capabilities.protection(self.engine, Path(path), self.token if token is None else token, tree=tree)
+
+    def test_the_engine_answers_for_the_vault_through_files_protected(self):
+        self.assertFalse(self.protection(self.vault).protected, "nothing is configured yet")
+        self.setup_vault()
+        inside = self.vault / "album" / "photo.png"
+        answer = self.protection(inside)
+        self.assertTrue(answer.protected)
+        self.assertFalse(answer.open)
+        self.assertIn("unlock", answer.message)
+        self.assertFalse(self.protection(self.directory).protected)
+        self.assertTrue(self.protection(self.directory, tree=True).protected, "it contains the vault")
+        self.assertFalse(self.protection(self.directory / "elsewhere", tree=True).protected)
+
+        self.unlock()
+        self.assertTrue(self.protection(inside).open)
+        self.assertTrue(self.protection(self.directory, tree=True).open)
+        other = self.engine.auth.create_session("admin")
+        self.assertFalse(self.protection(inside, token=other).open)
+
+    def test_an_encrypted_vault_is_never_open_to_other_satellites(self):
+        self.setup_vault()
+        self.unlock()
+        with mock.patch.object(type(self.runtime()), "vault_encrypted", return_value=True):
+            answer = self.protection(self.vault / "photo.png")
+            self.assertEqual(self.entries(self.vault), 403)
+        self.assertTrue(answer.protected)
+        self.assertFalse(answer.open)
+        self.assertIn("encrypted", answer.message)
+
+    def test_a_disabled_provider_still_protects(self):
+        self.setup_vault()
+        with mock.patch.object(type(self.locked_folder), "enabled", new_callable=mock.PropertyMock,
+                               return_value=False):
+            self.assertTrue(self.protection(self.vault).protected)
+            self.assertFalse(self.protection(self.vault).open)
+
+    def test_without_a_provider_nothing_is_protected(self):
+        self.setup_vault()
+        others = [satellite for satellite in self.engine.registry.all() if satellite is not self.locked_folder]
+        with mock.patch.object(self.engine.registry, "all", return_value=others):
+            answer = self.protection(self.vault)
+        self.assertFalse(answer.protected)
+        self.assertTrue(answer.open)
+
+    def test_a_provider_that_fails_or_answers_nonsense_fails_closed(self):
+        self.setup_vault()
+
+        def broken(request):
+            raise RuntimeError("the provider broke")
+
+        def nonsense(request):
+            return import_module("starcore.api.response").json_response({"protected": "no"})
+
+        unrelated = self.directory / "unrelated"
+        unrelated.mkdir()
+        for handler in (broken, nonsense):
+            with mock.patch.dict(self.locked_folder.routes, {"check": handler}):
+                answer = self.protection(unrelated)
+                self.assertTrue(answer.protected, handler.__name__)
+                self.assertFalse(answer.open, handler.__name__)
+                self.assertEqual(self.entries(unrelated), 403, handler.__name__)
+        self.assertEqual(self.entries(unrelated), 200)
+
+    def test_the_check_operation_needs_an_absolute_path(self):
+        self.setup_vault()
+        for query in ("", "?path=relative/folder"):
+            self.assertEqual(self.lf(f"check{query}")[0], 400, query)
+        status, payload = self.lf(f"check?path={self.vault / 'x'}")
+        self.assertEqual(status, 200)
+        self.assertEqual((payload["protected"], payload["open"]), (True, False))
+        self.assertEqual(self.lf("check", {"path": str(self.vault)})[0], 405)
+
+    def test_the_manifest_declares_files_protected(self):
+        provides = self.locked_folder.manifest.provides
+        self.assertIn("files.protected", provides)
+        self.assertEqual(provides["files.protected"]["operations"], {"check": "check"})
+
+    # ---------- Music never indexes the vault (A2) ----------
+
+    def music(self, flac):
+        satellite = self.engine.registry.get("Music")
+        if satellite is None:
+            self.skipTest("Music did not load")
+        satellite.config.data.update({"storage": str(self.directory / "music-data"),
+                                      "library": str(self.directory), "scan_interval": 0})
+        satellite.config.path = self.directory / "music-config.toml"
+        (self.directory / "public").mkdir()
+        (self.directory / "public" / "song.flac").write_bytes(flac(title="Public"))
+        (self.vault / "album").mkdir()
+        (self.vault / "album" / "secret.flac").write_bytes(flac(title="Secret"))
+        (self.vault / "loose.flac").write_bytes(flac(title="Loose"))
+        return module("music.library").library(satellite)
+
+    def indexed(self, music):
+        return sorted(Path(row["path"]).name for row in music.db.all("SELECT path FROM tracks"))
+
+    def test_music_refuses_to_scan_inside_the_vault(self):
+        music = self.music(import_module("tests.test_music").flac)
+        self.setup_vault()
+        self.unlock()  # even the owner's open vault is not Music's to index
+        for source in (self.vault, self.vault / "album"):
+            for background in (False, True):
+                status, payload = self.call("/api/satellites/Music/scan", "POST",
+                                            {"source": str(source), "background": background})
+                self.assertEqual(status, 400, (source, background))
+                self.assertIn("protected", payload.get("error", ""))
+        self.assertEqual(self.indexed(music), [])
+
+    def test_a_music_scan_of_a_parent_folder_skips_the_vault(self):
+        music = self.music(import_module("tests.test_music").flac)
+        self.setup_vault()
+        status, payload = self.call("/api/satellites/Music/scan", "POST", {"source": str(self.directory)})
+        self.assertEqual(status, 200, payload)
+        self.assertEqual(self.indexed(music), ["song.flac"])
+
+        # the configured library, scanned with no source, is walked the same way
+        status, payload = self.call("/api/satellites/Music/scan", "POST", {})
+        self.assertEqual(status, 200, payload)
+        self.assertEqual(self.indexed(music), ["song.flac"])
+
+    def test_a_disabled_provider_still_keeps_music_out_of_the_vault(self):
+        music = self.music(import_module("tests.test_music").flac)
+        self.setup_vault()
+        self.assertEqual(self.call("/api/satellites/LockedFolder/disable", "POST", {})[0], 200)
+        self.assertEqual(self.call("/api/satellites/Music/scan", "POST", {"source": str(self.vault)})[0], 400)
+        self.call("/api/satellites/Music/scan", "POST", {"source": str(self.directory)})
+        self.assertEqual(self.indexed(music), ["song.flac"])
+
 
 class SignatureTest(unittest.TestCase):
     def test_verify_accepts_only_the_exact_signature(self):

@@ -4,9 +4,10 @@ The Locked Folder owns everything specific to *being locked*: where the
 root is, whether a PIN is set, whether *this* session currently has it
 open, biometric unlock for enrolled phones, the vault's own media view,
 uploads, deletes and moves to and from Photos, and its encryption (see
-encryption.py). File Explorer refuses every path inside the vault unless
-this session has unlocked it - and, once the vault is encrypted, refuses it
-altogether (see satellites/native/file_explorer/locked_folder_guard.py).
+encryption.py). Through files.protected (the check route) it tells the
+Engine, and so every other Satellite, which paths are in the vault: they
+refuse them unless this session has unlocked it - and, once the vault is
+encrypted, altogether (starcore.capabilities.protection).
 
 Everything that reads or changes the vault, or loosens its protection,
 checks this session's unlock on the server - hiding the Locked Folder from
@@ -16,6 +17,7 @@ counters that can't be saved) always keeps the vault locked.
 See docs/satellites/locked_folder.md.
 """
 
+from pathlib import Path
 import base64
 import binascii
 import threading
@@ -61,6 +63,7 @@ def routes() -> dict:
         "biometric": biometric,
         "encryption": encryption_route,
         "recover": recover,
+        "check": check,
     }
 
 
@@ -148,6 +151,49 @@ def configuration_route(request):
         return json_response(configuration.update(request.engine, request.satellite, key, value))
     except configuration.ConfigurationError as error:
         return error_response(str(error), status=400)
+
+
+# what check() answers, in words the person can act on
+SEALED = "this location is the encrypted Locked Folder - open it from Photos instead"
+INSIDE_LOCKED = "this location is inside the Locked Folder - unlock it from the Locked Folder page first"
+CONTAINS_LOCKED = "this folder contains the Locked Folder - unlock it from Photos first"
+
+
+def check(request):
+    """files.protected: whether `path` is inside the vault (with tree=1, also a folder that
+    contains it), and whether this session may reach it through other Satellites now. An
+    encrypted vault, or one being encrypted, is never theirs to reach: they would find only
+    ciphertext, and anything they wrote there would land unencrypted. A configured vault is
+    guarded even before a PIN is set: nobody has unlocked it yet."""
+    if request.method != "GET":
+        return error_response("only GET is supported here", status=405)
+    raw = request.query.get("path")
+    if not isinstance(raw, str) or not raw.strip() or not Path(raw).is_absolute():
+        return error_response("'path' must be an absolute path", status=400)
+    try:
+        target = Path(raw).resolve()
+    except (OSError, RuntimeError):
+        return error_response("'path' could not be resolved", status=400)
+
+    live = runtime(request.satellite)
+    root = live.configured_root
+    inside = live.protects(target)
+    contains = (not inside and root is not None and request.query.get("tree") == "1"
+                and root.is_relative_to(target))
+    if not inside and not contains:
+        return json_response({"protected": False, "open": True})
+    if inside and _sealed_off(live):
+        return json_response({"protected": True, "open": False, "message": SEALED})
+    if live.is_unlocked(request.token):
+        return json_response({"protected": True, "open": True})
+    return json_response({"protected": True, "open": False,
+                          "message": INSIDE_LOCKED if inside else CONTAINS_LOCKED})
+
+
+def _sealed_off(live) -> bool:
+    """An encrypted vault, or one being encrypted: only reached through this Satellite."""
+    migration = live.migration
+    return bool((migration is not None and migration.running) or live.vault_encrypted())
 
 
 def status(request):

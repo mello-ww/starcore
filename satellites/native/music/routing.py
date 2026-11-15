@@ -20,7 +20,7 @@ class Call:
 
     def __init__(self, request):
         self.request = request
-        self.music = library(request.satellite)
+        self.music = library(request.satellite, request.engine)
         self.user = current_user(request)
         self.method = request.method
         self.path = request.path

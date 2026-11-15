@@ -33,7 +33,7 @@ satellites/native/file_explorer/
     api.py                  the routes: entries, content, upload, mkdir, rename, delete, view
     views.py                the read-only `view/...` routes ui.json binds to
     paths.py                path resolution and safety
-    locked_folder_guard.py  refuses a locked Locked Folder's contents
+    protection.py           refuses protected areas, as the Engine answers (files.protected)
     ui.json                 the interface, for every client (UI contract 1.2)
     mission_control/icon.svg  its icon (no page of its own: the interface is ui.json)
 ```

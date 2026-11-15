@@ -675,6 +675,7 @@ says so in place, and a document that `requires` it is not opened.
 | `media.gallery` | 1 | `list`: `GET ?kinds=image,video[&limit=N&cursor=C]` -> `{items: [{id, kind, title, duration, group}], next}` (with `limit`, one page and the next cursor; without it, everything); `thumbnail`: `GET /<id>` -> an image; optional `resolve`: `GET /<id>` -> `{id, kind}` for an item that may be acted on now, `404` otherwise | the client's media picker (the `pick` action), which pages through a provider that pages |
 | `audio.session` | 1 | `queue`; optional `history`, `radio`, `preferences`, `favorites`, `stream`, `connect` - see [Audio playback](media-audio.md) | none; the audio host uses it beside the same Satellite's `audio.library` |
 | `media.vault` | 1 | `status`, `unlock` (`for` asks for a single-use grant for one move), `lock`, `move_in` (`{items: [reference], grant?}`); optional `biometric` - see "Moves from a shared interface" in [the Locked Folder](satellites/locked_folder.md) | none yet; the `secure` action will use it. It has no operation that lists or reads what it holds |
+| `files.protected` | 1 | `check`: `GET ?path=<absolute path>[&tree=1]` -> `{protected, open, message?}`: whether the path is in a protected area (with `tree=1`, or contains one), and whether this session may reach it now - see "Every Satellite asks the Engine" in [the Locked Folder](satellites/locked_folder.md) | none: server-side only. The Engine asks every provider, enabled or not (`starcore.capabilities.protection`), before File Explorer, Photo or Music touch a path; a provider that fails keeps the path closed |
 
 A capability's operations are required unless the vocabulary lists them under
 `optional_operations`. An operation the version doesn't define is a problem too, so a typo
@@ -682,8 +683,9 @@ never registers a provider that only half works.
 
 File Explorer provides `files.browse`; Music provides `audio.library` and `audio.session`; Photo
 provides `media.gallery` - its active library only: never the recycle bin, and never anything
-in the Locked Folder. The Locked Folder provides `media.vault` only: somewhere to move media
-into, with no way to list or read it. Mission Control's folder picker for `"path"`-typed
+in the Locked Folder. The Locked Folder provides `media.vault`, somewhere to move media into
+with no way to list or read it, and `files.protected`, which keeps every other Satellite out of
+the vault. Mission Control's folder picker for `"path"`-typed
 settings also uses it, so no generic code names File Explorer any more.
 
 **References are claims.** A reference a client sends (`{provider, capability, id}`, as a pick
@@ -898,7 +900,7 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 | | Now (contract 1.2) | Target |
 |---|---|---|
 | Blocks | the 22 above, including `chart`, `table`, `image`, `media-list`, `media-grid`, `search`, `map` and `breadcrumb`; the `dashboard` template | more, minor by minor: `tabs`; templates `list-detail`, `settings`, `media-library` |
-| Satellite capabilities | `files.browse` (File Explorer), `audio.library` and `audio.session` (Music), `media.gallery` (Photo), `media.vault` (Locked Folder, `move_in` only through the `secure` action) | browsing the Locked Folder from the shared interface; more pickable capabilities (files) |
+| Satellite capabilities | `files.browse` (File Explorer), `audio.library` and `audio.session` (Music), `media.gallery` (Photo), `media.vault` (Locked Folder, `move_in` only through the `secure` action), `files.protected` (Locked Folder, asked by the Engine only) | browsing the Locked Folder from the shared interface; more pickable capabilities (files) |
 | Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action; saving, sharing and opening files (`download`, `share`); sending files (`upload`) | `device.background-tasks` (phone sync) - a native module written once in the app, behind a shared block |
 | Home | `widgets` in each document, drawn by both clients | |
 | Sections | `section_of`, but Photo still names the Locked Folder | the host discovers its sections from the catalog |

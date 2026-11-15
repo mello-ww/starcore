@@ -46,20 +46,25 @@ def fingerprint(path: Path, size: int) -> str:
 
 
 class Scanner:
-    def __init__(self, db, storage_root: Path, options: dict = None):
+    def __init__(self, db, storage_root: Path, options: dict = None, protects=None):
         self.db = db
         self.storage_root = Path(storage_root).resolve()
         self.options = options or {}
+        # path, tree=False -> whether it is in a protected area on disk, never walked into
+        self.protects = protects
         self._folder_art = {}
 
     # ---------- walking ----------
 
     def candidates(self, root: Path):
         excluded = [pattern for pattern in self.options.get("exclude") or [] if pattern]
+        # each folder is asked about only when the root holds a protected area at all
+        guarded = self.protects is not None and self.protects(root, True)
         for directory, folders, files in os.walk(root, followlinks=False):
             current = Path(directory)
             folders[:] = sorted(name for name in folders
-                                if not name.startswith(".") and not self._inside_storage(current / name))
+                                if not name.startswith(".") and not self._inside_storage(current / name)
+                                and not (guarded and self.protects(current / name)))
             for name in sorted(files):
                 path = current / name
                 if path.suffix.lower() not in audio.FORMATS or name.startswith("._"):

@@ -132,8 +132,8 @@ POST scan {"source": "...", "background": true}
 ```
 
 Without a `source`, every configured folder (`library` plus `sources`) is scanned. A scan walks
-each folder (hidden folders, symlinks and Music's own storage are skipped) and for each
-supported file:
+each folder (hidden folders, symlinks, Music's own storage and protected areas are skipped)
+and for each supported file:
 
 - skips it when the index already has that path with the same size and modification time
 - otherwise reads its tags and updates the entry, keeping its identifier
@@ -371,6 +371,10 @@ music albums [count]      albums with their track counts
   deferred extension points (see `docs/roadmap.md`) and will be opt-in.
 - A scan may be pointed at any directory by an authenticated administrator (as before); only
   audio files are ever indexed or served from it.
+- Never a protected area: a scan whose source, or one of whose configured folders, is in one
+  is refused, and a folder that contains one is scanned without it - also for a session that
+  has it open, since what is indexed outlives the unlock. Music asks the Engine
+  (`starcore.capabilities.protection`, the `files.protected` capability) and names no provider.
 
 ## Future Links
 

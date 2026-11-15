@@ -132,6 +132,13 @@
         "biometric": "POST challenge {key_id} -> {challenge}; POST unlock {key_id, challenge, signature, for?} -> as unlock"
       },
       "_note": "A protected store media can be moved into, by the client's own unlock prompt (the secure action). It offers no way to list or read what it holds: that stays in the providing Satellite's own interface. A reference is {provider, capability: \"media.gallery\", id}, and is only a claim: the server resolves it through the media.gallery provider it knows."
+    },
+    "files.protected": {
+      "versions": [1],
+      "operations": {
+        "check": "GET ?path=<absolute path>[&tree=1] -> {protected, open, message?}: protected when the path is inside an area the provider guards (with tree=1, also a folder that contains one); open when this session may reach it through other Satellites now; message, the provider's words for a refusal"
+      },
+      "_note": "Server-side only: what the Engine asks before any Satellite serves, lists, indexes, renames or deletes a path on disk (starcore.capabilities.protection). Every provider is asked, enabled or not, and a path is open only when each one says so; a provider that fails or answers anything else keeps the path closed. No client reads it."
     }
   },
   "client_capabilities": {
