@@ -23,6 +23,13 @@ export const FORMATS = new Set([
   'bitrate', 'byterate', 'date', 'time', 'datetime', 'relative',
 ]);
 export const TONES = new Set(['neutral', 'ok', 'warn', 'danger']);
+export const FORM_FIELD_KINDS = new Set([
+  'text', 'number', 'select', 'toggle',
+  // 1.2
+  'rows',
+]);
+/** What a protected document's action may ask this app to prompt for (1.2, secrets.ts). */
+export const SECRET_KINDS = new Set(['pin', 'recovery-key']);
 /** The shared icon set - every name is a Feather glyph this app can draw. */
 export const ICONS = new Set([
   'activity', 'box', 'camera', 'check', 'circle', 'clock', 'cpu', 'file', 'file-text',
@@ -58,6 +65,10 @@ export interface UiAction {
   body?: Record<string, Json>;
   confirm?: string;
   then?: 'refresh' | 'back' | {navigate: string; params?: Record<string, Json>};
+  /** 1.2, protected documents only: asked in this app's own prompt, put in the body. */
+  secrets?: Record<string, {kind: string; new?: boolean}>;
+  /** 1.2, protected documents only: a field of the answer shown once, then dropped. */
+  reveal?: string;
   /** 1.2: play what the audio.library provider finds, through the app's audio host. */
   play?: {search: Json};
   /** 1.2: choose media through the app's picker; the route then gets the references as $value. */
@@ -202,7 +213,38 @@ export function checkDocument(document: any): string | null {
       return 'A protected interface keeps nothing offline.';
     }
   }
+  // secrets and reveal (1.2): this app's own prompts, only for a store it unlocks, and only for
+  // what it knows how to ask
+  for (const action of routeActions(document)) {
+    if ((action.secrets !== undefined || action.reveal !== undefined) && document.protected === undefined) {
+      return "This interface asks for a secret, but isn't protected.";
+    }
+    if (action.secrets !== undefined && !knownSecrets(action.secrets)) {
+      return "This interface asks for a secret this app doesn't know how to ask for. Update StarCore for Android to use it.";
+    }
+  }
   return null;
+}
+
+/** Whether every entry of an action's `secrets` is a kind this app asks for. */
+export function knownSecrets(secrets: unknown): boolean {
+  return Boolean(secrets) && typeof secrets === 'object' && !Array.isArray(secrets)
+    && Object.keys(secrets as object).length > 0
+    && Object.values(secrets as Record<string, any>).every(
+      secret => Boolean(secret) && typeof secret === 'object' && SECRET_KINDS.has(secret.kind));
+}
+
+/** Every route action of a document that names secrets or a reveal, wherever it is. */
+function routeActions(node: any, found: any[] = []): any[] {
+  if (Array.isArray(node)) {
+    node.forEach(item => routeActions(item, found));
+  } else if (node && typeof node === 'object') {
+    if (typeof node.route === 'string' && (node.secrets !== undefined || node.reveal !== undefined)) {
+      found.push(node);
+    }
+    Object.values(node).forEach(value => routeActions(value, found));
+  }
+  return found;
 }
 
 /** The first enabled Satellite providing `name` in a protocol version this app speaks. */

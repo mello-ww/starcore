@@ -59,6 +59,7 @@ def routes() -> dict:
         "media": media,
         "gallery": gallery,
         "setup": setup,
+        "settings": settings,
         "upload": upload,
         "delete": delete,
         "move_in": move_in,
@@ -475,7 +476,33 @@ def setup(request):
         return error_response("authentication required", status=401)
     live = runtime(request.satellite)
     root = live.configured_root
-    return json_response(views.setup(live, root is not None, live.security_problem() if root is not None else None))
+    if root is None:
+        return json_response(views.setup(live, False, None))
+    # whether a recovery key could set a new PIN: what status tells anyone about encryption
+    recovery_key = encryption.status(live, root, False)["recovery_key"]
+    return json_response(views.setup(live, True, live.security_problem(), recovery_key))
+
+
+def settings(request):
+    """GET settings -> what the shared interface's settings page shows (views.py); with ?run=,
+    one encryption backup. Needs this session unlocked, as every route that says where the vault
+    is; what the page changes goes to configuration, pin, encryption and delink, each asking what
+    it always has."""
+    if request.method != "GET":
+        return error_response("only GET is supported here", status=405)
+    live = runtime(request.satellite)
+    refused = _require_unlocked(request, live)
+    if refused is not None:
+        return refused
+    root = live.configured_root
+    info = encryption.status(live, root, True)
+    run = request.query.get("run")
+    if run is not None:
+        found = views.backup(info, run)
+        if found is None:
+            return error_response("that backup isn't there any more", status=404)
+        return json_response(found)
+    return json_response(views.settings(live, root, info))
 
 
 def _thumbnail(live, root, relative, duration=False):

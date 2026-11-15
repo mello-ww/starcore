@@ -16,6 +16,8 @@ test("the vocabulary is the shared one", () => {
     assert.deepEqual([...contract.FORMATS].sort(), [...vocabulary.formats].sort());
     assert.deepEqual([...contract.TONES].sort(), [...vocabulary.tones].sort());
     assert.deepEqual([...contract.ICONS].sort(), [...vocabulary.icons].sort());
+    assert.deepEqual([...contract.FORM_FIELD_KINDS].sort(), [...vocabulary.form_field_kinds].sort());
+    assert.deepEqual([...contract.SECRET_KINDS].sort(), [...vocabulary.secret_kinds].sort());
     for (const name of Object.keys(contract.CAPABILITY_VERSIONS)) {
         assert.ok(vocabulary.satellite_capabilities[name], name);
     }

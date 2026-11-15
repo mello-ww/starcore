@@ -61,6 +61,20 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   web, a pill on Photos' card in the app's Satellites list). It reads two new views, `gallery`
   and `setup`, and changes the vault only through its existing routes
   (`docs/satellites/locked_folder.md`, "Shared interface").
+- **Secrets, reveal and repeatable rows (UI contract 1.2, contract change 2).** An action of a
+  protected document may ask for a PIN or a recovery key (`secrets`): the client asks in its own
+  prompt, a new PIN twice, and puts the value only in that request's body, never in a form, the
+  page's state, storage or a log. It may show a field of the answer once (`reveal`), in the
+  client's own dialog until the person says it is stored. A form field of kind `rows` holds a
+  list the person adds to and removes from. After every action of a protected document both
+  clients ask the store's status again (`docs/ui-contract.md`, "Secrets and reveal",
+  "Repeatable rows").
+- **The Locked Folder's setup and settings in its shared interface:** the setup page chooses
+  the folder, creates the PIN and sets a new one with the recovery key; a settings page changes
+  the PIN, encrypts (showing the recovery key once), resumes or undoes a run, replaces or
+  removes the recovery key, restores or deletes a backup, and delinks. It reads a new
+  `settings` view, served only while unlocked, and every route still needs what it did. Enrolling
+  a phone for biometric unlock stays in the app's own screens (`docs/satellites/locked_folder.md`).
 - **A host lists the Satellites it hosts from the Engine** (`starcore.sections`): Photo's
   albums show each as a tile, with its title and icon, that opens through the `section` action.
   Photo's document no longer names the Locked Folder, and in the app a hosted Satellite's own

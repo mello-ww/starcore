@@ -22,6 +22,11 @@ export const FORMATS = new Set([
     "bitrate", "byterate", "date", "time", "datetime", "relative",
 ]);
 export const TONES = new Set(["neutral", "ok", "warn", "danger"]);
+export const FORM_FIELD_KINDS = new Set(["text", "number", "select", "toggle",
+    // 1.2
+    "rows"]);
+// what a protected document's action may ask this client to prompt for (1.2, ui/secrets.js)
+export const SECRET_KINDS = new Set(["pin", "recovery-key"]);
 export const ICONS = new Set([
     "activity", "box", "camera", "check", "circle", "clock", "cpu", "file", "file-text",
     "folder", "grid", "hard-drive", "home", "image", "info", "layers", "list", "lock",
@@ -84,7 +89,37 @@ export function checkDocument(document) {
             return "A protected interface keeps nothing offline.";
         }
     }
+    // secrets and reveal (1.2): this client's own prompts, only for a store it unlocks, and only
+    // for what it knows how to ask
+    for (const action of routeActions(document)) {
+        if ((action.secrets !== undefined || action.reveal !== undefined) && document.protected === undefined) {
+            return "This interface asks for a secret, but isn't protected.";
+        }
+        if (action.secrets !== undefined && !knownSecrets(action.secrets)) {
+            return "This interface asks for a secret this Mission Control doesn't know how to ask for.";
+        }
+    }
     return null;
+}
+
+/** Whether every entry of an action's `secrets` is a kind this client asks for. */
+export function knownSecrets(secrets) {
+    return Boolean(secrets) && typeof secrets === "object" && !Array.isArray(secrets)
+        && Object.keys(secrets).length > 0
+        && Object.values(secrets).every((secret) => secret && typeof secret === "object" && SECRET_KINDS.has(secret.kind));
+}
+
+/** Every route action of a document ({route, ...}), wherever it is. */
+function routeActions(node, found = []) {
+    if (Array.isArray(node)) {
+        node.forEach((item) => routeActions(item, found));
+    } else if (node && typeof node === "object") {
+        if (typeof node.route === "string" && (node.secrets !== undefined || node.reveal !== undefined)) {
+            found.push(node);
+        }
+        Object.values(node).forEach((value) => routeActions(value, found));
+    }
+    return found;
 }
 
 /** What a document needs that this client or this server can't give it. */

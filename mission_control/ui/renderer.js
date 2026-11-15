@@ -13,12 +13,14 @@ import {
     BLOCK_TYPES, checkDocument, findProvider, formatValue, isSafeRoute, isVisible,
     missingRequirements, resolve, resolveTemplate, toneOf,
 } from "./contract.js";
+import { emptyRow, formBody, formProblem, formValues } from "./forms.js";
 import { canShareFiles, downloadFile, fileName, openFile, shareFile } from "./files.js";
 import { createGallery, holdsCollection } from "./gallery.js";
 import { createListPaging } from "./listpaging.js";
 import { icon } from "./icons.js";
 import { createMaps } from "./map.js";
 import { pickMedia } from "./picker.js";
+import { askSecrets, bodyWithSecrets, promptSecret, revealFrom, showRevealed } from "./secrets.js";
 import { promptPin, runSecure, secureProvider } from "./secure.js";
 import { chooseFiles, runUploads, sendFile, uploadReport } from "./upload.js";
 import { createVaultGate, protectedProvider } from "./vault.js";
@@ -741,7 +743,21 @@ export function mount(context) {
             return false;
         }
         const method = action.method || "POST";
-        const body = action.body !== undefined ? resolve(action.body, bindings) : (scope.form || {});
+        let body = action.body !== undefined ? resolve(action.body, bindings) : (scope.form || {});
+        if (action.secrets !== undefined) {
+            // 1.2: asked in Mission Control's own prompt, only for a protected document, and put
+            // in this one request's body - never in the form, the page's state or a notice
+            if (!isProtected() || method === "GET") {
+                setNotice("That action asks for a secret this interface may not ask for.", "error");
+                return false;
+            }
+            const who = (state.document && state.document.title) || satelliteName;
+            const secrets = await askSecrets(action.secrets, (ask) => promptSecret({ ...ask, satellite: who }));
+            if (!secrets) {
+                return false;  // cancelled: nothing is sent
+            }
+            body = bodyWithSecrets(body, secrets);
+        }
         let result;
         try {
             result = await call(`${satelliteBase}/${route}`, method === "GET" ? {} : {
@@ -755,12 +771,22 @@ export function mount(context) {
                 loadData({ background: true });  // show what's actually true now
             }
             return false;
+        } finally {
+            body = null;
+        }
+        if (action.reveal !== undefined && isProtected()) {
+            // 1.2: shown once in Mission Control's own dialog, then gone from the answer before a
+            // notice or `then` sees it
+            const who = (state.document && state.document.title) || satelliteName;
+            result = await revealFrom(result, action.reveal, (secret) => showRevealed({ value: secret, satellite: who }));
         }
         if (!quiet) {
             setNotice(result && typeof result.message === "string" ? result.message : null);
         }
-        if (gate && gate.state() === "setup") {
-            gate.check({ quiet: true });  // set up now? then it is locked, and the prompt follows
+        if (gate) {
+            // the store may have changed state: set up now (locked, the prompt follows), a new
+            // PIN (every unlock ended), delinked (back to setup); still open stays as it is
+            gate.check({ quiet: true });
         }
         const then = action.then;
         if (then === "back") {
@@ -1208,14 +1234,15 @@ export function mount(context) {
         form: (block, scope) => {
             const key = block.id || `form-${JSON.stringify(block.fields.map((field) => field.key))}`;
             if (!state.forms[key]) {
-                state.forms[key] = Object.fromEntries(block.fields.map((field) => [field.key,
-                    field.value !== undefined ? resolve(field.value, scope) : (field.kind === "toggle" ? false : "")]));
+                state.forms[key] = formValues(block.fields, scope);
             }
             const values = state.forms[key];
             const form = el("form", "ui-form");
             form.noValidate = true;
             for (const field of block.fields) {
-                form.appendChild(renderFormField(field, values, scope));
+                form.appendChild(field.kind === "rows"
+                    ? renderRowsField(field, values, scope)
+                    : renderFormField(field, values, scope));
             }
             const error = el("p", "ui-form-error");
             error.hidden = true;
@@ -1225,17 +1252,16 @@ export function mount(context) {
             form.appendChild(submit);
             form.addEventListener("submit", async (event) => {
                 event.preventDefault();
-                const missing = block.fields.filter((field) => field.required
-                    && (values[field.key] === "" || values[field.key] === null || values[field.key] === undefined));
-                if (missing.length) {
-                    error.textContent = `${missing.map((field) => field.label).join(", ")} ${missing.length === 1 ? "is" : "are"} required.`;
+                const problem = formProblem(block.fields, values);
+                if (problem) {
+                    error.textContent = problem;
                     error.hidden = false;
                     return;
                 }
                 error.hidden = true;
                 submit.disabled = true;
                 try {
-                    if (await runAction(block.submit.action, { ...scope, form: { ...values } })) {
+                    if (await runAction(block.submit.action, { ...scope, form: formBody(values) })) {
                         delete state.forms[key];  // a successful submit starts the form afresh
                     }
                 } finally {
@@ -1529,6 +1555,48 @@ export function mount(context) {
         grid.appendChild(body);
         wrapper.appendChild(grid);
         return wrapper;
+    }
+
+    /** A rows field (1.2): one card per row with its inputs and a Remove button, and a button that
+     * adds an empty row. `values[field.key]` is the list of rows the form sends. */
+    function renderRowsField(field, values, scope) {
+        const box = el("fieldset", "ui-rows");
+        box.appendChild(el("legend", "ui-field-label", `${text(field.label, scope)}${field.required ? " *" : ""}`));
+        const list = el("div", "ui-rows-list");
+        const add = el("button", "ui-pill ui-rows-add", field.add !== undefined ? text(field.add, scope) : "Add");
+        add.type = "button";
+        const draw = () => {
+            const rows = values[field.key];
+            list.replaceChildren(...rows.map((row, index) => {
+                const card = el("div", "ui-rows-row");
+                for (const input of field.fields) {
+                    card.appendChild(renderFormField(input, row, scope));
+                }
+                const remove = el("button", "ui-pill ui-rows-remove", "Remove");
+                remove.type = "button";
+                remove.setAttribute("aria-label", `Remove row ${index + 1}`);
+                remove.addEventListener("click", () => {
+                    rows.splice(index, 1);
+                    draw();
+                });
+                card.appendChild(remove);
+                return card;
+            }));
+            if (!rows.length) {
+                list.appendChild(el("p", "ui-text ui-text-caption", "None yet."));
+            }
+        };
+        add.addEventListener("click", () => {
+            values[field.key].push(emptyRow(field.fields));
+            draw();
+            const inputs = list.querySelectorAll(".ui-rows-row:last-child input, .ui-rows-row:last-child select");
+            if (inputs.length) {
+                inputs[0].focus();
+            }
+        });
+        draw();
+        box.append(list, add);
+        return box;
     }
 
     function renderFormField(field, values, scope) {

@@ -9,6 +9,7 @@ import {Surface} from '../../components/Surface';
 import {TOUCH_TARGET, tokens, useAccent} from '../../theme';
 import {MapBlock} from './MapBlock';
 import {ActionPill, MediaGridBlock} from './MediaGrid';
+import {emptyRow, formBody, formProblem, formValues} from './forms';
 import {createListPaging, type ListPagingStatus} from './listPaging';
 import {useImageSource} from './memoryImages';
 import {
@@ -794,10 +795,7 @@ function SliderBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
 function FormBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
   const fields: any[] = Array.isArray(block.fields) ? block.fields : [];
   const key = block.id ?? `form-${fields.map(field => field.key).join(',')}`;
-  const initial = () =>
-    Object.fromEntries(
-      fields.map(field => [field.key, field.value !== undefined ? resolve(field.value, scope) : field.kind === 'toggle' ? false : '']),
-    );
+  const initial = () => formValues(fields, scope);
   if (!context.forms[key]) {
     context.forms[key] = initial();
   }
@@ -810,15 +808,15 @@ function FormBlock({block, scope, context}: {block: UiBlock; scope: Scope; conte
     setValues(merged);
   };
   const submit = async () => {
-    const missing = fields.filter(field => field.required && (values[field.key] === '' || values[field.key] === null || values[field.key] === undefined));
-    if (missing.length) {
-      setError(`${missing.map(field => field.label).join(', ')} ${missing.length === 1 ? 'is' : 'are'} required.`);
+    const problem = formProblem(fields, values);
+    if (problem) {
+      setError(problem);
       return;
     }
     setError(null);
     setBusy(true);
     try {
-      if (await context.runAction(block.submit?.action, {...scope, form: {...values}})) {
+      if (await context.runAction(block.submit?.action, {...scope, form: formBody(values)})) {
         // a successful submit starts the form afresh - also when this page
         // stays mounted behind the one the action opened
         context.forms[key] = initial();
@@ -830,11 +828,54 @@ function FormBlock({block, scope, context}: {block: UiBlock; scope: Scope; conte
   };
   return (
     <View style={styles.form}>
-      {fields.map(field => (
-        <FormField key={field.key} field={field} value={values[field.key]} onChange={next => update(field.key, next)} context={context} />
-      ))}
+      {fields.map(field =>
+        field.kind === 'rows' ? (
+          <RowsField key={field.key} field={field} rows={values[field.key]} onChange={next => update(field.key, next)} context={context} />
+        ) : (
+          <FormField key={field.key} field={field} value={values[field.key]} onChange={next => update(field.key, next)} context={context} />
+        ),
+      )}
       {error && <Text style={styles.error}>{error}</Text>}
       <PrimaryButton title={asText(resolve(block.submit?.label, scope)) || 'Submit'} loading={busy} onPress={submit} />
+    </View>
+  );
+}
+
+/** A rows field (1.2): a list the person adds rows to and removes them from, each row the same few
+ * inputs, sent as a list of objects under the field's key. */
+function RowsField({field, rows, onChange, context}: {field: any; rows: any; onChange: (rows: any[]) => void; context: BlockContext}) {
+  const list: Record<string, any>[] = Array.isArray(rows) ? rows : [];
+  const inputs: any[] = Array.isArray(field.fields) ? field.fields : [];
+  const label = asText(field.label);
+  const setRow = (index: number, key: string, next: any) =>
+    onChange(list.map((row, at) => (at === index ? {...row, [key]: next} : row)));
+  return (
+    <View style={styles.inputField} accessibilityLabel={label}>
+      <Text style={styles.label}>{`${label}${field.required ? ' *' : ''}`}</Text>
+      {list.length === 0 && <Text style={styles.rowsEmpty}>None yet.</Text>}
+      {list.map((row, index) => (
+        <View key={index} style={styles.rowsRow} testID={`rows-${field.key}-${index}`}>
+          {inputs.map(input => (
+            <FormField key={input.key} field={input} value={row[input.key]} onChange={next => setRow(index, input.key, next)} context={context} />
+          ))}
+          <Pressable
+            onPress={() => onChange(list.filter((_, at) => at !== index))}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove row ${index + 1}`}
+            style={({pressed}) => [styles.pill, pressed && styles.pressed]}>
+            <Icon name="x" size={15} color={palette.text} />
+            <Text style={styles.rowsPillLabel}>Remove</Text>
+          </Pressable>
+        </View>
+      ))}
+      <Pressable
+        onPress={() => onChange([...list, emptyRow(inputs)])}
+        accessibilityRole="button"
+        accessibilityLabel={field.add !== undefined ? asText(field.add) : `Add to ${label}`}
+        style={({pressed}) => [styles.pill, pressed && styles.pressed]}>
+        <Icon name="plus" size={15} color={palette.text} />
+        <Text style={styles.rowsPillLabel}>{field.add !== undefined ? asText(field.add) : 'Add'}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -1328,6 +1369,15 @@ const styles = StyleSheet.create({
   option: {paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: 999, backgroundColor: palette.control},
   optionLabel: {...type.caption, color: palette.text, fontWeight: '600'},
   error: {color: palette.danger, fontSize: 13},
+  rowsEmpty: {...type.caption, color: palette.text3},
+  rowsRow: {
+    gap: space.sm,
+    padding: space.md,
+    borderRadius: radii.control,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.line,
+  },
+  rowsPillLabel: {...type.caption, color: palette.text, fontWeight: '600'},
   unsupported: {...type.caption, padding: space.md, borderRadius: radii.control, backgroundColor: palette.control},
   bars: {gap: space.sm},
   tableRow: {padding: space.md, borderRadius: radii.control, backgroundColor: palette.control, gap: space.sm},

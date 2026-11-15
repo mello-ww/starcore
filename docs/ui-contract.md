@@ -195,6 +195,38 @@ The rules are `mission_control/ui/vault.js` and `mobile/src/vault/gate.ts`. The 
 Mission Control's PIN prompt (`mission_control/ui/secure.js`) and the app's
 `mobile/src/vault/VaultUnlock.tsx`, the ones the `secure` action uses too.
 
+- **After every action it ran** (a successful route action) the client asks `status` again,
+  quietly: an open store stays as it is, but a new PIN ends every unlock (the card follows), a
+  first PIN locks a store that was being set up, and a delink goes back to the setup page.
+
+#### Secrets and reveal
+
+Only an action of a protected document may ask for a secret or show one (1.2). The document
+names what; the client asks and shows it in dialogs of its own, whose words name the Satellite
+asking, so no document can draw a field that takes a PIN.
+
+```json
+{"route": "pin", "secrets": {"current_pin": {"kind": "pin"}, "pin": {"kind": "pin", "new": true}}}
+{"route": "encryption/recovery_key", "secrets": {"pin": {"kind": "pin"}}, "reveal": "recovery_key"}
+```
+
+- **`secrets`**: `{key: {kind, new?}}`, at most 3, kinds from the vocabulary's `secret_kinds`
+  (`pin`, `recovery-key`). Before the request, after `confirm`, the client asks for each in
+  turn; a new PIN (`"new": true`) twice, from the start again while the two differ. Each value
+  goes into the request's body under its key and nowhere else: never `$form`, `$state`, storage,
+  a notice or a log, and the client drops it once the request is done. Cancelling any prompt
+  sends nothing.
+- **`reveal`**: a field of the answer the client shows once, in its own dialog, with a copy
+  button and a switch saying it was stored, which the dialog waits for. The field is taken out
+  of the answer first, so a notice or `then` never sees it, and kept nowhere.
+- **Where:** a route action (a button, a form's submit, a viewer's action) with `POST`. The
+  Engine refuses `secrets` or `reveal` outside a protected document, with `GET`, in a selection
+  or a tile's quick actions, a secret's key also in `body` or a form's fields, and an unknown
+  kind; both clients refuse such a document too.
+
+The rules are `mission_control/ui/secrets.js` (with its dialogs) and
+`mobile/src/satellites/ui/secrets.ts` with `SecretPrompt.tsx`.
+
 The server is what protects the store. Every route of the Satellite asks for the unlock,
 whatever a client shows. An unlock also ends by itself after the provider's idle time without a
 request to the store's routes or to `keep` (`idle_seconds` in `status`, 90 seconds for the
@@ -213,7 +245,7 @@ Locked Folder). `status` never extends it.
 | `button` | `label`, `action` | `style`: `primary`, `secondary`, `danger` | runs an action |
 | `toggle` | `label`, `value`, `action` | `description` | an on/off switch; the action gets the new value as `$value` |
 | `slider` | `label`, `value`, `min`, `max`, `action` | `step`, `format`, `unit` | a range; the action runs once, on release, with `$value` |
-| `form` | `fields`, `submit` | | inputs (`text`, `number`, `select`, `toggle`) and a submit action that gets them as `$form` |
+| `form` | `fields`, `submit` | | inputs (`text`, `number`, `select`, `toggle`, and `rows` (1.2), see "Repeatable rows" below) and a submit action that gets them as `$form` |
 | `file-browser` | `capability` | `select`: `none`, `directory`, `file`; `action`; `label` | the shared file browser - see [Shared blocks](#shared-blocks-and-satellite-capabilities) |
 | `chart` (1.1) | `series` | `title`, `kind`: `columns` (default) or `bars`, `format`, `unit`, `max`, `from`, `to`, `resolution`, `empty` | a time series - see below |
 | `table` (1.1) | `rows`, `columns` | `empty` | rows from an array, one cell per column - see below |
@@ -485,6 +517,28 @@ Numeric segments index arrays: `$.rows.0.id`. A missing value resolves to `null`
 displays as "—". **There is no expression language**: no operators, conditions or string
 building. A Satellite returns what it wants shown. For example, Showcase returns both
 `enabled` and `disabled` so that one block can be `visible` for each.
+
+### Repeatable rows
+
+A form field of kind `rows` (1.2) holds a list the person adds to and removes from, such as a
+list of folders with a name each:
+
+```json
+{"key": "folders", "label": "Folders", "kind": "rows", "add": "Add a folder", "required": true,
+ "value": "$.folders",
+ "fields": [{"key": "path", "label": "Path", "kind": "text", "required": true},
+            {"key": "name", "label": "Name", "kind": "text"}]}
+```
+
+- **`fields`** are one row's inputs, at most 6, of the other kinds: a row never holds rows.
+- **`add`** labels the button that adds an empty row; each row has its own Remove.
+- **`value`** binds the rows the form starts with: a list of objects, copied, so editing a row
+  never touches the page's data.
+- **The submit** sends them under the field's key as a list of objects, each with every input
+  of the row. It is refused before anything is sent when `required` and there is no row, or
+  when a row leaves a required input empty ("Folders, row 2: Path is required.").
+
+The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.ts`.
 
 ## Actions
 

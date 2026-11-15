@@ -23,6 +23,8 @@ describe('UI contract (shared fixtures)', () => {
     expect(sorted(contract.FORMATS)).toEqual(sorted(vocabulary.formats));
     expect(sorted(contract.TONES)).toEqual(sorted(vocabulary.tones));
     expect(sorted(contract.ICONS)).toEqual(sorted(vocabulary.icons));
+    expect(sorted(contract.FORM_FIELD_KINDS)).toEqual(sorted(vocabulary.form_field_kinds));
+    expect(sorted(contract.SECRET_KINDS)).toEqual(sorted(vocabulary.secret_kinds));
     for (const name of Object.keys(contract.CAPABILITY_VERSIONS)) {
       expect(vocabulary.satellite_capabilities[name]).toBeTruthy();
     }

@@ -616,11 +616,39 @@ Satellites list. Nothing about the vault is in Photo's document.
   forever** (`delete`, asking first). A selection offers Move to Photos and Delete forever.
 - **Add files** sends files with the contract's `upload` action to the existing `upload`
   route, which picks a free name, so no conflict can arise.
-- **The setup page** reads the new `setup` view, which answers without an unlock and never
-  gives the vault's location: "Not set up yet", "No PIN yet", "Can't be opened" (with the
-  problem, in Developer Mode) or "Ready". It only says so: choosing a location, a first PIN and
-  the settings stay in the Locked Folder's own page and screens until L4 brings the client
-  prompts for secrets.
+- **The setup page** reads the `setup` view, which answers without an unlock and never gives
+  the vault's location. It says what is missing and offers that step (L4):
+  - "Not set up yet": a form for the folder on the server (`configuration`,
+    `locked_folder_path`);
+  - "No PIN yet": **Create PIN**, asked twice in the client's own prompt (`pin`);
+  - a security problem, in the own page's words ("The PIN was changed outside StarCore", "This
+    server can't open the Locked Folder", ...): with a recovery key, **Set a new PIN with the
+    recovery key** (`recover`, the key and the new PIN asked in the client's prompts); the
+    problem's code shows in Developer Mode;
+  - "Ready", once a PIN is set: the client's unlock card follows.
+- **The settings page** (the vault page's Settings button) reads the `settings` view, served
+  only to a session that has the vault open:
+  - **PIN:** Change PIN (the current PIN and the new one twice, in the client's prompts), and how
+    many phones unlock with biometrics;
+  - **Encryption:** what state it is in; Encrypt with a recovery key (shown once, in the client's
+    own dialog, until the person says it is stored), Encrypt without one (with the warning as
+    its confirmation), Resume or Encrypt remaining files, Undo an interrupted run, New, Create
+    or Remove recovery key (each with the PIN);
+  - **Backups:** each unencrypted backup an encryption run kept, opening its page: Restore
+    originals (`encryption/undo`) or Delete backup (`encryption/discard`, with the PIN);
+  - **Location:** the folder, whether it is missing, and Delink (asking first).
+- **Every PIN and recovery key** is asked in the client's own prompt (`secrets`), never in a
+  form, and a new recovery key is shown only in the client's own dialog (`reveal`), see
+  [UI contract](../ui-contract.md), "Secrets and reveal". After every action the client asks
+  `status` again, so a new PIN shows the unlock card and a delink the setup page.
+- **Every route still needs what it needs** from the own page: an unlock for `settings`, the
+  location and `encryption/*`, the current PIN to change it, the PIN again to delete a backup or
+  replace the recovery key, the recovery key for `recover` (`engine/tests/test_locked_folder_ui.py`).
+- **Not in it yet:** enrolling a phone for biometric unlock, and removing one, stay in the
+  Android app's own Locked Folder screens: the shared prompt unlocks with biometrics where the
+  phone enrolled, but the enrolment is a native key ceremony no document can declare yet. The
+  PIN attempts, lockout and timeouts stay in the Satellite's generic configuration. Both are
+  for L5's parity check.
 
 **Photo's tile** is no longer Photo's: its albums route lists the Satellites it hosts from the
 Engine's registry (`engine/starcore/sections.py`, every enabled Satellite whose manifest says
@@ -839,9 +867,9 @@ again once when back online or as the page goes away.
 
 ## Security audit and plan: the Locked Folder in the shared interface (2026-11-15)
 
-**Status: approved by the owner (2026-11-15). L0 to L3 are done: A1, A2, A3, A5, A6 and A9
-are fixed, and the Locked Folder has a shared interface, a preview (see "Shared interface"
-above). Nothing else below is implemented yet**, and the decisions at the end stay open until
+**Status: approved by the owner (2026-11-15). L0 to L4 are done: A1, A2, A3, A5, A6, A7 and
+A9 are fixed, and the Locked Folder has a shared interface with its setup and settings, a
+preview (see "Shared interface" above). Nothing else below is implemented yet**, and the decisions at the end stay open until
 the milestone that needs them. Read from the code at `5b716a9`. It is the audit stage 4 of [Remaining work](../remaining-work.md)
 asks for, as M5 had ([its audit](../archive/m5-locked-folder-actions-audit.md)). The common
 order with Photos and the phone sync is in Remaining work.
@@ -952,7 +980,7 @@ tile stays where it is and Photo names nothing.
 | L1 (done) | `files.protected` v1 and the Engine's check; File Explorer, Photo and Music ask it (A2) | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `engine/starcore/capabilities.py`, the guard (becomes `protection.py`), `photo/private_media.py`, `music/routes_catalog.py`, `locked_folder/satellite.toml` | Engine: provider disabled, no provider, Music's scan refused inside the vault; the three contract suites still agree on the vocabulary | Opus 5.5 high |
 | L2 (done) | Protected documents, the `section` action, `keep` and the idle time, purpose-bound challenges (A3, A6); the generic unlock prompt on Android (`mobile/src/vault/`) and the web's prompt for a full unlock | **contract change 1** | `engine/starcore/ui_contract.py`, fixtures, `mission_control/ui/` (contract, renderer, `secure.js`), `mobile/src/satellites/ui/`, `mobile/src/vault/` (from `src/lockedFolder/`), `builtins.tsx`, `locked_folder/runtime.py` and `api.py` | fixtures valid and invalid (protected without the capability, with `offline`, `secrets` outside it); Engine idle expiry with a fake clock; both clients: gate, `403`, lock on leave, nothing cached | Opus 5.5 xhigh |
 | L3 (done) | The Locked Folder's `ui.json`: grid, viewer, move to Photos, delete, upload, download; Photo's tile through sections | data only | `locked_folder/ui.json`, `views.py` (new), `photo/gallery.py`, `photo/ui.json` | Engine: the document validates, every route it names exists and refuses a locked session; app: the document renders | Opus 5.5 high |
-| L4 | `secrets` and `reveal`, and repeatable form rows (`rows` field kind) in the same change; then the vault's settings and setup pages | **contract change 2** | as L2's contract files, the form renderers on both clients, `locked_folder/ui.json` | fixtures; both clients: a secret never in form state, storage or logs, a revealed value gone after closing; Engine: every management route still needs what it needs today | Opus 5.5 xhigh |
+| L4 (done) | `secrets` and `reveal`, and repeatable form rows (`rows` field kind) in the same change; then the vault's settings and setup pages | **contract change 2** | as L2's contract files, the form renderers on both clients, `locked_folder/ui.json` | fixtures; both clients: a secret never in form state, storage or logs, a revealed value gone after closing; Engine: every management route still needs what it needs today | Opus 5.5 xhigh |
 | L5 | End to end on the local demo (web and emulator) with a generated PIN; the owner validates on the web and the phone | none | none | the M5 list, plus: kill the client while unlocked and see it lock by itself | Opus 5.5 high |
 | L6 | Moves through capabilities (`sealed`, `original`, `release`, `adopt`); comments that name the other Satellite go | vocabulary: optional operations | `locked_folder/vault.py`, `photo/private_media.py`, `photo/api.py`, `capabilities.py` (POST calls) | the existing move tests unchanged; `KNOWN_CROSS_SATELLITE` loses three lines | Opus 5.5 xhigh |
 | L7 | Security review of L0 to L6 | none | none | findings fixed before L8 | Fable 5.2 high |

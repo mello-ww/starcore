@@ -1,10 +1,12 @@
 """What the Locked Folder's shared interface (ui.json) reads: the vault shaped for the shared
-blocks (a media-grid and its viewer), and a setup summary for a vault that can't be opened yet.
+blocks (a media-grid and its viewer), a setup summary for a vault that can't be opened yet, and
+its settings (the PIN, encryption, the recovery key, backups, the location).
 
 Only views: they read, never change anything, and every change the document makes goes to the
-Satellite's existing routes (upload, delete, move_out). The gallery is served to a session that
-has the vault open, as every other vault route (api.py); the setup summary to anyone signed in,
-so it says what is missing and never where the vault is. See docs/satellites/locked_folder.md,
+Satellite's existing routes (upload, delete, move_out, configuration, pin, recover, encryption,
+delink), each needing what it always has. The gallery and the settings are served to a session
+that has the vault open, as every other vault route (api.py); the setup summary to anyone signed
+in, so it says what is missing and never where the vault is. See docs/satellites/locked_folder.md,
 "Shared interface".
 """
 
@@ -59,27 +61,130 @@ def tile(item: dict, photos_available: bool) -> dict:
     }
 
 
-def setup(live, configured: bool, problem) -> dict:
-    """GET setup -> {title, message, problem}: why the vault can't be opened yet, in words the
-    person can act on - never its location, its PIN or anything it holds."""
+# why a configured vault can't be opened (status.security.problem), in words the person can act on
+PROBLEMS = {
+    "pin_unreadable": ("The PIN can't be read",
+                       "The stored PIN file on the server is damaged, so the Locked Folder stays locked."),
+    "pin_tampered": ("The PIN was changed outside StarCore",
+                     "The PIN record on the server doesn't match this Locked Folder, so it stays locked."),
+    "key_unavailable": ("This server can't open the Locked Folder",
+                        "The encryption key for these files isn't on this server - it may be a new server, "
+                        "a restored backup, or a different Windows account."),
+    "keyring_damaged": ("The Locked Folder's keyring is missing",
+                        "The file that holds the encryption key is missing or damaged. Restore it from a "
+                        "backup of the Locked Folder's folder."),
+    "encryption_unavailable": ("Encryption support isn't installed",
+                               "The Locked Folder is encrypted, but StarCore's encryption package isn't "
+                               "installed on this server. Install the engine's 'encryption' extra and "
+                               "restart StarCore."),
+}
+# the problems a recovery key gets past, by setting a new PIN
+RECOVERABLE = {"pin_unreadable", "pin_tampered", "key_unavailable"}
+
+
+def setup(live, configured: bool, problem, recovery_key: bool = False) -> dict:
+    """GET setup -> {title, message, problem, needs_location, needs_pin, recoverable}: why the
+    vault can't be opened yet, in words the person can act on, and which step the setup page
+    offers (a location, a first PIN, a new PIN with the recovery key) - never its location, its
+    PIN or anything it holds."""
+    page = {"problem": None, "needs_location": False, "needs_pin": False, "recoverable": False}
     if not configured:
-        return {"title": "Not set up yet",
-                "message": "Choose where the Locked Folder keeps its files and set a PIN in its own "
-                           "screens: Albums in Photos, then Locked Folder.",
-                "problem": None}
+        return {**page, "title": "Not set up yet", "needs_location": True,
+                "message": "Choose a folder on this server to hold private photos and files. They stay "
+                           "hidden from Photos, search, albums and File Explorer until you unlock them "
+                           "with your PIN."}
     if problem is not None:
-        return {"title": "Can't be opened",
-                "message": "The Locked Folder's security state can't be checked on this server, so it "
-                           "stays locked. Use the recovery key from its own screens, or ask whoever runs "
-                           "the server to look at it.",
-                "problem": problem}
+        title, text = PROBLEMS.get(problem, ("Can't be opened", "The Locked Folder can't be opened on this "
+                                                               "server, so it stays locked."))
+        recoverable = bool(recovery_key) and problem in RECOVERABLE
+        if recoverable:
+            advice = "Enter your recovery key to set a new PIN."
+        elif problem == "key_unavailable":
+            advice = ("No recovery key was set up, so without this server's original key its files can't "
+                      "be decrypted.")
+        elif problem == "pin_unreadable":
+            advice = "Whoever runs the server needs to restore pin.json in StarCore's data folder from a backup."
+        else:
+            advice = "Ask whoever runs the server to look at it."
+        return {**page, "title": title, "message": f"{text} {advice}", "problem": problem,
+                "recoverable": recoverable}
     if not live.pin_set:
-        return {"title": "No PIN yet",
-                "message": "Set a PIN in the Locked Folder's own screens (Albums in Photos, then Locked "
-                           "Folder). Until then nothing in it is protected.",
-                "problem": None}
-    return {"title": "Ready", "message": "The Locked Folder is set up. Unlock it to see what it holds.",
-            "problem": None}
+        return {**page, "title": "No PIN yet", "needs_pin": True,
+                "message": "Create a PIN of 4 to 12 digits. You'll need it every time you open the Locked "
+                           "Folder; until then nothing in it is protected. A forgotten PIN can only be reset "
+                           "with a recovery key, which you can create when you encrypt it."}
+    return {**page, "title": "Ready", "message": "The Locked Folder is set up. Unlock it to see what it holds."}
+
+
+def _originals(count) -> str:
+    return f"{count} {'original' if count == 1 else 'originals'}"
+
+
+def settings(live, root, info: dict) -> dict:
+    """GET settings -> what the settings page shows and which of its actions apply: the location,
+    the phones with biometric unlock, and encryption (`info`, encryption.py's status for an
+    unlocked session) with its recovery key and backups. Never the PIN or a key."""
+    state = info.get("state") or "off"
+    available = bool(info.get("available"))
+    unencrypted = int(info.get("unencrypted_files") or 0)
+    has_key = bool(info.get("recovery_key"))
+    devices = live.device_count()
+    backups = [{**found, "title": f"Backup of {_originals(found.get('files') or 0)}"}
+               for found in info.get("backups") or []]
+    return {
+        "path": str(root),
+        "path_missing": not root.is_dir(),
+        "biometric_devices": devices,
+        "biometric_note": (f"{devices} {'phone' if devices == 1 else 'phones'} can unlock with biometrics. "
+                           "Changing the PIN turns that off everywhere." if devices else
+                           "Phones can add fingerprint or face unlock from the StarCore app."),
+        "encryption": _encryption_summary(info, state, available, unencrypted),
+        "recovery": (("A recovery key is set up." if has_key else
+                      "No recovery key: if this server's key is lost, or the PIN forgotten, these files "
+                      "can't be recovered.") if state != "off" else None),
+        # which of the page's actions apply now
+        "can_encrypt": available and state == "off" and bool(live.pin_set),
+        "can_resume": available and (state == "interrupted" or (state == "on" and unencrypted > 0)),
+        "resume_label": "Resume encryption" if state == "interrupted" else "Encrypt remaining files",
+        "can_undo": state == "interrupted" and bool(info.get("interrupted_run")),
+        "interrupted_run": info.get("interrupted_run"),
+        "has_recovery_key": state == "on" and has_key,
+        "no_recovery_key": state == "on" and not has_key,
+        "backups": backups,
+        "has_backups": bool(backups),
+    }
+
+
+def backup(info: dict, run) -> dict | None:
+    """GET settings?run= -> one backup of `info` (encryption.py's status), for its own page."""
+    for found in info.get("backups") or []:
+        if str(found.get("id")) == str(run):
+            return {**found, "summary": f"{_originals(found.get('files') or 0)} kept unencrypted when the "
+                                        "Locked Folder was encrypted."}
+    return None
+
+
+def _encryption_summary(info: dict, state: str, available: bool, unencrypted: int) -> str:
+    if info.get("problem") in PROBLEMS:
+        return PROBLEMS[info["problem"]][1]
+    progress = info.get("migration") or {}
+    if state == "off":
+        if not available:
+            return ("Files here are protected by your PIN but stored unencrypted. Encryption needs the "
+                    "engine's 'encryption' extra installed on the server.")
+        return ("Files here are protected by your PIN but stored unencrypted. Encrypting them (AES-256-GCM) "
+                "means a copy of this folder, or a stolen disk, shows nothing. Your originals are kept as a "
+                "backup until you delete them.")
+    if state == "encrypting":
+        done, total = progress.get("done"), progress.get("total")
+        return f"Encrypting now: {done} of {total} files." if total else "Encrypting now..."
+    if state == "interrupted":
+        text = "Encryption started but didn't finish. Resume it, or undo it to put every original back."
+        return f"{text} {progress['error']}" if progress.get("error") else text
+    text = "On - files are stored encrypted with AES-256-GCM."
+    if unencrypted:
+        text += f" {unencrypted} {'file is' if unencrypted == 1 else 'files are'} not encrypted yet."
+    return text
 
 
 def _limit(value) -> int:

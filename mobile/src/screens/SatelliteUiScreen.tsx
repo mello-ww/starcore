@@ -18,6 +18,8 @@ import {SatellitesApi} from '../satellites/api';
 import type {SatelliteSummary} from '../satellites/types';
 import {MemoryImages} from '../satellites/ui/memoryImages';
 import {MediaPicker, type MediaReference, type PickRequest} from '../satellites/ui/MediaPicker';
+import {RevealSecret, SecretPrompt} from '../satellites/ui/SecretPrompt';
+import {askSecrets, bodyWithSecrets, revealFrom, type SecretAsk} from '../satellites/ui/secrets';
 import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
 import {hasPagedList, VirtualListPage} from '../satellites/ui/VirtualListPage';
 import {DEDICATED_SCREENS, opensSharedInterface, ownScreen} from './HomeScreen';
@@ -174,6 +176,11 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     wanted: GrantRequest;
     resolve: (grant: string | null) => void;
   } | null>(null);
+  // a protected document's secrets (1.2): the app's own prompt while it asks, and the dialog
+  // that shows a revealed secret once - nothing else holds either
+  const [secretAsk, setSecretAsk] = useState<{id: number; ask: SecretAsk; satellite: string; resolve: (value: string | null) => void} | null>(null);
+  const [revealRequest, setRevealRequest] = useState<{value: string; satellite: string; resolve: () => void} | null>(null);
+  const secretAsks = useRef(0);
   const nearEndListeners = useRef(new Set<() => void>()).current;
   const onNearEnd = useCallback(
     (listener: () => void) => {
@@ -736,10 +743,38 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       if (action.confirm && !(await confirmAction(String(resolve(action.confirm, scoped))))) {
         return false;
       }
+      const method = action.method ?? 'POST';
+      const who = document?.title || name;
+      let body: any = action.body !== undefined ? resolve(action.body, scoped) : scope.form ?? {};
+      if (action.secrets !== undefined) {
+        // 1.2: asked in the app's own prompt, only for a protected document, and put in this
+        // one request's body - never in the form, the page's state or a toast
+        if (!gatedRef.current || method === 'GET') {
+          showToast('That action asks for a secret this interface may not ask for.', true);
+          return false;
+        }
+        const secrets = await askSecrets(action.secrets, ask =>
+          new Promise<string | null>(done => {
+            secretAsks.current += 1;
+            setSecretAsk({
+              id: secretAsks.current,
+              ask,
+              satellite: who,
+              resolve: answer => {
+                setSecretAsk(null);
+                done(answer);
+              },
+            });
+          }),
+        );
+        if (!secrets) {
+          return false; // cancelled: nothing is sent
+        }
+        body = bodyWithSecrets(body, secrets);
+      }
       let result: any;
       try {
-        const body = action.body !== undefined ? resolve(action.body, scoped) : scope.form ?? {};
-        result = await api.act(name, resolveTemplate(action.route ?? '', scoped), action.method ?? 'POST', body);
+        result = await api.act(name, resolveTemplate(action.route ?? '', scoped), method, body);
       } catch (err: any) {
         recheck(err);
         if (!quiet) {
@@ -747,13 +782,32 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           loadData(); // show what's actually true now
         }
         return false;
+      } finally {
+        body = null;
+      }
+      if (action.reveal !== undefined && gatedRef.current) {
+        // 1.2: shown once in the app's own dialog, then gone from the answer before a toast or
+        // `then` sees it
+        result = await revealFrom(result, action.reveal, secret =>
+          new Promise<void>(done =>
+            setRevealRequest({
+              value: secret,
+              satellite: who,
+              resolve: () => {
+                setRevealRequest(null);
+                done();
+              },
+            }),
+          ),
+        );
       }
       // something changed on the server: what was kept for this Satellite may no longer be true
       // (an item gone, moved, renamed) - forgotten before the page reloads and keeps afresh
       kept.current = null;
       await store.forgetSatellite();
-      if (gatedRef.current && gateRef.current?.gate.state() === 'setup') {
-        // set up now? then it is locked, and the unlock card follows
+      if (gatedRef.current && gateRef.current) {
+        // the store may have changed state: set up now (locked, the unlock card follows), a new
+        // PIN (every unlock ended), delinked (back to setup); still open stays as it is
         gateRef.current.gate.check({quiet: true});
       }
       if (!quiet) {
@@ -769,7 +823,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       }
       return true;
     },
-    [api, name, go, loadData, navigation, showToast, audio, providers, store, mediaSource, satellites, recheck],
+    [api, name, go, loadData, navigation, showToast, audio, providers, store, mediaSource, satellites, recheck, document],
   );
 
   /** The secure action (1.2) on these items: one request, and one prompt when the session
@@ -1109,6 +1163,10 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           onCancel={() => grantRequest.resolve(null)}
         />
       )}
+      {secretAsk && (
+        <SecretPrompt key={secretAsk.id} ask={secretAsk.ask} satellite={secretAsk.satellite} onDone={secretAsk.resolve} />
+      )}
+      {revealRequest && <RevealSecret value={revealRequest.value} satellite={revealRequest.satellite} onDone={revealRequest.resolve} />}
       {overlay && (
         <View style={[styles.overlay, {bottom: space.lg + playerInset}]} pointerEvents="box-none">
           {overlay}

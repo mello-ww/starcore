@@ -57,6 +57,8 @@ BUTTON_STYLES = set(VOCABULARY["button_styles"])
 TONES = set(VOCABULARY["tones"])
 FORMATS = set(VOCABULARY["formats"])
 FORM_FIELD_KINDS = set(VOCABULARY["form_field_kinds"])
+# what a protected document's action may ask the client to prompt for (1.2): never a form field
+SECRET_KINDS = set(VOCABULARY["secret_kinds"])
 FILE_BROWSER_SELECT = set(VOCABULARY["file_browser_select"])
 ACTION_THEN = set(VOCABULARY["action_then"])
 METHODS = set(VOCABULARY["methods"])
@@ -1055,17 +1057,44 @@ class _Validator:
                 self.check_text(f"{at}.visible", entry["visible"])
 
     def check_form(self, where: str, block: dict):
-        fields = block.get("fields")
+        keys = self.check_form_fields(where, block.get("fields"))
+        submit = block.get("submit")
+        if not isinstance(submit, dict) or not isinstance(submit.get("label"), str) or "action" not in submit:
+            self.error(f"{where}.submit", "needs a 'label' and an 'action'")
+        else:
+            self.unknown_keys(f"{where}.submit", submit, {"label", "action"})
+            self.check_action(f"{where}.submit.action", submit["action"])
+            secrets = submit["action"].get("secrets") if isinstance(submit["action"], dict) else None
+            if isinstance(secrets, dict):
+                # the client's prompt asks for these, so the form never holds one
+                for key in sorted(keys & set(secrets)):
+                    self.error(f"{where}.submit.action.secrets.{key}",
+                               "is also a field of the form: a secret is never typed in a form")
+
+    def check_form_fields(self, where: str, fields, row: bool = False) -> set:
+        """A form's fields, or (row) the fields of one repeatable row: each a {key, label, kind}
+        input. A `rows` field (1.2) is a list the person adds rows to and removes them from, each
+        row the same few inputs (`fields`, none of them rows), and the form sends it as a list of
+        objects under its key; `add` names the button that adds one. Its value binds a list."""
         if not isinstance(fields, list) or not fields:
             self.error(f"{where}.fields", "must be a non-empty list")
-            fields = []
+            return set()
+        if row and len(fields) > LIMITS["row_fields"]:
+            self.error(f"{where}.fields", f"at most {LIMITS['row_fields']} inputs in a row")
         keys = set()
         for index, field in enumerate(fields):
             at = f"{where}.fields[{index}]"
             if not isinstance(field, dict):
                 self.error(at, "must be an object")
                 continue
-            self.unknown_keys(at, field, {"key", "label", "kind", "value", "options", "placeholder", "required"})
+            kind = field.get("kind")
+            if kind == "rows":
+                self.since(f"{at}.kind", "a rows field", 2)
+                self.unknown_keys(at, field, {"key", "label", "kind", "value", "fields", "add", "required"})
+            else:
+                # a row's inputs start empty: the row's own value is the rows field's
+                allowed = {"key", "label", "kind", "options", "placeholder", "required"}
+                self.unknown_keys(at, field, allowed if row else allowed | {"value"})
             key = field.get("key")
             if not isinstance(key, str) or not IDENTIFIER.match(key):
                 self.error(at, "needs an identifier 'key'")
@@ -1074,19 +1103,26 @@ class _Validator:
             keys.add(key)
             if not isinstance(field.get("label"), str):
                 self.error(at, "needs a 'label'")
-            if field.get("kind") not in FORM_FIELD_KINDS:
+            if kind not in FORM_FIELD_KINDS:
                 self.error(at, f"kind must be one of {sorted(FORM_FIELD_KINDS)}")
-            if field.get("kind") == "select":
+            elif kind == "rows":
+                if row:
+                    self.error(f"{at}.kind", "a row holds no rows of its own")
+                else:
+                    self.check_form_fields(at, field.get("fields"), row=True)
+                if "add" in field:
+                    self.check_text(f"{at}.add", field["add"])
+                if "value" in field and not isinstance(field["value"], list) and not (
+                        isinstance(field["value"], str) and is_binding(field["value"])):
+                    self.error(f"{at}.value", "must be a list of rows or a binding to one")
+            if kind == "select":
                 options = field.get("options")
                 if not isinstance(options, list) or not options or not all(
                         isinstance(o, dict) and isinstance(o.get("label"), str) and "value" in o for o in options):
                     self.error(at, "a select needs 'options': [{value, label}, ...]")
-        submit = block.get("submit")
-        if not isinstance(submit, dict) or not isinstance(submit.get("label"), str) or "action" not in submit:
-            self.error(f"{where}.submit", "needs a 'label' and an 'action'")
-        else:
-            self.unknown_keys(f"{where}.submit", submit, {"label", "action"})
-            self.check_action(f"{where}.submit.action", submit["action"])
+            if "required" in field and not isinstance(field["required"], bool):
+                self.error(f"{at}.required", "must be true or false")
+        return keys
 
     def check_action(self, where: str, action):
         if not isinstance(action, dict):
@@ -1119,6 +1155,12 @@ class _Validator:
         if "pick" in action:
             self.check_pick(where, action["pick"])
             known.add("pick")
+        if "secrets" in action:
+            self.check_secrets(where, action)
+            known.add("secrets")
+        if "reveal" in action:
+            self.check_reveal(where, action)
+            known.add("reveal")
         self.unknown_keys(where, action, known)
         self.check_route(f"{where}.route", action.get("route"))
         if "method" in action and action["method"] not in METHODS:
@@ -1138,6 +1180,55 @@ class _Validator:
             self.check_navigate(f"{where}.then", then)
         elif then not in ACTION_THEN:
             self.error(f"{where}.then", "must be 'refresh', 'back' or {navigate, params}")
+
+    def check_secrets(self, where: str, action: dict):
+        """secrets: {key: {kind, new?}} (1.2), only in a protected document: before the request
+        the client asks for each, in order, in its own prompt (twice for a `new` PIN) and puts it
+        in the body under `key` - never in $form, $state or anything it keeps. Its words are the
+        client's own and name the Satellite asking. No other document can raise such a prompt."""
+        self.since(f"{where}.secrets", "secrets", 2)
+        if not self.protected:
+            self.error(f"{where}.secrets", "only a protected document asks for secrets")
+        if self.in_bulk:
+            self.error(f"{where}.secrets", "are asked once for one request: not in a selection or a tile's quick actions")
+        if action.get("method") == "GET":
+            self.error(f"{where}.secrets", "go in a POST's body, never in a GET")
+        secrets = action["secrets"]
+        if not isinstance(secrets, dict) or not secrets:
+            self.error(f"{where}.secrets", "must be {key: {kind, new?}, ...}")
+            return
+        if len(secrets) > LIMITS["secrets"]:
+            self.error(f"{where}.secrets", f"at most {LIMITS['secrets']} secrets for one action")
+        body = action.get("body")
+        for key, secret in secrets.items():
+            at = f"{where}.secrets.{key}"
+            if not IDENTIFIER.match(key):
+                self.error(at, "the key must be an identifier")
+            if isinstance(body, dict) and key in body:
+                self.error(at, "is also in the body: the prompt fills it")
+            if not isinstance(secret, dict):
+                self.error(at, "must be {kind, new?}")
+                continue
+            self.unknown_keys(at, secret, {"kind", "new"})
+            if secret.get("kind") not in SECRET_KINDS:
+                self.error(f"{at}.kind", f"must be one of {sorted(SECRET_KINDS)}")
+            if "new" in secret:
+                if not isinstance(secret["new"], bool):
+                    self.error(f"{at}.new", "must be true or false")
+                elif secret["new"] and secret.get("kind") != "pin":
+                    self.error(f"{at}.new", "only a PIN is chosen anew")
+
+    def check_reveal(self, where: str, action: dict):
+        """reveal: field (1.2), only in a protected document: when the request succeeds, the
+        client shows that field of the answer once, in its own dialog, until the person confirms
+        they stored it, then forgets it - it reaches no binding, notice or anything kept."""
+        self.since(f"{where}.reveal", "reveal", 2)
+        if not self.protected:
+            self.error(f"{where}.reveal", "only a protected document reveals a secret")
+        if self.in_bulk:
+            self.error(f"{where}.reveal", "shows one answer: not in a selection or a tile's quick actions")
+        if not isinstance(action["reveal"], str) or not IDENTIFIER.match(action["reveal"]):
+            self.error(f"{where}.reveal", "must name one field of the answer")
 
     def check_file_action(self, where: str, action: dict, kind: str):
         """{download: route, name?} and {share: route, name?} (1.2): the client fetches one of

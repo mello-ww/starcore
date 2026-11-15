@@ -463,6 +463,38 @@ button.ui-list-row:hover {
     font: 500 13px/1.4 var(--sc-font-sans);
 }
 
+/* a rows field (1.2): one floating card per row, a pill to add one */
+.ui-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.ui-rows-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-2);
+}
+
+.ui-rows-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    align-items: end;
+    gap: var(--sc-space-2);
+    padding: var(--sc-space-3);
+    border: 1px solid var(--sc-line);
+    border-radius: var(--sc-radius-card);
+}
+
+.ui-rows-remove,
+.ui-rows-add {
+    justify-self: start;
+    align-self: start;
+}
+
 /* ---------- file browser ---------- */
 
 .ui-files {
@@ -2075,6 +2107,23 @@ body.ui-viewer-open {
     letter-spacing: 0.3em;
     text-align: center;
     font-size: 20px;
+}
+
+.ui-secret-key {
+    font-family: var(--sc-font-mono, monospace);
+    text-transform: uppercase;
+}
+
+/* a revealed secret (1.2): shown once, selectable, never kept */
+.ui-secret-reveal {
+    display: block;
+    padding: var(--sc-space-3);
+    border-radius: var(--sc-radius-control);
+    background: var(--sc-field);
+    color: var(--sc-text);
+    font: 500 16px/1.5 var(--sc-font-mono, monospace);
+    word-break: break-all;
+    user-select: all;
 }
 
 .ui-unlock-error {

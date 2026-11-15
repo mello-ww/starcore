@@ -1,5 +1,5 @@
 {
-  "_about": "The Locked Folder's shared interface (UI contract 1.2), a protected document: before any page the client asks media.vault's status, shows its own unlock prompt while the vault is locked and the setup page while it can't be opened yet, keeps the unlock alive while shown and locks on leaving (docs/ui-contract.md, \"Protected documents\"). Photo opens it from its Albums through the section action; it is a preview, so both clients keep opening the Locked Folder's own screens there and offer this document in Developer Mode until it is validated (docs/satellites/locked_folder.md, \"Shared interface\"). It reads the read-only views (views.py: gallery, setup) and changes the vault only through its existing routes: upload, delete, move_out and media/file for a download. Nothing is shared, kept offline or shown as a widget. Settings, the PIN, biometrics, encryption and recovery stay in its own screens until L4.",
+  "_about": "The Locked Folder's shared interface (UI contract 1.2), a protected document: before any page the client asks media.vault's status, shows its own unlock prompt while the vault is locked and the setup page while it can't be opened yet, keeps the unlock alive while shown, asks the status again after every action it runs and locks on leaving (docs/ui-contract.md, \"Protected documents\"). Photo opens it from its Albums through the section action; it is a preview, so both clients keep opening the Locked Folder's own screens there and offer this document in Developer Mode until it is validated (docs/satellites/locked_folder.md, \"Shared interface\"). It reads the read-only views (views.py: gallery, setup, settings) and changes the vault only through its existing routes, each needing what it always has: upload, delete, move_out and media/file for a download; configuration (the location), pin, recover, encryption/* and delink. Every PIN and recovery key is asked in the client's own prompt (secrets) and a new recovery key shown in its own dialog (reveal), never in a form. Nothing is shared, kept offline or shown as a widget. Biometric unlock is still set up from the Android app's own screens.",
   "contract": "starcore.ui/1.2",
   "title": "Locked Folder",
   "preview": true,
@@ -12,6 +12,7 @@
         {"type": "text", "style": "caption", "text": "$.summary"},
         {"type": "button", "label": "Add files", "style": "secondary",
          "action": {"upload": {"multiple": true}, "route": "upload?name={$value.name}", "then": "refresh"}},
+        {"type": "button", "label": "Settings", "style": "secondary", "action": {"navigate": "settings"}},
         {
           "type": "media-grid",
           "id": "vault",
@@ -55,7 +56,81 @@
       "blocks": [
         {"type": "heading", "text": "$.title"},
         {"type": "text", "text": "$.message"},
+        {"type": "form", "visible": "$.needs_location",
+         "fields": [{"key": "path", "label": "Folder on the server", "kind": "text", "placeholder": "/srv/starcore/private", "required": true}],
+         "submit": {"label": "Use this folder",
+                    "action": {"route": "configuration", "body": {"key": "locked_folder_path", "value": "$form.path"}, "then": "refresh"}}},
+        {"type": "button", "label": "Create PIN", "visible": "$.needs_pin",
+         "action": {"route": "pin", "secrets": {"pin": {"kind": "pin", "new": true}}}},
+        {"type": "button", "label": "Set a new PIN with the recovery key", "visible": "$.recoverable",
+         "action": {"route": "recover", "secrets": {"recovery_key": {"kind": "recovery-key"}, "pin": {"kind": "pin", "new": true}}}},
         {"type": "field", "label": "Problem", "value": "$.problem", "visible": "$.problem", "developer": true}
+      ]
+    },
+    "settings": {
+      "title": "Settings",
+      "source": {"route": "settings"},
+      "blocks": [
+        {"type": "card", "title": "PIN", "blocks": [
+          {"type": "text", "style": "caption", "text": "$.biometric_note"},
+          {"type": "button", "label": "Change PIN", "style": "secondary",
+           "action": {"route": "pin", "secrets": {"current_pin": {"kind": "pin"}, "pin": {"kind": "pin", "new": true}}}}
+        ]},
+        {"type": "card", "title": "Encryption", "blocks": [
+          {"type": "text", "text": "$.encryption"},
+          {"type": "text", "style": "caption", "text": "$.recovery", "visible": "$.recovery"},
+          {"type": "button", "label": "Encrypt with a recovery key", "visible": "$.can_encrypt",
+           "action": {"route": "encryption/start", "body": {"recovery_key": true}, "reveal": "recovery_key",
+                      "confirm": "Encrypt the Locked Folder? You'll see its recovery key once - store it safely. Your originals are kept as a backup until you delete them.",
+                      "then": "refresh"}},
+          {"type": "button", "label": "Encrypt without a recovery key", "style": "secondary", "visible": "$.can_encrypt",
+           "action": {"route": "encryption/start", "body": {"recovery_key": false},
+                      "confirm": "Encrypt without a recovery key? Without one, these files are lost for good if this server's key is lost - for example after reinstalling, or a Windows password reset.",
+                      "then": "refresh"}},
+          {"type": "button", "label": "$.resume_label", "visible": "$.can_resume",
+           "action": {"route": "encryption/start", "body": {}, "then": "refresh"}},
+          {"type": "button", "label": "Undo encryption", "style": "secondary", "visible": "$.can_undo",
+           "action": {"route": "encryption/undo", "body": {"run": "$.interrupted_run"},
+                      "confirm": "Undo this encryption? Every original goes back where it was, unencrypted.", "then": "refresh"}},
+          {"type": "button", "label": "New recovery key", "style": "secondary", "visible": "$.has_recovery_key",
+           "action": {"route": "encryption/recovery_key", "secrets": {"pin": {"kind": "pin"}}, "reveal": "recovery_key",
+                      "confirm": "Make a new recovery key? The current one stops working.", "then": "refresh"}},
+          {"type": "button", "label": "Create recovery key", "style": "secondary", "visible": "$.no_recovery_key",
+           "action": {"route": "encryption/recovery_key", "secrets": {"pin": {"kind": "pin"}}, "reveal": "recovery_key", "then": "refresh"}},
+          {"type": "button", "label": "Remove recovery key", "style": "danger", "visible": "$.has_recovery_key",
+           "action": {"route": "encryption/recovery_key", "body": {"remove": true}, "secrets": {"pin": {"kind": "pin"}},
+                      "confirm": "Remove the recovery key? Without it, a forgotten PIN or a lost server key means these files are lost for good.",
+                      "then": "refresh"}}
+        ]},
+        {"type": "card", "title": "Backups", "visible": "$.has_backups", "blocks": [
+          {"type": "text", "style": "caption", "text": "Unencrypted originals kept when the Locked Folder was encrypted. Delete them once you're sure the encrypted files open."},
+          {"type": "list", "items": "$.backups",
+           "item": {"title": "$.title", "subtitle": "$.created", "value": "$.bytes", "format": {"subtitle": "datetime", "value": "bytes"}},
+           "action": {"navigate": "backup", "params": {"run": "$.id"}}}
+        ]},
+        {"type": "card", "title": "Location", "blocks": [
+          {"type": "field", "label": "Folder", "value": "$.path"},
+          {"type": "text", "style": "caption", "visible": "$.path_missing",
+           "text": "This folder is missing on the server. Restore it, or delink the Locked Folder and link another one."},
+          {"type": "button", "label": "Delink", "style": "danger",
+           "action": {"route": "delink", "confirm": "Delink the Locked Folder? Its folder and files stay on disk untouched, but StarCore stops protecting them until you link a folder again."}}
+        ]}
+      ]
+    },
+    "backup": {
+      "title": "Backup",
+      "params": ["run"],
+      "source": {"route": "settings?run={$params.run}"},
+      "blocks": [
+        {"type": "text", "text": "$.summary"},
+        {"type": "field", "label": "Kept since", "value": "$.created", "format": "datetime"},
+        {"type": "field", "label": "Size", "value": "$.bytes", "format": "bytes"},
+        {"type": "button", "label": "Restore originals", "style": "secondary",
+         "action": {"route": "encryption/undo", "body": {"run": "$params.run"},
+                    "confirm": "Put these originals back unencrypted and remove their encrypted copies?", "then": "back"}},
+        {"type": "button", "label": "Delete backup", "style": "danger",
+         "action": {"route": "encryption/discard", "body": {"run": "$params.run"}, "secrets": {"pin": {"kind": "pin"}},
+                    "confirm": "Delete this backup? Every encrypted copy is checked first. The backup is then deleted permanently.", "then": "back"}}
       ]
     }
   }
