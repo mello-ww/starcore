@@ -386,7 +386,7 @@ class PhotoGalleryApiTest(unittest.TestCase):
         self.assertEqual(protected[0]["operations"], {"check": "check"})
         vault = catalog["capabilities"]["media.vault"]
         self.assertEqual([provider["satellite"] for provider in vault], ["LockedFolder"])
-        self.assertEqual(set(vault[0]["operations"]), {"status", "unlock", "lock", "move_in", "biometric"})
+        self.assertEqual(set(vault[0]["operations"]), {"status", "unlock", "lock", "keep", "move_in", "biometric"})
         self.assertFalse({"media", "media/file", "move_out", "delete", "upload", "encryption"}
                          & set(vault[0]["operations"].values()))
 

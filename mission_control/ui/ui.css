@@ -2054,11 +2054,16 @@ body.ui-viewer-open {
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
 }
 
-.ui-unlock-head {
+.ui-unlock-head,
+.ui-locked-head {
     display: flex;
     align-items: center;
     gap: var(--sc-space-2);
     color: var(--sc-text);
+}
+
+.ui-locked-head .eyebrow {
+    margin: 0;
 }
 
 .ui-unlock-title {

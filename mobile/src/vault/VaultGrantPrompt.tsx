@@ -2,20 +2,19 @@ import React, {useCallback, useEffect, useRef} from 'react';
 import {Modal, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import type {SecurePrompt, SecurePromptProps} from '../satellites/ui/secure';
 import {palette, space, type} from '../theme/tokens';
-import {LOCKED_FOLDER} from './api';
 import {grantWithBiometrics} from './biometricUnlock';
-import {LockedFolderUnlock} from './LockedFolderUnlock';
-import {useLockedFolder} from './useLockedFolder';
+import {useVault} from './useVault';
+import {VaultUnlock} from './VaultUnlock';
 
 /**
- * The Locked Folder's answer to a secure action (media.vault, UI contract 1.2): its own unlock
- * screen - the PIN, and biometrics when this phone turned them on - asking for a single-use
- * grant for exactly the items being moved instead of opening the vault. Attempts, lockouts and
- * the biometric challenge are the Locked Folder's as always. The PIN never leaves this screen
- * except to the Locked Folder's own unlock route; only the grant goes back.
+ * The app's answer to a secure action (media.vault, UI contract 1.2): its own unlock card - the
+ * PIN, and biometrics when this phone turned them on for the provider - asking the provider's
+ * unlock for a single-use grant for exactly the items being moved instead of opening the store.
+ * Attempts, lockouts and the biometric challenge are the provider's as always. The PIN never
+ * leaves this card except to the provider's own unlock route; only the grant goes back.
  */
-export function VaultGrantPrompt({count, wanted, onGrant, onCancel}: SecurePromptProps) {
-  const {api, biometricDeps} = useLockedFolder();
+export function VaultGrantPrompt({count, wanted, provider, onGrant, onCancel}: SecurePromptProps) {
+  const {api, biometricDeps} = useVault(provider);
   const granted = useRef<string | null>(null);
   const settled = useRef(false);
   const handlers = useRef({onGrant, onCancel});
@@ -38,7 +37,10 @@ export function VaultGrantPrompt({count, wanted, onGrant, onCancel}: SecurePromp
     granted.current = await api.grant(pin, wanted);
   }, [api, wanted]);
   const withBiometrics = useCallback(async () => {
-    const {result, grant} = await grantWithBiometrics(biometricDeps, 'Move to the Locked Folder', wanted);
+    if (!biometricDeps) {
+      return 'not-enrolled' as const;
+    }
+    const {result, grant} = await grantWithBiometrics(biometricDeps, 'Move it into the protected folder', wanted);
     granted.current = grant;
     return result;
   }, [biometricDeps, wanted]);
@@ -48,11 +50,10 @@ export function VaultGrantPrompt({count, wanted, onGrant, onCancel}: SecurePromp
     <Modal transparent animationType="fade" onRequestClose={() => settle(null)} statusBarTranslucent>
       <View style={styles.backdrop}>
         <ScrollView contentContainerStyle={styles.center} keyboardShouldPersistTaps="handled">
-          <LockedFolderUnlock
-            api={api}
+          <VaultUnlock
             biometricDeps={biometricDeps}
-            title="Move to the Locked Folder"
-            intro={`Enter your PIN to move ${what}. The Locked Folder stays locked.`}
+            title="Enter your PIN"
+            intro={`To move ${what} into the protected folder. It stays locked.`}
             withPin={withPin}
             withBiometrics={withBiometrics}
             onUnlocked={() => settle(granted.current)}
@@ -71,9 +72,9 @@ export function VaultGrantPrompt({count, wanted, onGrant, onCancel}: SecurePromp
   );
 }
 
-/** What the composition root registers: this prompt speaks the Locked Folder's own unlock, so it
- * answers only for media.vault as the Locked Folder provides it. */
-export const VAULT_GRANT_PROMPT: SecurePrompt = {capability: 'media.vault', satellite: LOCKED_FOLDER, component: VaultGrantPrompt};
+/** What the composition root registers for the secure action: the app's own prompt for
+ * media.vault, whichever Satellite the catalog says provides it. */
+export const VAULT_GRANT_PROMPT: SecurePrompt = {capability: 'media.vault', component: VaultGrantPrompt};
 
 const styles = StyleSheet.create({
   backdrop: {flex: 1, backgroundColor: 'rgba(0,0,0,0.75)'},

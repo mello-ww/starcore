@@ -262,9 +262,9 @@ POST /api/satellites/LockedFolder/move_in  { "items": [reference], "grant"? } ->
   moved in. One reference that doesn't resolve refuses the whole request (`400`, with
   `refused` listing which), so nothing is moved. At most 500 at once.
 - **A grant** is what an unlock with `for` returns instead of an unlock. The PIN (or a biometric
-  signature, with the same `for`) is checked exactly as for an unlock, with the same attempt
-  counting and lockout. A malformed `for` or a bad reference is refused before the attempt is
-  counted. The grant:
+  signature over a challenge asked for with the same `for`) is checked exactly as for an
+  unlock, with the same attempt counting and lockout. A malformed `for` or a bad reference is
+  refused before the attempt is counted. The grant:
   - is bound to this session, to `move_in`, and to exactly the resolved items;
   - lasts 60 seconds, in memory only;
   - is used up by the first `move_in` that presents it, whatever its outcome. Taking it out and
@@ -275,9 +275,9 @@ POST /api/satellites/LockedFolder/move_in  { "items": [reference], "grant"? } ->
   - **is not an unlock**: `status` still says locked, and `media`, `media/file`, `upload`,
     `delete`, `move_out` and `encryption` still refuse the session. So a client that dies
     after the PIN leaves nothing open, and has nothing to lock again.
-- **Clients:** Mission Control asks with its own PIN prompt. The Android app uses this
-  Satellite's own unlock screen (`mobile/src/lockedFolder/VaultGrantPrompt.tsx`), with
-  biometric unlock asking `biometric/unlock` for the same grant. Either way the moved items are
+- **Clients:** Mission Control asks with its own PIN prompt. The Android app uses its generic
+  prompt for any `media.vault` provider (`mobile/src/vault/VaultGrantPrompt.tsx`), with
+  biometric unlock asking `biometric/challenge` for the same grant. Either way the moved items are
   then dropped from the shared screen, the app's offline copies and its image cache.
 - **`move_in` with `items`** runs under this session's unlock (which it leaves as it was) or a
   matching grant. `photo_ids` keeps working for the dedicated screens, under an unlock.
@@ -527,7 +527,7 @@ instead of it. It is separate from the app's own biometric app lock.
 
 ```
 POST /api/satellites/LockedFolder/biometric/enroll     { "pin", "public_key", "device_name" } -> { "key_id" }
-POST /api/satellites/LockedFolder/biometric/challenge  { "key_id" }                           -> { "challenge" }
+POST /api/satellites/LockedFolder/biometric/challenge  { "key_id", "for"? }                   -> { "challenge" }
 POST /api/satellites/LockedFolder/biometric/unlock     { "key_id", "challenge", "signature" } -> like /unlock
 POST /api/satellites/LockedFolder/biometric/revoke     { "key_id" }                           -> { "revoked": true }
 ```
@@ -541,6 +541,13 @@ POST /api/satellites/LockedFolder/biometric/revoke     { "key_id" }             
   biometric prompt (SHA256withRSA) and the server verifies the signature against the enrolled
   key before unlocking the session - so a client that merely claims a biometric match gets
   nothing. A wrong signature counts toward the brute-force limits.
+- **What a signature buys is fixed with the challenge.** A challenge asked for with `for` (the
+  grant of "Moves from a shared interface") can only buy that grant, and one asked for without
+  it only a full unlock. The server keeps the purpose with the challenge, so nothing sent beside
+  the signature can change it, and a `for` there is refused.
+- **On the phone** the enrolled key's id is kept per server and per providing Satellite
+  (`mobile/src/vault/biometricUnlock.ts`), so a phone that enrolled before this layout asks to
+  turn biometric unlock on again, once.
 - **The PIN is never stored on the phone.** The earlier plan was to keep the PIN in the
   Keystore and release it after a biometric check; a signing key does the same job without a
   copy of the PIN existing anywhere but in the person's head.
@@ -577,6 +584,9 @@ photo in also drops it from the app's cached photo list and evicts its gallery t
 the image cache. The section locks again when it closes, when the app goes to the background,
 when the server is switched, and when the server's time limit runs out.
 
+While the vault shows open, both call `keep` every 30 seconds, so the server's idle time
+doesn't lock it under them.
+
 File Explorer's own page still draws a lock badge next to the vault and refuses to enter it
 until unlocked.
 
@@ -589,7 +599,7 @@ enabled = true
 storage = "data"                # where pin.json, attempts.json, devices.json, sealed.json,
                                 # the server key and the keyring copies are kept - see below
 locked_folder_path = ""         # empty means "not configured" - nothing is protected yet
-session_timeout_seconds = 900   # how long an unlock lasts before the session must PIN in again
+session_timeout_seconds = 900   # how long an unlock lasts at most before the session must PIN in again
 max_pin_attempts = 5            # incorrect PINs allowed before a temporary lockout
 lockout_seconds = 300           # how long that lockout lasts
 ```
@@ -600,6 +610,10 @@ lockout_seconds = 300           # how long that lockout lasts
 historical in-checkout location automatically. Anything else - an explicit absolute path, or
 an explicit relative one other than `"data"` - is a deliberate override, resolved exactly as
 before (relative paths inside this Satellite's own directory), with no migration attempted.
+
+An unlock also ends after 90 seconds without a request to a vault route or to `keep`, which
+the clients call every 30 seconds while they show the vault. That idle time isn't a setting;
+`status` reports it as `idle_seconds`, and its `expires_at` is the nearer of the two ends.
 
 All four editable settings (`locked_folder_path`, `session_timeout_seconds`,
 `max_pin_attempts`, `lockout_seconds`) are exposed through the Satellite's own
@@ -758,6 +772,17 @@ and that ordinary tracked source/configuration files are not.
   provider;
 - a biometric unlock asking for a grant.
 
+The idle time and purpose-bound challenges (A3, A6, L2), with the runtime's clock replaced
+in the test:
+- an unlock ending after the idle time;
+- `status`, `files.protected` and the settings never keeping it alive;
+- `keep` extending the idle time but never the session timeout, and needing an unlocked session
+  and a POST;
+- `status` reporting the idle time and the nearer expiry, and the manifest declaring `keep`;
+- a challenge asked for a grant never unlocking;
+- a `for` beside the signature refused before anything counts;
+- a malformed purpose refused.
+
 It covers `files.protected` too (A2, L1): the Engine's answer inside and outside the vault, for
 a folder that contains it, unlocked and for another session; an encrypted vault never open to
 other Satellites; a disabled provider still protecting; no provider protecting nothing; a
@@ -773,9 +798,9 @@ again once when back online or as the page goes away.
 
 ## Security audit and plan: the Locked Folder in the shared interface (2026-11-15)
 
-**Status: approved by the owner (2026-11-15). L0 is done: A1, A5 and A9 are fixed. Nothing
-else below is implemented yet**, and the decisions at the end stay open until the milestone that
-needs them. Read from the code at `5b716a9`. It is the audit stage 4 of [Remaining work](../remaining-work.md)
+**Status: approved by the owner (2026-11-15). L0 to L2 are done: A1, A2, A3, A5, A6 and A9
+are fixed. Nothing else below is implemented yet**, and the decisions at the end stay open until
+the milestone that needs them. Read from the code at `5b716a9`. It is the audit stage 4 of [Remaining work](../remaining-work.md)
 asks for, as M5 had ([its audit](../archive/m5-locked-folder-actions-audit.md)). The common
 order with Photos and the phone sync is in Remaining work.
 
@@ -818,10 +843,10 @@ order with Photos and the phone sync is in Remaining work.
 |---|---|---|---|
 | A1 | **Disabling the Locked Folder Satellite removes File Explorer's guard.** `locked_folder_guard._runtime()` answers "nothing to guard" for a disabled Satellite, and `POST /api/satellites/LockedFolder/disable` needs only a session. Checked with a throwaway test on temporary folders: for a session that never gave the PIN, listing the vault and reading a file in it went from `403` to `200`. For an encrypted vault the same step shows only ciphertext, but also the unencrypted originals in `.starcore-vault/backups/` until that backup is deleted, and lets all of it be renamed or deleted. Photo's `private_media.py` already ignores `enabled`; the guard doesn't. | **High** | Fixed in L0: the guard protects whether the Satellite is enabled or not. Then L1: protection is asked of the Engine, which asks every provider, enabled or not. |
 | A2 | **Protection is opt-in per Satellite.** File Explorer and Photo ask; any other Satellite that takes a server path doesn't. Music's `scan` accepts any `source` and never asks, so a signed-in session can index and stream the audio files of an unencrypted vault (read in the code, not exercised). | Medium | Fixed in L1: one Engine check (`files.protected`) that File Explorer, Photo and Music ask, Music included: a scan source in the vault is refused, a parent folder's scan skips it. |
-| A3 | **A full unlock opens everything for 900 seconds and outlives a dead client.** Accepted in M5 (its F3) because the shared interface never unlocked. Browsing the vault from the shared interface makes the full unlock the ordinary path on both clients, and locking on leaving is best effort: a crash, a lost connection or a killed app leaves the session open, also to File Explorer for an unencrypted vault. | Medium | L2: an unlock also ends after a short idle time, kept alive only by a client that is showing the vault. |
+| A3 | **A full unlock opens everything for 900 seconds and outlives a dead client.** Accepted in M5 (its F3) because the shared interface never unlocked. Browsing the vault from the shared interface makes the full unlock the ordinary path on both clients, and locking on leaving is best effort: a crash, a lost connection or a killed app leaves the session open, also to File Explorer for an unencrypted vault. | Medium | Fixed in L2: an unlock also ends after 90 seconds without a request to a vault route or to `keep`, which a client calls only while it shows the vault; `status` and other Satellites' `files.protected` questions never extend it. |
 | A4 | **What a session is worth bounds what the PIN is worth.** Session tokens are stored unhashed in `auth.json`, last 7 days, and the cookie is `Secure` only when the Engine itself serves HTTPS (not behind a TLS proxy). The app allows cleartext to any host. On plain HTTP the token, the PIN and the recovery key are readable on the network, so the PIN adds nothing against someone who can listen. | Medium, Engine-wide | Not the Locked Folder's to fix: the hashed tokens of Stabilisation, plus `Secure` on the cookie behind an HTTPS proxy. Until then this page says the vault's guarantees assume HTTPS. |
 | A5 | **`status` tells any signed-in session the vault's absolute path**, with the lockout counters and encryption state, before any unlock. The path is what A1 and A2 need. | Low | Fixed in L0: the path, in `status` and in the settings, only for an unlocked session, or while no PIN is set (setup). |
-| A6 | **A biometric signature isn't bound to what it is for.** `for` travels beside the signed challenge, not in it, so one signature is good for a grant or for a full unlock, whichever the request says. | Low | L2: the purpose is given when the challenge is asked for and kept with it on the server. |
+| A6 | **A biometric signature isn't bound to what it is for.** `for` travels beside the signed challenge, not in it, so one signature is good for a grant or for a full unlock, whichever the request says. | Low | Fixed in L2: the purpose is given with `biometric/challenge` and kept with the challenge on the server. A `for` beside the signature is refused (`400`) before the attempt is counted or the challenge used. |
 | A7 | **Secrets in the shared interface could become document inputs** (M5's F4, now concrete: setting a PIN and recovery move to the shared interface). A form field that takes a PIN teaches people to type it into whatever a document draws. | Low, design rule | L4: secrets are typed and shown only in prompts the client owns, and only for a protected document. |
 | A8 | **Unlocks and grants stay in memory after a sign-out** or a revoked session. Nothing can use them: authentication refuses the token first. | Low, accepted | Lapses by itself with A3's idle time. |
 | A9 | **Robustness:** `is_unlocked()` and `unlock()` change the unlock table outside the runtime's lock (a concurrent expiry can raise and answer `500`, never open anything); `unlock()` clears a counter by the raw token while the table is keyed by its hash (a no-op, `record_success()` does the real reset). After a Satellite **reload**, whether the guard and the routes still share one runtime has not been checked. | Low | Fixed in L0. Checking the reload found a real gap: the cached runtime kept reading the old Satellite's configuration, so a location set after a reload was not the one File Explorer guarded. It now follows the rebuilt Satellite. |
@@ -883,7 +908,7 @@ tile stays where it is and Photo names nothing.
 |---|---|---|---|---|---|
 | L0 (done) | Close A1; `status` and the settings without the path while locked (A5); the unlock table under the lock, the reload case (A9) | none | `file_explorer/locked_folder_guard.py`, `locked_folder/api.py`, `configuration.py`, `runtime.py` | `test_locked_folder_security.py`: a disabled Satellite still guards, also from a cold start; a locked `status` and configuration have no path; after a reload the guard and routes agree, and a new location is the one guarded; concurrent expiry never raises | Opus 5.5 high |
 | L1 (done) | `files.protected` v1 and the Engine's check; File Explorer, Photo and Music ask it (A2) | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `engine/starcore/capabilities.py`, the guard (becomes `protection.py`), `photo/private_media.py`, `music/routes_catalog.py`, `locked_folder/satellite.toml` | Engine: provider disabled, no provider, Music's scan refused inside the vault; the three contract suites still agree on the vocabulary | Opus 5.5 high |
-| L2 | Protected documents, the `section` action, `keep` and the idle time, purpose-bound challenges (A3, A6); the generic unlock prompt on Android (`mobile/src/vault/`) and the web's prompt for a full unlock | **contract change 1** | `engine/starcore/ui_contract.py`, fixtures, `mission_control/ui/` (contract, renderer, `secure.js`), `mobile/src/satellites/ui/`, `mobile/src/vault/` (from `src/lockedFolder/`), `builtins.tsx`, `locked_folder/runtime.py` and `api.py` | fixtures valid and invalid (protected without the capability, with `offline`, `secrets` outside it); Engine idle expiry with a fake clock; both clients: gate, `403`, lock on leave, nothing cached | Opus 5.5 xhigh |
+| L2 (done) | Protected documents, the `section` action, `keep` and the idle time, purpose-bound challenges (A3, A6); the generic unlock prompt on Android (`mobile/src/vault/`) and the web's prompt for a full unlock | **contract change 1** | `engine/starcore/ui_contract.py`, fixtures, `mission_control/ui/` (contract, renderer, `secure.js`), `mobile/src/satellites/ui/`, `mobile/src/vault/` (from `src/lockedFolder/`), `builtins.tsx`, `locked_folder/runtime.py` and `api.py` | fixtures valid and invalid (protected without the capability, with `offline`, `secrets` outside it); Engine idle expiry with a fake clock; both clients: gate, `403`, lock on leave, nothing cached | Opus 5.5 xhigh |
 | L3 | The Locked Folder's `ui.json`: grid, viewer, move to Photos, delete, upload, download; Photo's tile through sections | data only | `locked_folder/ui.json`, `views.py` (new), `photo/gallery.py`, `photo/ui.json` | Engine: the document validates, every route it names exists and refuses a locked session; app: the document renders | Opus 5.5 high |
 | L4 | `secrets` and `reveal`, and repeatable form rows (`rows` field kind) in the same change; then the vault's settings and setup pages | **contract change 2** | as L2's contract files, the form renderers on both clients, `locked_folder/ui.json` | fixtures; both clients: a secret never in form state, storage or logs, a revealed value gone after closing; Engine: every management route still needs what it needs today | Opus 5.5 xhigh |
 | L5 | End to end on the local demo (web and emulator) with a generated PIN; the owner validates on the web and the phone | none | none | the M5 list, plus: kill the client while unlocked and see it lock by itself | Opus 5.5 high |
@@ -891,8 +916,11 @@ tile stays where it is and Photo names nothing.
 | L7 | Security review of L0 to L6 | none | none | findings fixed before L8 | Fable 5.2 high |
 | L8 | Remove `locked_folder/mission_control/page.js`, `mobile/src/lockedFolder/`, Photo's `LockedFolderTab` | none | those | the suites | Sonnet 5.5 medium |
 
-Until L8 the Locked Folder's own page and screens keep working; in L2 they get the same `keep`
-call, so the idle time doesn't lock them while they are open.
+Until L8 the Locked Folder's own page and screens keep working; in L2 they got the same `keep`
+call, every 30 seconds while they show the vault open, so the idle time doesn't lock them.
+L2's fixtures refuse a protected document without the capability, with an offline page, with
+widgets or with `share`; the one for `secrets` outside a protected document comes with
+`secrets`, in L4.
 
 ### Decisions for the owner
 

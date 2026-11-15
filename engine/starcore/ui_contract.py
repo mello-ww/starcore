@@ -88,6 +88,12 @@ SECURE_OPERATIONS = {name: set(operations) for name, operations in VOCABULARY["s
 SECURE_ITEMS = "media.gallery"
 # a section of a Satellite's own interface, for the own action (1.2)
 OWN_SECTION = re.compile(r"[a-z][a-z0-9-]{0,31}")
+# a Satellite's name, for the section action (1.2)
+SATELLITE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}")
+# what a protected document (1.2) may name, and the operations its provider - the document's own
+# Satellite - must offer for a client to show it: {capability: {operations}}
+PROTECTED_CAPABILITIES = {name: set(operations) for name, operations in VOCABULARY["protected_capabilities"].items()
+                          if not name.startswith("_")}
 FORMATS_1_1 = set(SINCE_1_1["formats"])
 # Satellite capabilities with a protocol this Engine knows: their versions, the
 # operations every provider must offer and those it may. A Satellite may also
@@ -220,8 +226,12 @@ def validate(document, provides=None) -> list:
 class _Validator:
     def __init__(self, document, provides=None):
         self.document = document
-        # the capabilities the document's Satellite declares, or None when not known
+        # the capabilities the document's Satellite declares, or None when not known - with
+        # their operations when given as its [provides] table
         self.provides = None if provides is None else set(provides)
+        self.provided = provides if isinstance(provides, dict) else {}
+        # a protected document (1.2): it keeps nothing, so no offline page, widget or share
+        self.protected = False
         self.in_media_actions = False
         self.in_bulk = False  # a selection's or a tile's quick actions: no download or share there
         self.errors = []
@@ -258,7 +268,8 @@ class _Validator:
         self.lenient = version[1] > MINOR
         self.minor = version[1]
 
-        known = {"contract", "title", "requires", "entry", "navigation", "pages", "header", "widgets", "preview"}
+        known = {"contract", "title", "requires", "entry", "navigation", "pages", "header", "widgets", "preview",
+                 "protected"}
         self.unknown_keys("", document, known)
         if "title" in document and not isinstance(document["title"], str):
             self.error("title", "must be a string")
@@ -310,13 +321,47 @@ class _Validator:
             if "icon" in item and item["icon"] not in ICONS:
                 self.error(where, f"unknown icon {item['icon']!r}")
 
+        if "protected" in document:
+            self.check_protected(document["protected"])
         for page_id, page in pages.items():
             self.check_page(f"pages.{page_id}", page)
         if "header" in document:
             self.check_header(document["header"])
         if "widgets" in document:
+            if self.protected:
+                self.error("widgets", "a protected document has no widgets: nothing of it is shown outside it")
             self.check_widgets(document["widgets"])
         return self.errors
+
+    def check_protected(self, protected):
+        """protected: {capability, setup} (1.2): the document belongs to a store the client must
+        unlock first, through the capability its own Satellite provides (protected_capabilities).
+        Before any page the client asks status: not set up, it opens `setup` (a page without
+        params, whose routes the server serves without an unlock); locked, its own prompt. A 403
+        from the document's routes is "locked again"; it calls keep while it shows the document
+        and lock when it leaves; and it keeps nothing - so the document has no offline page, no
+        widget and no share action."""
+        self.since("protected", "a protected document", 2)
+        self.protected = True
+        if not isinstance(protected, dict) or set(protected) != {"capability", "setup"}:
+            self.error("protected", "must be {capability, setup}")
+            return
+        capability, setup = protected["capability"], protected["setup"]
+        if not isinstance(capability, str) or capability not in PROTECTED_CAPABILITIES:
+            self.error("protected.capability", f"must be one of {sorted(PROTECTED_CAPABILITIES)}")
+        elif self.provides is not None:
+            if capability not in self.provides:
+                self.error("protected.capability", f"names {capability}, which this Satellite doesn't provide")
+            elif self.provided:
+                operations = set((self.provided.get(capability) or {}).get("operations") or {})
+                missing = PROTECTED_CAPABILITIES[capability] - operations
+                if missing:
+                    self.error("protected.capability", f"its {capability} must offer {sorted(missing)} "
+                                                       "for a client to show a protected document")
+        if not isinstance(setup, str) or setup not in self.pages:
+            self.error("protected.setup", f"must name one of the pages (got {setup!r})")
+        elif self.page_params(setup):
+            self.error("protected.setup", "the setup page cannot require params")
 
     def check_header(self, header):
         """A band above the navigation on top-level pages: its own source and blocks."""
@@ -439,6 +484,8 @@ class _Validator:
             # `omit` (at any depth) - {"omit": [...]} is how a Satellite keeps what it wouldn't want
             # in a phone's unencrypted app storage (a location, a path on the server) out of it.
             self.since(f"{where}.offline", "offline pages", 2)
+            if self.protected:
+                self.error(f"{where}.offline", "a protected document keeps nothing offline")
             offline = page["offline"]
             if isinstance(offline, dict):
                 self.check_offline_omit(f"{where}.offline", offline, page.get("blocks"))
@@ -1058,6 +1105,9 @@ class _Validator:
         if "secure" in action:
             self.check_secure(where, action)
             return
+        if "section" in action:
+            self.check_section(where, action)
+            return
         for kind in ("download", "share"):
             if kind in action:
                 self.check_file_action(where, action, kind)
@@ -1105,6 +1155,23 @@ class _Validator:
             self.error(f"{where}.open", "must be true or false")
         if self.in_bulk:
             self.error(f"{where}.{kind}", "is one file at a time: not in a selection or a tile's quick actions")
+        if kind == "share" and self.protected:
+            self.error(f"{where}.share", "a protected document shares nothing")
+
+    def check_section(self, where: str, action: dict):
+        """{section: name} (1.2): the client opens the shared document of the Satellite `name`
+        (a binding, or a Satellite's name) when that Satellite's manifest says it is a section of
+        this one (section_of) - and nothing else: no route, no params. A client that can't open
+        it (no such section, no shared document) hides the control or says so."""
+        self.since(f"{where}.section", "the section action", 2)
+        self.unknown_keys(where, action, {"section"})
+        name = action["section"]
+        if isinstance(name, str) and is_binding(name):
+            self.check_binding(f"{where}.section", name)
+        elif not isinstance(name, str) or not SATELLITE_NAME.fullmatch(name):
+            self.error(f"{where}.section", "must be a Satellite's name or a binding to one")
+        if self.in_bulk:
+            self.error(f"{where}.section", "opens one section: not in a selection or a tile's quick actions")
 
     def check_upload(self, where: str, action: dict):
         """{upload: {multiple}, route, conflict?: {confirm?, route}, then?} (1.2): the person

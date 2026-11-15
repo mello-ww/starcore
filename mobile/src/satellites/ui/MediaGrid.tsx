@@ -8,6 +8,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import Video from 'react-native-video';
 import {usePinchColumnsGesture} from '../../components/pinchColumns';
 import {ZoomableImage} from '../../components/ZoomableImage';
+import {useImageSource} from './memoryImages';
 import {keptPages} from './offline';
 import {tokens, useAccent} from '../../theme';
 import {formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate, type Scope, type UiAction, type UiBlock} from './contract';
@@ -858,6 +859,8 @@ const Tile = memo(function Tile({
   const opacity = useRef(new Animated.Value(reduced ? 1 : 0)).current;
   const uri = entry.thumb?.uri;
   useEffect(() => setFailed(false), [uri]);
+  // a protected document's thumbnails come from memory, never through the image loader's cache
+  const [thumb, unreadable] = useImageSource(entry.thumb);
   const label = [title || (entry.kind === 'video' ? 'Video' : 'Image'), String(entry.index + 1)].join(', ');
   const height = Math.round(size / aspect);
   const content = (
@@ -869,10 +872,10 @@ const Tile = memo(function Tile({
           round && {borderRadius: size / 2},
           selected && {borderColor: accent, borderWidth: 3},
         ]}>
-        {entry.thumb && !failed ? (
+        {thumb && !failed && !unreadable ? (
           <Animated.View style={[StyleSheet.absoluteFill, {opacity}]}>
             <Image
-              source={entry.thumb}
+              source={thumb}
               resizeMode="cover"
               resizeMethod="resize"
               fadeDuration={0}
@@ -978,12 +981,13 @@ export function ActionPill({
 
 /** The shared full-screen viewer: swipe between items, a video plays in place (only on the
  * page shown, so swiping away stops it), facts and actions come from the document. */
-/** Whether an action's control is drawn: a secure action only where it can run (1.2). */
+/** Whether an action's control is drawn: a secure action only where it can run, a section only
+ * where this app opens it (1.2). */
 function canRun(context: BlockContext, action: any): boolean {
   if (action?.own !== undefined && !context.hasOwnScreens) {
     return false;  // an own action only where the app has the Satellite's own screens
   }
-  return !action?.secure || Boolean(context.canRun?.(action));
+  return (!action?.secure && action?.section === undefined) || Boolean(context.canRun?.(action));
 }
 
 /** An item's image URLs as the grid and the viewer load them: what leaves the image cache when
@@ -1150,6 +1154,8 @@ function ViewerPage({
   onZoomChange: (zoomed: boolean) => void;
 }) {
   const [failed, setFailed] = useState(false);
+  // a protected document's pictures come from memory (videos stream, kept nowhere)
+  const [still, unreadable] = useImageSource(video ? entry.thumb : image);
   if (video && active) {
     return (
       <View style={[styles.page, styles.videoPage, {width, height}]}>
@@ -1161,13 +1167,12 @@ function ViewerPage({
       </View>
     );
   }
-  const still = video ? entry.thumb : image;
   return (
     <View style={[styles.page, {width, height}]}>
-      {still && !failed && !video ? (
+      {still && !failed && !unreadable && !video ? (
         // pinch to zoom, then pan with one finger; double tap zooms in or back out
         <ZoomableImage source={still} active={active} onZoomChange={onZoomChange} onError={() => setFailed(true)} />
-      ) : still && !failed ? (
+      ) : still && !failed && !unreadable ? (
         <Image source={still} style={styles.media} resizeMode="contain" onError={() => setFailed(true)} accessibilityIgnoresInvertColors />
       ) : (
         <Icon name="image" size={28} color={palette.text3} />

@@ -51,6 +51,10 @@ GLOBAL_ATTEMPT_FACTOR = 4
 GLOBAL_MAX_LOCKOUT = 24 * 60 * 60
 
 CHALLENGE_SECONDS = 120     # how long a biometric unlock challenge stays valid
+# An unlock ends at session_timeout_seconds, or sooner after IDLE_SECONDS without a request to a
+# vault route or to keep (the media.vault operation a client calls while it shows the vault): a
+# client that crashes, loses its connection or is killed leaves the vault open this long at most.
+IDLE_SECONDS = 90
 MAX_DEVICE_KEYS = 20        # biometric devices enrolled at once
 
 # a day without a single wrong PIN forgets earlier escalation, so ordinary
@@ -59,6 +63,10 @@ FAILURE_MEMORY = 24 * 60 * 60
 ATTEMPTS_VERSION = 1
 
 _runtimes = {}
+
+
+def iso(epoch: float) -> str:
+    return datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat(timespec="seconds")
 
 
 class SecurityStateError(Exception):
@@ -155,7 +163,8 @@ class LockedFolderRuntime:
         self.attempts_damaged = False
         self._lock = threading.RLock()
         self._pin = self._load_pin()
-        self._unlocked = {}   # session token -> expires (epoch seconds)
+        # session token -> {"until": the session timeout, "seen": the last vault request} (epoch)
+        self._unlocked = {}
         # single-use grants for one move, kept apart from unlocks: grant id ->
         # {"token", "operation", "items" (frozenset of (provider, id)), "expires"}
         self._grants = {}
@@ -355,24 +364,35 @@ class LockedFolderRuntime:
     # Every read and change of the unlock table is made under the runtime's lock: an unlock
     # expiring while several requests check it is removed once, never raised over.
 
-    def is_unlocked(self, token: str) -> bool:
+    def clock(self) -> float:
+        """What every unlock, grant and challenge expiry is measured with (a test can replace it)."""
+        return time.time()
+
+    def is_unlocked(self, token: str, active: bool = False) -> bool:
+        """Whether this session has the vault open. `active` is for a request that uses the vault
+        (its own routes, keep): it restarts the idle time. A question about the vault - status,
+        settings, another Satellite asking files.protected - never does."""
         if not token:
             return False
         with self._lock:
-            expires = self._unlocked.get(token)
-            if expires is None:
+            entry = self._unlocked.get(token)
+            if entry is None:
                 return False
-            if expires < time.time():
+            now = self.clock()
+            if now > entry["until"] or now > entry["seen"] + IDLE_SECONDS:
                 del self._unlocked[token]
                 if not self._unlocked:
                     self.thumbnails.clear()
                 return False
+            if active:
+                entry["seen"] = now
             return True
 
     def unlock(self, token: str, timeout_seconds: int):
         # the attempt counters are reset by record_success(), which every unlock route calls
         with self._lock:
-            self._unlocked[token] = time.time() + timeout_seconds
+            now = self.clock()
+            self._unlocked[token] = {"until": now + timeout_seconds, "seen": now}
 
     def lock(self, token: str):
         with self._lock:
@@ -390,12 +410,12 @@ class LockedFolderRuntime:
         pairs), within GRANT_SECONDS: (grant id, ISO expiry). It is not an unlock -
         is_unlocked() stays as it was, and nothing but that operation accepts it."""
         grant_id = secrets.token_urlsafe(16)  # 128 random bits
-        expires = time.time() + GRANT_SECONDS
+        expires = self.clock() + GRANT_SECONDS
         with self._lock:
             self._drop_expired_grants()
             self._grants[grant_id] = {"token": token, "operation": operation,
                                       "items": frozenset(items), "expires": expires}
-        return grant_id, datetime.fromtimestamp(expires, tz=timezone.utc).isoformat(timespec="seconds")
+        return grant_id, iso(expires)
 
     def take_grant(self, grant_id, token: str, operation: str, items) -> bool:
         """Uses up a grant: it is taken out of the table and checked in one step under the lock,
@@ -409,25 +429,29 @@ class LockedFolderRuntime:
             self._drop_expired_grants()
         return bool(
             grant is not None
-            and grant["expires"] >= time.time()
+            and grant["expires"] >= self.clock()
             and token and secrets.compare_digest(grant["token"], token)
             and grant["operation"] == operation
             and grant["items"] == frozenset(items)
         )
 
     def _drop_expired_grants(self):
-        now = time.time()
+        now = self.clock()
         for grant_id in [grant_id for grant_id, grant in self._grants.items() if grant["expires"] < now]:
             del self._grants[grant_id]
 
     def expires_at(self, token: str):
-        """An ISO timestamp for when this session's unlock expires, or None
-        if it isn't (or no longer is) unlocked at all."""
+        """An ISO timestamp for when this session's unlock ends if nothing uses the vault before
+        then - the nearer of the session timeout and the idle time - or None if it isn't (or no
+        longer is) unlocked at all."""
         with self._lock:
-            expires = self._unlocked.get(token)
-        if expires is None or expires < time.time():
+            entry = self._unlocked.get(token)
+            if entry is None:
+                return None
+            expires = min(entry["until"], entry["seen"] + IDLE_SECONDS)
+        if expires < self.clock():
             return None
-        return datetime.fromtimestamp(expires, tz=timezone.utc).isoformat(timespec="seconds")
+        return iso(expires)
 
     # ---------- brute-force protection ----------
     #
@@ -693,31 +717,38 @@ class LockedFolderRuntime:
             self._devices.clear()
             self._save_devices(bind)
 
-    def new_challenge(self, token: str, key_id: str) -> str:
+    def new_challenge(self, token: str, key_id: str, purpose=None) -> str:
+        """A challenge for this session to sign with `key_id`, kept with what the signature will
+        be for: `purpose` is a grant's (operation, items), or None for a full unlock. The purpose
+        is fixed here, on the server, so the signature can't be spent on anything else."""
         with self._lock:
             challenge = secrets.token_urlsafe(32)
-            self._challenges[token] = {"key_id": key_id, "challenge": challenge,
-                                       "expires": time.time() + CHALLENGE_SECONDS}
+            self._challenges[token] = {"key_id": key_id, "challenge": challenge, "for": purpose,
+                                       "expires": self.clock() + CHALLENGE_SECONDS}
             return challenge
 
-    def verify_signature(self, token: str, key_id: str, challenge: str, signature: bytes) -> bool:
-        """True only for a signature, by this device's enrolled key, over the
-        challenge this same session was just given. Each challenge is used up
-        by the first attempt, right or wrong."""
+    def verify_signature(self, token: str, key_id: str, challenge: str, signature: bytes) -> tuple:
+        """(True, purpose) only for a signature, by this device's enrolled key, over the
+        challenge this same session was just given - `purpose` being what new_challenge() kept
+        with it; (False, None) otherwise. Each challenge is used up by the first attempt, right
+        or wrong."""
+        refused = (False, None)
         with self._lock:
             issued = self._challenges.pop(token, None)
         device = self._trusted_devices().get(key_id)
-        if issued is None or device is None or issued["expires"] < time.time():
-            return False
+        if issued is None or device is None or issued["expires"] < self.clock():
+            return refused
         if not isinstance(challenge, str) or issued["key_id"] != key_id:
-            return False
+            return refused
         if not secrets.compare_digest(issued["challenge"].encode(), challenge.encode("utf-8", "replace")):
-            return False
+            return refused
         try:
             public_key = signatures.parse_public_key(base64.b64decode(device["public_key"]))
         except ValueError:
-            return False
-        return signatures.verify(public_key, challenge.encode("utf-8"), signature)
+            return refused
+        if not signatures.verify(public_key, challenge.encode("utf-8"), signature):
+            return refused
+        return True, issued["for"]
 
     # ---------- small JSON stores next to pin.json ----------
 

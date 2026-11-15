@@ -182,8 +182,9 @@ function usesOwnPage(satellite) {
 // The own action (UI contract 1.2) opens a Satellite's own page at a section from its shared
 // interface: that visit is a history entry of its own, marked in history.state, so Back
 // returns to the shared interface and a reload stays on the own page. A section that is
-// another Satellite hosted by this one (section_of) is always on the own page, which hosts
-// it - so #/satellite/<host>/<hosted> keeps working whichever interface is chosen.
+// another Satellite hosted by this one (section_of) and still drawn by its own page is on the
+// host's own page, which hosts it - so #/satellite/<host>/<hosted> keeps working whichever
+// interface is chosen. One with a shared interface is drawn by itself (hostedInterface).
 const OWN_VISIT = "starcore.ownPage";
 
 function visitsOwnPage(satellite) {
@@ -193,7 +194,24 @@ function visitsOwnPage(satellite) {
     if (history.state && history.state[OWN_VISIT] === satellite.name) {
         return true;
     }
-    return Boolean(route.section) && satellites.some((other) => other.section_of === satellite.name && other.name === route.section);
+    const hosted = hostedSection(satellite, route.section);
+    return Boolean(hosted) && usesOwnPage(hosted);
+}
+
+// the Satellite `name` when its manifest says it is a section of `host`
+function hostedSection(host, name) {
+    return name ? satellites.find((other) => other.section_of === host.name && other.name === name) || null : null;
+}
+
+// what #/satellite/<name>/<section> draws: the routed Satellite at that section or, when the
+// section is a Satellite it hosts with a shared interface, that one - at the route's next part
+// (#/satellite/<host>/<hosted>/<section>), its hash beneath its host's
+function hostedInterface(satellite) {
+    const hosted = hostedSection(satellite, route.section);
+    if (hosted && hasUiDocument(hosted) && !usesOwnPage(hosted)) {
+        return { satellite: hosted, section: route.inner, hosted: true };
+    }
+    return { satellite, section: route.section, hosted: false };
 }
 
 function openOwnPage(satellite, section) {
@@ -301,24 +319,26 @@ function applyRoute() {
     // overlay in the first place
     closeSidebar();
 
-    const [name, param, section] = location.hash.replace(/^#\/?/, "").split("/");
+    const [name, param, section, inner] = location.hash.replace(/^#\/?/, "").split("/");
 
     if (name === "satellite" && param) {
-        route = { name: "satellite", satellite: decodeURIComponent(param), section: section ? decodeURIComponent(section) : null };
+        route = { name: "satellite", satellite: decodeURIComponent(param), section: section ? decodeURIComponent(section) : null,
+            inner: inner ? decodeURIComponent(inner) : null };
     } else if (name in CORE_PAGES && (developerMode || !DEVELOPER_ROUTES.has(name))) {
-        route = { name, satellite: null, section: null };
+        route = { name, satellite: null, section: null, inner: null };
     } else {
-        route = { name: "overview", satellite: null, section: null };
+        route = { name: "overview", satellite: null, section: null, inner: null };
     }
 
     // a real navigation to the page already showing: let it switch section (unless it now
     // needs the other interface - back from an own-page visit - which remounts below)
-    const showing = route.name === "satellite" ? findSatellite(route.satellite) : null;
-    if (mounted && showing && mounted.name.toLowerCase() === route.satellite.toLowerCase()
-        && mounted.section !== route.section && mounted.revision === pageRevision(showing)) {
-        mounted.section = route.section;
+    const routed = route.name === "satellite" ? findSatellite(route.satellite) : null;
+    const showing = routed ? hostedInterface(routed) : null;
+    if (mounted && showing && mounted.name.toLowerCase() === showing.satellite.name.toLowerCase()
+        && mounted.section !== showing.section && mounted.revision === pageRevision(showing.satellite)) {
+        mounted.section = showing.section;
         if (mounted.cleanup && typeof mounted.cleanup.showSection === "function") {
-            mounted.cleanup.showSection(route.section);
+            mounted.cleanup.showSection(showing.section);
         }
     }
 
@@ -641,8 +661,9 @@ async function loadWidgetDocument(satellite) {
     }
     try {
         const payload = await getJson(satelliteUrl(satellite.name, "/ui"));
-        const widgets = (payload && payload.document && Array.isArray(payload.document.widgets))
-            ? payload.document.widgets : [];
+        // a protected document (1.2) shows nothing of itself outside it
+        const widgets = (payload && payload.document && Array.isArray(payload.document.widgets)
+            && payload.document.protected === undefined) ? payload.document.widgets : [];
         widgetDocuments.set(satellite.name, { revision: satellite.ui.revision, widgets });
         return widgets;
     } catch {
@@ -1095,15 +1116,17 @@ function renderSatelliteList() {
 // a satellite can ship its own Mission Control page as an ES module; the module
 // is asked to render into a container of its own and to clean up when the user
 // navigates away
-async function mountSatellitePage(satellite) {
+async function mountSatellitePage(routed) {
     const container = document.getElementById("satellite-page");
+    // a Satellite this one hosts, when the route opens it and it has a shared interface
+    const { satellite, section, hosted } = hostedInterface(routed);
     const revision = pageRevision(satellite);
     if (mounted && mounted.name === satellite.name && mounted.revision === revision) {
         return;
     }
 
     unmountSatellitePage();
-    mounted = { name: satellite.name, section: route.section, revision, cleanup: null };
+    mounted = { name: satellite.name, section, revision, cleanup: null };
     container.replaceChildren();
 
     const ownPage = usesOwnPage(satellite);
@@ -1126,9 +1149,24 @@ async function mountSatellitePage(satellite) {
             element: container,
             satellite,
             // the section the route names (#/satellite/<name>/<section>), if any
-            section: route.section,
+            section,
+            // the hash of one of its sections: #/satellite/<host>/<hosted>/<section> for a hosted one
+            hash: (inner) => (inner ? `${satelliteHash(satellite)}/${inner}` : satelliteHash(satellite)),
             // the shared interface's own action (1.2): this Satellite's page.js, at a section
-            own: satellite.page && !ownPage ? { open: (section) => openOwnPage(satellite, section) } : null,
+            own: satellite.page && !ownPage && !hosted ? { open: (inner) => openOwnPage(satellite, inner) } : null,
+            // the section action (1.2): a Satellite this one hosts (section_of), whichever
+            // interface draws it
+            sections: {
+                has: (name) => Boolean(hostedSection(satellite, name)),
+                open: (name) => {
+                    const target = hostedSection(satellite, name);
+                    if (!target) {
+                        return false;
+                    }
+                    location.hash = satelliteHash(target);
+                    return true;
+                },
+            },
             // Developer Mode, for code that must react to it - see "Developer Mode" above
             developer: developerContext,
             api: {
@@ -1181,7 +1219,7 @@ function renderSatellitePage() {
     const rendered = Boolean(satellite.page) || hasUiDocument(satellite);
     document.getElementById("satellite-generic").hidden = rendered;
     if (rendered) {
-        setText("page-title", satellite.name);
+        setText("page-title", hostedInterface(satellite).satellite.name);
         mountSatellitePage(satellite);
         return;
     }
@@ -2292,9 +2330,9 @@ async function loadAccount() {
     setDeveloperMode(storedDeveloperMode(), false);
     applyRoute();
     // a page that mounted before this was known may have fallen back from a developer section
-    if (developerMode && mounted && route.section && mounted.cleanup
+    if (developerMode && mounted && mounted.section && mounted.cleanup
         && typeof mounted.cleanup.showSection === "function") {
-        mounted.cleanup.showSection(route.section);
+        mounted.cleanup.showSection(mounted.section);
     }
     if (route.name === "overview") {
         setText("page-title", greeting());

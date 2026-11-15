@@ -37,11 +37,11 @@
     },
     "1.2": {
       "blocks": ["image", "media-list", "media-grid", "search", "map", "breadcrumb"],
-      "actions": ["play", "pick", "own", "secure", "download", "share", "upload"],
-      "keys": ["document.preview", "list.more", "download.open", "media-grid.more", "media-grid.open", "media-grid.item.icon", "media-grid.quick", "map.viewport", "map.bounds", "map.item.count", "map.item.bounds", "page.offline"],
+      "actions": ["play", "pick", "own", "secure", "download", "share", "upload", "section"],
+      "keys": ["document.preview", "document.protected", "list.more", "download.open", "media-grid.more", "media-grid.open", "media-grid.item.icon", "media-grid.quick", "map.viewport", "map.bounds", "map.item.count", "map.item.bounds", "page.offline"],
       "bindings": ["$value."],
       "icons": ["chevron-left", "chevron-right", "download", "edit-2", "heart", "map-pin", "play", "rotate-ccw", "search", "share-2", "trash-2", "x"],
-      "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library. {own: section}: the client opens the Satellite's own interface (page.js, native screens) at a section that interface names; a client without one hides the control (a tile skips that entry of its media-grid `open`). {secure: {capability, operation}, item, confirm?, then?}: in a media viewer's or selection's actions, the client runs one of secure_operations on the items, behind its own unlock prompt (never a document form) - see secure_operations. {download: route, name?} and {share: route, name?}: the client fetches the Satellite's own route with its session and saves the file (download) or hands it to the system share sheet (share), named `name`; with `open: true` a download opens the file with the platform instead (a new browser tab, the phone's own viewer). A client that can't (an older Android, a browser that can't share files, a phone without a viewer module) hides the control. Not in a selection or a tile's quick actions. {upload: {multiple}, route, conflict?: {confirm?, route}, then?}: the person picks files on the device and each is sent in turn as the raw body of a POST to route, with $value the file's {name, size} (the name made safe as a download's); a 409 asks conflict.confirm, naming the file, then retries on conflict.route, and declining skips that file; each file is reported, and then (refresh or back) runs once something arrived. A client that can't pick files hides the control. Not in a selection or a tile's quick actions."
+      "_note": "{play: {search}}: the client searches the audio.library provider and plays the results through its media.audio host. A document using it requires client media.audio and capability audio.library. {own: section}: the client opens the Satellite's own interface (page.js, native screens) at a section that interface names; a client without one hides the control (a tile skips that entry of its media-grid `open`). {secure: {capability, operation}, item, confirm?, then?}: in a media viewer's or selection's actions, the client runs one of secure_operations on the items, behind its own unlock prompt (never a document form) - see secure_operations. {download: route, name?} and {share: route, name?}: the client fetches the Satellite's own route with its session and saves the file (download) or hands it to the system share sheet (share), named `name`; with `open: true` a download opens the file with the platform instead (a new browser tab, the phone's own viewer). A client that can't (an older Android, a browser that can't share files, a phone without a viewer module) hides the control. Not in a selection or a tile's quick actions. {upload: {multiple}, route, conflict?: {confirm?, route}, then?}: the person picks files on the device and each is sent in turn as the raw body of a POST to route, with $value the file's {name, size} (the name made safe as a download's); a 409 asks conflict.confirm, naming the file, then retries on conflict.route, and declining skips that file; each file is reported, and then (refresh or back) runs once something arrived. A client that can't pick files hides the control. Not in a selection or a tile's quick actions. {section: name}: the client opens the shared document of the Satellite `name` (a binding or a literal) when that Satellite's manifest says it is a section of this one (section_of), and nothing else; a client that can't hides the control. Not in a selection or a tile's quick actions. protected: {capability, setup}: the document belongs to a store a client must unlock first - see protected_capabilities."
     }
   },
   "common_block_keys": ["type", "id", "visible", "required", "developer"],
@@ -61,6 +61,10 @@
   "secure_operations": {
     "_note": "What the secure action (1.2) may run: a capability, and the operations of it a document may ask for. The client resolves the provider from the catalog, asks for the unlock in its own prompt (a single-use grant for exactly these items), and sends references to the document Satellite's own media.gallery items, built from `item` (a binding to each item's id). Only a Satellite that provides media.gallery may use it, on its own items.",
     "media.vault": ["move_in"]
+  },
+  "protected_capabilities": {
+    "_note": "What a document may name as `protected: {capability, setup}` (1.2), and the operations its provider must offer for a client to show it. The provider is the document's own Satellite. Before any page, the client asks status: not configured, no PIN, a security problem or an unreadable PIN opens the `setup` page (a page without params); locked, its own unlock prompt (never a document form), for a full unlock of this session. A 403 from any of the document's routes means locked again: the prompt, not an error. The client calls keep while it shows the document, and lock when it closes, is hidden or goes to the background, or the server changes. It keeps nothing: no offline page, no widget, no share action, images and videos never in a disk cache, and on Android the window can't be captured (secure.screen).",
+    "media.vault": ["status", "unlock", "lock", "keep"]
   },
   "media_viewer_keys": ["image", "video", "title", "subtitle", "fields", "actions"],
   "map_item_keys": ["lat", "lon", "key", "image", "title", "kind", "count", "bounds"],
@@ -123,13 +127,14 @@
     "media.vault": {
       "versions": [1],
       "operations": {
-        "status": "GET -> {configured, pin_set, unlocked, expires_at, session_timeout_seconds, ...}: whether this session could move media in now, or must unlock first",
-        "unlock": "POST {pin, for?: {operation: \"move_in\", items: [reference]}} -> with for: {grant, expires_at}, a single-use grant for exactly that move, without unlocking the vault; without: {unlocked, expires_at}. Attempts are counted and locked out as for any unlock",
+        "status": "GET -> {configured, pin_set, pin_unreadable, unlocked, expires_at, session_timeout_seconds, idle_seconds, security: {problem}, ...}: whether this session has the store open now, or must unlock first (or set it up). Never extends an unlock",
+        "unlock": "POST {pin, for?: {operation: \"move_in\", items: [reference]}} -> with for: {grant, expires_at}, a single-use grant for exactly that move, without unlocking the vault; without: {unlocked, expires_at}, an unlock of this session that ends at session_timeout_seconds or after idle_seconds without a request to the store's routes or to keep. Attempts are counted and locked out as for any unlock",
         "lock": "POST -> {locked}: ends this session's unlock",
         "move_in": "POST {items: [reference], grant?} -> {moved, failed}: moves media.gallery items into the vault, under this session's unlock or a matching grant; every reference is resolved on the server, again at the moment of the move"
       },
       "optional_operations": {
-        "biometric": "POST challenge {key_id} -> {challenge}; POST unlock {key_id, challenge, signature, for?} -> as unlock"
+        "keep": "POST -> {expires_at}: only for a session that is unlocked (403 otherwise); restarts the idle time, never past session_timeout_seconds. A client calls it while it shows a protected document",
+        "biometric": "POST challenge {key_id, for?} -> {challenge}; POST unlock {key_id, challenge, signature} -> as unlock, for what the challenge was asked for (a grant with for, a full unlock without). for beside the signature is refused"
       },
       "_note": "A protected store media can be moved into, by the client's own unlock prompt (the secure action). It offers no way to list or read what it holds: that stays in the providing Satellite's own interface. A reference is {provider, capability: \"media.gallery\", id}, and is only a claim: the server resolves it through the media.gallery provider it knows."
     },
@@ -142,7 +147,7 @@
     }
   },
   "client_capabilities": {
-    "_note": "Device features a client may offer a document beyond rendering blocks. media.audio (the shared audio host, docs/media-audio.md) is what the play action needs; the rest are reserved names no client claims yet. A document that requires one a client doesn't offer is shown as needing a newer app.",
+    "_note": "Device features a client may offer a document beyond rendering blocks. media.audio (the shared audio host, docs/media-audio.md) is what the play action needs, media.picker the pick action's; secure.screen, a window that can't be captured, is the Android app's (it applies it to every protected document); the rest are reserved names no client claims yet. A document that requires one a client doesn't offer is shown as needing a newer app.",
     "reserved": ["device.biometrics", "device.background-tasks", "media.audio", "media.picker", "secure.screen"]
   },
   "limits": {

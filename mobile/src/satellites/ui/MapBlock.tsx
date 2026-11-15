@@ -5,6 +5,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import {tokens, useAccent} from '../../theme';
 import {isSafeRoute, resolve, resolveTemplate, type Scope, type UiBlock} from './contract';
 import {mediaKind, MediaViewer} from './MediaGrid';
+import {useImageSource} from './memoryImages';
 import type {BlockContext} from './UiBlocks';
 
 const {palette, space, type, radii} = tokens;
@@ -342,6 +343,13 @@ function ClusterMarker({
 }) {
   // a marker's picture is drawn once it has loaded, then left alone (cheap with many markers)
   const [ready, setReady] = useState(!thumb);
+  // a protected document's pictures come from memory, never through the image loader's cache
+  const [picture, unreadable] = useImageSource(thumb);
+  useEffect(() => {
+    if (unreadable) {
+      setReady(true);
+    }
+  }, [unreadable]);
   const label = count > 1 ? `${count} items here` : title || 'One item';
   return (
     <Marker
@@ -351,8 +359,10 @@ function ClusterMarker({
       accessibilityLabel={label}
       testID={`map-marker-${count}`}>
       <View style={[styles.marker, {borderColor: accent}]}>
-        {thumb ? (
-          <Image source={thumb} style={styles.markerImage} onLoad={() => setReady(true)} onError={() => setReady(true)} />
+        {picture ? (
+          <Image source={picture} style={styles.markerImage} onLoad={() => setReady(true)} onError={() => setReady(true)} />
+        ) : thumb && !unreadable ? (
+          <View style={styles.markerImage} />
         ) : (
           <Icon name="map-pin" size={18} color={palette.text} />
         )}

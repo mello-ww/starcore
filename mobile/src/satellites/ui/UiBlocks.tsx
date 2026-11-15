@@ -10,6 +10,7 @@ import {TOUCH_TARGET, tokens, useAccent} from '../../theme';
 import {MapBlock} from './MapBlock';
 import {ActionPill, MediaGridBlock} from './MediaGrid';
 import {createListPaging, type ListPagingStatus} from './listPaging';
+import {useImageSource} from './memoryImages';
 import {
   BLOCK_TYPES, findProvider, formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate, toneOf,
   type Providers, type Scope, type UiAction, type UiBlock,
@@ -548,6 +549,8 @@ function MediaFrame({
 }) {
   const route = typeof template === 'string' ? resolveTemplate(template, scope) : null;
   const source = route && isSafeRoute(route) ? context.mediaSource?.(route) ?? null : null;
+  // a protected document's images come from memory, never through the image loader's cache
+  const [drawn, unreadable] = useImageSource(source);
   const [failed, setFailed] = useState(false);
   const shown = useRef(new Animated.Value(0)).current;
   const uri = source?.uri;
@@ -562,10 +565,10 @@ function MediaFrame({
   ];
   return (
     <View style={frame} accessible={!!alt} accessibilityRole={alt ? 'image' : undefined} accessibilityLabel={alt || undefined}>
-      {source && !failed ? (
+      {drawn && !failed && !unreadable ? (
         <Animated.View style={[StyleSheet.absoluteFill, {opacity: shown}]}>
           <Image
-            source={source}
+            source={drawn}
             resizeMode={fit}
             style={StyleSheet.absoluteFill}
             onLoad={() => Animated.timing(shown, {toValue: 1, duration: 180, useNativeDriver: true}).start()}
@@ -703,8 +706,8 @@ function ButtonBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
     return null; // opens native screens this app doesn't have for the Satellite
   }
   const files = block.action?.download !== undefined || block.action?.share !== undefined || block.action?.upload !== undefined;
-  if (files && !context.canRun?.(block.action)) {
-    return null; // files this phone can't save, share or send here
+  if ((files || block.action?.section !== undefined) && !context.canRun?.(block.action)) {
+    return null; // files this phone can't save, share or send here, or a Satellite it doesn't open
   }
   const label = asText(resolve(block.label, scope));
   const danger = block.style === 'danger';

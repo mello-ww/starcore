@@ -19,6 +19,8 @@ test("the vocabulary is the shared one", () => {
     for (const name of Object.keys(contract.CAPABILITY_VERSIONS)) {
         assert.ok(vocabulary.satellite_capabilities[name], name);
     }
+    const isProtected = Object.fromEntries(Object.entries(vocabulary.protected_capabilities).filter(([name]) => !name.startsWith("_")));
+    assert.deepEqual(contract.PROTECTED_CAPABILITIES, isProtected);
 });
 
 test("bindings", () => {

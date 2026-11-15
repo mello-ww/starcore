@@ -1,13 +1,12 @@
 /**
- * The app's composition root for Satellites that still have native code of their own
- * (native screens, and an unlock prompt for media.vault): the one shared file allowed to import a
- * Satellite's folder, so navigation,
- * layout and the AudioHost never do. Each entry goes once its Satellite moves to its ui.json
+ * The app's composition root for Satellites that still have native code of their own (native
+ * screens, and what they add to the shared audio host): the one shared file allowed to import a
+ * Satellite's folder, so navigation, layout and the AudioHost never do. Each entry goes once its
+ * Satellite moves to its ui.json
  * (docs/ui-contract.md, "Migration"); engine/tests/test_client_modularity.py checks that no
  * other shared file imports a Satellite folder.
  */
 import React from 'react';
-import {VAULT_GRANT_PROMPT} from '../lockedFolder/VaultGrantPrompt';
 import type {AudioHostExtensions} from '../media/AudioHost';
 import {MUSIC_AUDIO_EXTENSIONS} from '../music/MusicProvider';
 import {AlbumScreen} from '../music/screens/AlbumScreen';
@@ -19,7 +18,6 @@ import {MusicSettingsScreen} from '../music/screens/MusicSettingsScreen';
 import {PlaylistScreen} from '../music/screens/PlaylistScreen';
 import {TrackListScreen} from '../music/screens/TrackListScreen';
 import type {TrackListKind} from '../music/ui/navigation';
-import type {SecurePrompt} from './ui/secure';
 
 /** Route params of the native screens below, merged into the Satellites stack's own. */
 export type BuiltinScreenParams = {
@@ -55,7 +53,3 @@ export const BUILTIN_SCREENS: BuiltinScreen[] = [
 export const BUILTIN_AUDIO: {extensions: AudioHostExtensions} = {
   extensions: MUSIC_AUDIO_EXTENSIONS,
 };
-
-/** The app's own unlock prompts for the secure action (UI contract 1.2), by capability and
- * provider: the media.vault provider's PIN and biometric screen, asking for a single-use grant. */
-export const BUILTIN_SECURE_PROMPTS: SecurePrompt[] = [VAULT_GRANT_PROMPT];

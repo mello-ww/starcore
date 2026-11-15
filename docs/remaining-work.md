@@ -134,7 +134,7 @@ closed it.
   Satellite.
 - [x] **L1** - `files.protected`: one Engine check every Satellite that takes a path asks
   (File Explorer, Photo, Music).
-- [ ] **L2** - protected documents, the `section` action, an unlock that ends when idle, the
+- [x] **L2** - protected documents, the `section` action, an unlock that ends when idle, the
   generic unlock prompt on both clients (contract change 1).
 - [ ] **L3** - the Locked Folder's own `ui.json`: browse, view, move out, delete, upload.
 - [ ] **L4** - client-owned prompts for typing and showing secrets, and repeatable form rows

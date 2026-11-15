@@ -19,7 +19,8 @@ import Video from 'react-native-video';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {StarSwitch} from '../components/StarSwitch';
 import type {LockedFolderStatus, SecurityProblem, VaultItem} from '../lockedFolder/api';
-import {disable, enroll, isEnrolled} from '../lockedFolder/biometricUnlock';
+import {disable, enroll, isEnrolled} from '../vault/biometricUnlock';
+import {KEEP_SECONDS} from '../vault/gate';
 import {LockedFolderUnlock, formatWait} from '../lockedFolder/LockedFolderUnlock';
 import {PrivateImage} from '../lockedFolder/PrivateImage';
 import {useLockedFolder} from '../lockedFolder/useLockedFolder';
@@ -101,6 +102,25 @@ export function LockedFolderTab({onPhotosChanged}: {onPhotosChanged?: () => void
       }
     };
   }, [api, relock]);
+
+  // while it shows unlocked, it tells the server it is still in use: an unlock otherwise ends
+  // after the server's idle time, so an app that dies leaves it open that long at most
+  useEffect(() => {
+    if (!status?.unlocked) {
+      return;
+    }
+    const timer = setInterval(() => {
+      if (AppState.currentState !== 'active') {
+        return;
+      }
+      api.keep().catch((err: any) => {
+        if (err?.status === 401 || err?.status === 403) {
+          refresh(); // locked meanwhile: the unlock card again
+        }
+      });
+    }, KEEP_SECONDS * 1000);
+    return () => clearInterval(timer);
+  }, [status?.unlocked, api, refresh]);
 
   // and so does the server's own time limit
   useEffect(() => {

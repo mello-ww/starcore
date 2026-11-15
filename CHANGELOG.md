@@ -26,6 +26,15 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 - **After a reload of the Locked Folder, File Explorer guards its current location.** The
   shared runtime kept reading the configuration from before the reload, so a location set after
   it was not the one guarded. The unlock table is also changed only under its lock now (A9).
+- **An unlock of the Locked Folder ends after 90 seconds without use**, as well as after
+  `session_timeout_seconds` as before. Its own page and screens, and any protected document,
+  call the new `keep` every 30 seconds while they show the vault, and only then: a crashed tab,
+  a lost connection or a killed app leaves the vault open 90 seconds at most, not 15 minutes.
+  `status` never extends an unlock and reports `idle_seconds` (A3).
+- **A biometric signature buys only what its challenge was asked for.** The purpose (a grant
+  for one move, or a full unlock) is given with `biometric/challenge` and kept with the challenge
+  on the server; a `for` sent beside the signature is refused before anything counts (A6). On
+  Android, biometric unlock of the Locked Folder has to be turned on again once.
 
 ### Removed
 
@@ -36,6 +45,21 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Protected documents (UI contract 1.2):** a document can declare
+  `"protected": {"capability": "media.vault", "setup": "<page>"}`, and both clients then ask
+  the store's status before any page. They show the setup page when it isn't set up, their own
+  unlock card when it is locked (PIN, and biometrics on Android) and the page once it is open.
+  A `403` asks again, `keep` runs while it shows, and it locks when it closes or stays hidden
+  for 10 seconds. It keeps nothing: no offline page, widget or share; on Android images only in
+  memory, a window that can't be captured, and no "open in another app". The Engine accepts it
+  only from the store's own Satellite (`docs/ui-contract.md`, "Protected documents").
+- **The `section` action (UI contract 1.2)** opens a Satellite whose manifest says it is a
+  section of this one, over it, on both clients, and nothing else. A control for one the client
+  can't open is hidden.
+- **A generic unlock prompt on Android** (`mobile/src/vault/`): the unlock card, the grant prompt
+  of the `secure` action and biometric unlock work for whichever Satellite provides
+  `media.vault`. The Locked Folder's own screens use it too.
+- `media.vault` gains the optional `keep` operation, and its `biometric` challenge takes `for`.
 - **A clickable breadcrumb in File Explorer's folder page**, on both clients: each level of the
   path is a pill that opens that folder, the current one is shown and not pressable, and the
   row scrolls to the end when the path is long. It is **UI contract 1.2's `breadcrumb` block**,

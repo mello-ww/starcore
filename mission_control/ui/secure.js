@@ -137,10 +137,18 @@ function el(tag, className, text) {
     return node;
 }
 
-/** Mission Control's PIN prompt: resolves the PIN typed, or null when cancelled. Its words are
- * Mission Control's own; the PIN lives only in the field, which is emptied as it closes. */
-export function promptPin({ count, error = null, wait = 0 }) {
+/** Mission Control's PIN prompt: resolves the PIN typed, or null when cancelled (or when
+ * `signal` aborts). `purpose` is "move" (a grant for `count` items; nothing opens) or "unlock" (a
+ * protected document, named `title`, opens for this session). Its words are Mission Control's
+ * own; the PIN lives only in the field, which is emptied as it closes. */
+export function promptPin({ count = 0, error = null, wait = 0, purpose = "move", title = "", signal = null }) {
+    const unlocking = purpose === "unlock";
+    const action = unlocking ? "Unlock" : "Unlock and move";
     return new Promise((resolve) => {
+        if (signal && signal.aborted) {
+            resolve(null);
+            return;
+        }
         const returnFocus = document.activeElement;
         const overlay = el("div", "ui-unlock");
         overlay.setAttribute("role", "dialog");
@@ -152,8 +160,9 @@ export function promptPin({ count, error = null, wait = 0 }) {
         head.appendChild(icon("lock", 20) || el("span", null, ""));
         head.appendChild(el("p", "ui-unlock-title", "Enter your PIN"));
         form.appendChild(head);
-        form.appendChild(el("p", "ui-text ui-text-caption",
-            `To move ${count === 1 ? "this item" : `these ${count} items`} into the protected folder. It stays locked.`));
+        form.appendChild(el("p", "ui-text ui-text-caption", unlocking
+            ? `To open ${title || "this"}. It locks again when you leave it.`
+            : `To move ${count === 1 ? "this item" : `these ${count} items`} into the protected folder. It stays locked.`));
         const input = el("input", "ui-input ui-unlock-pin");
         input.type = "password";
         input.inputMode = "numeric";
@@ -169,7 +178,7 @@ export function promptPin({ count, error = null, wait = 0 }) {
         const foot = el("div", "ui-unlock-foot");
         const cancel = el("button", "ui-pill", "Cancel");
         cancel.type = "button";
-        const submit = el("button", "ui-pill ui-pill-primary", "Unlock and move");
+        const submit = el("button", "ui-pill ui-pill-primary", action);
         submit.type = "submit";
         foot.append(cancel, submit);
         form.appendChild(foot);
@@ -187,7 +196,7 @@ export function promptPin({ count, error = null, wait = 0 }) {
                 if (left <= 0) {
                     clearInterval(timer);
                     submit.disabled = false;
-                    submit.textContent = "Unlock and move";
+                    submit.textContent = action;
                 } else {
                     submit.textContent = `Try again in ${left}s`;
                 }
@@ -196,6 +205,9 @@ export function promptPin({ count, error = null, wait = 0 }) {
 
         const finish = (value) => {
             clearInterval(timer);
+            if (signal) {
+                signal.removeEventListener("abort", aborted);
+            }
             input.value = "";
             overlay.remove();
             if (returnFocus && typeof returnFocus.focus === "function") {
@@ -211,6 +223,13 @@ export function promptPin({ count, error = null, wait = 0 }) {
             }
         });
         cancel.addEventListener("click", () => finish(null));
+        // the gate closes it when the tab goes away or a newer check starts
+        function aborted() {
+            finish(null);
+        }
+        if (signal) {
+            signal.addEventListener("abort", aborted);
+        }
         overlay.addEventListener("keydown", (event) => {
             event.stopPropagation();  // never the viewer's arrows or Escape underneath
             if (event.key === "Escape") {

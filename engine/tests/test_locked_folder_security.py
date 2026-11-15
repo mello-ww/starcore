@@ -799,15 +799,57 @@ class LockedFolderSecurityTest(unittest.TestCase):
         self.setup_vault()
         first, *_ = self.import_photos()
         key_id = self.enroll()[1]["key_id"]
-        _, payload = self.lf("biometric/challenge", {"key_id": key_id})
+        # what the signature is for is given with the challenge, and kept with it (A6)
+        _, payload = self.lf("biometric/challenge", {"key_id": key_id,
+                                                     "for": {"operation": "move_in", "items": [self.ref(first)]}})
         body = {"key_id": key_id, "challenge": payload["challenge"],
-                "signature": b64(test_key().sign(payload["challenge"].encode())),
-                "for": {"operation": "move_in", "items": [self.ref(first)]}}
+                "signature": b64(test_key().sign(payload["challenge"].encode()))}
         status, payload = self.lf("biometric/unlock", body)
         self.assertEqual(status, 200)
         self.assertFalse(payload["unlocked"])
         self.assertFalse(self.lf("status")[1]["unlocked"])
         self.assertEqual(self.move([first], payload["grant"])[0], 200)
+
+    # ---------- a biometric signature is bound to what it is for (A6) ----------
+
+    def signed(self, key_id, challenge):
+        return {"key_id": key_id, "challenge": challenge, "signature": b64(test_key().sign(challenge.encode()))}
+
+    def test_a_purpose_beside_the_signature_is_refused_before_anything_counts(self):
+        self.setup_vault()
+        first, *_ = self.import_photos()
+        self.locked_folder.config.data["max_pin_attempts"] = 1
+        key_id = self.enroll()[1]["key_id"]
+        _, payload = self.lf("biometric/challenge", {"key_id": key_id})
+        body = {**self.signed(key_id, payload["challenge"]),
+                "for": {"operation": "move_in", "items": [self.ref(first)]}}
+        status, answer = self.lf("biometric/unlock", body)
+        self.assertEqual(status, 400)
+        self.assertIn("challenge", answer["error"])
+        # nothing was counted and the challenge was not used: it still opens, as it was asked
+        status, answer = self.lf("biometric/unlock", self.signed(key_id, payload["challenge"]))
+        self.assertEqual(status, 200)
+        self.assertTrue(answer["unlocked"])
+
+    def test_a_challenge_asked_for_a_grant_never_unlocks(self):
+        self.setup_vault()
+        first, *_ = self.import_photos()
+        key_id = self.enroll()[1]["key_id"]
+        _, payload = self.lf("biometric/challenge", {"key_id": key_id,
+                                                     "for": {"operation": "move_in", "items": [self.ref(first)]}})
+        status, answer = self.lf("biometric/unlock", self.signed(key_id, payload["challenge"]))
+        self.assertEqual(status, 200)
+        self.assertFalse(answer["unlocked"])
+        self.assertIn("grant", answer)
+        self.assertFalse(self.lf("status")[1]["unlocked"])
+        self.assertEqual(self.lf("media")[0], 403)
+
+    def test_a_challenge_with_a_malformed_purpose_is_refused(self):
+        self.setup_vault()
+        key_id = self.enroll()[1]["key_id"]
+        for wanted in ("move_in", {"operation": "delete", "items": []}, {"operation": "move_in", "items": []}):
+            status, _ = self.lf("biometric/challenge", {"key_id": key_id, "for": wanted})
+            self.assertEqual(status, 400, wanted)
 
     # ---------- the guard does not depend on the Satellite being enabled (A1) ----------
 
@@ -954,6 +996,86 @@ class LockedFolderSecurityTest(unittest.TestCase):
             with ThreadPoolExecutor(max_workers=8) as pool:
                 self.assertEqual(set(pool.map(check, range(8))), {False})
         self.assertEqual(failures, [])
+
+    # ---------- an unlock also ends when idle, kept alive by keep (A3) ----------
+
+    def fake_clock(self):
+        clock = {"now": 1_800_000_000.0}
+        patcher = mock.patch.object(self.runtime(), "clock", lambda: clock["now"])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return clock
+
+    def idle(self):
+        return module("locked_folder.runtime").IDLE_SECONDS
+
+    def test_an_unlock_ends_after_the_idle_time(self):
+        self.setup_vault()
+        clock = self.fake_clock()
+        self.assertEqual(self.unlock()[0], 200)
+        for _ in range(3):
+            clock["now"] += self.idle() - 1
+            self.assertEqual(self.lf("media")[0], 200, "a vault route keeps it alive")
+        clock["now"] += self.idle() + 1
+        self.assertEqual(self.lf("media")[0], 403)
+        self.assertFalse(self.lf("status")[1]["unlocked"])
+        self.assertEqual(self.entries(self.vault), 403, "File Explorer is closed again too")
+
+    def test_status_check_and_settings_never_keep_an_unlock_alive(self):
+        self.setup_vault()
+        clock = self.fake_clock()
+        self.unlock()
+        clock["now"] += self.idle() - 10
+        self.assertTrue(self.lf("status")[1]["unlocked"])
+        self.assertEqual(self.lf(f"check?path={self.vault}")[0], 200)
+        self.assertEqual(self.lf("configuration")[0], 200)
+        self.assertEqual(self.entries(self.vault), 200)
+        clock["now"] += 11
+        self.assertFalse(self.lf("status")[1]["unlocked"])
+
+    def test_keep_extends_the_idle_time_never_the_session_timeout(self):
+        self.setup_vault()
+        self.locked_folder.config.data["session_timeout_seconds"] = 300
+        clock = self.fake_clock()
+        start = clock["now"]
+        self.unlock()
+        expiries = []
+        while clock["now"] + 60 <= start + 300:
+            clock["now"] += 60
+            status, payload = self.lf("keep", {})
+            self.assertEqual(status, 200)
+            expiries.append(payload["expires_at"])
+        self.assertEqual(len(expiries), 5)
+        self.assertLess(expiries[0], expiries[-2], "each keep moves the idle expiry on")
+        self.assertEqual(expiries[-1], self.lf("status")[1]["expires_at"])
+        clock["now"] = start + 301
+        self.assertEqual(self.lf("keep", {})[0], 403, "the session timeout still ends it")
+        self.assertEqual(self.lf("media")[0], 403)
+
+    def test_keep_needs_an_unlocked_session_and_a_post(self):
+        self.setup_vault()
+        self.assertEqual(self.lf("keep", {})[0], 403)
+        self.assertEqual(self.lf("keep", {}, token="")[0], 401)
+        self.unlock()
+        self.assertEqual(self.lf("keep", method="GET")[0], 405)
+        other = self.engine.auth.create_session("admin")
+        self.assertEqual(self.lf("keep", {}, token=other)[0], 403)
+        self.assertEqual(self.lf("keep", {})[0], 200)
+
+    def test_status_reports_the_idle_time_and_the_nearer_expiry(self):
+        self.setup_vault()
+        clock = self.fake_clock()
+        status = self.lf("status")[1]
+        self.assertEqual(status["idle_seconds"], self.idle())
+        self.assertIsNone(status["expires_at"])
+        self.unlock()
+        status = self.lf("status")[1]
+        expected = module("locked_folder.runtime").iso(clock["now"] + self.idle())
+        self.assertEqual(status["expires_at"], expected)
+
+    def test_the_manifest_declares_keep(self):
+        operations = self.locked_folder.manifest.provides["media.vault"]["operations"]
+        self.assertEqual(operations["keep"], "keep")
 
     # ---------- every Satellite asks the Engine, through files.protected (A2) ----------
 

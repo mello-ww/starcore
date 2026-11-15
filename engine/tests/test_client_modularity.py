@@ -38,9 +38,8 @@ KNOWN_COUPLINGS = {
 # The composition root is where native Satellite code is wired in; the Photo
 # screens are still registered by the navigation. Lower a count when one goes.
 KNOWN_IMPORTS = {
-    # the composition root: Music's native screens, and the Locked Folder's unlock prompt for
-    # the secure action (media.vault)
-    "mobile/src/satellites/builtins.tsx": {"mobile/src/music/": 10, "mobile/src/lockedFolder/": 1},
+    # the composition root: Music's native screens
+    "mobile/src/satellites/builtins.tsx": {"mobile/src/music/": 10},
     "mobile/src/navigation/MainTabs.tsx": {"mobile/src/photo/": 5},
     # Photo's background sync, started with the app
     "mobile/src/App.tsx": {"mobile/src/photo/": 1},

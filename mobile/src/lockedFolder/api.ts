@@ -1,5 +1,6 @@
 import {StarCoreClient} from '../api/client';
 import {ApiError} from '../api/types';
+import type {EnrollingBiometricApi} from '../vault/biometricUnlock';
 
 /** The Satellite these screens belong to - the provider of media.vault they can unlock for. */
 export const LOCKED_FOLDER = 'LockedFolder';
@@ -80,7 +81,7 @@ function failure(body: any, status: number, fallback: string): LockedFolderError
  * Every route here is authorized on the server against this session's own
  * unlock - nothing in the app is trusted to decide that.
  */
-export class LockedFolderApi {
+export class LockedFolderApi implements EnrollingBiometricApi {
   constructor(private client: StarCoreClient) {}
 
   /** Null when this server has no Locked Folder satellite at all. */
@@ -102,18 +103,16 @@ export class LockedFolderApi {
     }
   }
 
-  /** A single-use grant for one operation on exactly these items, with the PIN - not an unlock:
-   * the vault stays locked for this session. Throws like unlock(). */
-  async grant(pin: string, wanted: GrantRequest): Promise<string> {
-    const {status, body} = await this.client.post(`${BASE}/unlock`, {pin, for: wanted});
-    if (status !== 200 || typeof body?.grant !== 'string') {
-      throw failure(body, status, 'Could not unlock for this.');
-    }
-    return body.grant;
-  }
-
   async lock(): Promise<void> {
     await this.client.post(`${BASE}/lock`, {});
+  }
+
+  /** While the vault shows: restarts the server's idle time. Throws a 403 once it is locked. */
+  async keep(): Promise<void> {
+    const {status, body} = await this.client.post(`${BASE}/keep`, {});
+    if (status !== 200) {
+      throw failure(body, status, 'Could not keep the Locked Folder open.');
+    }
   }
 
   async setPin(pin: string, currentPin?: string): Promise<void> {
@@ -183,9 +182,14 @@ export class LockedFolderApi {
     return body.key_id;
   }
 
-  /** Null when the server no longer knows this device's key. */
-  async biometricChallenge(keyId: string): Promise<string | null> {
-    const {status, body} = await this.client.post(`${BASE}/biometric/challenge`, {key_id: keyId});
+  /** Null when the server no longer knows this device's key. With `wanted`, the signature will
+   * buy a single-use grant for exactly that instead of an unlock: the server keeps the purpose
+   * with the challenge. */
+  async biometricChallenge(keyId: string, wanted?: GrantRequest): Promise<string | null> {
+    const {status, body} = await this.client.post(
+      `${BASE}/biometric/challenge`,
+      wanted ? {key_id: keyId, for: wanted} : {key_id: keyId},
+    );
     if (status === 404) {
       return null;
     }
@@ -195,13 +199,12 @@ export class LockedFolderApi {
     return body.challenge;
   }
 
-  /** With `wanted`, a single-use grant instead of an unlock: resolves the grant. */
-  async biometricUnlock(keyId: string, challenge: string, signature: string, wanted?: GrantRequest): Promise<string | null> {
+  /** Resolves the grant when the challenge was asked for one, null after an unlock. */
+  async biometricUnlock(keyId: string, challenge: string, signature: string): Promise<string | null> {
     const {status, body} = await this.client.post(`${BASE}/biometric/unlock`, {
       key_id: keyId,
       challenge,
       signature,
-      ...(wanted ? {for: wanted} : {}),
     });
     if (status !== 200) {
       throw failure(body, status, 'Biometric unlock failed.');

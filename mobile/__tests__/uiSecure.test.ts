@@ -13,7 +13,7 @@ const vocabulary = JSON.parse(readFileSync(join(__dirname, '../../contracts/ui/v
 const VAULT = {satellite: 'Vault', version: 1, enabled: true, operations: {status: 'status', unlock: 'unlock', lock: 'lock', move_in: 'move_in'}};
 const GALLERY = {satellite: 'Gallery', version: 1, enabled: true, operations: {list: 'media', thumbnail: 'thumbs', resolve: 'media/resolve'}};
 const CATALOG = {'media.vault': [VAULT], 'media.gallery': [GALLERY]};
-const PROMPT: SecurePrompt = {capability: 'media.vault', satellite: 'Vault', component: () => null};
+const PROMPT: SecurePrompt = {capability: 'media.vault', component: () => null};
 const MOVE = {secure: {capability: 'media.vault', operation: 'move_in'}, item: '$.id'};
 
 describe('the secure action', () => {
@@ -26,7 +26,7 @@ describe('the secure action', () => {
     expect(secureRunner(MOVE, CATALOG, 'Gallery', [PROMPT])).toEqual({provider: VAULT, prompt: PROMPT});
     expect(secureRunner(MOVE, CATALOG, 'Other', [PROMPT])).toBeNull();
     expect(secureRunner(MOVE, CATALOG, 'Gallery', [])).toBeNull(); // no prompt of the app's own
-    expect(secureRunner(MOVE, CATALOG, 'Gallery', [{...PROMPT, satellite: 'Elsewhere'}])).toBeNull();
+    expect(secureRunner(MOVE, CATALOG, 'Gallery', [{...PROMPT, capability: 'media.other'}])).toBeNull();
     expect(secureRunner({...MOVE, secure: {capability: 'media.vault', operation: 'move_out'}}, CATALOG, 'Gallery', [PROMPT])).toBeNull();
     expect(secureRunner(MOVE, {...CATALOG, 'media.vault': [{...VAULT, enabled: false}]}, 'Gallery', [PROMPT])).toBeNull();
     expect(secureRunner(MOVE, {'media.gallery': [GALLERY]}, 'Gallery', [PROMPT])).toBeNull();

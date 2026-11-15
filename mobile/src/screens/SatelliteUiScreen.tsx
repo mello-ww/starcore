@@ -12,20 +12,27 @@ import {useServers} from '../servers/ServersContext';
 import {UiApi} from '../satellites/ui/api';
 import {
   ICONS, findProvider, formatValue, isSafeRoute, isVisible, missingRequirements, resolve, resolveTemplate,
-  type Providers, type Scope, type UiAction, type UiDocument, type UiSource,
+  type CapabilityProvider, type Providers, type Scope, type UiAction, type UiDocument, type UiSource,
 } from '../satellites/ui/contract';
+import {SatellitesApi} from '../satellites/api';
+import type {SatelliteSummary} from '../satellites/types';
+import {MemoryImages} from '../satellites/ui/memoryImages';
 import {MediaPicker, type MediaReference, type PickRequest} from '../satellites/ui/MediaPicker';
 import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
 import {hasPagedList, VirtualListPage} from '../satellites/ui/VirtualListPage';
-import {DEDICATED_SCREENS} from './HomeScreen';
+import {DEDICATED_SCREENS, opensSharedInterface} from './HomeScreen';
 import {uiPreferences} from '../satellites/ui/preferences';
 import {
   collectionKey, forgetOfflineSatellite, forgetOfflineServer, offlinePlan, offlineStateKeys, OfflineStore, sessionScope,
   tidyOffline,
   type GridPages, type OfflineEntry,
 } from '../satellites/ui/offline';
-import {BUILTIN_SECURE_PROMPTS} from '../satellites/builtins';
-import {runSecure, secureRunner, type GrantRequest, type SecurePromptProps} from '../satellites/ui/secure';
+import {runSecure, secureRunner, type GrantRequest, type SecurePrompt, type SecurePromptProps} from '../satellites/ui/secure';
+import {VaultApi} from '../vault/api';
+import {attachGate, createVaultGate, protectedProvider, type GateAttachment, type GateState} from '../vault/gate';
+import {VAULT_GRANT_PROMPT} from '../vault/VaultGrantPrompt';
+import {VaultUnlock} from '../vault/VaultUnlock';
+import {useVault} from '../vault/useVault';
 import {privacy} from '../platform/privacy';
 import {
   canOpenFiles,
@@ -49,6 +56,42 @@ import {useOptionalAudioHost} from '../media/AudioHost';
 const {palette, radii, space, type} = tokens;
 
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'SatelliteUi'>;
+
+/** The app's own prompts for the secure action (1.2), by capability. */
+const SECURE_PROMPTS: SecurePrompt[] = [VAULT_GRANT_PROMPT];
+
+/** The Satellite `wanted` when its manifest says it is a section of `host` (the section action, 1.2). */
+function hostedSatellite(satellites: SatelliteSummary[] | null, host: string, wanted: unknown): SatelliteSummary | null {
+  if (typeof wanted !== 'string' || !wanted) {
+    return null;
+  }
+  return satellites?.find(other => other.section_of === host && other.name === wanted) ?? null;
+}
+
+/** Whether this app opens a Satellite: its shared interface, or a screen of the app's own for it. */
+function opensHosted(target: SatelliteSummary | null): boolean {
+  return Boolean(target && (opensSharedInterface(target) || DEDICATED_SCREENS[target.name]));
+}
+
+/**
+ * A protected document (1.2) while its store is locked: the app's own unlock card - the PIN, and
+ * biometrics when this phone turned them on for the provider - asking the provider's unlock for
+ * this session. The PIN goes nowhere but to that route.
+ */
+function LockedDocument({provider, title, onUnlocked}: {provider: CapabilityProvider; title: string; onUnlocked: () => void}) {
+  const {api, biometricDeps} = useVault(provider);
+  const withPin = useCallback((pin: string) => api.unlock(pin), [api]);
+  return (
+    <VaultUnlock
+      title={`${title} is locked`}
+      intro="Unlock it to see what it holds. It locks again when you leave it."
+      biometricPrompt={`Unlock ${title}`}
+      withPin={withPin}
+      biometricDeps={biometricDeps}
+      onUnlocked={onUnlocked}
+    />
+  );
+}
 
 /** Calls `load` now and every `source.refresh` seconds while `active`. */
 function usePolling(source: UiSource | undefined, active: boolean, load: () => void, paused: () => boolean) {
@@ -75,6 +118,10 @@ function usePolling(source: UiSource | undefined, active: boolean, load: () => v
  * a detail page is pushed as another instance of this screen, so Android's
  * back gesture works as everywhere else. Live pages refresh only while the
  * screen is focused and the app is in the foreground.
+ *
+ * A protected document (1.2) shows nothing before its store's own status says what may: the
+ * setup page, the app's unlock card, or the page once it is open (src/vault/gate.ts). It keeps
+ * nothing - no offline page, no share, images from memory only - and can't be captured.
  */
 export function SatelliteUiScreen({route, navigation}: Props) {
   const {name, page: requestedPage, params = {}, revision} = route.params;
@@ -97,6 +144,9 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const [document, setDocument] = useState<UiDocument | null>(null);
   const [offline, setOffline] = useState(false);
   const [providers, setProviders] = useState<Providers>({});
+  // the Satellites this one may host (section_of), for the section action (1.2) - only fetched
+  // for a document that has one
+  const [satellites, setSatellites] = useState<SatelliteSummary[] | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -120,6 +170,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   // the secure action's prompt (1.2), while it asks: the app's own screen for the capability
   const [grantRequest, setGrantRequest] = useState<{
     component: React.ComponentType<SecurePromptProps>;
+    provider: CapabilityProvider;
     wanted: GrantRequest;
     resolve: (grant: string | null) => void;
   } | null>(null);
@@ -146,6 +197,61 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const kept = useRef<{collection: string; entry: OfflineEntry; fromCache: boolean} | null>(null);
   const shownData = useRef<any>(null);
   const sourceTokens = useRef<Record<string, number>>({});
+  const headerToken = useRef(0);
+
+  // a protected document (1.2): one gate for its screens on this server, for this session
+  // (src/vault/gate.ts), shown while one of them is focused with the app in the foreground
+  const gated = Boolean(document?.protected);
+  const vaultProvider = useMemo(
+    () => (document?.protected ? protectedProvider(document, providers, name) : null),
+    [document, providers, name],
+  );
+  const vaultApi = useMemo(() => (vaultProvider ? new VaultApi(client, vaultProvider) : null), [client, vaultProvider]);
+  const [gateState, setGateState] = useState<GateState | null>(null);
+  const gateRef = useRef<GateAttachment | null>(null);
+  const gateKey = vaultApi ? `${serverId}|${session}|${name}` : null;
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  const gatedRef = useRef(gated);
+  gatedRef.current = gated;
+  useEffect(() => {
+    if (!gateKey || !vaultApi) {
+      setGateState(null);
+      return;
+    }
+    const attached = attachGate(gateKey, () => createVaultGate({store: vaultApi}));
+    gateRef.current = attached;
+    setGateState(attached.gate.state());
+    const unsubscribe = attached.gate.subscribe(setGateState);
+    attached.setShown(liveRef.current);
+    return () => {
+      unsubscribe();
+      if (gateRef.current === attached) {
+        gateRef.current = null;
+      }
+      attached.detach(); // the last screen of the document gone: it locks
+    };
+  }, [gateKey, vaultApi]);
+  useEffect(() => {
+    gateRef.current?.setShown(live);
+  }, [live]);
+  const gateOpen = !gated || gateState === 'open';
+  const inSetup = gated && gateState === 'setup';
+  // a 401 or 403 from a protected document's own routes: locked again, most likely - its gate
+  // asks the store, and the unlock card replaces what showed once it says so
+  const recheck = useCallback((err: any) => {
+    if (gatedRef.current && (err?.status === 401 || err?.status === 403)) {
+      gateRef.current?.gate.check({quiet: true});
+    }
+  }, []);
+  // a protected document can't be captured: no screenshot, recording or recent-apps preview
+  useEffect(() => {
+    if (!gated) {
+      return;
+    }
+    privacy.setSecure(true);
+    return () => privacy.setSecure(false);
+  }, [gated]);
 
   const navigationItems = useMemo(
     () => (document?.navigation ?? []).filter(item => !item.developer || developer),
@@ -153,9 +259,12 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   );
   const hidden = (target: string | undefined) =>
     Boolean(target && (document?.navigation ?? []).some(item => item.page === target && item.developer && !developer));
-  const pageId =
-    document && requestedPage && document.pages[requestedPage] && !hidden(requestedPage) ? requestedPage : document?.entry;
-  const page = document && pageId ? document.pages[pageId] : null;
+  // a protected document that isn't set up shows its setup page, whatever was asked for, and
+  // no page at all while it is locked
+  const pageId = inSetup
+    ? document?.protected?.setup
+    : document && requestedPage && document.pages[requestedPage] && !hidden(requestedPage) ? requestedPage : document?.entry;
+  const page = document && pageId && (gateOpen || inSetup) ? document.pages[pageId] : null;
   const topLevel = !!document && (pageId === document.entry || navigationItems.some(item => item.page === pageId));
   const paramsKey = JSON.stringify(params);
   const pageState = useMemo(
@@ -178,9 +287,19 @@ export function SatelliteUiScreen({route, navigation}: Props) {
             : `This interface needs a Satellite that provides ${item.name}.`)).join('\n'));
           return;
         }
+        if (loaded.document.protected && !protectedProvider(loaded.document, found, name)) {
+          setFatal(`This interface is kept locked by ${loaded.document.protected.capability}, which ${name} doesn't offer on this server.`);
+          return;
+        }
         setDocument(loaded.document);
         setOffline(loaded.offline);
         setProviders(found);
+        if (/"section"\s*:/.test(JSON.stringify(loaded.document))) {
+          new SatellitesApi(client)
+            .list()
+            .then(list => !cancelled && setSatellites(list))
+            .catch(() => undefined); // its controls stay hidden
+        }
       } catch (err: any) {
         if (!cancelled) {
           setFatal(err?.message || 'Could not load this interface.');
@@ -190,7 +309,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     return () => {
       cancelled = true;
     };
-  }, [api, name, revision]);
+  }, [api, client, name, revision]);
 
   // a new page starts afresh
   useEffect(() => {
@@ -201,6 +320,29 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     setDataError(null);
     setUpdatedAt(null);
   }, [page, paramsKey]);
+
+  // a protected document not open (locked, or in setup): nothing its store showed stays in
+  // memory - answers still on their way are dropped, and what was typed or chosen goes too
+  useEffect(() => {
+    if (!gated || gateOpen) {
+      return;
+    }
+    loadToken.current += 1;
+    headerToken.current += 1;
+    for (const key of Object.keys(sourceTokens.current)) {
+      sourceTokens.current[key] += 1;
+    }
+    kept.current = null;
+    shownData.current = null;
+    setData(null);
+    setSources({});
+    setHeader(null);
+    setLoading(false);
+    setChoices({page: undefined, values: {}});
+    for (const key of Object.keys(forms)) {
+      delete forms[key];
+    }
+  }, [gated, gateOpen, forms]);
 
   // a progress toast ("Uploading 2 of 5") stays until what follows replaces it
   const showToast = useCallback((text: string | null, error = false, progress = false) => {
@@ -231,6 +373,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   // a search's free text - such a page isn't kept at all
   const keptStateKeys = useMemo(() => (page ? offlineStateKeys(page) : null), [page]);
   const offlinePage = Boolean(
+    !gated &&
     (page?.offline === true || (page?.offline && typeof page.offline === 'object')) &&
       page.source &&
       keptStateKeys !== null,
@@ -270,11 +413,12 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         return;
       }
       const status = typeof err?.status === 'number' ? err.status : 0;
-      if (status === 401 || status === 403) {
+      if (status === 401 || (status === 403 && !gated)) {
         // the server no longer lets this session in: nothing it kept may be shown any more
         kept.current = null;
         await forgetOfflineServer(serverId);
       }
+      recheck(err);
       if (status === 0 && offlinePage && (shownData.current === null || kept.current?.fromCache)) {
         // StarCore can't be reached: what was kept for this page, marked with its age
         const entry = await store.read(collection);
@@ -294,7 +438,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         setLoading(false);
       }
     }
-  }, [api, name, page, bindings, offlinePage, collection, store, serverId, plan]);
+  }, [api, name, page, bindings, offlinePage, collection, store, serverId, plan, gated, recheck]);
 
   // a grid on an offline page: its pages are kept with the page data (never with kept data
   // shown, which must not be written back as if it were live), and given back with it
@@ -329,25 +473,30 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         if (sourceTokens.current[sourceName] === token) {
           setSources(current => ({...current, [sourceName]: body}));
         }
-      } catch {
+      } catch (err: any) {
         // a named source is supplementary: its blocks show what they have, the page stays
+        recheck(err);
       }
     },
-    [api, name, page, bindings],
+    [api, name, page, bindings, recheck],
   );
 
   const loadHeader = useCallback(async () => {
     const source = document?.header?.source;
-    if (!source) {
+    if (!source || !gateOpen) {
       return;
     }
+    const token = ++headerToken.current;
     try {
       const body = await api.read(name, resolveTemplate(source.route, {}));
-      setHeader(body && typeof body === 'object' ? body : {});
-    } catch {
+      if (token === headerToken.current) {
+        setHeader(body && typeof body === 'object' ? body : {});
+      }
+    } catch (err: any) {
       // the page's own notice says when StarCore isn't answering
+      recheck(err);
     }
-  }, [api, name, document]);
+  }, [api, name, document, gateOpen, recheck]);
 
   const loadAll = useCallback(() => {
     loadData();
@@ -446,6 +595,22 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       if (action.secure) {
         // 1.2: one protected operation on this item, behind the app's own prompt
         return runSecureRef.current(action, [scope]);
+      }
+      if (action.section !== undefined) {
+        // 1.2: a Satellite this one hosts (section_of), pushed over this screen - in its shared
+        // interface, or in a screen of the app's own for it - so Back returns here
+        const target = hostedSatellite(satellites, name, resolve(action.section, scoped));
+        if (target && opensSharedInterface(target)) {
+          navigation.push('SatelliteUi', {name: target.name, revision: target.ui?.revision ?? undefined});
+          return true;
+        }
+        const hostedScreen = target ? DEDICATED_SCREENS[target.name] : undefined;
+        if (!hostedScreen) {
+          showToast("That isn't available in this app.", true);
+          return false;
+        }
+        (navigation as any).push(hostedScreen);
+        return true;
       }
       if (action.own !== undefined) {
         // 1.2: the Satellite's own native screens, at a section they name - pushed over this
@@ -576,6 +741,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         const body = action.body !== undefined ? resolve(action.body, scoped) : scope.form ?? {};
         result = await api.act(name, resolveTemplate(action.route ?? '', scoped), action.method ?? 'POST', body);
       } catch (err: any) {
+        recheck(err);
         if (!quiet) {
           showToast(err?.message || 'That action failed.', true);
           loadData(); // show what's actually true now
@@ -586,6 +752,10 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       // (an item gone, moved, renamed) - forgotten before the page reloads and keeps afresh
       kept.current = null;
       await store.forgetSatellite();
+      if (gatedRef.current && gateRef.current?.gate.state() === 'setup') {
+        // set up now? then it is locked, and the unlock card follows
+        gateRef.current.gate.check({quiet: true});
+      }
       if (!quiet) {
         showToast(typeof result?.message === 'string' ? result.message : null);
       }
@@ -599,7 +769,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       }
       return true;
     },
-    [api, name, go, loadData, navigation, showToast, audio, providers, store, mediaSource],
+    [api, name, go, loadData, navigation, showToast, audio, providers, store, mediaSource, satellites, recheck],
   );
 
   /** The secure action (1.2) on these items: one request, and one prompt when the session
@@ -607,7 +777,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
    * forgotten from every session's offline copies and from the image cache. */
   const runSecureAction = useCallback(
     async (action: UiAction, items: Scope[], imagesOf?: (item: Scope) => string[]): Promise<boolean> => {
-      const runner = secureRunner(action, providers, name, BUILTIN_SECURE_PROMPTS);
+      const runner = secureRunner(action, providers, name, SECURE_PROMPTS);
       if (!runner || !items.length) {
         showToast("That isn't available on this server.", true);
         return false;
@@ -625,6 +795,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           new Promise<string | null>(done =>
             setGrantRequest({
               component: prompt.component,
+              provider,
               wanted,
               resolve: grant => {
                 setGrantRequest(null);
@@ -659,21 +830,33 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   );
   const runSecureRef = useRef(runSecureAction);
   runSecureRef.current = runSecureAction;
-  // whether an action's control is drawn here: a secure action only where it can run, and
-  // download, open, share or upload only where this phone can (saving needs Android 10 or later)
+  // whether an action's control is drawn here: a secure action only where it can run, a section
+  // only where this app opens it (a binding is checked when pressed), and download, open, share or
+  // upload only where this phone can (saving needs Android 10 or later). A protected document
+  // shares nothing, and opens nothing in another app: that would leave a copy in the app's cache.
   const canRun = useCallback(
     (action: UiAction | undefined) =>
-      (action?.download === undefined || (action.open === true ? canOpenFiles() : canSaveFiles())) &&
-      (action?.share === undefined || canShareFiles()) &&
+      (action?.download === undefined || (action.open === true ? !gated && canOpenFiles() : canSaveFiles())) &&
+      (action?.share === undefined || (!gated && canShareFiles())) &&
       (action?.upload === undefined || canUploadFiles()) &&
-      (!action?.secure || Boolean(secureRunner(action, providers, name, BUILTIN_SECURE_PROMPTS))),
-    [providers, name],
+      (action?.section === undefined ||
+        (typeof action.section === 'string' && action.section.startsWith('$')) ||
+        opensHosted(hostedSatellite(satellites, name, action.section))) &&
+      (!action?.secure || Boolean(secureRunner(action, providers, name, SECURE_PROMPTS))),
+    [providers, name, gated, satellites],
   );
 
   // the picker reads the provider's routes, and loads its thumbnails, with this session
   const readProvider = useCallback((satellite: string, providerRoute: string) => api.read(satellite, providerRoute), [api]);
   // a grid's next page, a map's viewport: this Satellite's own routes, with this session
-  const loadOwn = useCallback((ownRoute: string) => api.read(name, ownRoute), [api, name]);
+  const loadOwn = useCallback(
+    (ownRoute: string) =>
+      api.read(name, ownRoute).catch(err => {
+        recheck(err);
+        throw err;
+      }),
+    [api, name, recheck],
+  );
   const providerSource = useCallback(
     (satellite: string, providerRoute: string) => ({
       uri: `${baseUrl}/api/satellites/${encodeURIComponent(satellite)}/${providerRoute}`,
@@ -736,6 +919,30 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         <Icon name="alert-triangle" size={28} color={palette.text3} />
         <Text style={styles.fatal}>{fatal}</Text>
       </View>
+    );
+  }
+  if (document && gated && !gateOpen && !inSetup) {
+    const title = document.title || name;
+    return (
+      <ScrollView contentContainerStyle={styles.gate} keyboardShouldPersistTaps="handled" testID="ui-gate">
+        {gateState === 'failed' ? (
+          <View style={styles.failure} testID="ui-gate-failed">
+            <Text style={type.title}>{`${title} is unavailable`}</Text>
+            <Text style={type.body}>{gateRef.current?.gate.detail() || 'StarCore did not answer.'}</Text>
+            <Pressable
+              onPress={() => gateRef.current?.gate.check()}
+              accessibilityRole="button"
+              testID="ui-gate-retry"
+              style={({pressed}) => [styles.retry, pressed && styles.pressed]}>
+              <Text style={type.label}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : gateState === 'locked' && focused && vaultProvider ? (
+          <LockedDocument provider={vaultProvider} title={title} onUnlocked={() => gateRef.current?.gate.opened()} />
+        ) : (
+          <ActivityIndicator color={accent} />
+        )}
+      </ScrollView>
     );
   }
   if (!document || !page) {
@@ -822,6 +1029,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     </>
   );
   return (
+    <MemoryImages.Provider value={gated}>
     <View style={styles.screen}>
       {gridIndex >= 0 ? (
         <VirtualMediaGrid
@@ -895,6 +1103,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       {grantRequest && (
         <grantRequest.component
           count={grantRequest.wanted.items.length}
+          provider={grantRequest.provider}
           wanted={grantRequest.wanted}
           onGrant={grant => grantRequest.resolve(grant)}
           onCancel={() => grantRequest.resolve(null)}
@@ -914,6 +1123,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         </View>
       )}
     </View>
+    </MemoryImages.Provider>
   );
 }
 
@@ -921,6 +1131,7 @@ const styles = StyleSheet.create({
   screen: {flex: 1, backgroundColor: palette.bg},
   content: {padding: space.lg, gap: space.md, paddingBottom: space.xxl * 2},
   center: {flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.md, backgroundColor: palette.bg, padding: space.xl},
+  gate: {flexGrow: 1, justifyContent: 'center', padding: space.lg, backgroundColor: palette.bg},
   fatal: {...type.body, textAlign: 'center'},
   header: {gap: space.sm, paddingBottom: space.xs},
   tabs: {gap: space.sm, paddingBottom: space.xs},

@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {ActivityIndicator, Image, ImageResizeMode, ImageStyle, StyleProp, StyleSheet, Text, View} from 'react-native';
+import {loadDataUri as loadIntoMemory} from '../satellites/ui/memoryImages';
 import {colors} from '../theme';
 
 /**
@@ -59,18 +60,9 @@ export function PrivateImage({
   );
 }
 
-export async function loadDataUri(url: string, token: string | null): Promise<string> {
-  const response = await fetch(url, {headers: token ? {Authorization: `Bearer ${token}`} : undefined});
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => (typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('empty')));
-    reader.onerror = () => reject(new Error('unreadable'));
-    reader.readAsDataURL(blob);
-  });
+/** The shared renderers' loader (src/satellites/ui/memoryImages.tsx), with the session's token. */
+export function loadDataUri(url: string, token: string | null): Promise<string> {
+  return loadIntoMemory({uri: url, headers: token ? {Authorization: `Bearer ${token}`} : undefined});
 }
 
 const styles = StyleSheet.create({

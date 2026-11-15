@@ -33,10 +33,14 @@ export const ICONS = new Set([
   'share-2', 'trash-2', 'x',
 ]);
 /** Device features this app offers a document beyond its blocks: the shared audio host
- * (src/media/), which the play action plays through. */
-export const CLIENT_CAPABILITIES = new Set<string>(['media.audio', 'media.picker']);
+ * (src/media/), which the play action plays through, the media picker the pick action chooses
+ * through, and a window that can't be captured (every protected document has it). */
+export const CLIENT_CAPABILITIES = new Set<string>(['media.audio', 'media.picker', 'secure.screen']);
 /** Satellite capabilities this app has a shared block for, and the protocol versions it speaks. */
 export const CAPABILITY_VERSIONS: Record<string, number[]> = {'files.browse': [1], 'audio.library': [1], 'media.gallery': [1], 'media.vault': [1]};
+/** What a protected document (1.2) may name, and the operations its gate (src/vault/gate.ts)
+ * calls. */
+export const PROTECTED_CAPABILITIES: Record<string, string[]> = {'media.vault': ['status', 'unlock', 'lock', 'keep']};
 
 const RESERVED_SEGMENTS = new Set(['assets', 'enable', 'disable', 'reload', 'ui']);
 const FIRST_SEGMENT = /^[A-Za-z0-9_-]+$/;
@@ -76,6 +80,9 @@ export interface UiAction {
    * `conflict.route`. */
   upload?: {multiple?: boolean};
   conflict?: {confirm?: Json; route: string};
+  /** 1.2: open the shared interface of a Satellite whose manifest says it is a section of this
+   * one (section_of): its name, or a binding to it. */
+  section?: Json;
 }
 
 /** One block. Deliberately loose: a document is network data, so every
@@ -133,6 +140,9 @@ export interface UiDocument {
   pages: Record<string, UiPage>;
   /** 1.2: doesn't replace the Satellite's own screens yet (they stay the default). */
   preview?: boolean;
+  /** 1.2: a store the app unlocks first, through the capability its own Satellite provides;
+   * `setup` is the page shown while it isn't set up (src/vault/gate.ts). */
+  protected?: {capability: string; setup: string};
 }
 
 export interface CapabilityProvider {
@@ -177,6 +187,20 @@ export function checkDocument(document: any): string | null {
   }
   if (!Object.prototype.hasOwnProperty.call(pages, document.entry)) {
     return "The interface description's entry page is missing.";
+  }
+  if (document.protected !== undefined) {
+    // a store this app unlocks first: only one it knows how to unlock, and one that keeps
+    // nothing of itself outside it
+    const capability = document.protected?.capability;
+    if (typeof capability !== 'string' || !Object.prototype.hasOwnProperty.call(PROTECTED_CAPABILITIES, capability)) {
+      return "This interface is protected by something this app can't unlock. Update StarCore for Android to use it.";
+    }
+    if (document.widgets !== undefined) {
+      return 'A protected interface has no widgets.';
+    }
+    if (Object.values(pages).some((page: any) => page && typeof page === 'object' && page.offline !== undefined)) {
+      return 'A protected interface keeps nothing offline.';
+    }
   }
   return null;
 }

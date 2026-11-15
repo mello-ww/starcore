@@ -21,6 +21,7 @@ import { createMaps } from "./map.js";
 import { pickMedia } from "./picker.js";
 import { promptPin, runSecure, secureProvider } from "./secure.js";
 import { chooseFiles, runUploads, sendFile, uploadReport } from "./upload.js";
+import { createVaultGate, protectedProvider } from "./vault.js";
 
 const STYLESHEET = "/ui/ui.css";
 const TONE_LEVEL = { warn: "warning", danger: "critical" };
@@ -128,6 +129,15 @@ export function mount(context) {
     // the Satellite's own interface (its page.js), which the own action (1.2) opens at a
     // section; null when the host has none for this Satellite, and the action's controls hide
     const own = context.own && typeof context.own.open === "function" ? context.own : null;
+    // the section action (1.2): another Satellite this one hosts (section_of), which the host
+    // opens; null when the host can't, and the action's controls hide
+    const sections = context.sections && typeof context.sections.open === "function" ? context.sections : null;
+    // the hash of one of this interface's sections - beneath its host's when it is a hosted one
+    const hashFor = typeof context.hash === "function" ? context.hash
+        : (section) => `#/satellite/${encodeURIComponent(satelliteName)}/${section}`;
+    // a protected document's gate (1.2, ui/vault.js), and the section to show once it is open
+    let gate = null;
+    let wanted = context.section;
 
     const state = {
         document: null,
@@ -152,14 +162,37 @@ export function mount(context) {
         openTables: new WeakSet(),
     };
 
+    // the document's own routes. For a protected document a 403 means "locked again": its gate
+    // asks the server, and nothing of the store stays on screen once it says so
+    const call = (url, options) => requestJson(url, options).catch((error) => {
+        if (gate && error && error.status === 403) {
+            gate.check({ quiet: true });
+        }
+        throw error;
+    });
+
     // the media-grid block and its viewer (1.2), which keep their own state across renders
     // whether an action's control is drawn here: a secure action only where it can run, an own
-    // action only where this Satellite has an own interface, and share only where this browser
-    // can hand a file to the system share sheet
+    // action only where this Satellite has an own interface, a section only where the host can
+    // open it, and share only where this browser can hand a file to the system share sheet -
+    // never in a protected document, which shares nothing
     function canRun(action) {
         return !action || ((action.own === undefined || Boolean(own))
-            && (action.share === undefined || canShareFiles(globalThis.navigator))
+            && (action.section === undefined || canOpenSection(action.section))
+            && (action.share === undefined || (!isProtected() && canShareFiles(globalThis.navigator)))
             && (!action.secure || Boolean(secureProvider(action, state.catalog && state.catalog.capabilities, satelliteName))));
+    }
+
+    function isProtected() {
+        return Boolean(state.document && state.document.protected);
+    }
+
+    // a name the document gives (not one bound to its data) is known now
+    function canOpenSection(name) {
+        if (!sections) {
+            return false;
+        }
+        return typeof name !== "string" || name.startsWith("$") || typeof sections.has !== "function" || sections.has(name);
     }
 
     const gallery = createGallery({
@@ -183,7 +216,7 @@ export function mount(context) {
             },
         },
         // a grid's next page (`more`), from the Satellite's own route, with this session
-        load: (route) => requestJson(`${satelliteBase}/${route}`),
+        load: (route) => call(`${satelliteBase}/${route}`),
         runAction: (...args) => runAction(...args),
         // the secure action (1.2): once for a whole selection, and hidden where it can't run
         runSecure: (action, items, scope) => runSecureAction(action, items, scope),
@@ -202,7 +235,7 @@ export function mount(context) {
 
     // a list's further pages (1.2 `more`), kept across renders; `listViews` is each paged list
     // as last drawn, where a page that arrives is appended
-    const listPaging = createListPaging({ load: (route) => requestJson(`${satelliteBase}/${route}`) });
+    const listPaging = createListPaging({ load: (route) => call(`${satelliteBase}/${route}`) });
     let listViews = new WeakMap();
     const listObservers = new Set();
 
@@ -219,7 +252,7 @@ export function mount(context) {
     // gallery's shared viewer
     const maps = createMaps({
         satelliteBase, runAction: (...args) => runAction(...args), gallery,
-        load: (route) => requestJson(`${satelliteBase}/${route}`),
+        load: (route) => call(`${satelliteBase}/${route}`),
     });
     // the search block (1.2): one input per block, kept across renders so typing is never lost
     let searchInputs = new WeakMap();
@@ -360,7 +393,7 @@ export function mount(context) {
     }
 
     function navigate(page, params = {}) {
-        location.hash = `#/satellite/${encodeURIComponent(satelliteName)}/${sectionFor(page, params)}`;
+        location.hash = hashFor(sectionFor(page, params));
     }
 
     function goBack() {
@@ -376,10 +409,26 @@ export function mount(context) {
         return !(item && item.developer && !developer.enabled);
     }
 
+    // a protected document shows only what its gate allows: the setup page while it isn't set
+    // up, any page once it is open, and nothing otherwise - the section waits for the unlock
     function showSection(section) {
         if (!state.document) {
             return;
         }
+        if (gate) {
+            wanted = section;
+            const now = gate.state();
+            if (now === "setup") {
+                openPage(state.document.protected.setup);
+            } else if (now === "open") {
+                openPage(section);
+            }
+            return;
+        }
+        openPage(section);
+    }
+
+    function openPage(section) {
         const { page, params } = parseSection(section);
         let target = page && Object.hasOwn(state.document.pages, page) ? page : state.document.entry;
         if (!isAvailable(target)) {
@@ -442,7 +491,7 @@ export function mount(context) {
         if (!isSafeRoute(route)) {
             throw new Error("This page points outside its Satellite and was not loaded.");
         }
-        const data = await requestJson(`${satelliteBase}/${route}`);
+        const data = await call(`${satelliteBase}/${route}`);
         if (token !== state.tokens.get(name) || state.disposed) {
             return undefined;  // a newer request for this source is under way
         }
@@ -457,6 +506,9 @@ export function mount(context) {
     }
 
     async function loadData({ background = false } = {}) {
+        if (!state.page) {
+            return;  // a protected document that locked meanwhile
+        }
         const page = state.page;
         const source = pageDefinition().source;
         if (!source) {
@@ -493,6 +545,9 @@ export function mount(context) {
     }
 
     async function loadNamed(name) {
+        if (!state.page) {
+            return;
+        }
         const page = state.page;
         const source = (pageDefinition().sources || {})[name];
         if (!source) {
@@ -541,6 +596,9 @@ export function mount(context) {
     }
 
     function onVisibility() {
+        if (gate) {
+            gate.setHidden(document.hidden);
+        }
         if (!document.hidden && !state.disposed && state.document && state.page) {
             loadData({ background: true });
             for (const name of Object.keys(pageDefinition().sources || {})) {
@@ -602,6 +660,15 @@ export function mount(context) {
                 return false;
             }
             own.open(String(action.own));
+            return true;
+        }
+        if (action.section !== undefined) {
+            // 1.2: the interface of a Satellite this one hosts - nothing runs here
+            const name = resolve(action.section, bindings);
+            if (!sections || typeof name !== "string" || !name || !sections.open(name)) {
+                setNotice("That isn't available in Mission Control.", "error");
+                return false;
+            }
             return true;
         }
         if (action.download !== undefined || action.share !== undefined) {
@@ -677,7 +744,7 @@ export function mount(context) {
         const body = action.body !== undefined ? resolve(action.body, bindings) : (scope.form || {});
         let result;
         try {
-            result = await requestJson(`${satelliteBase}/${route}`, method === "GET" ? {} : {
+            result = await call(`${satelliteBase}/${route}`, method === "GET" ? {} : {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
@@ -691,6 +758,9 @@ export function mount(context) {
         }
         if (!quiet) {
             setNotice(result && typeof result.message === "string" ? result.message : null);
+        }
+        if (gate && gate.state() === "setup") {
+            gate.check({ quiet: true });  // set up now? then it is locked, and the prompt follows
         }
         const then = action.then;
         if (then === "back") {
@@ -1739,6 +1809,111 @@ export function mount(context) {
         root.replaceChildren(el("p", "banner error ui-notice", message));
     }
 
+    // ---------- a protected document (1.2) ----------
+
+    function documentTitle() {
+        return typeof state.document.title === "string" && state.document.title ? state.document.title : satelliteName;
+    }
+
+    /** Everything the store showed or holds in page state, gone: on screen, in timers, in flight. */
+    function forget() {
+        for (const [name, token] of state.tokens) {
+            state.tokens.set(name, token + 1);  // an answer still on its way is dropped
+        }
+        state.timers.forEach((timer) => clearTimeout(timer));
+        state.timers.clear();
+        state.page = null;
+        state.params = {};
+        state.pageState = {};
+        state.data = null;
+        state.dataError = null;
+        state.lastGood = 0;
+        state.sources = {};
+        state.header = null;
+        state.forms = {};
+        gallery.reset();
+        maps.reset();
+        resetLists();
+        searchInputs = new WeakMap();
+        state.charts.forEach((chart) => chart.destroy());
+        state.charts.clear();
+        root.replaceChildren();
+    }
+
+    function onGate(next, why) {
+        if (state.disposed) {
+            return;
+        }
+        if (next === "open") {
+            loadHeader();
+            openPage(wanted);
+            return;
+        }
+        forget();
+        if (next === "setup") {
+            openPage(state.document.protected.setup);
+            return;
+        }
+        renderGate(next, why);
+    }
+
+    function renderGate(next, why) {
+        root.classList.remove("ui-wide", "ui-collection");
+        const box = el("section", "ui-card ui-failure ui-locked");
+        box.setAttribute("role", "status");
+        const head = el("div", "ui-locked-head");
+        const glyph = icon(next === "failed" ? "info" : "lock", 18);
+        if (glyph) {
+            head.appendChild(glyph);
+        }
+        head.appendChild(el("p", "eyebrow", next === "failed" ? `${documentTitle()} is unavailable`
+            : next === "checking" ? documentTitle() : `${documentTitle()} is locked`));
+        box.appendChild(head);
+        if (next === "checking") {
+            box.appendChild(el("p", "ui-text ui-text-caption", "Checking…"));
+        } else {
+            box.appendChild(el("p", "ui-text ui-text-caption", next === "failed"
+                ? why || "StarCore did not answer."
+                : "Unlock it to see what it holds. It locks again when you leave it."));
+            const button = el("button", "sc-button ui-button", next === "failed" ? "Try again" : "Unlock");
+            button.type = "button";
+            button.addEventListener("click", () => (next === "failed" ? gate.check() : gate.unlock()));
+            box.appendChild(button);
+        }
+        root.replaceChildren(box);
+    }
+
+    function openGate(provider) {
+        const base = `/api/satellites/${encodeURIComponent(provider.satellite)}`;
+        gate = createVaultGate({
+            provider,
+            request: (route, body) => requestJson(`${base}/${route}`, body === undefined ? {} : {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            }),
+            prompt: (options) => promptPin({ ...options, title: documentTitle() }),
+            // sent even as the page goes away; the server's idle time ends it if this is lost
+            lock: (route) => {
+                fetch(`${base}/${route}`, {
+                    method: "POST",
+                    keepalive: true,
+                    headers: { "Content-Type": "application/json", Accept: "application/json" },
+                    body: "{}",
+                }).catch(() => {});
+            },
+            onChange: onGate,
+        });
+        window.addEventListener("pagehide", onPageHide);
+        gate.check();
+    }
+
+    function onPageHide() {
+        if (gate) {
+            gate.leave();
+        }
+    }
+
     async function start() {
         try {
             const [payload, catalog] = await Promise.all([
@@ -1761,6 +1936,16 @@ export function mount(context) {
                 fail(missing.map((item) => (item.kind === "client"
                     ? `This interface needs ${item.name}, which this Mission Control doesn't offer yet.`
                     : `This interface needs a Satellite that provides ${item.name}.`)).join(" "));
+                return;
+            }
+            if (state.document.protected) {
+                // nothing shows before the store's own status says what may
+                const provider = protectedProvider(state.document, catalog.capabilities, satelliteName);
+                if (!provider) {
+                    fail(`This interface is kept locked by ${state.document.protected.capability}, which ${satelliteName} doesn't offer on this server.`);
+                    return;
+                }
+                openGate(provider);
                 return;
             }
             loadHeader();
@@ -1789,6 +1974,10 @@ export function mount(context) {
         clearTimeout(state.noticeTimer);
         state.charts.forEach((chart) => chart.destroy());
         document.removeEventListener("visibilitychange", onVisibility);
+        window.removeEventListener("pagehide", onPageHide);
+        if (gate) {
+            gate.dispose();  // the document closed: it locks now
+        }
         unsubscribe();
         root.remove();
         noticeSlot.remove();

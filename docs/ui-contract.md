@@ -112,6 +112,7 @@ comes from the Satellite's ordinary routes, through bindings.
 | `header` | 1.1, optional: blocks shown above the navigation on every top-level page, with a `source` of their own - see [Dashboards, headers and widgets](#dashboards-headers-and-widgets). |
 | `widgets` | 1.1, optional: up to 4 summaries a client may show outside the Satellite (Home). |
 | `preview` | 1.2, optional `true`: the document doesn't replace the Satellite's own interface yet. A client that has one (a `page.js` on the web, a screen of its own in the app) keeps opening it and offers the document in Developer Mode; a client without one opens the document. The listing reports it as `ui.preview`. Without it, the document is the default and Developer Mode offers the Satellite's own interface instead, on both clients. |
+| `protected` | 1.2, optional `{capability, setup}`: the document belongs to a store its own Satellite keeps locked, and a client unlocks it before showing any page - see [Protected documents](#protected-documents). |
 | `pages` | Page id (lower case, digits, `-`, `_`) to page. |
 
 A **page** has `blocks` and optionally:
@@ -141,6 +142,63 @@ Pages listed in `navigation` (and the entry page) are top-level. Any other page 
 page, which clients open on top with a way back. On Android, that is a pushed screen.
 
 Keys starting with `_` are comments and are ignored.
+
+### Protected documents
+
+A Satellite that keeps a store locked declares it in its document (1.2):
+`"protected": {"capability": "media.vault", "setup": "setup"}`.
+
+- **What it may name:** only a capability the vocabulary's `protected_capabilities` lists. So
+  far that is `media.vault`, whose provider must offer `status`, `unlock`, `lock` and `keep`. The
+  Engine accepts it only when the document's own Satellite provides that capability, and
+  `setup` must name a page without params.
+- **What it can't have:** an offline page, widgets or a `share` action. The Engine refuses all
+  three, and both clients refuse the first two and hide the third.
+
+The client, not the document, decides what of it shows:
+
+- **Status first.** Before any page it asks the provider's `status`, and fetches nothing of a
+  page before the answer.
+  - Not configured, no PIN, an unreadable PIN or a security problem: the `setup` page, whose
+    routes the Satellite serves without an unlock.
+  - Locked: the client's own unlock card, a PIN with biometrics on Android where the phone
+    enrolled. It asks `unlock` for a full unlock of this session. The document supplies no
+    field for it.
+  - Open: the page.
+- **A `401` or `403`** from any of the document's routes asks `status` again. Locked again
+  means the card, never an error page with the store's content still behind it, and what was
+  fetched while open is forgotten.
+- **`keep`** runs every 30 seconds while the document shows, so the unlock outlives the
+  server's idle time. "Shows" means a visible tab, or a focused screen with the app in the
+  foreground. A refused `keep` asks `status` again.
+- **It locks** when the document closes, when the server or session changes, and when it stays
+  hidden for 10 seconds.
+  - Hidden means a hidden tab, the app in the background, or every screen of the document
+    covered.
+  - The grace leaves room for the system's file picker, or a file opened in another tab. Shown
+    again after it, the client asks `status` again.
+  - `lock` is best effort: the server's idle time ends the unlock anyway.
+- **It keeps nothing:** no offline copy, no widget, no share.
+  - On Android every image the shared renderers draw is fetched with the session into memory
+    and shown as a data URI, never through the image loader's disk cache
+    (`src/satellites/ui/memoryImages.tsx`).
+  - The app's window is `FLAG_SECURE` (`secure.screen`): no screenshots, and a blank card in
+    recent apps.
+  - The app hides a `download` with `open`, because handing the file to a viewer leaves a copy
+    in its cache. A plain download stays: saving a file is the person's own choice.
+  - Mission Control hides `share` and opens files as for any document.
+- **One gate per document**, for one session on one server. On Android the entry screen and
+  every detail page pushed over it share it, so moving between them neither asks again nor
+  locks.
+
+The rules are `mission_control/ui/vault.js` and `mobile/src/vault/gate.ts`. The unlock cards are
+Mission Control's PIN prompt (`mission_control/ui/secure.js`) and the app's
+`mobile/src/vault/VaultUnlock.tsx`, the ones the `secure` action uses too.
+
+The server is what protects the store. Every route of the Satellite asks for the unlock,
+whatever a client shows. An unlock also ends by itself after the provider's idle time without a
+request to the store's routes or to `keep` (`idle_seconds` in `status`, 90 seconds for the
+Locked Folder). `status` never extends it.
 
 ## Blocks
 
@@ -501,6 +559,16 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
   - On the web, a section that is another Satellite hosted by this one (`section_of`, such as
     `#/satellite/Photo/LockedFolder`) always opens the own page, which hosts it, whichever
     interface Developer Mode has chosen.
+- **`section`** (1.2), on its own: `{"section": "$.section"}` or `{"section": "Albums"}` opens
+  another Satellite that this one hosts, and nothing else.
+  - The target is a Satellite whose manifest says `section_of` this one, found in the Engine's
+    listing of Satellites, never trusted from document data alone.
+  - It opens over this interface, so Back returns here. Mission Control opens it beneath its
+    host (`#/satellite/<host>/<name>`), in whichever interface draws it. The app pushes its
+    shared interface, or else a screen of the app's own for it.
+  - A literal name the client can't open (not a section of this Satellite, or nothing it can
+    draw) hides the control. A binding is checked when pressed, and says so as a notice.
+  - Not in a selection or a tile's quick actions.
 - **`download`** and **`share`** (1.2): `{"download": "originals/{$.id}", "name": "$.title"}`
   fetches one of the Satellite's own routes with the client's own session, then saves the file
   (download) or hands it to the system share sheet (share), named `name` (else the route's last
@@ -574,9 +642,9 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
     `failed` items are reported, and partial success is never shown as complete.
   - **A client** without a provider for the capability, or without a prompt for it, hides the
     control. Mission Control's runner and prompt are `mission_control/ui/secure.js`. The
-    app's runner is `mobile/src/satellites/ui/secure.ts`; its prompt for a capability is a
-    native screen the composition root (`src/satellites/builtins.tsx`) registers for one
-    provider, and the shared screen never sees the PIN, only the grant it hands back.
+    app's runner is `mobile/src/satellites/ui/secure.ts`; its prompt for `media.vault` is
+    `mobile/src/vault/VaultGrantPrompt.tsx`, a native screen for whichever provider the catalog
+    names. The shared screen never sees the PIN, only the grant it hands back.
 
 A response may carry `{"message": "..."}`, shown as a short notice; an error response's
 `error` is shown the same way. Either way, the page then shows what is actually true again.
@@ -674,7 +742,7 @@ says so in place, and a document that `requires` it is not opened.
 | `audio.library` | 1 | `search`, `track`, `resolve`, `artwork`; optional `lyrics` - see [Audio playback](media-audio.md) | none yet; the `media.audio` client capability will play it |
 | `media.gallery` | 1 | `list`: `GET ?kinds=image,video[&limit=N&cursor=C]` -> `{items: [{id, kind, title, duration, group}], next}` (with `limit`, one page and the next cursor; without it, everything); `thumbnail`: `GET /<id>` -> an image; optional `resolve`: `GET /<id>` -> `{id, kind}` for an item that may be acted on now, `404` otherwise | the client's media picker (the `pick` action), which pages through a provider that pages |
 | `audio.session` | 1 | `queue`; optional `history`, `radio`, `preferences`, `favorites`, `stream`, `connect` - see [Audio playback](media-audio.md) | none; the audio host uses it beside the same Satellite's `audio.library` |
-| `media.vault` | 1 | `status`, `unlock` (`for` asks for a single-use grant for one move), `lock`, `move_in` (`{items: [reference], grant?}`); optional `biometric` - see "Moves from a shared interface" in [the Locked Folder](satellites/locked_folder.md) | none yet; the `secure` action will use it. It has no operation that lists or reads what it holds |
+| `media.vault` | 1 | `status`, `unlock` (`for` asks for a single-use grant for one move; without it, an unlock of this session that ends after `idle_seconds` without use), `lock`, `move_in` (`{items: [reference], grant?}`); optional `keep` (`POST` -> `{expires_at}`, restarts the idle time) and `biometric` (`challenge {key_id, for?}`: the purpose is fixed with the challenge, never beside the signature) - see "Moves from a shared interface" in [the Locked Folder](satellites/locked_folder.md) | none: the `secure` action and protected documents use it, through each client's own unlock prompt. It has no operation that lists or reads what it holds |
 | `files.protected` | 1 | `check`: `GET ?path=<absolute path>[&tree=1]` -> `{protected, open, message?}`: whether the path is in a protected area (with `tree=1`, or contains one), and whether this session may reach it now - see "Every Satellite asks the Engine" in [the Locked Folder](satellites/locked_folder.md) | none: server-side only. The Engine asks every provider, enabled or not (`starcore.capabilities.protection`), before File Explorer, Photo or Music touch a path; a provider that fails keeps the path closed |
 
 A capability's operations are required unless the vocabulary lists them under
@@ -839,9 +907,10 @@ The contract is `starcore.ui/<major>.<minor>`:
 `GET /api/catalog` reports what the Engine supports (`contract.version`, `majors`, and the
 capability protocol versions). Clients check a document's `requires` against their own client
 capabilities and the catalog's providers. Both clients claim `media.audio` (the `play` action)
-and `media.picker` (the `pick` action); the other reserved names are in `vocabulary.json`. The
-`own` action needs no capability: whether a client has a Satellite's own interface is its own
-knowledge, so it hides what it can't open.
+and `media.picker` (the `pick` action); the app also claims `secure.screen`, a window that can't
+be captured, which it applies to every protected document. The other reserved names are in
+`vocabulary.json`. The `own` action needs no capability: whether a client has a Satellite's own
+interface is its own knowledge, so it hides what it can't open.
 
 A client that meets a block or action it doesn't know skips it (see "Trust and validation").
 
@@ -901,9 +970,9 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 |---|---|---|
 | Blocks | the 22 above, including `chart`, `table`, `image`, `media-list`, `media-grid`, `search`, `map` and `breadcrumb`; the `dashboard` template | more, minor by minor: `tabs`; templates `list-detail`, `settings`, `media-library` |
 | Satellite capabilities | `files.browse` (File Explorer), `audio.library` and `audio.session` (Music), `media.gallery` (Photo), `media.vault` (Locked Folder, `move_in` only through the `secure` action), `files.protected` (Locked Folder, asked by the Engine only) | browsing the Locked Folder from the shared interface; more pickable capabilities (files) |
-| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action; saving, sharing and opening files (`download`, `share`); sending files (`upload`) | `device.background-tasks` (phone sync) - a native module written once in the app, behind a shared block |
+| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action and protected documents; `secure.screen` on Android; saving, sharing and opening files (`download`, `share`); sending files (`upload`) | `device.background-tasks` (phone sync) - a native module written once in the app, behind a shared block |
 | Home | `widgets` in each document, drawn by both clients | |
-| Sections | `section_of`, but Photo still names the Locked Folder | the host discovers its sections from the catalog |
+| Sections | `section_of` and the `section` action, but Photo still names the Locked Folder | the host discovers its sections from the catalog (the Locked Folder's L3) |
 | Icons | `icon_name` from the shared set, a neutral circle without one | Satellite-provided icons |
 | Rediscovery | Mission Control button and API | also on Android; and a CLI command |
 | Formats | 12, including rates, dates and relative times | |
@@ -937,7 +1006,8 @@ Retiring all of them is planned in [Remaining work](remaining-work.md).
       Photo's own page and screens stay in Developer Mode until they are retired;
    2. `media.vault` from the Locked Folder. **Partly done (1.2):** the `secure` action moves
       photos in from Photos' shared viewer and selection, behind each client's own PIN and
-      biometric prompt. Next: the Locked Folder itself in the shared interface;
+      biometric prompt, and a document can be protected by the store. Next: the Locked Folder
+      itself in the shared interface;
    3. `audio.library` and `media.audio` from Music's player, queue and downloads, specified in
       [Audio playback](media-audio.md). **Done (1.2):** the shared audio host on both clients
       and the `play` action. Music's own library screens are still native.

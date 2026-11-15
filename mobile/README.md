@@ -229,6 +229,9 @@ mobile/
 │   ├── satellites/       the Satellite list and document cache, and in ui/
 │   │                     the shared renderer for UI contract documents
 │   ├── media/            the shared audio host and player
+│   ├── vault/            unlocking any media.vault store: the unlock card, the
+│   │                     grant prompt, biometric unlock and a protected
+│   │                     document's gate
 │   ├── files/            saving, sharing and opening files
 │   ├── components/       shared UI (cards, pills, sliders, charts, TopBarSlot,
 │   │                     FloatingPlayerInset, ZoomableImage)

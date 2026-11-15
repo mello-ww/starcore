@@ -8,8 +8,8 @@ import {findProvider, type CapabilityProvider, type Providers} from './contract'
  *
  * - The document names only the operation and how to bind each item's id. The provider comes
  *   from the catalog, the references are built for the document Satellite's own media.gallery
- *   items, and the prompt belongs to the app: a native screen the composition root
- *   (src/satellites/builtins.tsx) registers for the capability, which asks with the PIN (or a
+ *   items, and the prompt belongs to the app: its own card for the capability
+ *   (src/vault/VaultGrantPrompt.tsx), which asks the provider's unlock with the PIN (or a
  *   biometric match) for a single-use grant for exactly these items. Nothing opens, so nothing
  *   has to be locked again, and an app killed half way leaves at most a grant that expires.
  * - No PIN passes through here: the prompt hands back only the grant.
@@ -37,20 +37,21 @@ export interface GrantRequest {
 export interface SecurePromptProps {
   count: number;
   wanted: GrantRequest;
+  /** the provider the catalog named, whose unlock the prompt asks */
+  provider: CapabilityProvider;
   onGrant: (grant: string) => void;
   onCancel: () => void;
 }
 
-/** A prompt the composition root registers: for which capability, from which provider. */
+/** The app's own prompt for a capability: it speaks the capability's unlock, whichever
+ * Satellite provides it. */
 export interface SecurePrompt {
   capability: string;
-  /** the providing Satellite whose own unlock the prompt speaks */
-  satellite: string;
   component: React.ComponentType<SecurePromptProps>;
 }
 
 /** The provider and prompt an action would run with, or null when this app can't run it here:
- * an operation it doesn't know, no enabled provider offering it, no prompt for that provider,
+ * an operation it doesn't know, no enabled provider offering it, no prompt for the capability,
  * or a Satellite acting on items it doesn't provide. Its control is then hidden. */
 export function secureRunner(
   action: any,
@@ -71,7 +72,7 @@ export function secureRunner(
   if (!provider || !['status', 'unlock', secure.operation].every(name => typeof operations[name] === 'string')) {
     return null;
   }
-  const prompt = prompts.find(entry => entry.capability === secure.capability && entry.satellite === provider.satellite);
+  const prompt = prompts.find(entry => entry.capability === secure.capability);
   return prompt ? {provider, prompt} : null;
 }
 

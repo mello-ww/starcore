@@ -26,7 +26,7 @@ from starcore.api.response import error_response, file_response, json_response, 
 from starcore.capabilities import ReferenceProblem
 
 from . import configuration, crypto, encryption, thumbnails, vault
-from .runtime import SecurityStateError, runtime, validate_pin
+from .runtime import IDLE_SECONDS, SecurityStateError, runtime, validate_pin
 
 # settings that would loosen protection or point it somewhere else once a
 # PIN guards the vault - changing them needs this session to be unlocked
@@ -54,6 +54,7 @@ def routes() -> dict:
         "pin": pin,
         "unlock": unlock,
         "lock": lock,
+        "keep": keep,
         "delink": delink,
         "media": media,
         "upload": upload,
@@ -103,12 +104,13 @@ def _protected(live) -> bool:
 
 
 def _require_unlocked(request, live):
-    """None when this session has the vault open, otherwise the error to return."""
+    """None when this session has the vault open, otherwise the error to return. A request that
+    gets through uses the vault, so it also restarts the unlock's idle time."""
     if not request.token:
         return error_response("authentication required", status=401)
     if live.configured_root is None:
         return error_response("no Locked Folder location is configured yet", status=400)
-    if not live.is_unlocked(request.token):
+    if not live.is_unlocked(request.token, active=True):
         return error_response("the Locked Folder is locked - unlock it first", status=403)
     return None
 
@@ -140,7 +142,7 @@ def configuration_route(request):
         return error_response("'key' must be a string", status=400)
 
     live = runtime(request.satellite)
-    if key in GUARDED_SETTINGS and _protected(live) and not live.is_unlocked(request.token):
+    if key in GUARDED_SETTINGS and _protected(live) and not live.is_unlocked(request.token, active=True):
         # otherwise anyone signed in could point the Locked Folder elsewhere
         # (or loosen its limits) and reach the old vault without the PIN
         return error_response("unlock the Locked Folder before changing its settings", status=403)
@@ -226,6 +228,9 @@ def status(request):
         "unlocked": unlocked,
         "expires_at": expires,
         "session_timeout_seconds": int(request.satellite.config.get("session_timeout_seconds", 900)),
+        # an unlock also ends after this long without a vault request or keep; status itself
+        # never counts as one
+        "idle_seconds": IDLE_SECONDS,
         "photos_available": vault.photo_library(request.engine) is not None,
         "biometric_devices": live.device_count(),
         # diagnostics for whoever administers the server: never a PIN, key or token
@@ -347,6 +352,19 @@ def lock(request):
     return json_response({"locked": True})
 
 
+def keep(request):
+    """media.vault's keep: a client showing the vault calls it now and then, so the unlock
+    outlives its idle time while it is in use - and only then. It never extends the session
+    timeout, and a session that isn't unlocked gets the usual 403."""
+    if request.method != "POST":
+        return error_response("only POST is supported here", status=405)
+    live = runtime(request.satellite)
+    refused = _require_unlocked(request, live)
+    if refused is not None:
+        return refused
+    return json_response({"expires_at": live.expires_at(request.token)})
+
+
 def delink(request):
     """Removes the Locked Folder's association with its configured
     directory, without touching that directory on disk at all - the fix
@@ -367,7 +385,7 @@ def delink(request):
     live = runtime(request.satellite)
     if live.configured_root is None:
         return error_response("no Locked Folder location is configured", status=400)
-    if live.pin_set and not live.is_unlocked(request.token):
+    if live.pin_set and not live.is_unlocked(request.token, active=True):
         return error_response("unlock the Locked Folder before delinking it", status=403)
     busy = _require_idle(live)
     if busy is not None:
@@ -554,7 +572,7 @@ def move_in(request):
         _use_up(live, request, grant)
         return json_response({"error": "some of these items can't be moved", "refused": refused}, status=400)
 
-    unlocked = live.is_unlocked(request.token)
+    unlocked = live.is_unlocked(request.token, active=True)
     granted = grant is not None and live.take_grant(grant, request.token, "move_in", _keys(resolved))
     if not unlocked and not granted:
         return error_response("the Locked Folder is locked - unlock it first", status=403)
@@ -781,19 +799,26 @@ def biometric(request):
         return error_response("this device is not enrolled for biometric unlock", status=404)
 
     if action == "challenge":
-        return json_response({"challenge": live.new_challenge(request.token, key_id)})
+        # what the signature will be for is decided here and kept with the challenge, never sent
+        # beside the signature: one signature buys a grant or a full unlock, not either
+        wanted, problem = _wanted_grant(request, body)
+        if problem is not None:
+            return problem
+        return json_response({"challenge": live.new_challenge(request.token, key_id, wanted)})
 
+    if "for" in body:
+        # checked before the attempt is counted or the challenge used: a client still sending the
+        # purpose here loses nothing, and asks for its challenge again with it
+        return error_response("'for' belongs to biometric/challenge - ask for the challenge with it", status=400)
     try:
         signature = _decode(body.get("signature"))
     except ValueError:
         return error_response("'signature' must be base64", status=400)
-    wanted, problem = _wanted_grant(request, body)
-    if problem is not None:
-        return problem
     refused = _begin(request, live)
     if refused is not None:
         return refused
-    if not live.verify_signature(request.token, key_id, body.get("challenge", ""), signature):
+    verified, wanted = live.verify_signature(request.token, key_id, body.get("challenge", ""), signature)
+    if not verified:
         return error_response("biometric unlock failed - use the PIN", status=401)
     return _grant_unlock(request, live, wanted)
 

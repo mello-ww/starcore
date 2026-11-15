@@ -40,6 +40,9 @@ const PROBLEMS = {
         + "Install the engine's 'encryption' extra and restart StarCore."],
 };
 
+// how often an open vault tells the server it is still in use - well inside its idle time
+const KEEP_SECONDS = 30;
+
 export function mount(context) {
     const { element: root, api } = context;
     const onPhotosChanged = context.onPhotosChanged || (() => {});
@@ -68,10 +71,18 @@ export function mount(context) {
         }
     };
     window.addEventListener("pagehide", onPageHide);
+    // an unlock also ends after the server's idle time (status.idle_seconds) without a vault
+    // request: while this page shows the vault open, keep says it is still in use
+    const keeper = setInterval(() => {
+        if (!closed && !document.hidden && status && status.unlocked) {
+            api.post("/keep", {}).catch(() => {});
+        }
+    }, KEEP_SECONDS * 1000);
 
     const cleanup = () => {
         closed = true;
         window.removeEventListener("pagehide", onPageHide);
+        clearInterval(keeper);
         clearTimers();
         closeViewer();
         // leaving the private area always locks it again

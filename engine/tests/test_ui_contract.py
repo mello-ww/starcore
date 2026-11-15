@@ -134,6 +134,21 @@ class DocumentFixturesTest(unittest.TestCase):
         self.assertEqual(problems, [])
         for capability, operations in ui_contract.SECURE_OPERATIONS.items():
             self.assertLessEqual(operations, set(provides[capability]["operations"]), capability)
+        for capability, operations in ui_contract.PROTECTED_CAPABILITIES.items():
+            self.assertLessEqual(operations, set(provides[capability]["operations"]), capability)
+
+    def test_a_protected_document_needs_its_own_satellite_to_provide_the_store(self):
+        # known only at load: the store a client unlocks is the document's own Satellite's, and
+        # it must offer every operation the gate calls (status, unlock, lock, keep)
+        document = next(case["document"] for case in fixture("documents.json")["valid"]
+                        if case["name"] == "protected-document")
+        operations = {"status": "status", "unlock": "unlock", "lock": "lock", "keep": "keep"}
+        self.assertEqual(ui_contract.validate(document, {"media.vault": {"version": 1, "operations": operations}}), [])
+        errors = ui_contract.validate(document, {"media.gallery": {"version": 1, "operations": {"list": "media"}}})
+        self.assertTrue(any("media.vault" in error for error in errors), errors)
+        without_keep = {op: route for op, route in operations.items() if op != "keep"}
+        errors = ui_contract.validate(document, {"media.vault": {"version": 1, "operations": without_keep}})
+        self.assertTrue(any("keep" in error for error in errors), errors)
 
     def test_route_safety(self):
         routes = fixture("routes.json")

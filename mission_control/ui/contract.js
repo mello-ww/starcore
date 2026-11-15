@@ -37,6 +37,8 @@ export const CLIENT_CAPABILITIES = new Set(["media.audio", "media.picker"]);
 // Satellite capabilities this client has a shared block for, and the
 // protocol versions it speaks
 export const CAPABILITY_VERSIONS = { "files.browse": [1], "audio.library": [1], "media.gallery": [1], "media.vault": [1] };
+// what a protected document (1.2) may name, and the operations its gate (ui/vault.js) calls
+export const PROTECTED_CAPABILITIES = { "media.vault": ["status", "unlock", "lock", "keep"] };
 
 const RESERVED_SEGMENTS = new Set(["assets", "enable", "disable", "reload", "ui"]);
 const FIRST_SEGMENT = /^[A-Za-z0-9_-]+$/;
@@ -67,6 +69,20 @@ export function checkDocument(document) {
     }
     if (!Object.hasOwn(pages, document.entry)) {
         return "The interface description's entry page is missing.";
+    }
+    if (document.protected !== undefined) {
+        // a store this client unlocks first: only one it knows how to unlock, and one that keeps
+        // nothing of itself outside it
+        const capability = document.protected && document.protected.capability;
+        if (!Object.hasOwn(PROTECTED_CAPABILITIES, String(capability))) {
+            return "This interface is protected by something this Mission Control can't unlock.";
+        }
+        if (document.widgets !== undefined) {
+            return "A protected interface has no widgets.";
+        }
+        if (Object.values(pages).some((page) => page && typeof page === "object" && page.offline !== undefined)) {
+            return "A protected interface keeps nothing offline.";
+        }
     }
     return null;
 }

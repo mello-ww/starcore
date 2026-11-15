@@ -21,11 +21,10 @@ jest.mock('../src/satellites/ui/api', () => {
   const mocks = {document: jest.fn(), providers: jest.fn(), read: jest.fn(), act: jest.fn()};
   return {UiApi: jest.fn().mockImplementation(() => mocks), __mocks: mocks};
 });
-// the app's own prompt for media.vault, as the composition root registers it: grants at once
-jest.mock('../src/satellites/builtins', () => {
+// the app's own prompt for media.vault (src/vault/VaultGrantPrompt.tsx): grants at once
+jest.mock('../src/vault/VaultGrantPrompt', () => {
   const prompt = {
     capability: 'media.vault',
-    satellite: 'Vault',
     component: jest.fn(({wanted, onGrant}: any) => {
       const {useEffect: effect} = require('react');
       effect(() => {
@@ -34,10 +33,10 @@ jest.mock('../src/satellites/builtins', () => {
       return null;
     }),
   };
-  return {BUILTIN_SECURE_PROMPTS: [prompt], __prompt: prompt};
+  return {VAULT_GRANT_PROMPT: prompt, __prompt: prompt};
 });
 const {__mocks} = jest.requireMock('../src/satellites/ui/api') as {__mocks: Record<string, jest.Mock>};
-const {__prompt} = jest.requireMock('../src/satellites/builtins') as {__prompt: {component: jest.Mock}};
+const {__prompt} = jest.requireMock('../src/vault/VaultGrantPrompt') as {__prompt: {component: jest.Mock}};
 const {privacy} = jest.requireMock('../src/platform/privacy') as {privacy: {evictImages: jest.Mock}};
 
 const MOVE = {secure: {capability: 'media.vault', operation: 'move_in'}, item: '$.id', confirm: 'Move it?', then: 'refresh'};
@@ -105,6 +104,8 @@ describe('the secure action on the app’s shared screen', () => {
 
     expect(Alert.alert).toHaveBeenCalledWith('Move it?', undefined, expect.anything(), expect.anything());
     expect(__prompt.component).toHaveBeenCalledTimes(1);
+    // the prompt is told which provider it unlocks for: whichever the catalog named
+    expect(__prompt.component.mock.calls[0][0].provider).toEqual(VAULT);
     const reference = {provider: 'Pics', capability: 'media.gallery', id: 'p1'};
     expect(__mocks.act).toHaveBeenCalledWith('Vault', 'move_in', 'POST', {items: [reference], grant: 'grant-for-1'});
     expect(__mocks.act.mock.calls.flat().join(' ')).not.toMatch(/pin/i);
