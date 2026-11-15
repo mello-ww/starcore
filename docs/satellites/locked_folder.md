@@ -590,6 +590,47 @@ doesn't lock it under them.
 File Explorer's own page still draws a lock badge next to the vault and refuses to enter it
 until unlocked.
 
+## Shared interface
+
+The Locked Folder has a shared interface, `satellites/native/locked_folder/ui.json` (UI
+contract 1.2), drawn by the shared renderers over its own routes (L3 of the plan below). It is
+a **preview**: its own page and screens stay the default on both clients until it reaches parity
+and the owner validates it, and Developer Mode offers the document beside them - on the web the
+top bar's switch at `#/satellite/Photo/LockedFolder`, in the app a pill on Photos' card in the
+Satellites list. Nothing about the vault is in Photo's document.
+
+- **Protected:** `"protected": {"capability": "media.vault", "setup": "setup"}`. The clients
+  ask `status` first, show their own unlock card when it is locked, and keep nothing (no
+  offline page, widget or share; on Android images in memory only and a window that can't be
+  captured). Every route the document names answers `403` to a session that hasn't unlocked,
+  but the setup page's.
+- **The vault page** reads the new `gallery` view (`views.py`): every file as a tile, newest
+  first, in month groups, 120 at a time (`?limit=` up to 500, `?cursor=` the position the last
+  page gave as `next`). A tile carries `kind` (`image`, `video` or none), `preview` (the media
+  route its thumbnail comes from: `file` for a picture, `thumbnail` for a video, none for any
+  other file, which then shows its `icon` and loads nothing), `group` and `movable`. The
+  summary says how many items there are.
+- **The viewer** shows the picture or plays the video from `media/file`, with when it was
+  added, its size, its folder and its name, and three actions: **Move to Photos** (`move_out`,
+  only for a picture or a video, and only while Photos is there), **Download** and **Delete
+  forever** (`delete`, asking first). A selection offers Move to Photos and Delete forever.
+- **Add files** sends files with the contract's `upload` action to the existing `upload`
+  route, which picks a free name, so no conflict can arise.
+- **The setup page** reads the new `setup` view, which answers without an unlock and never
+  gives the vault's location: "Not set up yet", "No PIN yet", "Can't be opened" (with the
+  problem, in Developer Mode) or "Ready". It only says so: choosing a location, a first PIN and
+  the settings stay in the Locked Folder's own page and screens until L4 brings the client
+  prompts for secrets.
+
+**Photo's tile** is no longer Photo's: its albums route lists the Satellites it hosts from the
+Engine's registry (`engine/starcore/sections.py`, every enabled Satellite whose manifest says
+`section_of = "Photo"`), each as a tile under "Folders" with the section action
+`{"section": "$.section"}`. One deviation from the plan: a manifest has no title, so a tile's
+title is the hosted Satellite's document `title` ("Locked Folder"), or else its name split into
+words; its icon is the manifest's `icon_name`. A tile names nothing about what the vault holds.
+Opened, the tile shows the Locked Folder's own page or screen by default: in the app a hosted
+Satellite's own screen is its host's, opened at a section named after it.
+
 ## Configuration
 
 `satellites/native/locked_folder/config.toml`:
@@ -798,8 +839,9 @@ again once when back online or as the page goes away.
 
 ## Security audit and plan: the Locked Folder in the shared interface (2026-11-15)
 
-**Status: approved by the owner (2026-11-15). L0 to L2 are done: A1, A2, A3, A5, A6 and A9
-are fixed. Nothing else below is implemented yet**, and the decisions at the end stay open until
+**Status: approved by the owner (2026-11-15). L0 to L3 are done: A1, A2, A3, A5, A6 and A9
+are fixed, and the Locked Folder has a shared interface, a preview (see "Shared interface"
+above). Nothing else below is implemented yet**, and the decisions at the end stay open until
 the milestone that needs them. Read from the code at `5b716a9`. It is the audit stage 4 of [Remaining work](../remaining-work.md)
 asks for, as M5 had ([its audit](../archive/m5-locked-folder-actions-audit.md)). The common
 order with Photos and the phone sync is in Remaining work.
@@ -909,7 +951,7 @@ tile stays where it is and Photo names nothing.
 | L0 (done) | Close A1; `status` and the settings without the path while locked (A5); the unlock table under the lock, the reload case (A9) | none | `file_explorer/locked_folder_guard.py`, `locked_folder/api.py`, `configuration.py`, `runtime.py` | `test_locked_folder_security.py`: a disabled Satellite still guards, also from a cold start; a locked `status` and configuration have no path; after a reload the guard and routes agree, and a new location is the one guarded; concurrent expiry never raises | Opus 5.5 high |
 | L1 (done) | `files.protected` v1 and the Engine's check; File Explorer, Photo and Music ask it (A2) | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `engine/starcore/capabilities.py`, the guard (becomes `protection.py`), `photo/private_media.py`, `music/routes_catalog.py`, `locked_folder/satellite.toml` | Engine: provider disabled, no provider, Music's scan refused inside the vault; the three contract suites still agree on the vocabulary | Opus 5.5 high |
 | L2 (done) | Protected documents, the `section` action, `keep` and the idle time, purpose-bound challenges (A3, A6); the generic unlock prompt on Android (`mobile/src/vault/`) and the web's prompt for a full unlock | **contract change 1** | `engine/starcore/ui_contract.py`, fixtures, `mission_control/ui/` (contract, renderer, `secure.js`), `mobile/src/satellites/ui/`, `mobile/src/vault/` (from `src/lockedFolder/`), `builtins.tsx`, `locked_folder/runtime.py` and `api.py` | fixtures valid and invalid (protected without the capability, with `offline`, `secrets` outside it); Engine idle expiry with a fake clock; both clients: gate, `403`, lock on leave, nothing cached | Opus 5.5 xhigh |
-| L3 | The Locked Folder's `ui.json`: grid, viewer, move to Photos, delete, upload, download; Photo's tile through sections | data only | `locked_folder/ui.json`, `views.py` (new), `photo/gallery.py`, `photo/ui.json` | Engine: the document validates, every route it names exists and refuses a locked session; app: the document renders | Opus 5.5 high |
+| L3 (done) | The Locked Folder's `ui.json`: grid, viewer, move to Photos, delete, upload, download; Photo's tile through sections | data only | `locked_folder/ui.json`, `views.py` (new), `photo/gallery.py`, `photo/ui.json` | Engine: the document validates, every route it names exists and refuses a locked session; app: the document renders | Opus 5.5 high |
 | L4 | `secrets` and `reveal`, and repeatable form rows (`rows` field kind) in the same change; then the vault's settings and setup pages | **contract change 2** | as L2's contract files, the form renderers on both clients, `locked_folder/ui.json` | fixtures; both clients: a secret never in form state, storage or logs, a revealed value gone after closing; Engine: every management route still needs what it needs today | Opus 5.5 xhigh |
 | L5 | End to end on the local demo (web and emulator) with a generated PIN; the owner validates on the web and the phone | none | none | the M5 list, plus: kill the client while unlocked and see it lock by itself | Opus 5.5 high |
 | L6 | Moves through capabilities (`sealed`, `original`, `release`, `adopt`); comments that name the other Satellite go | vocabulary: optional operations | `locked_folder/vault.py`, `photo/private_media.py`, `photo/api.py`, `capabilities.py` (POST calls) | the existing move tests unchanged; `KNOWN_CROSS_SATELLITE` loses three lines | Opus 5.5 xhigh |

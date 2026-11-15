@@ -1,0 +1,62 @@
+{
+  "_about": "The Locked Folder's shared interface (UI contract 1.2), a protected document: before any page the client asks media.vault's status, shows its own unlock prompt while the vault is locked and the setup page while it can't be opened yet, keeps the unlock alive while shown and locks on leaving (docs/ui-contract.md, \"Protected documents\"). Photo opens it from its Albums through the section action; it is a preview, so both clients keep opening the Locked Folder's own screens there and offer this document in Developer Mode until it is validated (docs/satellites/locked_folder.md, \"Shared interface\"). It reads the read-only views (views.py: gallery, setup) and changes the vault only through its existing routes: upload, delete, move_out and media/file for a download. Nothing is shared, kept offline or shown as a widget. Settings, the PIN, biometrics, encryption and recovery stay in its own screens until L4.",
+  "contract": "starcore.ui/1.2",
+  "title": "Locked Folder",
+  "preview": true,
+  "protected": {"capability": "media.vault", "setup": "setup"},
+  "entry": "vault",
+  "pages": {
+    "vault": {
+      "source": {"route": "gallery?limit=120"},
+      "blocks": [
+        {"type": "text", "style": "caption", "text": "$.summary"},
+        {"type": "button", "label": "Add files", "style": "secondary",
+         "action": {"upload": {"multiple": true}, "route": "upload?name={$value.name}", "then": "refresh"}},
+        {
+          "type": "media-grid",
+          "id": "vault",
+          "items": "$.items",
+          "more": {"route": "gallery?limit=120&cursor={$value}", "cursor": "$.next"},
+          "size": "medium",
+          "empty": "Nothing here yet. Move photos in from Photos, or add files.",
+          "item": {"image": "media/{$.preview}?path={$.path}", "key": "$.path", "kind": "$.kind", "group": "$.group", "icon": "$.icon"},
+          "viewer": {
+            "image": "media/file?path={$.path}",
+            "video": "media/file?path={$.path}",
+            "title": "$.name",
+            "fields": [
+              {"label": "Added", "value": "$.modified", "format": "datetime"},
+              {"label": "Size", "value": "$.size", "format": "bytes"},
+              {"label": "Folder", "value": "$.folder"},
+              {"label": "File", "value": "$.name"}
+            ],
+            "actions": [
+              {"label": "Move to Photos", "icon": "image", "visible": "$.movable",
+               "action": {"route": "move_out", "body": {"paths": ["$.path"]}, "confirm": "Move this back to Photos? It leaves the Locked Folder and is no longer behind your PIN.", "then": "refresh"}},
+              {"label": "Download", "icon": "download", "action": {"download": "media/file?path={$.path}&download=1", "name": "$.name"}},
+              {"label": "Delete forever", "icon": "trash-2", "style": "danger",
+               "action": {"route": "delete", "body": {"paths": ["$.path"]}, "confirm": "Delete this for good? This can't be undone.", "then": "refresh"}}
+            ]
+          },
+          "selection": {
+            "actions": [
+              {"label": "Move to Photos", "icon": "image",
+               "action": {"route": "move_out", "body": {"paths": ["$.path"]}, "confirm": "Move the selected items back to Photos? They leave the Locked Folder and are no longer behind your PIN.", "then": "refresh"}},
+              {"label": "Delete forever", "icon": "trash-2", "style": "danger",
+               "action": {"route": "delete", "body": {"paths": ["$.path"]}, "confirm": "Delete the selected items for good? This can't be undone.", "then": "refresh"}}
+            ]
+          }
+        }
+      ]
+    },
+    "setup": {
+      "title": "Locked Folder",
+      "source": {"route": "setup"},
+      "blocks": [
+        {"type": "heading", "text": "$.title"},
+        {"type": "text", "text": "$.message"},
+        {"type": "field", "label": "Problem", "value": "$.problem", "visible": "$.problem", "developer": true}
+      ]
+    }
+  }
+}

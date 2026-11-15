@@ -20,7 +20,7 @@ import {MemoryImages} from '../satellites/ui/memoryImages';
 import {MediaPicker, type MediaReference, type PickRequest} from '../satellites/ui/MediaPicker';
 import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
 import {hasPagedList, VirtualListPage} from '../satellites/ui/VirtualListPage';
-import {DEDICATED_SCREENS, opensSharedInterface} from './HomeScreen';
+import {DEDICATED_SCREENS, opensSharedInterface, ownScreen} from './HomeScreen';
 import {uiPreferences} from '../satellites/ui/preferences';
 import {
   collectionKey, forgetOfflineSatellite, forgetOfflineServer, offlinePlan, offlineStateKeys, OfflineStore, sessionScope,
@@ -70,7 +70,7 @@ function hostedSatellite(satellites: SatelliteSummary[] | null, host: string, wa
 
 /** Whether this app opens a Satellite: its shared interface, or a screen of the app's own for it. */
 function opensHosted(target: SatelliteSummary | null): boolean {
-  return Boolean(target && (opensSharedInterface(target) || DEDICATED_SCREENS[target.name]));
+  return Boolean(target && (opensSharedInterface(target) || ownScreen(target)));
 }
 
 /**
@@ -604,12 +604,12 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           navigation.push('SatelliteUi', {name: target.name, revision: target.ui?.revision ?? undefined});
           return true;
         }
-        const hostedScreen = target ? DEDICATED_SCREENS[target.name] : undefined;
+        const hostedScreen = target ? ownScreen(target) : undefined;
         if (!hostedScreen) {
           showToast("That isn't available in this app.", true);
           return false;
         }
-        (navigation as any).push(hostedScreen);
+        (navigation as any).push(hostedScreen.screen, hostedScreen.params);
         return true;
       }
       if (action.own !== undefined) {

@@ -156,15 +156,19 @@ class PhotoUiDocumentTest(unittest.TestCase):
                   ("Unfavorite", "$.favorite", "albums/favorites/photos/remove")]
         self.assertEqual(hearts, {"library": toggle, "search": toggle, "album": toggle})
 
-    def test_settings_sync_and_the_locked_folder_open_photos_own_screens(self):
+    def test_settings_open_photos_own_screens_and_a_section_tile_its_section(self):
         blocks = self.document["pages"]["albums"]["blocks"]
         opened = {block["label"]: block["action"]["own"] for block in blocks
                   if block["type"] == "button" and "own" in block.get("action", {})}
         self.assertEqual(opened, {"Settings and phone sync": "settings"})
-        # the Locked Folder is a tile among the albums: the one tile that opens Photo's own screens
+        # a Satellite Photo hosts is a tile among the albums, opened through the section action:
+        # the document names none of them, and nothing about the vault is in it
         grid = next(block for block in blocks if block["type"] == "media-grid")
-        self.assertEqual(grid["open"], [{"visible": "$.locked", "action": {"own": "locked"}},
+        self.assertEqual(grid["open"], [{"visible": "$.section", "action": {"section": "$.section"}},
                                         {"action": {"navigate": "album", "params": {"id": "$.id"}}}])
+        text = json.dumps({key: value for key, value in self.document.items() if not key.startswith("_")})
+        self.assertNotIn("LockedFolder", text)
+        self.assertNotIn('"own": "locked"', text)
         self.assertEqual(grid["item"]["icon"], "$.icon")
         # Photo's own web page knows both sections, and the Locked Folder's link as well
         page = (PHOTO_DIR / "mission_control" / "page.js").read_text(encoding="utf-8")
@@ -282,25 +286,25 @@ class PhotoGalleryApiTest(unittest.TestCase):
         self.assertEqual(tiles, [("Favorites", "Folders"), ("Locked Folder", "Folders"), ("Camera", "Folders"),
                                  ("Holidays", "Albums")])
 
-    def test_the_locked_folder_is_a_folder_tile_while_a_vault_is_there(self):
+    def test_a_hosted_satellite_is_a_folder_tile_while_it_is_enabled(self):
         from starcore import capabilities
         tile = next(tile for tile in self.json_request("/api/satellites/photo/gallery/albums")[1]["albums"]
-                    if tile["id"] == "locked")
-        # a lock instead of a cover, and the flag the document opens the Locked Folder on;
-        # nothing about what it holds (no count, no cover): it is never listed here
-        self.assertEqual(tile, {"id": "locked", "title": "Locked Folder", "subtitle": "Behind your PIN",
-                                "group": "Folders", "cover": "", "icon": "lock", "locked": True})
+                    if tile.get("section"))
+        # its title (its document's) and icon (its manifest's) from the Engine's registry, the
+        # section the document opens, and nothing about what it holds (no count, no cover)
+        self.assertEqual(tile, {"id": "section-LockedFolder", "title": "Locked Folder", "subtitle": "",
+                                "group": "Folders", "cover": "", "icon": "lock", "section": "LockedFolder"})
 
         vault, _ = capabilities.provider(self.engine, "media.vault")
         self.assertIsNotNone(vault)
         before = dict(vault.config.data)
         vault.config.data["enabled"] = False
         try:
-            ids = [tile["id"] for tile in self.json_request("/api/satellites/photo/gallery/albums")[1]["albums"]]
+            tiles = self.json_request("/api/satellites/photo/gallery/albums")[1]["albums"]
         finally:
             vault.config.data.clear()
             vault.config.data.update(before)
-        self.assertNotIn("locked", ids)
+        self.assertFalse([tile for tile in tiles if tile.get("section")])
 
     def test_an_album_keeps_the_order_photos_were_added_in(self):
         photos = self.import_photos("a.png", "b.png", "c.png", "d.png")

@@ -312,9 +312,12 @@ class UiApiTest(unittest.TestCase):
         explorer = next(item for item in payload["satellites"] if item["name"] == "FileExplorer")
         self.assertEqual(explorer["provides"]["files.browse"]["operations"], {"list": "entries"})
         self.assertNotIn("preview", explorer["ui"])  # F6: its default interface on every client
-        # a Satellite without a ui.json still has an entry, with no definition
+        # L3: a preview, so the clients keep its own screens until it is validated
         locked = next(item for item in payload["satellites"] if item["name"] == "LockedFolder")
-        self.assertIsNone(locked["ui"])
+        self.assertTrue(locked["ui"]["preview"])
+        # a Satellite without a ui.json still has an entry, with no definition
+        music = next(item for item in payload["satellites"] if item["name"] == "Music")
+        self.assertIsNone(music["ui"])
 
     def test_the_document_is_served_with_its_revision_as_etag(self):
         status, payload, headers = request(self.engine, "/api/satellites/Showcase/ui")

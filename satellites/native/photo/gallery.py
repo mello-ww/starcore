@@ -30,7 +30,7 @@ import json
 import math
 from datetime import datetime, timezone
 
-from starcore import capabilities
+from starcore import sections
 from starcore.ui_contract import format_value
 
 from . import albums as albums_module
@@ -232,17 +232,21 @@ def library_view(satellite, limit=None, cursor=None, group="month") -> dict:
     }
 
 
-# the Locked Folder as a folder among the others, while a media.vault provider is there: a lock
-# instead of a cover, and nothing about what it holds - it is never listed here. ui.json opens
-# it through Photo's own interface ("locked"), which asks for its PIN
-VAULT_TILE = {"id": "locked", "title": "Locked Folder", "subtitle": "Behind your PIN",
-              "group": "Folders", "cover": "", "icon": "lock", "locked": True}
+def section_tiles(satellite, engine) -> list:
+    """The Satellites Photo hosts (section_of), each as a folder among the others: its title and
+    icon from the Engine's registry, no cover and nothing about what it holds. ui.json opens one
+    with the section action, so the client opens whichever interface it has for it."""
+    if engine is None:
+        return []
+    return [{"id": f"section-{section['name']}", "title": section["title"], "subtitle": "",
+             "group": "Folders", "cover": "", "icon": section["icon"], "section": section["name"]}
+            for section in sections.hosted(engine, satellite.manifest.name)]
 
 
 def albums_view(satellite, engine=None) -> dict:
-    """Every album as a tile: Favorites pinned first, then the Locked Folder (while there is
-    one), then the phone's own folders - together under "Folders" - then the custom albums. A
-    client groups consecutive tiles, so Favorites always heads the Folders group."""
+    """Every album as a tile: Favorites pinned first, then the Satellites Photo hosts (while they
+    are enabled), then the phone's own folders - together under "Folders" - then the custom
+    albums. A client groups consecutive tiles, so Favorites always heads the Folders group."""
     photo_library = library(satellite)
     store = albums(satellite)
     listed = albums_module.physical_albums(satellite, photo_library)
@@ -258,9 +262,8 @@ def albums_view(satellite, engine=None) -> dict:
         "group": GROUPS.get(album.get("kind"), "Albums"),
         "cover": album.get("cover_photo_id") or "",
     } for album in listed]
-    if engine is not None and capabilities.provider(engine, "media.vault")[0] is not None:
-        pinned = sum(1 for album in listed if album.get("kind") == "favorites")
-        tiles.insert(pinned, dict(VAULT_TILE))
+    pinned = sum(1 for album in listed if album.get("kind") == "favorites")
+    tiles[pinned:pinned] = section_tiles(satellite, engine)
     return {"albums": tiles}
 
 

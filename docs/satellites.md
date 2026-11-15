@@ -130,7 +130,9 @@ gives it no sidebar entry or Home card, and opens `#/satellite/<it>` as
 (`context.section`) and through `cleanup.showSection(section)` while it's showing. The
 Android app leaves it out of the Satellites list. It is presentation only: the Satellite
 keeps its own routes, data and configuration, and they are exactly as protected as any
-other's. The Locked Folder uses this to appear as a tab of Photos.
+other's. The Locked Folder uses this to appear as a tab of Photos. A host's shared interface
+lists the Satellites it hosts with `starcore.sections.hosted(engine, host)` (name, title from
+the hosted document, `icon_name`), and opens them with the `section` action, so it names none.
 
 ## Enabling, disabling and reloading
 

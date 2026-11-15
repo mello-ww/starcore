@@ -330,12 +330,13 @@ collection: the document says where each picture comes from and what can be done
   `{action, visible}` entries, and a tile runs the first whose `visible` holds (an entry
   without one always does). An entry a client can't run there is skipped - an `own` action
   without the Satellite's own interface - and a tile left with none doesn't open. Photos uses it
-  for its albums: the Locked Folder's tile opens Photo's own screens, every other tile its album.
+  for its albums: a Satellite it hosts is a tile that opens through the `section` action, every
+  other tile its album.
 
   ```json
   {"type": "media-grid", "items": "$.albums",
    "item": {"image": "thumbnails/{$.cover}", "key": "$.id", "title": "$.title", "icon": "$.icon"},
-   "open": [{"visible": "$.locked", "action": {"own": "locked"}},
+   "open": [{"visible": "$.section", "action": {"section": "$.section"}},
             {"action": {"navigate": "album", "params": {"id": "$.id"}}}]}
   ```
 - **`viewer`**: full screen, over everything. It shows `image` (the tile's own when absent), or
@@ -557,15 +558,19 @@ building. A Satellite returns what it wants shown. For example, Showcase returns
   - Back returns to the shared interface: on the web the visit is a browser-history entry of its
     own, and a reload stays on it; in the app the native screen is pushed over the shared one.
   - On the web, a section that is another Satellite hosted by this one (`section_of`, such as
-    `#/satellite/Photo/LockedFolder`) always opens the own page, which hosts it, whichever
-    interface Developer Mode has chosen.
+    `#/satellite/Photo/LockedFolder`) opens the host's own page, which hosts it, whichever
+    interface the host shows - unless the hosted Satellite opens in its own shared interface
+    (or Developer Mode switched it there): then that one, beneath its host.
 - **`section`** (1.2), on its own: `{"section": "$.section"}` or `{"section": "Albums"}` opens
   another Satellite that this one hosts, and nothing else.
   - The target is a Satellite whose manifest says `section_of` this one, found in the Engine's
     listing of Satellites, never trusted from document data alone.
   - It opens over this interface, so Back returns here. Mission Control opens it beneath its
     host (`#/satellite/<host>/<name>`), in whichever interface draws it. The app pushes its
-    shared interface, or else a screen of the app's own for it.
+    shared interface, or else a screen of the app's own for it: a hosted Satellite's own screen
+    is its host's, opened at a section named after it.
+  - A host lists its sections from the Engine (`starcore.sections.hosted`: name, title, icon),
+    so its document names none of them.
   - A literal name the client can't open (not a section of this Satellite, or nothing it can
     draw) hides the control. A binding is checked when pressed, and says so as a notice.
   - Not in a selection or a tile's quick actions.
@@ -969,10 +974,10 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 | | Now (contract 1.2) | Target |
 |---|---|---|
 | Blocks | the 22 above, including `chart`, `table`, `image`, `media-list`, `media-grid`, `search`, `map` and `breadcrumb`; the `dashboard` template | more, minor by minor: `tabs`; templates `list-detail`, `settings`, `media-library` |
-| Satellite capabilities | `files.browse` (File Explorer), `audio.library` and `audio.session` (Music), `media.gallery` (Photo), `media.vault` (Locked Folder, `move_in` only through the `secure` action), `files.protected` (Locked Folder, asked by the Engine only) | browsing the Locked Folder from the shared interface; more pickable capabilities (files) |
+| Satellite capabilities | `files.browse` (File Explorer), `audio.library` and `audio.session` (Music), `media.gallery` (Photo), `media.vault` (Locked Folder, `move_in` only through the `secure` action), `files.protected` (Locked Folder, asked by the Engine only) | more pickable capabilities (files) |
 | Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action and protected documents; `secure.screen` on Android; saving, sharing and opening files (`download`, `share`); sending files (`upload`) | `device.background-tasks` (phone sync) - a native module written once in the app, behind a shared block |
 | Home | `widgets` in each document, drawn by both clients | |
-| Sections | `section_of` and the `section` action, but Photo still names the Locked Folder | the host discovers its sections from the catalog (the Locked Folder's L3) |
+| Sections | `section_of` and the `section` action; a host lists its sections from the Engine's registry | |
 | Icons | `icon_name` from the shared set, a neutral circle without one | Satellite-provided icons |
 | Rediscovery | Mission Control button and API | also on Android; and a CLI command |
 | Formats | 12, including rates, dates and relative times | |
@@ -992,7 +997,8 @@ Retiring all of them is planned in [Remaining work](remaining-work.md).
 4. **Partly done:** remove cheap couplings.
    - Done: icons come from `icon_name`; the folder picker uses `files.browse`; Home draws
      widgets instead of naming Status.
-   - Next: sections discovered instead of Photo naming the Locked Folder.
+   - Done: a host's sections come from the Engine's registry; Photo's document names no
+     Satellite it hosts.
 5. Rediscovery and cache controls on Android.
 6. **Done (1.1): Status first.** `chart`, `table`, `choice`, `status`, `code`, the
    `dashboard` template, page state and sources, the header and widgets. Status's `ui.json`

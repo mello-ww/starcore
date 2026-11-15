@@ -51,6 +51,13 @@ describe('PhotoHomeScreen sections', () => {
     expect(navigation.replace).not.toHaveBeenCalled();
   });
 
+  it('shows the same for its Satellite’s name - the section a hosted Satellite’s own screen opens at', async () => {
+    mockStatus.mockResolvedValue({configured: true, unlocked: false});
+    const {tree} = await mount({section: 'LockedFolder'});
+    expect(texts(tree)).toEqual(expect.arrayContaining(['Locked Folder', 'Locked Folder tab']));
+    expect(texts(tree)).not.toContain('Library');
+  });
+
   it('says so when the server has no Locked Folder', async () => {
     mockStatus.mockResolvedValue(null);
     const {tree} = await mount({section: 'locked'});

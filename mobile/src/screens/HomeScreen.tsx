@@ -51,24 +51,44 @@ export const DEDICATED_SCREENS: Record<string, 'PhotoHome' | 'MusicHome'> = {
   Music: 'MusicHome',
 };
 
+/** A screen of this app's own and the params it opens with. */
+export interface OwnScreen {
+  screen: 'PhotoHome' | 'MusicHome';
+  params?: {section: string};
+}
+
+/**
+ * The screen of this app's own for a Satellite: its dedicated screen or, for a Satellite another
+ * one hosts (section_of), its host's dedicated screen opened at a section named after it - as
+ * Mission Control opens the host's own page at that section.
+ */
+export function ownScreen(satellite: SatelliteSummary): OwnScreen | undefined {
+  const own = DEDICATED_SCREENS[satellite.name];
+  if (own) {
+    return {screen: own};
+  }
+  const host = satellite.section_of ? DEDICATED_SCREENS[satellite.section_of] : undefined;
+  return host ? {screen: host, params: {section: satellite.name}} : undefined;
+}
+
 /**
  * Whether a Satellite opens in its shared interface (its ui.json, SatelliteUiScreen). It does
  * whenever it has one, unless the document is a preview (UI contract 1.2) and this app has a
- * screen of the Satellite's own: that screen stays the default until the document reaches
+ * screen of its own for the Satellite: that screen stays the default until the document reaches
  * parity, and Developer Mode offers the shared one beside it.
  */
 export function opensSharedInterface(satellite: SatelliteSummary): boolean {
-  return Boolean(satellite.ui?.revision) && !(satellite.ui?.preview === true && DEDICATED_SCREENS[satellite.name]);
+  return Boolean(satellite.ui?.revision) && !(satellite.ui?.preview === true && ownScreen(satellite));
 }
 
 /** A preview document beside the app's own screen for it: what Developer Mode can open. */
 export function hasSharedPreview(satellite: SatelliteSummary): boolean {
-  return Boolean(satellite.ui?.revision) && satellite.ui?.preview === true && Boolean(DEDICATED_SCREENS[satellite.name]);
+  return Boolean(satellite.ui?.revision) && satellite.ui?.preview === true && Boolean(ownScreen(satellite));
 }
 
 /** Whether tapping a Satellite opens anything: its shared interface, or a screen of this app's own. */
 export function canOpen(satellite: SatelliteSummary): boolean {
-  return Boolean(satellite.ui?.revision) || Boolean(DEDICATED_SCREENS[satellite.name]);
+  return Boolean(satellite.ui?.revision) || Boolean(ownScreen(satellite));
 }
 
 /**
@@ -76,8 +96,8 @@ export function canOpen(satellite: SatelliteSummary): boolean {
  * in this app, kept until the shared one is validated. Developer Mode can open that screen
  * instead, as Mission Control's Developer Mode can show a Satellite's own page.
  */
-export function ownScreenBeside(satellite: SatelliteSummary): 'PhotoHome' | 'MusicHome' | undefined {
-  return opensSharedInterface(satellite) ? DEDICATED_SCREENS[satellite.name] : undefined;
+export function ownScreenBeside(satellite: SatelliteSummary): OwnScreen | undefined {
+  return opensSharedInterface(satellite) ? ownScreen(satellite) : undefined;
 }
 
 export function alertsFor(satellites: SatelliteSummary[]) {

@@ -136,7 +136,8 @@ closed it.
   (File Explorer, Photo, Music).
 - [x] **L2** - protected documents, the `section` action, an unlock that ends when idle, the
   generic unlock prompt on both clients (contract change 1).
-- [ ] **L3** - the Locked Folder's own `ui.json`: browse, view, move out, delete, upload.
+- [x] **L3** - the Locked Folder's own `ui.json`: browse, view, move out, delete, upload, a
+  preview behind its own page and screens; Photo lists the Satellites it hosts as tiles.
 - [ ] **L4** - client-owned prompts for typing and showing secrets, and repeatable form rows
   (contract change 2); the vault's settings and setup pages.
 - [ ] **L5** - end to end on the local demo; the owner validates on the web and the phone.

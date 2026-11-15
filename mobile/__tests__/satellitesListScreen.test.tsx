@@ -1,6 +1,6 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {Text} from 'react-native';
+import {Pressable, Text} from 'react-native';
 import {SatellitesListScreen} from '../src/screens/SatellitesListScreen';
 
 // Factory-mocked (not auto-mocked) so requiring this module never pulls in
@@ -9,6 +9,7 @@ import {SatellitesListScreen} from '../src/screens/SatellitesListScreen';
 // src/platform/README.md.
 jest.mock('../src/auth/AuthContext', () => ({useAuth: jest.fn()}));
 jest.mock('../src/servers/ServersContext', () => ({useServers: jest.fn()}));
+jest.mock('../src/developer/DeveloperModeContext', () => ({useDeveloperMode: jest.fn(() => ({enabled: false}))}));
 jest.mock('../src/satellites/cache');
 jest.mock('../src/satellites/api', () => {
   const list = jest.fn();
@@ -17,6 +18,7 @@ jest.mock('../src/satellites/api', () => {
 
 import {useAuth} from '../src/auth/AuthContext';
 import {useServers} from '../src/servers/ServersContext';
+import {useDeveloperMode} from '../src/developer/DeveloperModeContext';
 import {getCachedSatellites, setCachedSatellites} from '../src/satellites/cache';
 const {__mocks} = jest.requireMock('../src/satellites/api') as {__mocks: {list: jest.Mock}};
 
@@ -72,6 +74,36 @@ describe('SatellitesListScreen', () => {
 
     expect(texts(tree)).toContain('status');
     expect(texts(tree)).not.toContain('LockedFolder');
+  });
+
+  it('offers a hosted Satellite’s preview document on its host’s card, in Developer Mode only', async () => {
+    const photo = {...satelliteA, name: 'Photo', ui: {contract: 'starcore.ui/1.2', revision: 'p1', error: null, preview: true}};
+    const hosted = {...satelliteB, name: 'Vaulty', section_of: 'Photo',
+      ui: {contract: 'starcore.ui/1.2', revision: 'v1', error: null, preview: true}};
+    __mocks.list.mockResolvedValue([photo, hosted]);
+    const pill = (tree: ReturnType<typeof renderer.create>) =>
+      tree.root.findAll((node: any) => node.type === Pressable && node.props.testID === 'shared-preview-Vaulty');
+
+    let tree!: ReturnType<typeof renderer.create>;
+    await act(async () => {
+      tree = renderer.create(<SatellitesListScreen navigation={navigation} route={route} />);
+    });
+    expect(pill(tree)).toHaveLength(0);
+    act(() => tree.unmount());
+
+    (useDeveloperMode as jest.Mock).mockReturnValue({enabled: true});
+    try {
+      await act(async () => {
+        tree = renderer.create(<SatellitesListScreen navigation={navigation} route={route} />);
+      });
+      // not a card of its own: only the pill on its host's names it
+      expect(texts(tree)).not.toContain('Container control');
+      expect(pill(tree)).toHaveLength(1);
+      act(() => pill(tree)[0].props.onPress());
+      expect(navigation.navigate).toHaveBeenCalledWith('SatelliteUi', {name: 'Vaulty', revision: 'v1'});
+    } finally {
+      (useDeveloperMode as jest.Mock).mockReturnValue({enabled: false});
+    }
   });
 
   it('marks a satellite with no interface as such and does not navigate on tap', async () => {

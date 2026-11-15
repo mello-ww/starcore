@@ -1709,10 +1709,12 @@ function buildConfigButton(satellite, extraClass) {
 
 // shown in the topbar whenever the current route is a configurable satellite's
 // page, in addition to the same button already on its card in the list
-// Developer Mode only: a Satellite with both a ui.json and a page.js can be shown either way
+// Developer Mode only: a Satellite with both a ui.json and a page.js can be shown either way.
+// At a section that is a Satellite the routed one hosts (section_of), the switch is that one's
 function updateSatelliteOwnPageButton() {
     const button = document.getElementById("satellite-classic-button");
-    const satellite = route.name === "satellite" ? findSatellite(route.satellite) : null;
+    const routed = route.name === "satellite" ? findSatellite(route.satellite) : null;
+    const satellite = routed ? hostedSection(routed, route.section) || routed : null;
     if (!satellite || !satellite.page || !hasUiDocument(satellite)) {
         button.hidden = true;
         button.onclick = null;

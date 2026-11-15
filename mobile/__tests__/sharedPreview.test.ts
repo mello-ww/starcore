@@ -1,11 +1,11 @@
-import {hasSharedPreview, opensSharedInterface, ownScreenBeside} from '../src/screens/HomeScreen';
+import {canOpen, hasSharedPreview, opensSharedInterface, ownScreen, ownScreenBeside} from '../src/screens/HomeScreen';
 import type {SatelliteSummary} from '../src/satellites/types';
 
 // a preview document (UI contract 1.2) leaves the app's own screen for a Satellite first;
 // any other document - or a preview for a Satellite the app has no screen of its own for -
 // opens in the shared interface
-const satellite = (name: string, ui: SatelliteSummary['ui']): SatelliteSummary =>
-  ({name, ui, status: 'running', description: ''}) as unknown as SatelliteSummary;
+const satellite = (name: string, ui: SatelliteSummary['ui'], section_of?: string): SatelliteSummary =>
+  ({name, ui, section_of, status: 'running', description: ''}) as unknown as SatelliteSummary;
 
 describe('which interface a Satellite opens in', () => {
   it('opens a document in the shared interface', () => {
@@ -37,9 +37,23 @@ describe('which interface a Satellite opens in', () => {
     const switched = satellite('Photo', {contract: 'starcore.ui/1.2', revision: 'r4', error: null});
     expect(opensSharedInterface(switched)).toBe(true);
     expect(hasSharedPreview(switched)).toBe(false);
-    expect(ownScreenBeside(switched)).toBe('PhotoHome');
+    expect(ownScreenBeside(switched)).toEqual({screen: 'PhotoHome'});
     // a preview, or a Satellite the app has no screen of its own for, has nothing to offer here
     expect(ownScreenBeside(satellite('Photo', {contract: 'starcore.ui/1.2', revision: 'r2', error: null, preview: true}))).toBeUndefined();
     expect(ownScreenBeside(satellite('Gallery', {contract: 'starcore.ui/1.2', revision: 'r3', error: null}))).toBeUndefined();
+  });
+
+  it('a hosted Satellite’s own screen is its host’s, opened at a section named after it', () => {
+    const hosted = satellite('Vaulty', {contract: 'starcore.ui/1.2', revision: 'r5', error: null, preview: true}, 'Photo');
+    expect(ownScreen(hosted)).toEqual({screen: 'PhotoHome', params: {section: 'Vaulty'}});
+    expect(opensSharedInterface(hosted)).toBe(false);
+    expect(hasSharedPreview(hosted)).toBe(true);
+    expect(canOpen(hosted)).toBe(true);
+    // its document no longer a preview: the shared one by default, the host's screen beside it
+    const switched = satellite('Vaulty', {contract: 'starcore.ui/1.2', revision: 'r6', error: null}, 'Photo');
+    expect(opensSharedInterface(switched)).toBe(true);
+    expect(ownScreenBeside(switched)).toEqual({screen: 'PhotoHome', params: {section: 'Vaulty'}});
+    // a host the app has no screen of its own for gives nothing
+    expect(ownScreen(satellite('Vaulty', null as any, 'Elsewhere'))).toBeUndefined();
   });
 });

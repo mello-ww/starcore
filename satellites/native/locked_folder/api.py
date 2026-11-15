@@ -25,7 +25,7 @@ import threading
 from starcore.api.response import error_response, file_response, json_response, stream_response
 from starcore.capabilities import ReferenceProblem
 
-from . import configuration, crypto, encryption, thumbnails, vault
+from . import configuration, crypto, encryption, thumbnails, vault, views
 from .runtime import IDLE_SECONDS, SecurityStateError, runtime, validate_pin
 
 # settings that would loosen protection or point it somewhere else once a
@@ -57,6 +57,8 @@ def routes() -> dict:
         "keep": keep,
         "delink": delink,
         "media": media,
+        "gallery": gallery,
+        "setup": setup,
         "upload": upload,
         "delete": delete,
         "move_in": move_in,
@@ -440,6 +442,40 @@ def media(request):
     content_type = vault.MEDIA_TYPES.get(target.suffix.lower(), (None, "application/octet-stream"))[1]
     return file_response(target, content_type, cache="private, no-store",
                          download_name=target.name if download else None)
+
+
+def gallery(request):
+    """GET gallery?limit=&cursor= -> the vault a page at a time, for the shared interface's grid
+    (views.py). Like every vault read, only for a session that has it open."""
+    if request.method != "GET":
+        return error_response("only GET is supported here", status=405)
+    live = runtime(request.satellite)
+    refused = _require_unlocked(request, live)
+    if refused is not None:
+        return refused
+    root = live.configured_root
+    if not root.is_dir():
+        return error_response("the Locked Folder directory is missing", status=404)
+    try:
+        page = views.gallery(live, root, vault.photo_library(request.engine) is not None,
+                             request.query.get("limit"), request.query.get("cursor"))
+    except encryption.KeyProblem as problem:
+        return _problem(problem.code)
+    except (vault.VaultError, encryption.EncryptionError) as error:
+        return error_response(str(error), status=error.status)
+    return json_response(page)
+
+
+def setup(request):
+    """GET setup -> what the shared interface's setup page says (views.py): served without an
+    unlock, as status is, so it never says where the vault is or what it holds."""
+    if request.method != "GET":
+        return error_response("only GET is supported here", status=405)
+    if not request.token:
+        return error_response("authentication required", status=401)
+    live = runtime(request.satellite)
+    root = live.configured_root
+    return json_response(views.setup(live, root is not None, live.security_problem() if root is not None else None))
 
 
 def _thumbnail(live, root, relative, duration=False):

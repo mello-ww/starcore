@@ -4,6 +4,7 @@ import {ActivityIndicator, Pressable, StyleSheet, Text, View} from 'react-native
 import Icon from 'react-native-vector-icons/Feather';
 import {colors, spacing, typography, useAccentStyles} from '../theme';
 import {SettingsButton} from '../components/SettingsButton';
+import {LOCKED_FOLDER} from '../lockedFolder/api';
 import {useLockedFolder} from '../lockedFolder/useLockedFolder';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
 import {LockedFolderTab} from './LockedFolderTab';
@@ -44,9 +45,10 @@ export function PhotoHomeScreen({navigation, route}: Props) {
   const {api: lockedApi} = useLockedFolder();
   const [hasLockedFolder, setHasLockedFolder] = useState(false);
   const [lockedChecked, setLockedChecked] = useState(false);
-  // opened by the shared interface's own action ({"own": "settings"} in Photo's ui.json): one
-  // destination on its own, pushed over the shared screen, so Back returns there
-  const opened = route.params?.section;
+  // opened by the shared interface's own action ({"own": "settings"} in Photo's ui.json), or by
+  // its section action at the Locked Folder (named after its Satellite): one destination on its
+  // own, pushed over the shared screen, so Back returns there
+  const opened = route.params?.section === LOCKED_FOLDER ? 'locked' : route.params?.section;
   // bumped when photos come back out of the Locked Folder, so Library reloads
   const [libraryKey, setLibraryKey] = useState(0);
 

@@ -193,10 +193,10 @@ POST /api/satellites/photo/albums/<id>/photos           add a photo   {"photo_id
 POST /api/satellites/photo/albums/<id>/photos/remove    remove a photo {"photo_id": ...}
 GET  /api/satellites/photo/gallery            the library shaped for ui.json's shared gallery (read-only); ?group=month
                                               (the default), camera (alphabetical, unknown last, each newest first) or all
-GET  /api/satellites/photo/gallery/albums     every album as a tile with its cover: Favorites pinned first, then the
-                                              Locked Folder while a media.vault provider is there (a lock, nothing about
-                                              what it holds), the phone's folders (together under "Folders"), then
-                                              custom albums ("Albums")
+GET  /api/satellites/photo/gallery/albums     every album as a tile with its cover: Favorites pinned first, then each
+                                              enabled Satellite Photo hosts (section_of, from the Engine's registry: its
+                                              title and icon, a "section" to open, nothing about what it holds), the
+                                              phone's folders (together under "Folders"), then custom albums ("Albums")
 GET  /api/satellites/photo/gallery/albums/<id>   one album's photos in the album's own order, for the shared gallery
 GET  /api/satellites/photo/gallery/trash      the recycle bin, with the days each item has left ("left")
 GET  /api/satellites/photo/gallery/import     the default import folder and the formats an import takes in
@@ -295,7 +295,7 @@ What it covers:
 | Map clustering | web only, by rounded coordinates | both clients, a grid about 64 px wide on screen |
 | Import from a folder on the server: check, then import | web only | yes, both clients ("Import from a folder" on Library) |
 | Phone sync, settings | yes | opens Photo's own: "Settings and phone sync" on Albums (the web's Configuration tab, the app's Photo configuration) |
-| Locked Folder | yes | opens Photo's own: the Locked Folder's tile among the folders on Albums (a lock for its cover, shown while a `media.vault` provider is there), with its PIN or biometrics, locked again on leaving; its security-sensitive behaviour isn't migrated |
+| Locked Folder | yes | its tile among the folders on Albums (a lock, shown while the Locked Folder is enabled) opens it with the `section` action: its own page or screen by default, its shared interface (a preview, [the Locked Folder](locked_folder.md#shared-interface)) in Developer Mode |
 | Move a photo into the Locked Folder | yes, from the viewer | yes: the viewer (Library, Search, Map, an album) and a selection (Library, an album), through the secure action - see below |
 | Offline cache of the library (Android) | yes, the whole list (metadata only) | yes: Library, Albums and an album, with up to 600 items each (`offline` pages, see the UI contract's "Offline pages"), only the fields they show, and never an item's GPS location or its folder on the server; never the recycle bin, Search or Map |
 
@@ -310,14 +310,16 @@ one the map area stays blank and the Library, Search and viewer work as usual. D
 remain: on Android a cluster opens the viewer directly (the web shows its thumbnails first), and
 the web's single-photo popup is replaced by opening the viewer at once.
 
-The two Albums buttons use the contract's `own` action (`{"own": "settings"}`,
-`{"own": "locked"}`): Photo's own web page opens its Configuration or Locked Folder tab for
-them, and the app pushes Photo configuration, or the Locked Folder on its own screen, over the
-shared one, so Back returns there. Nothing about the Locked Folder changes: it asks for its PIN
-or biometrics as before, locks again on leaving, blocks screenshots on Android, and the shared
-document never reaches its routes or media. A server without a Locked Folder says so on that
-screen. `#/satellite/Photo/LockedFolder` keeps opening Photo's own page on the web, whichever
-interface is shown.
+"Settings and phone sync" on Albums uses the contract's `own` action (`{"own": "settings"}`):
+Photo's own web page opens its Configuration tab, and the app pushes Photo configuration over
+the shared one, so Back returns there. The Locked Folder's tile uses the `section` action
+(`{"section": "$.section"}`), and Photo's document names no Satellite it hosts: the albums route
+lists them from the Engine. By default it opens the Locked Folder's own interface - Photo's own
+web page at `#/satellite/Photo/LockedFolder`, and in the app the Locked Folder on its own
+screen, pushed over the shared one - which asks for its PIN or biometrics as before, locks
+again on leaving and blocks screenshots on Android. Photo's document never reaches the vault's
+routes or media. The Locked Folder's own shared interface, a preview, opens there instead once
+Developer Mode switches it on ([the Locked Folder](locked_folder.md#shared-interface)).
 
 **Move to Locked Folder** is the contract's `secure` action (`media.vault` / `move_in`), on the
 viewer and on a selection. The document names neither the Locked Folder nor a route.

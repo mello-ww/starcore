@@ -53,6 +53,18 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   for 10 seconds. It keeps nothing: no offline page, widget or share; on Android images only in
   memory, a window that can't be captured, and no "open in another app". The Engine accepts it
   only from the store's own Satellite (`docs/ui-contract.md`, "Protected documents").
+- **The Locked Folder's shared interface, a preview** (`locked_folder/ui.json`, a protected
+  document): a grid of everything in the vault in month groups, paged, with the picture or the
+  video in a viewer, Move to Photos, Download and Delete forever, a selection, and Add files; a
+  setup page that says what is missing without giving the location. Its own page and screens
+  stay the default until it is validated; Developer Mode opens it (the top bar's switch on the
+  web, a pill on Photos' card in the app's Satellites list). It reads two new views, `gallery`
+  and `setup`, and changes the vault only through its existing routes
+  (`docs/satellites/locked_folder.md`, "Shared interface").
+- **A host lists the Satellites it hosts from the Engine** (`starcore.sections`): Photo's
+  albums show each as a tile, with its title and icon, that opens through the `section` action.
+  Photo's document no longer names the Locked Folder, and in the app a hosted Satellite's own
+  screen is its host's, opened at its section.
 - **The `section` action (UI contract 1.2)** opens a Satellite whose manifest says it is a
   section of this one, over it, on both clients, and nothing else. A control for one the client
   can't open is hidden.
