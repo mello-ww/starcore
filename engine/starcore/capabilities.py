@@ -14,7 +14,14 @@ Only the provider's answer counts.
 
 It also answers, for every Satellite, whether a path on disk is in a protected area
 (`protection`, the files.protected capability): asked before a Satellite serves, lists, indexes,
-renames or deletes a path, so no Satellite needs to know which one guards it.
+renames or deletes a path, so no Satellite needs to know which one guards it. And whether media
+was moved into a protected store (`sealed`, media.vault's optional `sealed`), so a library never
+takes it back in.
+
+`call` runs one provider's operation in-process for another Satellite: the Satellites that move
+media between a library and a vault ask each other only this way, never by importing each
+other. The request carries `caller`, which a client's request over HTTP never has, so an
+operation meant for the server alone refuses clients (`refuse_clients`).
 
 Nothing here names a Satellite.
 See docs/ui-contract.md, "Shared blocks and Satellite capabilities".
@@ -23,7 +30,7 @@ See docs/ui-contract.md, "Shared blocks and Satellite capabilities".
 import re
 from typing import NamedTuple, Optional
 
-from .api.response import Request
+from .api.response import Request, error_response
 
 # at most this many references in one request (a selection's bulk limit)
 MAX_REFERENCES = 500
@@ -49,31 +56,91 @@ def provider(engine, capability: str):
     return found[0] if found else (None, None)
 
 
-def call(engine, capability: str, operation: str, path: tuple = (), query: dict = None, token: str = ""):
-    """Runs a GET operation of the capability's provider in-process, with the caller's session,
-    as if the client had asked it. The Response, or None when there is no provider, it lacks the
-    operation, or it failed."""
+# the caller the Engine's own checks (sealed) give, beside a Satellite's name
+ENGINE_CALLER = "starcore"
+SERVER_SIDE = "this is asked only by the server, never by a client"
+
+
+def call(engine, capability: str, operation: str, path: tuple = (), query: dict = None, token: str = "",
+         method: str = "GET", body=None, raw=None, caller: str = None):
+    """Runs an operation of the capability's provider in-process, with the given session (empty
+    for none), as if a client had asked it, or, with `caller` (the asking Satellite's name), as
+    that Satellite asking through the Engine. `body` is a JSON body; `raw` a RawBody-like stream
+    (read(size), length). The Response, or None when there is no provider, it lacks the operation,
+    or it failed."""
     satellite, entry = provider(engine, capability)
     if satellite is None:
         return None
-    return _run(engine, satellite, entry, capability, operation, path, query, token)
+    return _run(engine, satellite, entry, capability, operation, path, query, token, method, body, raw, caller)
 
 
-def _run(engine, satellite, entry, capability, operation, path=(), query=None, token=""):
-    """One provider's GET operation, in-process: its Response, or None when it lacks the
-    operation or failed."""
+def offers(engine, capability: str, operations) -> bool:
+    """Whether the capability's provider is there and offers every one of `operations`."""
+    satellite, entry = provider(engine, capability)
+    return satellite is not None and all(operation in entry["operations"] for operation in operations)
+
+
+def provider_name(engine, capability: str):
+    """The name of the capability's provider, or None."""
+    satellite, _entry = provider(engine, capability)
+    return None if satellite is None else satellite.manifest.name
+
+
+def refuse_clients(request):
+    """For an operation only the server asks: a 403 for a client's request (no `caller`), None
+    when a Satellite or the Engine asked it through `call`."""
+    return None if getattr(request, "caller", None) else error_response(SERVER_SIDE, status=403)
+
+
+def _run(engine, satellite, entry, capability, operation, path=(), query=None, token="", method="GET",
+         body=None, raw=None, caller=None):
+    """One provider's operation, in-process: its Response, or None when it lacks the operation
+    or failed."""
     if operation not in entry["operations"]:
         return None
     route = entry["operations"][operation].split("/")
     handler = satellite.routes.get(route[0])
     if handler is None:
         return None
-    request = Request(engine, satellite, "GET", tuple(route[1:]) + tuple(path), dict(query or {}), token=token)
+    request = Request(engine, satellite, method, tuple(route[1:]) + tuple(path), dict(query or {}), body=body,
+                      raw=raw, token=token, caller=caller)
     try:
         return handler(request)
     except Exception as error:
         print(f"[WARNING]: '{capability}' {operation} of '{satellite.manifest.name}' failed ({type(error).__name__}).")
         return None
+
+
+# ---------- media moved into a protected store (media.vault's sealed) ----------
+
+VAULT = "media.vault"
+DIGEST = re.compile(r"^[0-9a-f]{64}$")
+
+
+def sealed(engine, digest: str) -> bool:
+    """Whether media with this SHA-256 (lowercase hex) was moved into a protected store, as
+    every media.vault provider that offers `sealed` answers: a library asks before it takes a
+    file in, and refuses it when the answer is yes.
+
+    Every provider is asked, enabled or not, as for `protection`: disabling one needs no PIN, so
+    it must not let its media back into a library. A provider that fails, or answers anything
+    but {sealed: bool}, counts as yes: the file stays out rather than risk taking in what was
+    moved away on purpose."""
+    if not isinstance(digest, str) or not DIGEST.match(digest):
+        return False
+    for satellite, entry in providers(engine, VAULT, enabled_only=False):
+        if "sealed" not in entry["operations"]:
+            continue
+        response = _run(engine, satellite, entry, VAULT, "sealed", path=(digest,), caller=ENGINE_CALLER)
+        payload = getattr(response, "payload", None)
+        if (response is None or response.status != 200 or not isinstance(payload, dict)
+                or not isinstance(payload.get("sealed"), bool)):
+            print(f"[WARNING]: '{satellite.manifest.name}' could not say whether media was moved into it; "
+                  "it stays out of the library.")
+            return True
+        if payload["sealed"]:
+            return True
+    return False
 
 
 # ---------- protected areas on disk (files.protected) ----------

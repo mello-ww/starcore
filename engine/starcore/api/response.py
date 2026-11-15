@@ -4,7 +4,8 @@ from pathlib import Path
 class Request:
     """What a satellite route handler receives."""
 
-    def __init__(self, engine, satellite, method: str, path: tuple, query: dict, body=None, raw=None, token: str = ""):
+    def __init__(self, engine, satellite, method: str, path: tuple, query: dict, body=None, raw=None, token: str = "",
+                 caller: str = None):
         self.engine = engine
         self.satellite = satellite
         self.method = method
@@ -22,6 +23,11 @@ class Request:
         # this request at all (StarCore not yet bootstrapped). A route that
         # doesn't need it ignores it.
         self.token = token
+        # who asked through the Engine (starcore.capabilities): a Satellite's
+        # name, or the Engine's own checks; None for a client's request over
+        # HTTP, which can never set it. A server-side-only operation refuses a
+        # request without one (capabilities.refuse_clients).
+        self.caller = caller
 
 
 class Response:

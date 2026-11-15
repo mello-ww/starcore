@@ -7,6 +7,14 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Security
 
+- **The Locked Folder and Photo no longer reach into each other's code.** Moves between the
+  vault and the library go through the Engine, as `media.gallery`'s new optional `original`,
+  `release` and `adopt`, and Photo asks whether a file was moved into the vault through
+  `media.vault`'s new optional `sealed`, of every provider, enabled or not; one that can't
+  answer keeps the file out (before, a Locked Folder whose runtime didn't exist yet let it in).
+  All four are for the server alone: a request through the Engine carries its `caller`, which a
+  client's request never has, so a client gets `403` (`docs/satellites/locked_folder.md`, L6).
+
 - **Disabling the Locked Folder no longer opens it to File Explorer.** Disabling a Satellite
   needs only a session, not the PIN, and File Explorer's guard used to skip a disabled Locked
   Folder: a session that never gave the PIN could then list, read, rename and delete what was in

@@ -8,10 +8,11 @@ icon_name = "lock"
 section_of = "Photo" # opened as a tab of Photo, not from its own navigation entry
 
 # a protected store media can be moved into from a shared interface (the secure action) -
-# deliberately no operation that lists or reads the vault: that stays in its own screens
+# deliberately no operation that lists or reads the vault: that stays in its own screens.
+# sealed (server-side only) tells a library whether a file was moved in, so it stays out
 [provides."media.vault"]
 version = 1
-operations = { status = "status", unlock = "unlock", lock = "lock", keep = "keep", move_in = "move_in", biometric = "biometric" }
+operations = { status = "status", unlock = "unlock", lock = "lock", keep = "keep", move_in = "move_in", biometric = "biometric", sealed = "sealed" }
 
 # what the Engine asks before any Satellite serves, lists, indexes, renames or deletes a path:
 # whether it is in the vault (or contains it), and whether this session may reach it now

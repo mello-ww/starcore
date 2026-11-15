@@ -1,14 +1,8 @@
 """Published to Mission Control's dashboard (see docs/satellites.md,
-"Publishing state"). Also doubles as the warm-up point for the runtime
-File Explorer's guard reaches into: engine.registry.get("LockedFolder")
-alone only returns the Satellite object, not a populated
-`.locked_folder_runtime` attribute - that only exists once runtime() has
-run at least once (see runtime.py). state() is called automatically
-whenever the API is asked for Satellites, which happens on every Mission
-Control dashboard load, so in practice this satellite is warmed up well
-before anyone reaches a route that needs it. File Explorer's guard and
-Photo's private_media check also call this themselves when nothing has
-created the runtime yet, so a cold start is guarded too.
+"Publishing state"). Nothing depends on it to create the runtime: every
+route, the Engine's questions (files.protected's check, media.vault's
+sealed) included, creates it on first use (see runtime.py), so a cold
+start is guarded without it.
 """
 
 from .runtime import runtime as runtime_module

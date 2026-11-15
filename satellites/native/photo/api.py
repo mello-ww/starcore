@@ -3,7 +3,7 @@
 from starcore.api.response import error_response, file_response, json_response
 
 from . import albums as albums_module
-from . import configuration, gallery, sync
+from . import configuration, gallery, handover, sync
 from .albums import AlbumError, AlbumNotFound, albums
 from .images import UnsupportedImage
 from .library import PhotoImportError, PhotoNotFound, library
@@ -81,7 +81,13 @@ def gallery_route(request):
     return error_response(f"unknown endpoint 'gallery/{'/'.join(path)}'")
 
 
+# media.gallery's server-side operations (handover.py): refused to a client
+HANDOVER = {"original": handover.original, "release": handover.release, "adopt": handover.adopt}
+
+
 def media_route(request):
+    if request.path and request.path[0] in HANDOVER:
+        return HANDOVER[request.path[0]](request)
     if request.method != "GET":
         return error_response("only GET is supported here", status=405)
     if len(request.path) == 2 and request.path[0] == "resolve":
@@ -98,8 +104,8 @@ def media_route(request):
 
 def resolve_media(request, photo_id: str):
     """media.gallery's resolve operation: GET media/resolve/<id> -> {id, kind}, for an item of
-    the active library only - never one in the recycle bin, and never one moved into the Locked
-    Folder (it has left the library). What the Engine asks before another Satellite acts on a
+    the active library only - never one in the recycle bin, and never one moved into a protected
+    store (it has left the library). What the Engine asks before another Satellite acts on a
     reference a client sent (starcore.capabilities.resolve_references)."""
     photo = library(request.satellite).get(photo_id) if 0 < len(photo_id) <= 128 else None
     if photo is None:

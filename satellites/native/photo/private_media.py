@@ -1,24 +1,20 @@
 """What the Photo library must never take in: anything in a protected area on
-disk, and anything that was moved from Photos into the Locked Folder.
+disk, and anything that was moved from Photos into a protected store.
 
-Whether a path is protected is the Engine's answer (files.protected), as for
-every Satellite: Photo names no provider for it. Whether a photo was moved into
-the vault is still asked of the Locked Folder's live runtime, a narrow yes/no
-question, until that too goes through a capability. Both apply whether or not
-the Locked Folder is currently enabled, since its files are just as private
-either way.
+Both are the Engine's answers, as for every Satellite: whether a path is
+protected (files.protected), and whether a file was moved into a store
+(media.vault's sealed). Photo names no provider for either. The Engine asks
+every provider, enabled or not, since what they hold is just as private either
+way, and one that can't answer keeps the file out.
 """
 
 from pathlib import Path
 
-from starcore.capabilities import protection
-
-LOCKED_FOLDER_NAME = "LockedFolder"
+from starcore.capabilities import protection, sealed
 
 
 class PrivateMedia:
-    def __init__(self, live=None, engine=None):
-        self._live = live
+    def __init__(self, engine=None):
         self._engine = engine
 
     def is_private(self, path) -> bool:
@@ -28,25 +24,12 @@ class PrivateMedia:
                     and protection(self._engine, Path(path).resolve()).protected)
 
     def is_sealed(self, digest: str) -> bool:
-        """True for a photo that was moved from Photos into the Locked Folder."""
-        return bool(self._live and self._live.is_sealed(digest))
+        """True for a file that was moved from Photos into a protected store."""
+        return bool(self._engine is not None and sealed(self._engine, digest))
 
 
 NONE = PrivateMedia()
 
 
 def policy(engine) -> PrivateMedia:
-    if engine is None:
-        return NONE
-    satellite = engine.registry.get(LOCKED_FOLDER_NAME)
-    if satellite is None:
-        return PrivateMedia(None, engine)
-    live = getattr(satellite, "locked_folder_runtime", None)
-    if live is None and satellite.state_provider is not None:
-        # the Locked Folder's state provider is its documented warm-up point
-        try:
-            satellite.state_provider(engine, satellite)
-        except Exception:
-            pass
-        live = getattr(satellite, "locked_folder_runtime", None)
-    return PrivateMedia(live, engine)
+    return NONE if engine is None else PrivateMedia(engine)

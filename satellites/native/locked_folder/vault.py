@@ -1,6 +1,7 @@
 """Reading the vault as a media library, uploads and deletes, and verified
-moves to and from Photos - for an unencrypted vault and an encrypted one
-(see encryption.py) alike.
+moves to and from the media library (this server's media.gallery provider,
+reached only through the Engine) - for an unencrypted vault and an encrypted
+one (see encryption.py) alike.
 
 Listing and serving only ever touch paths that resolve inside the configured
 root, so a symlink or ".." can never reach outside it, and never anything
@@ -21,19 +22,21 @@ import secrets
 import threading
 
 from starcore import capabilities
+from starcore.api.response import RawBody
 
 from . import encryption
 from .keys import META_DIR
 from .media import MEDIA_TYPES  # noqa: F401 - part of this module's interface
 
-PHOTO_SATELLITE = "Photo"
-MOVED_IN_FOLDER = "Photos"     # where photos moved in from the Photo library land
+MOVED_IN_FOLDER = "Photos"     # where photos moved in from the media library land
 GALLERY = "media.gallery"      # the capability references to movable media name
+# what the media.gallery provider must offer for moves (its optional, server-side operations)
+HANDOVER = ("original", "release", "adopt")
 MAX_ITEMS = 20000
 READ_SIZE = 1024 * 1024
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024
 
-# one move at a time: the Photo library index and the vault are both plain
+# one move at a time: the library's index and the vault are both plain
 # files, and two overlapping moves of the same photo must not interleave
 _move_lock = threading.Lock()
 
@@ -169,47 +172,92 @@ def _safe_name(name) -> str:
 
 
 # ---------- moves ----------
+#
+# The library on the other side is whatever this server's media.gallery provider is, reached
+# only through the Engine (starcore.capabilities.call): `original` hands an item's stored file
+# over, `release` lets it go once the copy here is verified, `adopt` takes a file back. Each is
+# asked as this Satellite (`caller`), which a client's request can never be.
 
-def photo_library(engine):
-    """The Photo satellite's live library, or None when Photo isn't loaded."""
-    satellite = engine.registry.get(PHOTO_SATELLITE)
-    if satellite is None:
-        return None
-    try:
-        # loaded lazily and by its registered package name, the same module
-        # object Photo's own routes use (so one in-memory index, not two)
-        from satellites.native.photo.library import library
-    except ImportError:
-        return None
-    return library(satellite)
+def gallery_available(engine) -> bool:
+    """Whether this server's media.gallery provider can hand items over and take them back."""
+    return capabilities.offers(engine, GALLERY, HANDOVER)
 
 
 def resolve_movable(engine, references, token: str) -> tuple:
     """(resolved, refused) for references a client sent (move_in's `items`): each one resolved
-    by the Engine through the media.gallery provider it knows, never trusted as sent. Only the
-    Photo library's items can be moved in, so a provider other than Photo refuses them all.
+    by the Engine through the media.gallery provider it knows, never trusted as sent. A provider
+    that can't hand its items over refuses them all.
     Raises capabilities.ReferenceProblem when the list can't be used at all."""
     resolved, refused = capabilities.resolve_references(engine, GALLERY, references, token)
-    if any(item["provider"] != PHOTO_SATELLITE for item in resolved):
-        raise capabilities.ReferenceProblem("only photos from the Photo library can be moved in")
+    if not gallery_available(engine):
+        raise capabilities.ReferenceProblem("this server's media library can't hand its items over")
     return resolved, refused
 
 
 def still_movable(engine, token: str):
     """The check made again for each photo at the moment it is moved: does the media.gallery
     provider still answer for it, in the active library?"""
-    return lambda photo_id: capabilities.still_resolves(
-        engine, GALLERY, {"provider": PHOTO_SATELLITE, "id": photo_id}, token)
+    name = capabilities.provider_name(engine, GALLERY)
+    return lambda photo_id: name is not None and capabilities.still_resolves(
+        engine, GALLERY, {"provider": name, "id": photo_id}, token)
 
 
-def move_in(engine, live, root: Path, photo_ids, still_valid=None) -> dict:
-    """Moves photos out of the Photo library into the vault's Photos folder -
-    encrypted, once the vault is. With `still_valid`, each photo is checked again
-    with it just before its copy, under the move lock; one that no longer passes
-    is reported in `failed` and left alone."""
-    library = photo_library(engine)
-    if library is None:
-        raise VaultError("the Photo satellite is not available", status=503)
+class _Gallery:
+    """The media.gallery provider's server-side operations, asked as `caller`."""
+
+    def __init__(self, engine, caller: str):
+        self._engine = engine
+        self._caller = caller
+
+    def _call(self, operation, path=(), query=None, method="GET", body=None, raw=None):
+        return capabilities.call(self._engine, GALLERY, operation, path, query, method=method, body=body,
+                                 raw=raw, caller=self._caller)
+
+    def original(self, photo_id: str):
+        """(path, filename) of an item's stored original in the active library."""
+        response = self._call("original", (photo_id,))
+        if response is None or response.status != 200 or response.path is None:
+            raise VaultError("no such photo in the library", status=404)
+        path = Path(response.path)
+        return path, response.download_name or path.name
+
+    def release(self, photo_id: str, sha256: str):
+        response = self._call("release", method="POST", body={"id": photo_id, "sha256": sha256})
+        if response is None or response.status != 200:
+            raise VaultError(_reason(response, "the library did not let the photo go, so it was left there"),
+                             status=409)
+
+    def adopt(self, source: Path, filename: str) -> dict:
+        """{id, kind, added} once the library has taken `source` in."""
+        size = source.stat().st_size
+        query = {"name": filename, "modified": str(source.stat().st_mtime)}
+        with open(source, "rb") as handle:
+            response = self._call("adopt", query=query, method="POST", raw=RawBody(handle, size))
+        payload = getattr(response, "payload", None)
+        if response is None or response.status != 200 or not isinstance(payload, dict) \
+                or not isinstance(payload.get("id"), str):
+            raise VaultError(_reason(response, "the library did not take the file, so it was left in the "
+                                               "Locked Folder"), status=500)
+        return payload
+
+
+def _reason(response, fallback: str) -> str:
+    payload = getattr(response, "payload", None)
+    message = payload.get("error") if isinstance(payload, dict) else None
+    return message if isinstance(message, str) and message else fallback
+
+
+def _gallery(engine, caller: str) -> _Gallery:
+    if not gallery_available(engine):
+        raise VaultError("this server's media library is not available", status=503)
+    return _Gallery(engine, caller)
+
+
+def move_in(engine, live, root: Path, photo_ids, still_valid=None, *, caller: str) -> dict:
+    """Moves photos out of the media library into the vault's Photos folder - encrypted, once
+    the vault is. With `still_valid`, each photo is checked again with it just before its copy,
+    under the move lock; one that no longer passes is reported in `failed` and left alone."""
+    gallery = _gallery(engine, caller)
     if not isinstance(photo_ids, list) or not photo_ids or not all(isinstance(item, str) for item in photo_ids):
         raise VaultError("'photo_ids' must be a non-empty list of photo ids")
     store = encryption.Store.open(live, root)  # KeyProblem: refuse rather than store unencrypted
@@ -222,10 +270,9 @@ def move_in(engine, live, root: Path, photo_ids, still_valid=None) -> dict:
                 continue
             try:
                 if store is not None:
-                    moved.append(_move_one_in_encrypted(live, library, store, photo_id))
+                    moved.append(_move_one_in_encrypted(live, gallery, store, photo_id))
                 else:
-                    moved.append(_move_one_in(live, library, root, photo_id))
-                _forget_in_albums(engine, library)
+                    moved.append(_move_one_in(live, gallery, root, photo_id))
             except encryption.EncryptionError as error:
                 failed.append({"id": photo_id, "reason": str(error)})
             except VaultError as error:
@@ -238,19 +285,21 @@ def move_in(engine, live, root: Path, photo_ids, still_valid=None) -> dict:
     return {"moved": moved, "failed": failed}
 
 
-def _move_one_in(live, library, root: Path, photo_id: str) -> dict:
-    photo = library.get(photo_id)
-    if photo is None:
-        raise VaultError("no such photo in the library", status=404)
-    source = library.original_path(photo)
+def _handed_over(gallery, photo_id: str):
+    """(source, filename, digest) of an item's original, once its digest matches its id."""
+    source, filename = gallery.original(photo_id)
     expected = digest(source)
     if not expected.startswith(photo_id):
         raise VaultError("the stored photo does not match its record, so it was left alone", status=409)
+    return source, filename, expected
 
-    target = copy_verified(source, root / MOVED_IN_FOLDER, photo.get("filename") or source.name, expected)
+
+def _move_one_in(live, gallery, root: Path, photo_id: str) -> dict:
+    source, filename, expected = _handed_over(gallery, photo_id)
+    target = copy_verified(source, root / MOVED_IN_FOLDER, filename, expected)
     try:
         live.seal(expected)
-        library.remove_moved(photo_id)
+        gallery.release(photo_id, expected)
     except Exception:
         # the library still has it: undo the vault copy so nothing is duplicated
         target.unlink(missing_ok=True)
@@ -259,22 +308,15 @@ def _move_one_in(live, library, root: Path, photo_id: str) -> dict:
     return {"id": photo_id, "path": target.relative_to(root).as_posix()}
 
 
-def _move_one_in_encrypted(live, library, store, photo_id: str) -> dict:
-    photo = library.get(photo_id)
-    if photo is None:
-        raise VaultError("no such photo in the library", status=404)
-    source = library.original_path(photo)
-    expected = digest(source)
-    if not expected.startswith(photo_id):
-        raise VaultError("the stored photo does not match its record, so it was left alone", status=409)
-
+def _move_one_in_encrypted(live, gallery, store, photo_id: str) -> dict:
+    source, filename, expected = _handed_over(gallery, photo_id)
     modified = datetime.fromtimestamp(source.stat().st_mtime, tz=timezone.utc).isoformat(timespec="seconds")
     relative, _metadata = store.add(encryption.file_chunks(source), {
-        "name": _safe_name(photo.get("filename") or source.name), "folder": MOVED_IN_FOLDER, "modified": modified,
+        "name": _safe_name(filename), "folder": MOVED_IN_FOLDER, "modified": modified,
     }, expected_sha256=expected)
     try:
         live.seal(expected)
-        library.remove_moved(photo_id)
+        gallery.release(photo_id, expected)
     except Exception:
         store.delete(relative)
         live.unseal(expected)
@@ -282,27 +324,9 @@ def _move_one_in_encrypted(live, library, store, photo_id: str) -> dict:
     return {"id": photo_id, "path": relative}
 
 
-def _forget_in_albums(engine, library):
-    """Drops photos the library no longer holds from every album (Favorites
-    included), so no album file keeps pointing at a now-private photo."""
-    satellite = engine.registry.get(PHOTO_SATELLITE)
-    try:
-        from satellites.native.photo.albums import albums
-    except ImportError:
-        return
-    if satellite is None:
-        return
-    store = albums(satellite)
-    known = library.all_ids()
-    for album in store.all():
-        store.prune_missing(album["id"], known)
-
-
-def move_out(engine, live, root: Path, paths) -> dict:
-    """Moves vault files back into the Photo library."""
-    library = photo_library(engine)
-    if library is None:
-        raise VaultError("the Photo satellite is not available", status=503)
+def move_out(engine, live, root: Path, paths, *, caller: str) -> dict:
+    """Moves vault files back into the media library."""
+    gallery = _gallery(engine, caller)
     if not isinstance(paths, list) or not paths or not all(isinstance(item, str) for item in paths):
         raise VaultError("'paths' must be a non-empty list of Locked Folder paths")
 
@@ -318,65 +342,69 @@ def move_out(engine, live, root: Path, paths) -> dict:
                 if encryption.Store.is_object_path(relative):
                     if store is None:
                         raise VaultError("no such file in the Locked Folder", status=404)
-                    moved.append(_move_one_out_encrypted(live, library, store, relative))
+                    moved.append(_move_one_out_encrypted(live, gallery, store, relative))
                 else:
-                    moved.append(_move_one_out(live, library, root, relative))
+                    moved.append(_move_one_out(live, gallery, root, relative))
             except (VaultError, encryption.EncryptionError) as error:
                 failed.append({"path": relative, "reason": str(error)})
             except OSError as error:
                 failed.append({"path": relative, "reason": f"the file could not be moved ({error.strerror or error})"})
             except Exception as error:
-                print(f"[WARNING]: moving a Locked Folder file into Photos failed ({type(error).__name__}).")
+                print(f"[WARNING]: moving a Locked Folder file into the library failed ({type(error).__name__}).")
                 failed.append({"path": relative, "reason": "the file could not be moved"})
     return {"moved": moved, "failed": failed}
 
 
-def _move_one_out(live, library, root: Path, relative: str) -> dict:
+def _move_one_out(live, gallery, root: Path, relative: str) -> dict:
     source = resolve_item(root, relative)
-    photo = _hand_to_photos(live, library, source, source.name, digest(source))
+    photo = _hand_back(live, gallery, source, source.name, digest(source))
     source.unlink()
     return {"path": relative, "id": photo["id"]}
 
 
-def _move_one_out_encrypted(live, library, store, relative: str) -> dict:
+def _move_one_out_encrypted(live, gallery, store, relative: str) -> dict:
     # decrypted into the vault's own tmp folder, checked, and removed again
     # whatever happens - never into a shared temp directory
     staging, metadata = store.decrypt_to_staging(relative)
     try:
-        photo = _hand_to_photos(live, library, staging, _safe_name(metadata.get("name")), metadata["sha256"])
+        photo = _hand_back(live, gallery, staging, _safe_name(metadata.get("name")), metadata["sha256"])
     finally:
         staging.unlink(missing_ok=True)
     store.delete(relative)
     return {"path": relative, "id": photo["id"]}
 
 
-def _hand_to_photos(live, library, source: Path, filename: str, expected: str) -> dict:
-    """Adds `source` to Photos and checks the copy there. Returns the photo;
-    on any failure Photos is left as it was and the vault keeps the file."""
+def _hand_back(live, gallery, source: Path, filename: str, expected: str) -> dict:
+    """Hands `source` to the media library and checks the copy there. Returns {id, kind}; on any
+    failure the library is left as it was and the vault keeps the file."""
     was_sealed = live.is_sealed(expected)
-    live.unseal(expected)  # Photo refuses sealed media, and this one is being released on purpose
+    live.unseal(expected)  # the library refuses sealed media, and this one is being released on purpose
 
-    added = None
+    adopted = None
     try:
-        added = library.add_file(source, filename=filename)
-        photo = added or library.get_any(expected[:16])
-        if photo is None:
-            raise VaultError("Photo did not take the file, so it was left in the Locked Folder", status=500)
-        if digest(library.original_path(photo)) != expected:
-            raise VaultError("the copy in Photos did not match, so the file was left in the Locked Folder", status=500)
-        if photo.get("trashed_at"):
-            # the same photo was sitting in Photo's recycle bin - bring it back
-            # rather than leave the only copy there
-            library.restore(photo["id"])
+        adopted = gallery.adopt(source, filename)
+        copy, _name = gallery.original(adopted["id"])
+        if digest(copy) != expected:
+            raise VaultError("the copy in the library did not match, so the file was left in the Locked Folder",
+                             status=500)
     except Exception as error:
-        if added is not None:
-            library.remove_moved(added["id"])
+        if adopted is not None and adopted.get("added"):
+            _undo_adopt(gallery, adopted["id"])
         if was_sealed:
             live.seal(expected)
         if isinstance(error, (VaultError, OSError)):
             raise
-        raise VaultError(str(error) or "Photo could not read this file") from error
-    return photo
+        raise VaultError(str(error) or "the library could not read this file") from error
+    return {"id": adopted["id"], "kind": adopted.get("kind")}
+
+
+def _undo_adopt(gallery, photo_id: str):
+    """Lets go of an item a failed move out had just added, whatever its copy holds."""
+    try:
+        copy, _name = gallery.original(photo_id)
+        gallery.release(photo_id, digest(copy))
+    except Exception as error:
+        print(f"[WARNING]: a failed move out could not be undone in the library ({type(error).__name__}).")
 
 
 # ---------- uploads and deletes ----------

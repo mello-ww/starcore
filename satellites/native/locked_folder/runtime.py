@@ -88,15 +88,10 @@ def runtime(satellite):
     per root the same way Photo's library()/albums() factories are (see
     library.py) - one instance per root, reused across every call.
 
-    Also stashes itself on the Satellite instance as `.locked_folder_runtime`
-    purely so File Explorer - a different Satellite entirely - can reach
-    this exact live instance (to ask "is this path protected, and is this
-    session's unlock still valid") without importing this module by name.
-    Satellites are otherwise decoupled from one another (see
-    docs/satellites.md); this is the one, narrow exception, no different in
-    spirit from Mission Control's own configuration picker reaching into
-    FileExplorer's `entries` route by name - see docs/satellites/locked_folder.md,
-    "How File Explorer recognizes the Locked Folder".
+    Also stashes itself on the Satellite instance as `.locked_folder_runtime`,
+    where the tests find the live instance. No other Satellite reads it: they
+    ask the Engine, which asks this Satellite's routes (files.protected's
+    check, media.vault's sealed) - see docs/satellites/locked_folder.md.
     """
     root = _storage_root(satellite)
     if root not in _runtimes:

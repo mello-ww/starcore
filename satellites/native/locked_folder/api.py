@@ -7,7 +7,9 @@ uploads, deletes and moves to and from Photos, and its encryption (see
 encryption.py). Through files.protected (the check route) it tells the
 Engine, and so every other Satellite, which paths are in the vault: they
 refuse them unless this session has unlocked it - and, once the vault is
-encrypted, altogether (starcore.capabilities.protection).
+encrypted, altogether (starcore.capabilities.protection). Through
+media.vault's sealed (the sealed route, for the server alone) it tells a
+media library which files were moved in, so it never takes them back.
 
 Everything that reads or changes the vault, or loosens its protection,
 checks this session's unlock on the server - hiding the Locked Folder from
@@ -23,7 +25,7 @@ import binascii
 import threading
 
 from starcore.api.response import error_response, file_response, json_response, stream_response
-from starcore.capabilities import ReferenceProblem
+from starcore.capabilities import DIGEST, ReferenceProblem, refuse_clients
 
 from . import configuration, crypto, encryption, thumbnails, vault, views
 from .runtime import IDLE_SECONDS, SecurityStateError, runtime, validate_pin
@@ -68,6 +70,7 @@ def routes() -> dict:
         "encryption": encryption_route,
         "recover": recover,
         "check": check,
+        "sealed": sealed_route,
     }
 
 
@@ -195,6 +198,21 @@ def check(request):
                           "message": INSIDE_LOCKED if inside else CONTAINS_LOCKED})
 
 
+def sealed_route(request):
+    """media.vault's sealed, for the server alone: GET sealed/<sha256> -> {sealed}, whether a
+    file with that digest was moved into the vault, so a media library refuses to take it back
+    in (starcore.capabilities.sealed). Answered whether or not the vault is unlocked or this
+    Satellite enabled: it is the Engine asking, never a client."""
+    refused = refuse_clients(request)
+    if refused is not None:
+        return refused
+    if request.method != "GET":
+        return error_response("only GET is supported here", status=405)
+    if len(request.path) != 1 or not DIGEST.match(request.path[0]):
+        return error_response("name one SHA-256 digest: sealed/<sha256>", status=400)
+    return json_response({"sealed": runtime(request.satellite).is_sealed(request.path[0])})
+
+
 def _sealed_off(live) -> bool:
     """An encrypted vault, or one being encrypted: only reached through this Satellite."""
     migration = live.migration
@@ -234,7 +252,7 @@ def status(request):
         # an unlock also ends after this long without a vault request or keep; status itself
         # never counts as one
         "idle_seconds": IDLE_SECONDS,
-        "photos_available": vault.photo_library(request.engine) is not None,
+        "photos_available": vault.gallery_available(request.engine),
         "biometric_devices": live.device_count(),
         # diagnostics for whoever administers the server: never a PIN, key or token
         "security": {"problem": live.security_problem() if root is not None else None,
@@ -458,7 +476,7 @@ def gallery(request):
     if not root.is_dir():
         return error_response("the Locked Folder directory is missing", status=404)
     try:
-        page = views.gallery(live, root, vault.photo_library(request.engine) is not None,
+        page = views.gallery(live, root, vault.gallery_available(request.engine),
                              request.query.get("limit"), request.query.get("cursor"))
     except encryption.KeyProblem as problem:
         return _problem(problem.code)
@@ -616,7 +634,8 @@ def move_in(request):
     body = request.body or {}
     if "items" not in body:
         def action(live, root):
-            return _moved(vault.move_in(request.engine, live, root, body.get("photo_ids")))
+            return _moved(vault.move_in(request.engine, live, root, body.get("photo_ids"),
+                                        caller=request.satellite.manifest.name))
         return _vault_action(request, action)
 
     if not request.token:
@@ -642,7 +661,8 @@ def move_in(request):
 
     def action(live, root):
         result = vault.move_in(request.engine, live, root, [item["id"] for item in resolved],
-                               still_valid=vault.still_movable(request.engine, request.token))
+                               still_valid=vault.still_movable(request.engine, request.token),
+                               caller=request.satellite.manifest.name)
         return _moved(result)
     return _vault_action(request, action, authorized=True)
 
@@ -662,7 +682,8 @@ def move_out(request):
         return error_response("only POST is supported here", status=405)
 
     def action(live, root):
-        result = vault.move_out(request.engine, live, root, (request.body or {}).get("paths"))
+        result = vault.move_out(request.engine, live, root, (request.body or {}).get("paths"),
+                                caller=request.satellite.manifest.name)
         return json_response(result, status=200 if result["moved"] or not result["failed"] else 409)
     return _vault_action(request, action)
 

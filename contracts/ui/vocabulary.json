@@ -106,9 +106,12 @@
         "thumbnail": "GET /<id> -> an image"
       },
       "optional_operations": {
-        "resolve": "GET /<id> -> {id, kind}: an item the person may act on now (in the active library); 404 otherwise. What the Engine asks before another Satellite acts on a reference a client sent."
+        "resolve": "GET /<id> -> {id, kind}: an item the person may act on now (in the active library); 404 otherwise. What the Engine asks before another Satellite acts on a reference a client sent.",
+        "original": "GET /<id> -> the stored original of an item in the active library, as a file whose download name is the item's filename; 404 otherwise. Server-side only",
+        "release": "POST {id, sha256} -> {released: id}: the item leaves the library for good, without a recycle bin and out of every album, because a verified copy now lives elsewhere (a move into a media.vault); 409 when it is no longer in the active library or its original doesn't match sha256. Server-side only",
+        "adopt": "POST raw body ?name=&modified= -> {id, kind}: takes a file in as an import would (refusing media a media.vault holds) and brings it back from a recycle bin if it was there; 415 for a file the library can't read. Server-side only"
       },
-      "_note": "Picked through the client's media.picker (the pick action). A pick returns references, never paths: [{provider, capability, id, kind}], where provider is the providing Satellite's name. A provider lists only what the signed-in session may see; private or protected media is never listed."
+      "_note": "Picked through the client's media.picker (the pick action). A pick returns references, never paths: [{provider, capability, id, kind}], where provider is the providing Satellite's name. A provider lists only what the signed-in session may see; private or protected media is never listed. original, release and adopt are what a media.vault provider moves media in and out with; they are server-side only: asked by another Satellite through the Engine (starcore.capabilities.call, which sets the request's caller), and a client's request is refused (403)."
     },
     "audio.session": {
       "versions": [1],
@@ -135,9 +138,10 @@
       },
       "optional_operations": {
         "keep": "POST -> {expires_at}: only for a session that is unlocked (403 otherwise); restarts the idle time, never past session_timeout_seconds. A client calls it while it shows a protected document",
-        "biometric": "POST challenge {key_id, for?} -> {challenge}; POST unlock {key_id, challenge, signature} -> as unlock, for what the challenge was asked for (a grant with for, a full unlock without). for beside the signature is refused"
+        "biometric": "POST challenge {key_id, for?} -> {challenge}; POST unlock {key_id, challenge, signature} -> as unlock, for what the challenge was asked for (a grant with for, a full unlock without). for beside the signature is refused",
+        "sealed": "GET /<sha256> -> {sealed}: whether media with that digest was moved into the store, so a library refuses to take it back in. Server-side only: the Engine asks every provider, enabled or not (starcore.capabilities.sealed), and a provider that fails counts as yes"
       },
-      "_note": "A protected store media can be moved into, by the client's own unlock prompt (the secure action). It offers no way to list or read what it holds: that stays in the providing Satellite's own interface. A reference is {provider, capability: \"media.gallery\", id}, and is only a claim: the server resolves it through the media.gallery provider it knows."
+      "_note": "A protected store media can be moved into, by the client's own unlock prompt (the secure action). It offers no way to list or read what it holds: that stays in the providing Satellite's own interface (sealed answers yes or no for one digest, and only to the server). A reference is {provider, capability: \"media.gallery\", id}, and is only a claim: the server resolves it through the media.gallery provider it knows. A provider moves media in and out with media.gallery's original, release and adopt, through the Engine."
     },
     "files.protected": {
       "versions": [1],

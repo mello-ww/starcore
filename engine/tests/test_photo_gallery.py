@@ -488,12 +488,15 @@ class PhotoGalleryApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         providers = catalog["capabilities"]["media.gallery"]
         self.assertEqual([provider["satellite"] for provider in providers], ["Photo"])
-        self.assertEqual(providers[0]["operations"], {"list": "media", "thumbnail": "thumbnails", "resolve": "media/resolve"})
+        self.assertEqual(providers[0]["operations"], {"list": "media", "thumbnail": "thumbnails", "resolve": "media/resolve",
+                                                      "original": "media/original", "release": "media/release",
+                                                      "adopt": "media/adopt"})
         self.assertEqual(catalog["contract"]["capabilities"]["media.gallery"], [1])
 
     def test_the_locked_folder_offers_nothing_to_pick_list_or_read(self):
-        # it provides media.vault - a place to move media into - and files.protected - a yes/no
-        # check on a path - and nothing in either can list or read what the vault holds
+        # it provides media.vault - a place to move media into, and a yes/no for one digest (sealed,
+        # for the server alone) - and files.protected - a yes/no check on a path - and nothing in
+        # either can list or read what the vault holds
         status, catalog = self.json_request("/api/catalog")
         self.assertEqual(status, 200)
         for name, providers in catalog["capabilities"].items():
@@ -504,7 +507,8 @@ class PhotoGalleryApiTest(unittest.TestCase):
         self.assertEqual(protected[0]["operations"], {"check": "check"})
         vault = catalog["capabilities"]["media.vault"]
         self.assertEqual([provider["satellite"] for provider in vault], ["LockedFolder"])
-        self.assertEqual(set(vault[0]["operations"]), {"status", "unlock", "lock", "keep", "move_in", "biometric"})
+        self.assertEqual(set(vault[0]["operations"]),
+                         {"status", "unlock", "lock", "keep", "move_in", "biometric", "sealed"})
         self.assertFalse({"media", "media/file", "move_out", "delete", "upload", "encryption"}
                          & set(vault[0]["operations"].values()))
 

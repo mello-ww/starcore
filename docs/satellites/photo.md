@@ -204,6 +204,9 @@ GET  /api/satellites/photo/gallery/settings   what the shared Settings page edit
                                               photo_directory and sync_default_path
 GET  /api/satellites/photo/media?kinds=       media.gallery's list: what a media picker may offer
 GET  /api/satellites/photo/media/resolve/<id>  media.gallery's resolve: {id, kind} for a photo of the active library, 404 otherwise
+GET  /api/satellites/photo/media/original/<id> media.gallery's original, for the server alone (403 to a client): the stored original
+POST /api/satellites/photo/media/release      media.gallery's release, for the server alone: {id, sha256}; the item leaves the library and its albums
+POST /api/satellites/photo/media/adopt        media.gallery's adopt, for the server alone: ?name=&modified= and a raw body -> {id, kind, added}
 GET  /api/satellites/photo/gallery/search?q=&kind=   photos and albums matching a search, for the shared Search page
 GET  /api/satellites/photo/gallery/map        every photo with a location, for the shared Map page;
                                                ?overview=1 its count and bounds only; ?bbox=&zoom= what is in an area
@@ -345,7 +348,9 @@ viewer and on a selection. The document names neither the Locked Folder nor a ro
    locked and nothing needs locking again.
 3. The Locked Folder resolves each reference through Photo's `media.gallery` `resolve`,
    checks it again at the moment of the move, and moves it as it always has (verified copy,
-   seal, removal from the library and albums).
+   seal, removal from the library and albums), through `media.gallery`'s server-side
+   `original` and `release` (`handover.py`); a move out uses `adopt`. Whether a file was moved
+   in is asked through the Engine (`media.vault`'s `sealed`), never of the Locked Folder's code.
 
 A selection is one prompt and one request. A partial move says so. The moved photos leave
 the page, every offline copy on the phone, and its image cache. A server without an enabled

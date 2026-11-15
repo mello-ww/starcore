@@ -21,6 +21,7 @@ import shutil
 import tempfile
 import unittest
 
+from starcore import capabilities
 from starcore.auth import AuthStore, hash_secret
 from tests.support import start_engine, stop_engine
 from tests.test_photo import png
@@ -475,6 +476,95 @@ class LockedFolderSecurityTest(unittest.TestCase):
         self.assertEqual(status, 409)
         self.assertIsNotNone(library.get(ids[0]))
         self.assertEqual([path for path in self.vault.rglob("*") if path.is_file()], [])
+
+    # ---------- moves go through capabilities, never between the two Satellites (L6) ----------
+
+    def test_the_handover_operations_refuse_a_client(self):
+        ids = self.import_photos(1)
+        self.setup_vault()
+        self.unlock()
+        digest = hashlib.sha256(b"anything").hexdigest()
+        for method, path in (("GET", f"/api/satellites/Photo/media/original/{ids[0]}"),
+                             ("POST", "/api/satellites/Photo/media/release"),
+                             ("POST", "/api/satellites/Photo/media/adopt?name=a.png"),
+                             ("GET", f"/api/satellites/LockedFolder/sealed/{digest}")):
+            with self.subTest(path):
+                payload = {"id": ids[0], "sha256": digest} if method == "POST" else None
+                self.assertEqual(self.request(path, method, payload)[0], 403)
+        self.assertIsNotNone(self.library().get(ids[0]), "nothing was released")
+
+    def test_the_engine_says_what_was_moved_in_and_moved_out(self):
+        ids = self.import_photos(1)
+        library = self.library()
+        data = library.original_path(library.get(ids[0])).read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        self.assertFalse(capabilities.sealed(self.engine, digest))
+        self.setup_vault()
+        self.unlock()
+        _, moved = self.lf("move_in", {"photo_ids": ids})
+        self.assertTrue(capabilities.sealed(self.engine, digest))
+        self.assertFalse(capabilities.sealed(self.engine, hashlib.sha256(b"other").hexdigest()))
+        self.assertFalse(capabilities.sealed(self.engine, "not a digest"))
+
+        self.assertEqual(self.lf("move_out", {"paths": [moved["moved"][0]["path"]]})[0], 200)
+        self.assertFalse(capabilities.sealed(self.engine, digest))
+
+    def test_a_disabled_locked_folder_still_keeps_what_it_holds_out_of_photos(self):
+        ids = self.import_photos(1)
+        library = self.library()
+        data = library.original_path(library.get(ids[0])).read_bytes()
+        self.setup_vault()
+        self.unlock()
+        self.lf("move_in", {"photo_ids": ids})
+        self.locked_folder.config.data["enabled"] = False
+        try:
+            again = self.directory / "again"
+            again.mkdir()
+            (again / "copy.png").write_bytes(data)
+            status, payload = self.call("/api/satellites/Photo/import", "POST", {"source": str(again)})
+            self.assertEqual((status, payload["imported"]), (200, 0))
+            self.assertIsNone(library.get_any(ids[0]))
+        finally:
+            self.locked_folder.config.data["enabled"] = True
+
+    def test_a_store_that_cannot_answer_keeps_the_file_out(self):
+        data = png(20, 20, bytes([10, 200, 30]))
+        source = self.directory / "camera"
+        source.mkdir()
+        (source / "new.png").write_bytes(data)
+        with mock.patch.object(type(self.runtime()), "is_sealed", side_effect=OSError("unreadable")):
+            self.assertTrue(capabilities.sealed(self.engine, hashlib.sha256(data).hexdigest()))
+            status, payload = self.call("/api/satellites/Photo/import", "POST", {"source": str(source)})
+            self.assertEqual((status, payload["imported"]), (200, 0))
+        status, payload = self.call("/api/satellites/Photo/import", "POST", {"source": str(source)})
+        self.assertEqual((status, payload["imported"]), (200, 1), "taken in once the store answers")
+
+    def test_a_copy_that_does_not_match_after_a_move_out_is_let_go(self):
+        self.setup_vault()
+        self.unlock()
+        (self.vault / "a.png").write_bytes(png(9, 9))
+        vault = module("locked_folder.vault")
+        real_digest = vault.digest
+        calls = []
+
+        def corrupt_copy(path):
+            calls.append(path)  # the vault file, then the library's copy as it checks it
+            return "0" * 64 if len(calls) == 2 else real_digest(path)
+
+        with mock.patch.object(vault, "digest", corrupt_copy):
+            status, _ = self.lf("move_out", {"paths": ["a.png"]})
+        self.assertEqual(status, 409)
+        self.assertTrue((self.vault / "a.png").is_file())
+        self.assertEqual(self.library().count, 0, "the copy the library had just taken was let go")
+
+    def test_moves_need_a_library_that_can_hand_its_items_over(self):
+        ids = self.import_photos(1)
+        self.setup_vault()
+        self.unlock()
+        with mock.patch.object(capabilities, "offers", return_value=False):
+            self.assertEqual(self.lf("move_in", {"photo_ids": ids})[0], 503)
+            self.assertFalse(self.lf("status")[1]["photos_available"])
+        self.assertIsNotNone(self.library().get(ids[0]))
 
     def test_moving_out_puts_the_file_back_in_photos(self):
         ids = self.import_photos(1)

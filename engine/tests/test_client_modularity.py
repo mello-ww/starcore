@@ -49,11 +49,6 @@ KNOWN_IMPORTS = {
 KNOWN_CROSS_SATELLITE = {
     # Photo hosts the Locked Folder's page as a tab (until sections are discovered)
     "satellites/native/photo/mission_control/page.js": 1,
-    # Photo keeps photos moved into the Locked Folder out of its library (whether a path is
-    # protected already goes through files.protected; this goes when L6 moves the rest)
-    "satellites/native/photo/private_media.py": 1,
-    # the Locked Folder's vault lives beside Photo's library
-    "satellites/native/locked_folder/vault.py": 1,
     # not Satellite references: a Python type named "Status" and a column
     # label, matched by the same pattern
     "satellites/native/music/library.py": 1,

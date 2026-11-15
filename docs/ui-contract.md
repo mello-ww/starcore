@@ -799,14 +799,21 @@ says so in place, and a document that `requires` it is not opened.
 |---|---|---|---|
 | `files.browse` | 1 | `list`: `GET ?path=` → `{path, parent, entries: [{name, type: dir\|file, size, modified}]}`; at the roots (`path` empty) each entry's name is itself an absolute path | `file-browser` |
 | `audio.library` | 1 | `search`, `track`, `resolve`, `artwork`; optional `lyrics` - see [Audio playback](media-audio.md) | none yet; the `media.audio` client capability will play it |
-| `media.gallery` | 1 | `list`: `GET ?kinds=image,video[&limit=N&cursor=C]` -> `{items: [{id, kind, title, duration, group}], next}` (with `limit`, one page and the next cursor; without it, everything); `thumbnail`: `GET /<id>` -> an image; optional `resolve`: `GET /<id>` -> `{id, kind}` for an item that may be acted on now, `404` otherwise | the client's media picker (the `pick` action), which pages through a provider that pages |
+| `media.gallery` | 1 | `list`: `GET ?kinds=image,video[&limit=N&cursor=C]` -> `{items: [{id, kind, title, duration, group}], next}` (with `limit`, one page and the next cursor; without it, everything); `thumbnail`: `GET /<id>` -> an image; optional `resolve`: `GET /<id>` -> `{id, kind}` for an item that may be acted on now, `404` otherwise; optional, for the server alone, `original`, `release` and `adopt` (what a `media.vault` provider moves media in and out with) | the client's media picker (the `pick` action), which pages through a provider that pages |
 | `audio.session` | 1 | `queue`; optional `history`, `radio`, `preferences`, `favorites`, `stream`, `connect` - see [Audio playback](media-audio.md) | none; the audio host uses it beside the same Satellite's `audio.library` |
-| `media.vault` | 1 | `status`, `unlock` (`for` asks for a single-use grant for one move; without it, an unlock of this session that ends after `idle_seconds` without use), `lock`, `move_in` (`{items: [reference], grant?}`); optional `keep` (`POST` -> `{expires_at}`, restarts the idle time) and `biometric` (`challenge {key_id, for?}`: the purpose is fixed with the challenge, never beside the signature) - see "Moves from a shared interface" in [the Locked Folder](satellites/locked_folder.md) | none: the `secure` action and protected documents use it, through each client's own unlock prompt. It has no operation that lists or reads what it holds |
+| `media.vault` | 1 | `status`, `unlock` (`for` asks for a single-use grant for one move; without it, an unlock of this session that ends after `idle_seconds` without use), `lock`, `move_in` (`{items: [reference], grant?}`); optional `keep` (`POST` -> `{expires_at}`, restarts the idle time), `biometric` (`challenge {key_id, for?}`: the purpose is fixed with the challenge, never beside the signature) and, for the server alone, `sealed` (`GET /<sha256>` -> `{sealed}`, asked of every provider by `starcore.capabilities.sealed`) - see "Moves from a shared interface" in [the Locked Folder](satellites/locked_folder.md) | none: the `secure` action and protected documents use it, through each client's own unlock prompt. It has no operation that lists or reads what it holds |
 | `files.protected` | 1 | `check`: `GET ?path=<absolute path>[&tree=1]` -> `{protected, open, message?}`: whether the path is in a protected area (with `tree=1`, or contains one), and whether this session may reach it now - see "Every Satellite asks the Engine" in [the Locked Folder](satellites/locked_folder.md) | none: server-side only. The Engine asks every provider, enabled or not (`starcore.capabilities.protection`), before File Explorer, Photo or Music touch a path; a provider that fails keeps the path closed |
 
 A capability's operations are required unless the vocabulary lists them under
 `optional_operations`. An operation the version doesn't define is a problem too, so a typo
 never registers a provider that only half works.
+
+**Operations for the server alone.** Some operations are asked only by another Satellite or by
+the Engine, in-process, through `starcore.capabilities.call` (`sealed` and the moves'
+`original`, `release` and `adopt`). Such a request carries a `caller` (the asking Satellite's
+name, or the Engine's), which a client's request over HTTP never has; the operation refuses a
+request without one (`capabilities.refuse_clients`, `403`). The catalog lists them like any
+other operation, but no client calls them.
 
 File Explorer provides `files.browse`; Music provides `audio.library` and `audio.session`; Photo
 provides `media.gallery` - its active library only: never the recycle bin, and never anything

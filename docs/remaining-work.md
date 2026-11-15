@@ -149,7 +149,10 @@ closed it.
   offers "Forgot your PIN?" (the recovery-key form); the shared document's unlock card offers
   only Unlock. The protected document needs a way out of the unlock card (a contract change)
   before L8.
-- [ ] **L6** - the vault and the library move files through capabilities.
+- [x] **L6** - the vault and the library move files through capabilities: `media.vault`'s
+  `sealed` and `media.gallery`'s `original`, `release` and `adopt`, for the server alone
+  (a request through the Engine carries its `caller`). `KNOWN_CROSS_SATELLITE` lost the vault's
+  and `private_media.py`'s entries; Photo's `page.js` (the Locked Folder tab) stays until L8.
 - [ ] **L7** - security review.
 - [ ] **L8** - remove the Locked Folder's `page.js` and `mobile/src/lockedFolder/`.
 

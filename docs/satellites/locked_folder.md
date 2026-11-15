@@ -241,13 +241,33 @@ exactly where it was; if removing it from the library fails, the vault copy is r
 **Moving a file out** imports it into the Photo library through Photo's normal ingestion,
 checks the library's copy against the original's SHA-256, and only then deletes the vault
 file. A file Photo can't read (a document, say) stays in the vault and is reported in
-`failed`. A photo that was sitting in Photo's recycle bin comes back out of it.
+`failed`. A photo that was sitting in Photo's recycle bin comes back out of it. If the
+library's copy doesn't match, the library lets go of the item it had just added.
+
+**Through capabilities, not imports** (L6). The vault reaches the library only through the
+Engine (`starcore.capabilities.call`), as whatever this server's `media.gallery` provider is,
+with three of its optional operations:
+
+- `original` (`GET media/original/<id>`): the stored original of an item of the active library,
+  as a file. The vault reads it, checks its SHA-256 against the content-addressed id, and copies
+  it in (or encrypts it on the way in).
+- `release` (`POST media/release {id, sha256}`): once the copy is verified and sealed, the item
+  leaves the library for good and every album, checked again under the library's lock; `409`
+  if it was binned, erased or moved meanwhile, or its original no longer has that digest.
+- `adopt` (`POST media/adopt?name=&modified=`, the file as a raw body): a move out hands the
+  file to the library, which takes it in as an import would and brings it back from the
+  recycle bin if it was there; the vault then reads `original` again to check the copy.
+
+They are for the server alone: a request made through the Engine carries its `caller`, which a
+client's request over HTTP never has, so a client asking any of them gets `403`. A server whose
+`media.gallery` provider lacks them can't move anything (`503`, and `photos_available` is
+false). Neither Satellite imports the other or names it in its code.
 
 ### Moves from a shared interface: grants and references
 
 The Locked Folder provides the `media.vault` capability: `status`, `unlock`, `lock`, `move_in`
-and, optionally, `biometric`. It has no operation that lists or reads the vault; viewing it
-stays in its own screens. The design, its security audit and the accepted risks are in
+and, optionally, `keep`, `biometric` and `sealed` (for the server alone, below). It has no
+operation that lists or reads the vault; viewing it stays in its own screens. The design, its security audit and the accepted risks are in
 [`archive/m5-locked-folder-actions-audit.md`](../archive/m5-locked-folder-actions-audit.md).
 
 ```
@@ -258,8 +278,8 @@ POST /api/satellites/LockedFolder/move_in  { "items": [reference], "grant"? } ->
 
 - **A reference** is `{"provider", "capability": "media.gallery", "id"}`. It is resolved by
   the Engine through the `media.gallery` provider it knows (see the UI contract's "Shared
-  blocks and Satellite capabilities"), never trusted as sent, and only Photo's items can be
-  moved in. One reference that doesn't resolve refuses the whole request (`400`, with
+  blocks and Satellite capabilities"), never trusted as sent, and only items of a provider that
+  can hand them over (`original`, `release`, `adopt`) can be moved in. One reference that doesn't resolve refuses the whole request (`400`, with
   `refused` listing which), so nothing is moved. At most 500 at once.
 - **A grant** is what an unlock with `for` returns instead of an unlock. The PIN (or a biometric
   signature over a challenge asked for with the same `for`) is checked exactly as for an
@@ -289,14 +309,17 @@ POST /api/satellites/LockedFolder/move_in  { "items": [reference], "grant"? } ->
 
 ### Keeping private media out of Photos
 
-Photo asks two questions (`satellites/native/photo/private_media.py`), whether or not the
-Locked Folder is currently enabled:
+Photo asks the Engine two questions (`satellites/native/photo/private_media.py`), which asks
+every provider whether or not it is currently enabled:
 
 - **Is this path inside the vault?** Asked of the Engine (`files.protected`, see "Every
   Satellite asks the Engine"). Importing or scanning the vault itself is refused, and importing
   a folder that contains the vault (or links into it) skips the vault's files.
 - **Was this file moved in from Photos?** Every move in records the file's SHA-256 (only the
-  digest, never a name or path) in `sealed.json` next to `pin.json`. Photo answers such a file
+  digest, never a name or path) in `sealed.json` next to `pin.json`. Photo asks the Engine
+  (`starcore.capabilities.sealed`), which asks `media.vault`'s optional `sealed`
+  (`GET sealed/<sha256>` -> `{sealed}`, for the server alone: a client gets `403`) of every
+  provider; one that fails or answers anything else counts as yes. Photo answers such a file
   like a duplicate in a directory import, a phone sync upload and the standalone sync
   listener - so a phone that still has the photo stops re-sending it, and it never reappears
   in the gallery, search, albums, the map or thumbnails. Moving it back out clears the record.
@@ -805,9 +828,9 @@ lives in the cached `runtime.py` module, keeps every unlock, grant and counter, 
 on reads the rebuilt Satellite's configuration. A location that changed in `config.toml` before
 the reload ends every unlock, as a change through the settings does.
 
-Whether a photo was moved in from Photos (`sealed.json`) is still asked of the Locked Folder's
-live runtime (`satellite.locked_folder_runtime`, warmed up through its state provider) by
-Photo's `private_media.py`, until L6 moves it to `media.vault`.
+Whether a photo was moved in from Photos (`sealed.json`) is asked the same way since L6:
+through the Engine, by `media.vault`'s `sealed` route, which creates the runtime if nothing has
+yet. No other Satellite reads `satellite.locked_folder_runtime` any more.
 
 ## Tests
 
@@ -942,8 +965,9 @@ order with Photos and the phone sync is in Remaining work.
   account, doubling up to 24 hours. Damaged security state keeps the vault locked.
 - **Biometrics** are a server-verified RSA signature over a single-use challenge of this
   session. A client that only claims a match gets nothing.
-- **`media.vault`** offers `status`, `unlock`, `lock`, `move_in` and `biometric`: nothing that
-  lists or reads.
+- **`media.vault`** offers `status`, `unlock`, `lock`, `move_in`, `keep` and `biometric`:
+  nothing that lists or reads. Its `sealed` answers yes or no for one digest, and only to the
+  server (a client gets `403`).
 - **The `secure` action** is accepted by the Engine only in a media viewer's or selection's
   actions, only for `media.vault` / `move_in`, only in a document whose Satellite provides
   `media.gallery`, and with no route, body or form. The client builds the references from the
@@ -1018,9 +1042,10 @@ Five rules, each testable:
    document, so no other document can raise a PIN prompt.
 5. **Satellites reach each other through the Engine** (L1, L6): `files.protected` v1 (`check`:
    `GET ?path=` -> `{protected, open}` for this session), asked through an Engine helper that
-   consults every provider, enabled or not; later `media.vault`'s optional `sealed` and
-   `media.gallery`'s optional `original`, `release` and `adopt`, so the vault and the library
-   move files without importing each other.
+   consults every provider, enabled or not; since L6 `media.vault`'s optional `sealed` (asked
+   the same way) and `media.gallery`'s optional `original`, `release` and `adopt`, so the vault
+   and the library move files without importing each other. These four are for the server
+   alone: an in-process request carries its `caller`, which HTTP never sets.
 
 Sections: a client opens another Satellite's document from inside its host with the **`section`**
 action (contract, L2): `{"section": "$.section"}` opens the document of a Satellite whose
@@ -1038,7 +1063,7 @@ tile stays where it is and Photo names nothing.
 | L3 (done) | The Locked Folder's `ui.json`: grid, viewer, move to Photos, delete, upload, download; Photo's tile through sections | data only | `locked_folder/ui.json`, `views.py` (new), `photo/gallery.py`, `photo/ui.json` | Engine: the document validates, every route it names exists and refuses a locked session; app: the document renders | Opus 5.5 high |
 | L4 (done) | `secrets` and `reveal`, and repeatable form rows (`rows` field kind) in the same change; then the vault's settings and setup pages | **contract change 2** | as L2's contract files, the form renderers on both clients, `locked_folder/ui.json` | fixtures; both clients: a secret never in form state, storage or logs, a revealed value gone after closing; Engine: every management route still needs what it needs today | Opus 5.5 xhigh |
 | L5 (run on the web) | End to end on the local demo (web and emulator) with a generated PIN; the owner validates on the web and the phone | none | none | the M5 list, plus: kill the client while unlocked and see it lock by itself. Results: "End to end on the local demo (L5)" under "Shared interface"; the emulator part was not run | Opus 5.5 high |
-| L6 | Moves through capabilities (`sealed`, `original`, `release`, `adopt`); comments that name the other Satellite go | vocabulary: optional operations | `locked_folder/vault.py`, `photo/private_media.py`, `photo/api.py`, `capabilities.py` (POST calls) | the existing move tests unchanged; `KNOWN_CROSS_SATELLITE` loses three lines | Opus 5.5 xhigh |
+| L6 (done) | Moves through capabilities (`sealed`, `original`, `release`, `adopt`); comments that name the other Satellite go | vocabulary: optional operations | `locked_folder/vault.py`, `photo/private_media.py`, `photo/api.py`, `capabilities.py` (POST calls) | the existing move tests unchanged; `KNOWN_CROSS_SATELLITE` loses three lines | Opus 5.5 xhigh |
 | L7 | Security review of L0 to L6 | none | none | findings fixed before L8 | Fable 5.2 high |
 | L8 | Remove `locked_folder/mission_control/page.js`, `mobile/src/lockedFolder/`, Photo's `LockedFolderTab` | none | those | the suites | Sonnet 5.5 medium |
 
