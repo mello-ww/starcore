@@ -64,6 +64,12 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **"Forgot your PIN?" in a protected document (UI contract 1.2):** a protected document may
+  name a `forgot` page (`protected.forgot`, a page without params that the server serves
+  without an unlock). Both clients' unlock cards then offer "Forgot your PIN?", which shows that
+  page in place of the card; its way back, or its action, asks the store's status again. The
+  Locked Folder's offers a new PIN with the recovery key, or says what else can be done
+  (`docs/ui-contract.md`, "Protected documents").
 - **Protected documents (UI contract 1.2):** a document can declare
   `"protected": {"capability": "media.vault", "setup": "<page>"}`, and both clients then ask
   the store's status before any page. They show the setup page when it isn't set up, their own

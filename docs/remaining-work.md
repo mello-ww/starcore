@@ -142,13 +142,11 @@ closed it.
 - [x] **L4** - client-owned prompts for typing and showing secrets, and repeatable form rows
   (contract change 2); the vault's settings and setup pages. Biometric enrolment stays in the
   app's own screens for now.
-- [ ] **L5** - end to end on the local demo; the owner validates on the web and the phone. Run
-  on the web (2026-11-15, `docs/satellites/locked_folder.md`, "End to end on the local demo");
-  the emulator went offline, so the app's side waits for the owner's phone check.
-- [ ] **L5 finding - a forgotten PIN in the shared interface:** the own page's locked screen
-  offers "Forgot your PIN?" (the recovery-key form); the shared document's unlock card offers
-  only Unlock. The protected document needs a way out of the unlock card (a contract change)
-  before L8.
+- [x] **L5** - end to end on the local demo; the owner validated it on the web and the phone
+  (2026-11-16, `docs/satellites/locked_folder.md`, "End to end on the local demo").
+- [x] **L5 finding - a forgotten PIN in the shared interface** (contract change 3): a protected
+  document may name a `forgot` page, which the unlock card's "Forgot your PIN?" opens in its
+  place; the Locked Folder's offers the recovery key, or says what else can be done.
 - [x] **L6** - the vault and the library move files through capabilities: `media.vault`'s
   `sealed` and `media.gallery`'s `original`, `release` and `adopt`, for the server alone
   (a request through the Engine carries its `caller`). `KNOWN_CROSS_SATELLITE` lost the vault's
@@ -160,9 +158,9 @@ closed it.
   could be captured, and now set `FLAG_SECURE` on their own windows; `check` answered clients,
   and now answers the server alone. Accepted and documented: an unreadable `sealed.json` reads
   as empty.
-- [ ] **L7 follow-up - the phone check** (with L5's): a screenshot of the vault's viewer, of a
-  PIN prompt and of the recovery-key dialog comes out black. The fix is built but was not seen
-  on a device.
+- [x] **L7 follow-up - the phone check** (with L5's): a screenshot of the vault's viewer, of a
+  PIN prompt and of the recovery-key dialog comes out black. The owner validated the phone side
+  on the emulator with this build (2026-11-16).
 - [ ] **L7 follow-up - a browser's cache after a move in:** Mission Control asks the browser to
   fetch a moved item's thumbnail and original again, which replaces the copies it cached (the
   Android app already evicts its image cache).

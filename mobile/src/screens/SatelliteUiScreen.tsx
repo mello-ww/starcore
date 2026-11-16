@@ -2,7 +2,7 @@ import {useIsFocused} from '@react-navigation/native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
-  ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent,
+  ActivityIndicator, BackHandler, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {useAuth} from '../auth/AuthContext';
@@ -78,9 +78,20 @@ function opensHosted(target: SatelliteSummary | null): boolean {
 /**
  * A protected document (1.2) while its store is locked: the app's own unlock card - the PIN, and
  * biometrics when this phone turned them on for the provider - asking the provider's unlock for
- * this session. The PIN goes nowhere but to that route.
+ * this session. The PIN goes nowhere but to that route. With `onForgot` (the document names a
+ * forgot page), it offers "Forgot your PIN?".
  */
-function LockedDocument({provider, title, onUnlocked}: {provider: CapabilityProvider; title: string; onUnlocked: () => void}) {
+function LockedDocument({
+  provider,
+  title,
+  onUnlocked,
+  onForgot,
+}: {
+  provider: CapabilityProvider;
+  title: string;
+  onUnlocked: () => void;
+  onForgot?: () => void;
+}) {
   const {api, biometricDeps} = useVault(provider);
   const withPin = useCallback((pin: string) => api.unlock(pin), [api]);
   return (
@@ -91,6 +102,7 @@ function LockedDocument({provider, title, onUnlocked}: {provider: CapabilityProv
       withPin={withPin}
       biometricDeps={biometricDeps}
       onUnlocked={onUnlocked}
+      onForgot={onForgot}
     />
   );
 }
@@ -244,6 +256,19 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   }, [live]);
   const gateOpen = !gated || gateState === 'open';
   const inSetup = gated && gateState === 'setup';
+  // "Forgot your PIN?" on the card: the document's forgot page, served without an unlock
+  const inForgot = gated && gateState === 'forgot' && Boolean(document?.protected?.forgot);
+  // its way back is the unlock card, the back gesture's too
+  useEffect(() => {
+    if (!inForgot || !focused) {
+      return;
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      gateRef.current?.gate.check();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [inForgot, focused]);
   // a 401 or 403 from a protected document's own routes: locked again, most likely - its gate
   // asks the store, and the unlock card replaces what showed once it says so
   const recheck = useCallback((err: any) => {
@@ -270,8 +295,10 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   // no page at all while it is locked
   const pageId = inSetup
     ? document?.protected?.setup
-    : document && requestedPage && document.pages[requestedPage] && !hidden(requestedPage) ? requestedPage : document?.entry;
-  const page = document && pageId && (gateOpen || inSetup) ? document.pages[pageId] : null;
+    : inForgot
+      ? document?.protected?.forgot
+      : document && requestedPage && document.pages[requestedPage] && !hidden(requestedPage) ? requestedPage : document?.entry;
+  const page = document && pageId && (gateOpen || inSetup || inForgot) ? document.pages[pageId] : null;
   const topLevel = !!document && (pageId === document.entry || navigationItems.some(item => item.page === pageId));
   const paramsKey = JSON.stringify(params);
   const pageState = useMemo(
@@ -975,7 +1002,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       </View>
     );
   }
-  if (document && gated && !gateOpen && !inSetup) {
+  if (document && gated && !gateOpen && !inSetup && !inForgot) {
     const title = document.title || name;
     return (
       <ScrollView contentContainerStyle={styles.gate} keyboardShouldPersistTaps="handled" testID="ui-gate">
@@ -992,7 +1019,12 @@ export function SatelliteUiScreen({route, navigation}: Props) {
             </Pressable>
           </View>
         ) : gateState === 'locked' && focused && vaultProvider ? (
-          <LockedDocument provider={vaultProvider} title={title} onUnlocked={() => gateRef.current?.gate.opened()} />
+          <LockedDocument
+            provider={vaultProvider}
+            title={title}
+            onUnlocked={() => gateRef.current?.gate.opened()}
+            onForgot={document.protected?.forgot ? () => gateRef.current?.gate.forgot() : undefined}
+          />
         ) : (
           <ActivityIndicator color={accent} />
         )}
@@ -1047,6 +1079,17 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const hasTop = Boolean(headerBlocks) || tabs.length > 1 || offline || stale;
   const top = (
     <>
+      {inForgot && (
+        <Pressable
+          onPress={() => gateRef.current?.gate.check()}
+          accessibilityRole="button"
+          hitSlop={8}
+          testID="ui-forgot-back"
+          style={({pressed}) => [styles.forgotBack, pressed && styles.pressed]}>
+          <Icon name="chevron-left" size={18} color={palette.text2} />
+          <Text style={[type.label, {color: palette.text2}]}>Back to unlock</Text>
+        </Pressable>
+      )}
       {headerBlocks && (
           <View style={styles.header} testID="ui-header">
             <UiBlocks blocks={headerBlocks} scope={{data: header, page: header, params: {}}} context={{...context, inline: true}} />
@@ -1232,6 +1275,14 @@ const styles = StyleSheet.create({
     backgroundColor: palette.controlStrong,
   },
   pressed: {opacity: 0.8},
+  forgotBack: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    minHeight: TOUCH_TARGET,
+    paddingRight: space.md,
+  },
   toast: {
     position: 'absolute',
     left: space.lg,

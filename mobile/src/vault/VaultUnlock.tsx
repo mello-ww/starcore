@@ -23,6 +23,7 @@ export function VaultUnlock({
   biometricPrompt,
   autoBiometrics = true,
   forgotHelp,
+  onForgot,
 }: {
   /** What the PIN does; throws as the store's unlock does (401 wrong, `retryAfter` locked out). */
   withPin: (pin: string) => Promise<void>;
@@ -38,6 +39,8 @@ export function VaultUnlock({
   autoBiometrics?: boolean;
   /** What to do about a forgotten PIN, behind a "Forgot your PIN?" link. */
   forgotHelp?: string;
+  /** What "Forgot your PIN?" opens instead (a protected document's forgot page). */
+  onForgot?: () => void;
 }) {
   const accentStyle = useAccentStyles();
   const [pin, setPin] = useState('');
@@ -186,7 +189,16 @@ export function VaultUnlock({
           <PrimaryButton title="Use biometrics" variant="secondary" onPress={tryBiometrics} disabled={busy || wait > 0} />
         )}
       </View>
-      {forgotHelp ? (
+      {onForgot ? (
+        <Pressable
+          onPress={onForgot}
+          accessibilityRole="button"
+          hitSlop={12}
+          testID="vault-forgot"
+          style={styles.forgot}>
+          <Text style={[typography.caption, accentStyle.text]}>Forgot your PIN?</Text>
+        </Pressable>
+      ) : forgotHelp ? (
         showForgot ? (
           <Text style={[typography.caption, styles.center]}>{forgotHelp}</Text>
         ) : (

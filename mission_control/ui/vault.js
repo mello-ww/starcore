@@ -1,9 +1,11 @@
 // Protected documents (UI contract 1.2), Mission Control's side: a document that declares
-// `protected: {capability, setup}` belongs to a store its own Satellite keeps locked, and this
-// gate decides what of it may show.
+// `protected: {capability, setup, forgot?}` belongs to a store its own Satellite keeps locked, and
+// this gate decides what of it may show.
 //
 // - Before any page it asks the provider's status: not set up, the document's setup page;
 //   locked, Mission Control's own PIN prompt, for a full unlock of this session; open, the page.
+// - The prompt's "Forgot your PIN?" (when the document names a forgot page) shows that page
+//   instead: nothing of the store, nothing unlocked. Its way back, or its action, asks again.
 // - A 403 from the document's routes asks status again: locked again means the prompt, never an
 //   error page with the store's content still behind it.
 // - While the document shows, `keep` tells the server it is still in use, so the unlock outlives
@@ -36,7 +38,8 @@ export function protectedProvider(document, capabilities, satellite) {
     return provider && required.every((name) => typeof operations[name] === "string") ? provider : null;
 }
 
-/** What a status answer means for the document: "setup", "locked", "open" or "failed". */
+/** What a status answer means for the document: "setup", "locked", "open" or "failed" (the
+ * gate's own "checking" and "forgot" are never a status answer). */
 export function gateState(status) {
     if (!status || typeof status !== "object" || Array.isArray(status)) {
         return "failed";
@@ -53,9 +56,9 @@ export function gateState(status) {
  *   `status` (and `payload`) when it refuses;
  * - `prompt({purpose: "unlock", error, wait, signal})` resolves the PIN, or null for cancel;
  * - `lock(route)` sends the lock even as the page goes away (a keepalive request);
- * - `onChange(state, detail)` hears every change of "checking", "setup", "locked", "open" and
- *   "failed" (detail: the reason).
- * Returns {state(), check({quiet}), unlock(), setHidden(hidden), leave(), dispose()}.
+ * - `onChange(state, detail)` hears every change of "checking", "setup", "locked", "forgot",
+ *   "open" and "failed" (detail: the reason).
+ * Returns {state(), check({quiet}), unlock(), forgot(), setHidden(hidden), leave(), dispose()}.
  */
 export function createVaultGate({ provider, request, prompt, lock, onChange, timers = globalThis,
     keepSeconds = KEEP_SECONDS, graceSeconds = LEAVE_GRACE_SECONDS }) {
@@ -198,6 +201,18 @@ export function createVaultGate({ provider, request, prompt, lock, onChange, tim
         }
     }
 
+    /** "Forgot your PIN?", from the prompt or the locked card: the forgot page instead, while
+     * locked. A newer run drops the prompt's answer; check() leads back. */
+    function forgot() {
+        if (disposed || current !== "locked") {
+            return;
+        }
+        run += 1;
+        closePrompt();
+        stopKeeping();
+        set("forgot");
+    }
+
     /** Locks now: the document closed, the page went away, or the tab stayed hidden. */
     function leave() {
         if (disposed) {
@@ -209,7 +224,7 @@ export function createVaultGate({ provider, request, prompt, lock, onChange, tim
         grace = null;
         closePrompt();
         stopKeeping();
-        if (current !== "setup") {
+        if (current !== "setup" && current !== "forgot") {
             try {
                 lock(operations.lock);
             } catch {
@@ -239,6 +254,7 @@ export function createVaultGate({ provider, request, prompt, lock, onChange, tim
             left = false;
             return ask(++run);
         },
+        forgot,
         setHidden,
         leave,
         dispose() {

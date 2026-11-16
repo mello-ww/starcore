@@ -31,7 +31,7 @@ const DOCUMENT = {
   contract: 'starcore.ui/1.2',
   title: 'Safe',
   entry: 'home',
-  protected: {capability: 'media.vault', setup: 'setup'},
+  protected: {capability: 'media.vault', setup: 'setup', forgot: 'forgot'},
   pages: {
     home: {
       source: {route: 'items'},
@@ -44,6 +44,7 @@ const DOCUMENT = {
       ],
     },
     setup: {blocks: [{type: 'text', text: 'Set a PIN first.'}]},
+    forgot: {source: {route: 'setup?forgot=1'}, blocks: [{type: 'text', text: 'Use your recovery key.'}]},
   },
 };
 const VAULT = {satellite: 'Safe', version: 1, enabled: true, operations: {status: 'status', unlock: 'unlock', lock: 'lock', keep: 'keep'}};
@@ -274,6 +275,23 @@ describe('a protected document on the app’s shared screen', () => {
     mounted.splice(0);
     await settle();
     expect(mockClient.post).not.toHaveBeenCalledWith('/api/satellites/Safe/lock', {});
+  });
+
+  it('forgot your PIN: the forgot page instead of the card, nothing unlocked, and back to the card', async () => {
+    const {tree} = await mount();
+    await act(async () => byId(tree, 'vault-forgot')[0].props.onPress());
+    await settle();
+    expect(byId(tree, 'vault-unlock')).toHaveLength(0);
+    expect(texts(tree)).toEqual(expect.arrayContaining(['Use your recovery key.']));
+    expect(pageReads().map(([, route]) => route)).toEqual(['setup?forgot=1']);
+    await act(async () => byId(tree, 'ui-forgot-back')[0].props.onPress());
+    await settle();
+    expect(byId(tree, 'vault-unlock')).toHaveLength(1);
+    expect(texts(tree)).not.toContain('Use your recovery key.');
+    act(() => tree.unmount());
+    mounted.splice(0);
+    await settle();
+    expect(mockClient.post).toHaveBeenCalledWith('/api/satellites/Safe/lock', {}); // locked again: it locks on leaving
   });
 
   it('without the store on this server, it says so and shows nothing', async () => {

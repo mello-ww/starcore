@@ -82,11 +82,14 @@ PROBLEMS = {
 RECOVERABLE = {"pin_unreadable", "pin_tampered", "key_unavailable"}
 
 
-def setup(live, configured: bool, problem, recovery_key: bool = False) -> dict:
+def setup(live, configured: bool, problem, recovery_key: bool = False, encrypted: bool = False,
+          forgot: bool = False) -> dict:
     """GET setup -> {title, message, problem, needs_location, needs_pin, recoverable}: why the
     vault can't be opened yet, in words the person can act on, and which step the setup page
     offers (a location, a first PIN, a new PIN with the recovery key) - never its location, its
-    PIN or anything it holds."""
+    PIN or anything it holds. With `forgot` (GET setup?forgot=1, the forgotten-PIN page), for a
+    vault that is ready: the way out of a forgotten PIN, the recovery key when there is one,
+    otherwise what can still be done and by whom."""
     page = {"problem": None, "needs_location": False, "needs_pin": False, "recoverable": False}
     if not configured:
         return {**page, "title": "Not set up yet", "needs_location": True,
@@ -113,6 +116,18 @@ def setup(live, configured: bool, problem, recovery_key: bool = False) -> dict:
                 "message": "Create a PIN of 4 to 12 digits. You'll need it every time you open the Locked "
                            "Folder; until then nothing in it is protected. A forgotten PIN can only be reset "
                            "with a recovery key, which you can create when you encrypt it."}
+    if forgot:
+        if recovery_key:
+            message = ("Enter your recovery key, then choose a new PIN. Phones set up to unlock with "
+                       "biometrics have to be set up again.")
+        elif encrypted:
+            message = "No recovery key was created for this Locked Folder, so a forgotten PIN can't be reset."
+        else:
+            message = ("This Locked Folder isn't encrypted and has no recovery key, so its PIN can't be reset "
+                       "from here. Whoever runs the StarCore server can delete pin.json from StarCore's data "
+                       "folder (satellites/LockedFolder) and restart StarCore, then create a new PIN here. The "
+                       "files in the folder are not touched.")
+        return {**page, "title": "Forgot your PIN?", "message": message, "recoverable": bool(recovery_key)}
     return {**page, "title": "Ready", "message": "The Locked Folder is set up. Unlock it to see what it holds."}
 
 

@@ -182,6 +182,31 @@ test("not set up: the setup page, no prompt, and nothing to lock", async () => {
     assert.deepEqual(world.locks, []);
 });
 
+test("forgot: the forgot page in place of the prompt, nothing to lock, and checking leads back", async () => {
+    const { gate, world } = setup();
+    const checked = gate.check();
+    await flush();
+    assert.equal(gate.state(), "locked");
+    gate.forgot();
+    await checked;  // the open prompt closed, and its answer is dropped
+    assert.deepEqual(world.states, ["checking", "locked", "forgot"]);
+    assert.equal(world.calls.filter((call) => call.startsWith("unlock")).length, 0);
+    gate.leave();
+    assert.deepEqual(world.locks, [], "nothing was unlocked");
+    world.pins.push("2468");
+    await gate.check();
+    assert.equal(gate.state(), "open");
+});
+
+test("forgot is only for a locked document", async () => {
+    const { gate, world } = setup({ status: { ...SET_UP, unlocked: true } });
+    await gate.check();
+    gate.forgot();
+    assert.equal(gate.state(), "open");
+    assert.deepEqual(world.states, ["checking", "open"]);
+    gate.dispose();
+});
+
 test("a refused keep or a 403 asks again: locked again means the prompt, not an error", async () => {
     const { gate, world, timers } = setup({ status: { ...SET_UP, unlocked: true } });
     await gate.check();

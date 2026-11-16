@@ -102,8 +102,10 @@ class LockedFolderUiDocumentTest(unittest.TestCase):
     def test_it_is_a_protected_preview_with_a_setup_page_and_nothing_kept(self):
         self.assertEqual(self.document["contract"], "starcore.ui/1.2")
         self.assertTrue(self.document["preview"])
-        self.assertEqual(self.document["protected"], {"capability": "media.vault", "setup": "setup"})
+        self.assertEqual(self.document["protected"], {"capability": "media.vault", "setup": "setup", "forgot": "forgot"})
         self.assertNotIn("params", self.document["pages"]["setup"])
+        self.assertNotIn("params", self.document["pages"]["forgot"])
+        self.assertEqual(self.document["pages"]["forgot"]["source"]["route"], "setup?forgot=1")
         self.assertNotIn("widgets", self.document)
         self.assertFalse([name for name, page in self.document["pages"].items() if "offline" in page])
         self.assertNotIn('"share"', json.dumps(self.document))
@@ -146,7 +148,7 @@ class LockedFolderUiDocumentTest(unittest.TestCase):
         self.assertEqual(asked, {
             "pin": [{"pin": ("pin", True)},
                     {"current_pin": ("pin", False), "pin": ("pin", True)}],
-            "recover": [{"recovery_key": ("recovery-key", False), "pin": ("pin", True)}],
+            "recover": [{"recovery_key": ("recovery-key", False), "pin": ("pin", True)}] * 2,  # setup and forgot
             "encryption/recovery_key": [{"pin": ("pin", False)}] * 3,
             "encryption/discard": [{"pin": ("pin", False)}],
         })
@@ -177,6 +179,28 @@ class LockedFolderUiDocumentTest(unittest.TestCase):
                 self.assertNotIn("vault", json.dumps(page).lower().replace("locked folder", ""))
         self.assertIn("recovery key to set a new PIN", views.setup(live, True, "pin_tampered", True)["message"])
         self.assertIn("No recovery key", views.setup(live, True, "key_unavailable", False)["message"])
+
+    def test_the_forgot_page_offers_the_recovery_key_or_says_who_can_reset_it(self):
+        from satellites.native.locked_folder import views
+
+        class Live:
+            pin_set = True
+
+        live = Live()
+        with_key = views.setup(live, True, None, True, True, forgot=True)
+        self.assertEqual((with_key["title"], with_key["recoverable"]), ("Forgot your PIN?", True))
+        encrypted = views.setup(live, True, None, False, True, forgot=True)
+        self.assertFalse(encrypted["recoverable"])
+        self.assertIn("can't be reset", encrypted["message"])
+        plain = views.setup(live, True, None, False, False, forgot=True)
+        self.assertFalse(plain["recoverable"])
+        self.assertIn("pin.json", plain["message"])
+        # a vault that can't be opened, or isn't set up, says so rather than the forgotten PIN
+        self.assertEqual(views.setup(live, True, "pin_tampered", True, True, forgot=True)["title"],
+                         views.PROBLEMS["pin_tampered"][0])
+        self.assertTrue(views.setup(live, False, None, forgot=True)["needs_location"])
+        live.pin_set = False
+        self.assertTrue(views.setup(live, True, None, forgot=True)["needs_pin"])
 
     def test_the_settings_view_offers_what_applies_now(self):
         from satellites.native.locked_folder import views
@@ -295,7 +319,7 @@ class LockedFolderUiApiTest(unittest.TestCase):
         self.assertGreaterEqual(len(named), 20)
         for method, template, body, kind, secrets in named:
             status = self.call(method, template, body, kind, secrets)
-            if kind == "setup":
+            if kind in ("setup", "forgot"):
                 self.assertEqual(status, 200, template)
             elif template in ("pin", "recover"):
                 # a PIN or a recovery key is what these need, not an unlock: a wrong one is refused
@@ -357,6 +381,11 @@ class LockedFolderUiApiTest(unittest.TestCase):
         self.assertFalse(page["needs_pin"] or page["needs_location"] or page["recoverable"])
         self.assertNotIn(str(self.vault), json.dumps(page))
         self.assertNotIn("vault", json.dumps(page).lower().replace("locked folder", ""))
+        # locked, the forgot page answers too, and says how a forgotten PIN is reset
+        status, page = self.json_request("setup?forgot=1")
+        self.assertEqual((status, page["title"], page["recoverable"]), (200, "Forgot your PIN?", False))
+        self.assertIn("pin.json", page["message"])
+        self.assertNotIn(str(self.vault), json.dumps(page))
 
     def test_the_settings_page_gives_its_cards_what_they_bind(self):
         self.protect()

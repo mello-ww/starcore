@@ -490,8 +490,9 @@ def gallery(request):
 
 
 def setup(request):
-    """GET setup -> what the shared interface's setup page says (views.py): served without an
-    unlock, as status is, so it never says where the vault is or what it holds."""
+    """GET setup -> what the shared interface's setup page says (views.py); setup?forgot=1, its
+    forgotten-PIN page. Served without an unlock, as status is, so it never says where the vault
+    is or what it holds."""
     if request.method != "GET":
         return error_response("only GET is supported here", status=405)
     if not request.token:
@@ -501,8 +502,9 @@ def setup(request):
     if root is None:
         return json_response(views.setup(live, False, None))
     # whether a recovery key could set a new PIN: what status tells anyone about encryption
-    recovery_key = encryption.status(live, root, False)["recovery_key"]
-    return json_response(views.setup(live, True, live.security_problem(), recovery_key))
+    info = encryption.status(live, root, False)
+    return json_response(views.setup(live, True, live.security_problem(), info["recovery_key"],
+                                     info["state"] != "off", request.query.get("forgot") == "1"))
 
 
 def settings(request):

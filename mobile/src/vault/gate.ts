@@ -2,12 +2,15 @@ import {CAPABILITY_VERSIONS, PROTECTED_CAPABILITIES, type CapabilityProvider, ty
 
 /**
  * Protected documents (UI contract 1.2), the app's side: a document that declares
- * `protected: {capability, setup}` belongs to a store its own Satellite keeps locked, and this
- * gate decides what of it may show. The same rules as Mission Control's (mission_control/ui/vault.js):
+ * `protected: {capability, setup, forgot?}` belongs to a store its own Satellite keeps locked,
+ * and this gate decides what of it may show. The same rules as Mission Control's
+ * (mission_control/ui/vault.js):
  *
  * - Before any page it asks the provider's status: not set up, the document's setup page;
  *   locked, the app's own unlock card (src/vault/VaultUnlock.tsx), for a full unlock of this
  *   session; open, the page.
+ * - The card's "Forgot your PIN?" (when the document names a forgot page) shows that page
+ *   instead: nothing of the store, nothing unlocked. Its way back, or its action, asks again.
  * - A 403 from the document's routes asks status again (`check({quiet})`): locked again means the
  *   card, never an error page with the store's content still behind it.
  * - While the document shows, `keep` tells the server it is still in use, so the unlock outlives
@@ -26,7 +29,7 @@ export const KEEP_SECONDS = 30;
 /** How long a hidden document keeps the unlock before it locks. */
 export const LEAVE_GRACE_SECONDS = 10;
 
-export type GateState = 'checking' | 'setup' | 'locked' | 'open' | 'failed';
+export type GateState = 'checking' | 'setup' | 'locked' | 'forgot' | 'open' | 'failed';
 
 /** The provider of a protected document's store - its own Satellite's, offering every
  * operation the gate calls - or null when this app can't open it. */
@@ -81,6 +84,8 @@ export interface VaultGate {
   check(options?: {quiet?: boolean}): Promise<void>;
   /** The unlock card opened the store: shown at once, kept while shown. */
   opened(): void;
+  /** "Forgot your PIN?" on the card: the forgot page instead, while locked; check() leads back. */
+  forgot(): void;
   setHidden(hidden: boolean): void;
   /** Locks now: the document closed, or stayed hidden past the grace. */
   leave(): void;
@@ -192,7 +197,7 @@ export function createVaultGate({
       grace = null;
     }
     stopKeeping();
-    if (current !== 'setup') {
+    if (current !== 'setup' && current !== 'forgot') {
       sendLock();
     }
     set('locked');
@@ -217,6 +222,14 @@ export function createVaultGate({
       run += 1; // a check still on its way is older than this
       set('open');
       startKeeping();
+    },
+    forgot() {
+      if (disposed || current !== 'locked') {
+        return;
+      }
+      run += 1;
+      stopKeeping();
+      set('forgot');
     },
     setHidden(value) {
       hidden = Boolean(value);

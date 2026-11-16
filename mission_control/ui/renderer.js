@@ -412,7 +412,8 @@ export function mount(context) {
     }
 
     // a protected document shows only what its gate allows: the setup page while it isn't set
-    // up, any page once it is open, and nothing otherwise - the section waits for the unlock
+    // up, its forgot page after "Forgot your PIN?", any page once it is open, and nothing
+    // otherwise - the section waits for the unlock
     function showSection(section) {
         if (!state.document) {
             return;
@@ -422,6 +423,8 @@ export function mount(context) {
             const now = gate.state();
             if (now === "setup") {
                 openPage(state.document.protected.setup);
+            } else if (now === "forgot") {
+                openPage(state.document.protected.forgot);
             } else if (now === "open") {
                 openPage(section);
             }
@@ -1832,7 +1835,8 @@ export function mount(context) {
             const head = el("div", "ui-page-head");
             const back = el("button", "sc-icon-button sc-icon-button-quiet ui-back", "‹ Back");
             back.type = "button";
-            back.addEventListener("click", goBack);
+            // the forgot page leads back to the unlock, not through the history
+            back.addEventListener("click", () => (gate && gate.state() === "forgot" ? gate.check() : goBack()));
             head.appendChild(back);
             if (page.title !== undefined && state.data) {
                 head.appendChild(el("h2", "ui-page-title", text(page.title, scope)));
@@ -1922,6 +1926,10 @@ export function mount(context) {
             openPage(state.document.protected.setup);
             return;
         }
+        if (next === "forgot") {
+            openPage(state.document.protected.forgot);
+            return;
+        }
         renderGate(next, why);
     }
 
@@ -1947,6 +1955,12 @@ export function mount(context) {
             button.type = "button";
             button.addEventListener("click", () => (next === "failed" ? gate.check() : gate.unlock()));
             box.appendChild(button);
+            if (next === "locked" && state.document.protected.forgot) {
+                const forgot = el("button", "ui-unlock-forgot", "Forgot your PIN?");
+                forgot.type = "button";
+                forgot.addEventListener("click", () => gate.forgot());
+                box.appendChild(forgot);
+            }
         }
         root.replaceChildren(box);
     }
@@ -1960,7 +1974,8 @@ export function mount(context) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
             }),
-            prompt: (options) => promptPin({ ...options, title: documentTitle() }),
+            prompt: (options) => promptPin({ ...options, title: documentTitle(),
+                onForgot: state.document.protected.forgot ? () => gate.forgot() : null }),
             // sent even as the page goes away; the server's idle time ends it if this is lost
             lock: (route) => {
                 fetch(`${base}/${route}`, {

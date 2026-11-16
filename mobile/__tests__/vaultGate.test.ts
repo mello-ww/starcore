@@ -129,6 +129,28 @@ describe('a protected document’s gate', () => {
     expect(store.lock).not.toHaveBeenCalled();
   });
 
+  it('forgot: the forgot page while locked, nothing to lock, and checking leads back', async () => {
+    const store = fakeStore(LOCKED);
+    const gate = createVaultGate({store});
+    await gate.check();
+    gate.forgot();
+    expect(gate.state()).toBe('forgot');
+    await gate.check();
+    expect(gate.state()).toBe('locked');
+    gate.forgot();
+    gate.dispose();
+    expect(store.lock).not.toHaveBeenCalled(); // nothing was unlocked
+  });
+
+  it('forgot is only for a locked document', async () => {
+    const store = fakeStore(OPEN);
+    const gate = createVaultGate({store});
+    await gate.check();
+    gate.forgot();
+    expect(gate.state()).toBe('open');
+    gate.dispose();
+  });
+
   it('a refused keep asks again: locked again means the card, not an error', async () => {
     const store = fakeStore(OPEN);
     const gate = createVaultGate({store});

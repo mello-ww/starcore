@@ -336,17 +336,19 @@ class _Validator:
         return self.errors
 
     def check_protected(self, protected):
-        """protected: {capability, setup} (1.2): the document belongs to a store the client must
-        unlock first, through the capability its own Satellite provides (protected_capabilities).
-        Before any page the client asks status: not set up, it opens `setup` (a page without
-        params, whose routes the server serves without an unlock); locked, its own prompt. A 403
-        from the document's routes is "locked again"; it calls keep while it shows the document
-        and lock when it leaves; and it keeps nothing - so the document has no offline page, no
-        widget and no share action."""
+        """protected: {capability, setup, forgot?} (1.2): the document belongs to a store the
+        client must unlock first, through the capability its own Satellite provides
+        (protected_capabilities). Before any page the client asks status: not set up, it opens
+        `setup` (a page without params, whose routes the server serves without an unlock); locked,
+        its own prompt, which offers "Forgot your PIN?" when `forgot` names a page (as setup: no
+        params, served without an unlock) and opens it instead. A 403 from the document's routes
+        is "locked again"; it calls keep while it shows the document and lock when it leaves; and
+        it keeps nothing - so the document has no offline page, no widget and no share action."""
         self.since("protected", "a protected document", 2)
         self.protected = True
-        if not isinstance(protected, dict) or set(protected) != {"capability", "setup"}:
-            self.error("protected", "must be {capability, setup}")
+        if (not isinstance(protected, dict) or not {"capability", "setup"} <= set(protected)
+                or set(protected) - {"capability", "setup", "forgot"}):
+            self.error("protected", "must be {capability, setup, forgot?}")
             return
         capability, setup = protected["capability"], protected["setup"]
         if not isinstance(capability, str) or capability not in PROTECTED_CAPABILITIES:
@@ -360,10 +362,14 @@ class _Validator:
                 if missing:
                     self.error("protected.capability", f"its {capability} must offer {sorted(missing)} "
                                                        "for a client to show a protected document")
-        if not isinstance(setup, str) or setup not in self.pages:
-            self.error("protected.setup", f"must name one of the pages (got {setup!r})")
-        elif self.page_params(setup):
-            self.error("protected.setup", "the setup page cannot require params")
+        for key in ("setup", "forgot"):
+            if key not in protected:
+                continue
+            page = protected[key]
+            if not isinstance(page, str) or page not in self.pages:
+                self.error(f"protected.{key}", f"must name one of the pages (got {page!r})")
+            elif self.page_params(page):
+                self.error(f"protected.{key}", f"the {key} page cannot require params")
 
     def check_header(self, header):
         """A band above the navigation on top-level pages: its own source and blocks."""

@@ -630,11 +630,11 @@ and the owner validates it, and Developer Mode offers the document beside them -
 top bar's switch at `#/satellite/Photo/LockedFolder`, in the app a pill on Photos' card in the
 Satellites list. Nothing about the vault is in Photo's document.
 
-- **Protected:** `"protected": {"capability": "media.vault", "setup": "setup"}`. The clients
-  ask `status` first, show their own unlock card when it is locked, and keep nothing (no
-  offline page, widget or share; on Android images in memory only and a window that can't be
-  captured). Every route the document names answers `403` to a session that hasn't unlocked,
-  but the setup page's.
+- **Protected:** `"protected": {"capability": "media.vault", "setup": "setup", "forgot":
+  "forgot"}`. The clients ask `status` first, show their own unlock card when it is locked, and
+  keep nothing (no offline page, widget or share; on Android images in memory only and a window
+  that can't be captured). Every route the document names answers `403` to a session that
+  hasn't unlocked, but the setup and forgot pages'.
 - **The vault page** reads the new `gallery` view (`views.py`): every file as a tile, newest
   first, in month groups, 120 at a time (`?limit=` up to 500, `?cursor=` the position the last
   page gave as `next`). A tile carries `kind` (`image`, `video` or none), `preview` (the media
@@ -657,6 +657,11 @@ Satellites list. Nothing about the vault is in Photo's document.
     recovery key** (`recover`, the key and the new PIN asked in the client's prompts); the
     problem's code shows in Developer Mode;
   - "Ready", once a PIN is set: the client's unlock card follows.
+- **The forgot page** (the unlock card's "Forgot your PIN?") reads `setup?forgot=1`, served
+  without an unlock too. With a recovery key it offers **Set a new PIN with the recovery key**
+  (`recover`), after which the card asks for the new PIN. Without one it says what can still be
+  done, as the own page did: nothing for an encrypted vault, and for an unencrypted one,
+  `pin.json` removed on the server. Its way back is the unlock card.
 - **The settings page** (the vault page's Settings button) reads the `settings` view, served
   only to a session that has the vault open:
   - **PIN:** Change PIN (the current PIN and the new one twice, in the client's prompts), and how
@@ -685,8 +690,8 @@ Satellites list. Nothing about the vault is in Photo's document.
 
 Run on an isolated demo engine (its own data directory, Satellite copies and generated
 photos; Photo's library imported from a generated folder) in Mission Control, with the
-Locked Folder's shared interface chosen in Developer Mode and generated PINs. The owner's
-validation on the web and the phone is still to come.
+Locked Folder's shared interface chosen in Developer Mode and generated PINs. The owner then
+validated it on the web and on the phone (the emulator, 2026-11-16), on a build with L7's fixes.
 
 Verified on the web:
 
@@ -715,20 +720,19 @@ Verified on the web:
 
 Not verified in this run:
 
-- **The emulator:** the Android emulator went offline before its part could run, so the app's
-  side (the generic prompt, biometrics in the prompt, the window that can't be captured, a
-  killed app locking by itself) is left to the owner's phone check.
+- **The emulator** went offline before its part could run in this pass; the app's side (the
+  generic prompt, biometrics in the prompt, the window that can't be captured) was then the
+  owner's own check.
 - Add files (the browser pane used has no file chooser), the Download button itself (only its
   route), Delink, Restore originals, and the Map page (the demo photos have no location).
 
 Found:
 
-- **A forgotten PIN can't be reset from the shared interface's locked state.** The own web
-  page's locked screen offers "Forgot your PIN?": the recovery-key form, or what to do without
-  a key. The shared document's locked state is the client's unlock card, which offers only
-  Unlock; Set a new PIN with the recovery key appears only on the setup page, for a damaged
-  security state. It needs the protected document to name a way out of the unlock card (a
-  contract change), before L8 removes the own page.
+- **A forgotten PIN couldn't be reset from the shared interface's locked state** (fixed after
+  L5). The own web page's locked screen offers "Forgot your PIN?": the recovery-key form, or
+  what to do without a key; the client's unlock card offered only Unlock. A protected document
+  now names a `forgot` page, which the card's "Forgot your PIN?" opens (see "The forgot page"
+  above).
 - Mission Control's confirmations are the browser's native `confirm()` dialog, unlike the
   client's own prompts; the browser pane used for the run suppresses it, so it was answered
   from the page.
@@ -1082,7 +1086,7 @@ tile stays where it is and Photo names nothing.
 | L2 (done) | Protected documents, the `section` action, `keep` and the idle time, purpose-bound challenges (A3, A6); the generic unlock prompt on Android (`mobile/src/vault/`) and the web's prompt for a full unlock | **contract change 1** | `engine/starcore/ui_contract.py`, fixtures, `mission_control/ui/` (contract, renderer, `secure.js`), `mobile/src/satellites/ui/`, `mobile/src/vault/` (from `src/lockedFolder/`), `builtins.tsx`, `locked_folder/runtime.py` and `api.py` | fixtures valid and invalid (protected without the capability, with `offline`, `secrets` outside it); Engine idle expiry with a fake clock; both clients: gate, `403`, lock on leave, nothing cached | Opus 5.5 xhigh |
 | L3 (done) | The Locked Folder's `ui.json`: grid, viewer, move to Photos, delete, upload, download; Photo's tile through sections | data only | `locked_folder/ui.json`, `views.py` (new), `photo/gallery.py`, `photo/ui.json` | Engine: the document validates, every route it names exists and refuses a locked session; app: the document renders | Opus 5.5 high |
 | L4 (done) | `secrets` and `reveal`, and repeatable form rows (`rows` field kind) in the same change; then the vault's settings and setup pages | **contract change 2** | as L2's contract files, the form renderers on both clients, `locked_folder/ui.json` | fixtures; both clients: a secret never in form state, storage or logs, a revealed value gone after closing; Engine: every management route still needs what it needs today | Opus 5.5 xhigh |
-| L5 (run on the web) | End to end on the local demo (web and emulator) with a generated PIN; the owner validates on the web and the phone | none | none | the M5 list, plus: kill the client while unlocked and see it lock by itself. Results: "End to end on the local demo (L5)" under "Shared interface"; the emulator part was not run | Opus 5.5 high |
+| L5 (done) | End to end on the local demo (web and emulator) with a generated PIN; the owner validates on the web and the phone | none | none | the M5 list, plus: kill the client while unlocked and see it lock by itself. Results: "End to end on the local demo (L5)" under "Shared interface"; validated by the owner on the web and the phone. Its finding, a forgotten PIN, became `protected.forgot` (contract change 3) | Opus 5.5 high |
 | L6 (done) | Moves through capabilities (`sealed`, `original`, `release`, `adopt`); comments that name the other Satellite go | vocabulary: optional operations | `locked_folder/vault.py`, `photo/private_media.py`, `photo/api.py`, `capabilities.py` (POST calls) | the existing move tests unchanged; `KNOWN_CROSS_SATELLITE` loses three lines | Opus 5.5 xhigh |
 | L7 (done) | Security review of L0 to L6: see "Security review of L0 to L6" at the end of this page | none | `locked_folder/runtime.py` and `api.py`, `capabilities.py`, the app's `SecureWindow` | another name for the vault is still the vault; `check` refuses a client; the app's marker is in its prompts | Fable 5.2 high |
 | L8 | Remove `locked_folder/mission_control/page.js`, `mobile/src/lockedFolder/`, Photo's `LockedFolderTab` | none | those | the suites | Sonnet 5.5 medium |

@@ -112,7 +112,7 @@ comes from the Satellite's ordinary routes, through bindings.
 | `header` | 1.1, optional: blocks shown above the navigation on every top-level page, with a `source` of their own - see [Dashboards, headers and widgets](#dashboards-headers-and-widgets). |
 | `widgets` | 1.1, optional: up to 4 summaries a client may show outside the Satellite (Home). |
 | `preview` | 1.2, optional `true`: the document doesn't replace the Satellite's own interface yet. A client that has one (a `page.js` on the web, a screen of its own in the app) keeps opening it and offers the document in Developer Mode; a client without one opens the document. The listing reports it as `ui.preview`. Without it, the document is the default and Developer Mode offers the Satellite's own interface instead, on both clients. |
-| `protected` | 1.2, optional `{capability, setup}`: the document belongs to a store its own Satellite keeps locked, and a client unlocks it before showing any page - see [Protected documents](#protected-documents). |
+| `protected` | 1.2, optional `{capability, setup, forgot?}`: the document belongs to a store its own Satellite keeps locked, and a client unlocks it before showing any page - see [Protected documents](#protected-documents). |
 | `pages` | Page id (lower case, digits, `-`, `_`) to page. |
 
 A **page** has `blocks` and optionally:
@@ -146,12 +146,12 @@ Keys starting with `_` are comments and are ignored.
 ### Protected documents
 
 A Satellite that keeps a store locked declares it in its document (1.2):
-`"protected": {"capability": "media.vault", "setup": "setup"}`.
+`"protected": {"capability": "media.vault", "setup": "setup", "forgot": "forgot"}`.
 
 - **What it may name:** only a capability the vocabulary's `protected_capabilities` lists. So
   far that is `media.vault`, whose provider must offer `status`, `unlock`, `lock` and `keep`. The
-  Engine accepts it only when the document's own Satellite provides that capability, and
-  `setup` must name a page without params.
+  Engine accepts it only when the document's own Satellite provides that capability. `setup`
+  must name a page without params, and so must `forgot`, which is optional.
 - **What it can't have:** an offline page, widgets or a `share` action. The Engine refuses all
   three, and both clients refuse the first two and hide the third.
 
@@ -164,6 +164,11 @@ The client, not the document, decides what of it shows:
   - Locked: the client's own unlock card, a PIN with biometrics on Android where the phone
     enrolled. It asks `unlock` for a full unlock of this session. The document supplies no
     field for it.
+  - "Forgot your PIN?" on that card, when the document names `forgot`: the `forgot` page in
+    place of the card, whose routes the Satellite serves without an unlock, as the setup
+    page's. Nothing is unlocked meanwhile. Its way back (and Android's back gesture) asks
+    `status` again, and so does its action: a new PIN set with a recovery key leads back to
+    the card.
   - Open: the page.
 - **A `401` or `403`** from any of the document's routes asks `status` again. Locked again
   means the card, never an error page with the store's content still behind it, and what was

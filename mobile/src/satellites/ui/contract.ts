@@ -153,7 +153,7 @@ export interface UiDocument {
   preview?: boolean;
   /** 1.2: a store the app unlocks first, through the capability its own Satellite provides;
    * `setup` is the page shown while it isn't set up (src/vault/gate.ts). */
-  protected?: {capability: string; setup: string};
+  protected?: {capability: string; setup: string; forgot?: string};
 }
 
 export interface CapabilityProvider {

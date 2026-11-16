@@ -139,9 +139,10 @@ function el(tag, className, text) {
 
 /** Mission Control's PIN prompt: resolves the PIN typed, or null when cancelled (or when
  * `signal` aborts). `purpose` is "move" (a grant for `count` items; nothing opens) or "unlock" (a
- * protected document, named `title`, opens for this session). Its words are Mission Control's
- * own; the PIN lives only in the field, which is emptied as it closes. */
-export function promptPin({ count = 0, error = null, wait = 0, purpose = "move", title = "", signal = null }) {
+ * protected document, named `title`, opens for this session). With `onForgot`, an unlock offers
+ * "Forgot your PIN?": the prompt closes (null) and onForgot runs. Its words are Mission
+ * Control's own; the PIN lives only in the field, which is emptied as it closes. */
+export function promptPin({ count = 0, error = null, wait = 0, purpose = "move", title = "", signal = null, onForgot = null }) {
     const unlocking = purpose === "unlock";
     const action = unlocking ? "Unlock" : "Unlock and move";
     return new Promise((resolve) => {
@@ -175,6 +176,12 @@ export function promptPin({ count = 0, error = null, wait = 0, purpose = "move",
         message.setAttribute("role", "alert");
         message.hidden = !error;
         form.appendChild(message);
+        let forgot = null;
+        if (unlocking && typeof onForgot === "function") {
+            forgot = el("button", "ui-unlock-forgot", "Forgot your PIN?");
+            forgot.type = "button";
+            form.appendChild(forgot);
+        }
         const foot = el("div", "ui-unlock-foot");
         const cancel = el("button", "ui-pill", "Cancel");
         cancel.type = "button";
@@ -223,6 +230,12 @@ export function promptPin({ count = 0, error = null, wait = 0, purpose = "move",
             }
         });
         cancel.addEventListener("click", () => finish(null));
+        if (forgot) {
+            forgot.addEventListener("click", () => {
+                finish(null);
+                onForgot();
+            });
+        }
         // the gate closes it when the tab goes away or a newer check starts
         function aborted() {
             finish(null);
