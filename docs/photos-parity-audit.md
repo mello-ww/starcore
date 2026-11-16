@@ -271,7 +271,7 @@ The app finds the provider in the catalog and never names it.
 | S2 (done) | The `sync` action and `device.media-sync`; Photo's button and Devices page | **contract change 4** | `ui_contract.py`, fixtures, both clients' contract and action runners, `photo/ui.json` | Opus 5.5 high |
 | S3 (done) | The app's sync: the Kotlin package (workers, MediaStore, index, uploader, notification), `mobile/src/sync/` (screen, state), the manifest, `App.tsx` | none | `mobile/android/app/src/main/java/.../sync/`, `mobile/src/sync/`, `AndroidManifest.xml` | Opus 5.5 xhigh |
 | S4 (emulator done) | Emulator runs from the table above; then the owner's phone | none | the fixes below: `engine/starcore/api/response.py` and `server.py`, the Kotlin sync package, `MainApplication.kt`, `MediaSyncScreen.tsx` | Opus 5.5 high |
-| S5 | Security review of S1 to S3 (the credential, the upload route, what the phone stores) | none | none | Fable 5.2 high |
+| S5 (done) | Security review of S1 to S4 (the credential, the upload route, what the phone stores): "Security review of S1 to S4" below | none | `photo/backup.py`, `engine/starcore/capabilities.py`, `SyncClient.kt`, `SyncRun.kt` | Fable 5.2 high |
 
 ### What S3 built
 
@@ -341,6 +341,69 @@ Notes:
 - If the process dies at the very moment a change wakes it, that change waits for the next run
   (opening the app, the next change, or the six-hour run).
 - "Backed up from this phone" counts the items of the folders backed up now.
+
+### Security review of S1 to S4 (S5, 2026-11-16)
+
+Read: the Engine's device credentials (`auth.py`, `_authorized` and `_device_may_reach` in
+`api/server.py`, the raw body and its timeout), Photo's `backup.py` and what `add_file` does
+with what arrives, the Kotlin sync package, `mobile/src/sync/`, the manifest and the network
+configuration.
+
+**What holds:**
+
+- A device credential reaches only its capability provider's operation routes: every other
+  `/api/` path answers `403`, also the provider's other routes, its assets and its lifecycle.
+  Paths are compared segment by segment after decoding, the same way the route is then chosen.
+  It never validates as a session, can't issue another credential, and is kept as its SHA-256.
+- The provider refuses it `devices`, so it reads its own record and its own offsets, nothing
+  else. Unfinished uploads are kept under the caller's opaque id, never a name it chooses.
+- What arrives is named by a digest (64 hex digits) and a size; nothing the phone sends is a
+  path. `folder` only picks a configured album, `name` goes through `safe_filename`.
+- A file is taken in only when its SHA-256 matches and its content is a JPEG, PNG, WebP, MP4,
+  MOV or 3GP, recognised by its bytes. The library serves it under that type with `nosniff`
+  and a sandbox policy, so an add-only credential can't plant a page.
+- On the phone: the credential is encrypted under a Keystore key, in private preferences
+  (`allowBackup` is off); the client calls only the origin the credential was issued by, never
+  follows a redirect, and trusts the system's certificates only. The notification names no
+  file. Signing out revokes the credential while the session still can and removes the index.
+
+**Fixed:**
+
+1. **A protected store that can't answer made every file "known" (medium).** `sealed` counts
+   a provider that fails as yes, which is right for a library (the file stays out) and wrong
+   for a backup: `check` answered every digest the library didn't have as known, the phone
+   marked all of it as backed up, and none of it would ever be sent. `check` and `upload` now
+   answer `503` when nobody can say (`starcore.capabilities.sealed_state`), the phone asks
+   again later, and nothing is taken in meanwhile.
+2. **A `200` that isn't the provider's answer (low).** A Wi-Fi sign-in page in front of a
+   plain-HTTP server answers `200` to anything: `check`'s items were then all marked as
+   refused. A `status` or `check` answer without its own fields now stops the run, to be tried
+   again. An answer longer than 1 MiB is not read into memory.
+3. **Free space was asked once per upload (low).** Several uploads started on the same free
+   space could fill the disk between them, past the 256 MiB margin; a full disk also stops
+   the Engine saving its sessions. It is now asked at every chunk.
+4. **An upload complete but never taken in (not security).** If the server stopped between
+   the last byte and the import, no chunk could finish the file and the phone gave up on it
+   after five tries. Asking its offset now drops it, and it starts again.
+
+**Accepted, for the owner to know:**
+
+- `check` says whether the server has, had, or protects a file with a given SHA-256, to a
+  device credential too. Asking needs the exact file, so it confirms what the asker already
+  holds; it is what makes the backup skip what is there.
+- A device credential never expires and the Engine keeps no "last used" for it. A sign-out
+  that can't reach the server, or removing the server from the app, leaves it valid on the
+  server (the phone no longer has it): it is revoked from the sessions list. The devices page
+  shows when each one last backed up.
+- A stolen credential can add media until the disk is down to the margin, and it reaches the
+  image and video parsers (the thumbnailer, ffmpeg) like any upload. It can't read or delete.
+- File names and folders travel in `upload`'s query string, so a reverse proxy's access log
+  holds them. The credential travels in a header.
+- Over plain HTTP the credential and the media can be read on the way, and an answer can be
+  forged (a forged "known" keeps a file from being sent). The screen says so; HTTPS is the fix.
+- The Engine's auth store is not locked against concurrent writes, and session tokens are kept
+  as they are (device credentials are hashed): both are older than the sync and are listed
+  for the stabilisation stage (`docs/roadmap.md`, "Security").
 
 ### Decisions for the owner
 

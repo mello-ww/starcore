@@ -10,7 +10,7 @@ way, and one that can't answer keeps the file out.
 
 from pathlib import Path
 
-from starcore.capabilities import protection, sealed
+from starcore.capabilities import protection, sealed, sealed_state
 
 
 class PrivateMedia:
@@ -26,6 +26,11 @@ class PrivateMedia:
     def is_sealed(self, digest: str) -> bool:
         """True for a file that was moved from Photos into a protected store."""
         return bool(self._engine is not None and sealed(self._engine, digest))
+
+    def sealed_state(self, digest: str):
+        """is_sealed for a phone's backup: True, False, or None when a store could not say,
+        which is not a reason to tell the phone its file is safe here."""
+        return False if self._engine is None else sealed_state(self._engine, digest)
 
 
 NONE = PrivateMedia()

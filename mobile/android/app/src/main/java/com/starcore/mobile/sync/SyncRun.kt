@@ -63,7 +63,7 @@ class SyncRun(
         index.releaseDue(System.currentTimeMillis())
 
         val status = client.status()
-        SyncRules.runAnswer(status.code)?.let { throw RunStopped(it.phase, it.retry) }
+        SyncRules.runAnswer(status.code, status.body?.has("accepts") == true)?.let { throw RunStopped(it.phase, it.retry) }
         val chunk = SyncRules.chunkSize(status.body?.optLong("chunk_bytes", 0))
         val maxBytes = status.body?.optLong("max_bytes", 0)?.takeIf { it > 0 } ?: Long.MAX_VALUE
         val accepts = status.body?.optJSONArray("accepts")?.let { list -> (0 until list.length()).map { list.optString(it) }.toSet() }
@@ -95,7 +95,9 @@ class SyncRun(
         for (batch in index.toSend(hashed = true).chunked(SyncRules.CHECK_BATCH)) {
             if (stopped()) return
             val answer = client.check(batch)
-            SyncRules.runAnswer(answer.code)?.let { throw RunStopped(it.phase, it.retry) }
+            // without both lists it is not check's answer: no item is marked known or refused
+            val answered = answer.body?.optJSONArray("known") != null && answer.body.optJSONArray("wanted") != null
+            SyncRules.runAnswer(answer.code, answered)?.let { throw RunStopped(it.phase, it.retry) }
             val known = answer.body?.optJSONArray("known")?.let { list -> (0 until list.length()).map { list.optString(it) }.toSet() }
                 ?: emptySet()
             val wants = answer.body?.optJSONArray("wanted")?.let { list -> (0 until list.length()).map { list.optString(it) }.toSet() }

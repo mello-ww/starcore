@@ -179,9 +179,13 @@ object SyncRules {
         else -> Answer.Stop(Phases.OFFLINE, retry = true)
     }
 
-    /** What an answer of status or check means for the whole run: null when it may go on. */
-    fun runAnswer(code: Int): Answer.Stop? = when {
-        code == 200 -> null
+    /** What an answer of status or check means for the whole run: null when it may go on.
+     * `answered` is whether a 200 carried what the operation answers: one that didn't is not
+     * the provider speaking (a Wi-Fi sign-in page, a proxy's page), and nothing is concluded
+     * from it about any item. */
+    fun runAnswer(code: Int, answered: Boolean = true): Answer.Stop? = when {
+        code == 200 && answered -> null
+        code == 200 -> Answer.Stop(Phases.OFFLINE, retry = true)
         code == 401 -> Answer.Stop(Phases.SIGNED_OUT, retry = false)
         code == 403 || code == 404 || code in 300..399 -> Answer.Stop(Phases.UNAVAILABLE, retry = false)
         code == 507 -> Answer.Stop(Phases.SERVER_FULL, retry = true)

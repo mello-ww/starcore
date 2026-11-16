@@ -8,7 +8,9 @@ checks as any import.
 
 Known, for `check` and `upload`, means the library has the item, its recycle bin holds it, it
 was erased from there (the library remembers erased digests), or it was moved into a protected
-store (the Engine's sealed). The answer never says which.
+store (the Engine's sealed). The answer never says which. When a protected store can't say
+whether it holds a file, nothing is answered as known: a device takes "known" as "safe on the
+server" and would never send the file again, so it gets 503 and asks later.
 
 What arrives is kept per caller: the opaque id of the session or device credential that sent
 it (AuthStore.caller), never a name the client chooses, so one caller's unfinished uploads never
@@ -50,8 +52,15 @@ CALLER_ID = re.compile(r"^[0-9a-f]{1,64}$")
 LOCAL = "local"
 FOLDER = "backup"
 
+UNSURE = "the server can't check this media right now; try again later"
+
 _backups = {}
 _creating = threading.Lock()
+
+
+class CannotTell(Exception):
+    """A protected store could not say whether it holds a file, so whether the file is known
+    can't be answered either way."""
 
 
 def route(request):
@@ -108,14 +117,17 @@ def check(request):
 
     store = backup(request.satellite)
     known, wanted, seen = [], [], set()
-    for digest, size in entries:
-        if digest in seen:
-            continue
-        seen.add(digest)
-        if store.known(request.engine, digest):
-            known.append(digest)
-        elif size <= MAX_BYTES:
-            wanted.append(digest)
+    try:
+        for digest, size in entries:
+            if digest in seen:
+                continue
+            seen.add(digest)
+            if store.known(request.engine, digest):
+                known.append(digest)
+            elif size <= MAX_BYTES:
+                wanted.append(digest)
+    except CannotTell:
+        return error_response(UNSURE, status=503)
     store.touch(_caller(request), body.get("device"))
     return json_response({"known": known, "wanted": wanted})
 
@@ -159,13 +171,21 @@ def upload(request, digest: str):
         if offset != current:
             return _refuse(raw, "send from the offset the server holds", 409, offset=current)
         if current == 0:
-            if store.known(request.engine, digest):
+            try:
+                already = store.known(request.engine, digest)
+            except CannotTell:
+                return _refuse(raw, UNSURE, 503)
+            if already:
                 _drain(raw)
                 return json_response({"status": "duplicate", "id": digest[:ID_LENGTH], "offset": size})
             store.make_room(caller["id"])
             if _free_space(store.root) < size + SPACE_MARGIN:
                 return _refuse(raw, "the server does not have enough free space for this file", 507)
             partial.parent.mkdir(parents=True, exist_ok=True)
+        elif _free_space(store.root) < length + SPACE_MARGIN:
+            # asked again at every chunk: several uploads started on the same free space must
+            # not fill the disk between them. What is held stays, for when there is room
+            return _refuse(raw, "the server does not have enough free space for this file", 507)
 
         held = current + _append(raw, partial, length)
         if held < current + length:
@@ -224,7 +244,14 @@ class Backup:
     # ---------- what is known ----------
 
     def known(self, engine, digest: str) -> bool:
-        return self.library.knows(digest) or policy(engine).is_sealed(digest)
+        """Whether a device need not send this file. Raises CannotTell when the library doesn't
+        have it and a protected store could not say whether it does."""
+        if self.library.knows(digest):
+            return True
+        state = policy(engine).sealed_state(digest)
+        if state is None:
+            raise CannotTell()
+        return state
 
     # ---------- unfinished uploads ----------
 
@@ -239,12 +266,20 @@ class Backup:
         return wanted
 
     def offset(self, caller_id: str, digest: str) -> int:
+        """The bytes held from this caller for `digest`. An upload whose every byte arrived but
+        which was never taken in (the server stopped at that moment) can't be finished by
+        another chunk, so it is dropped and starts again from 0."""
         folder = self.partials_dir / caller_id
         for path in folder.glob(f"{digest}-*.part") if folder.is_dir() else ():
             try:
-                return path.stat().st_size
+                held = path.stat().st_size
             except OSError:
                 return 0
+            with self._lock:
+                if held >= _declared_size(path) and not self._is_busy(caller_id, path):
+                    path.unlink(missing_ok=True)
+                    return 0
+            return held
         return 0
 
     @contextmanager
@@ -301,17 +336,22 @@ class Backup:
     def take_in(self, request, caller: dict, partial: Path, digest: str, size: int):
         """The whole file arrived and matches its digest: into the library, as an import."""
         try:
-            if self.known(request.engine, digest):
-                return json_response({"status": "duplicate", "id": digest[:ID_LENGTH], "offset": size})
+            try:
+                if self.known(request.engine, digest):
+                    return json_response({"status": "duplicate", "id": digest[:ID_LENGTH], "offset": size})
+            except CannotTell:
+                # the file is not kept: the device sends it again once the store answers
+                return json_response({"error": UNSURE, "offset": 0}, status=503)
             query = request.query
             taken = _taken(query.get("taken"))
             if taken is not None:
                 os.utime(partial, (taken, taken))
             try:
+                # no `private` here: known() just asked the protected stores, and add_file would
+                # answer one that can no longer say as a duplicate
                 added = self.library.add_file(
                     partial, filename=safe_filename(query.get("name")),
                     physical_path=configuration.resolve_physical_path(self.satellite, query.get("folder")),
-                    private=policy(request.engine),
                     captured_at=None if taken is None else datetime.fromtimestamp(taken).isoformat(timespec="seconds"))
             except UnsupportedImage as error:
                 return json_response({"error": str(error), "offset": 0}, status=415)
@@ -443,6 +483,14 @@ def _free_space(path: Path) -> int:
     try:
         return shutil.disk_usage(probe).free
     except OSError:
+        return 0
+
+
+def _declared_size(path: Path) -> int:
+    """The whole file's size an unfinished upload was started under (<sha256>-<size>.part)."""
+    try:
+        return int(path.stem.rsplit("-", 1)[1])
+    except (IndexError, ValueError):
         return 0
 
 

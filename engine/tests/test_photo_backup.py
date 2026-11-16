@@ -253,7 +253,23 @@ class PhotoBackupTest(unittest.TestCase):
         self.assertEqual(status, 415)
         with mock.patch.object(backup, "_free_space", return_value=0):
             self.assertEqual(self.send(digest, data[:10], 0, len(data))[0], 507)
+        # the space is asked at every chunk, and what is held stays for when there is room
+        self.assertEqual(self.send(digest, data[:10], 0, len(data)), (200, {"offset": 10}))
+        with mock.patch.object(backup, "_free_space", return_value=backup.SPACE_MARGIN):
+            self.assertEqual(self.send(digest, data[10:], 10, len(data))[0], 507)
+        self.assertEqual(self.backup(f"upload/{digest}"), (200, {"offset": 10}))
         self.assertEqual(self.library().count, 0)
+
+    def test_an_upload_complete_but_never_taken_in_starts_again(self):
+        # the server stopped between the last byte and the import: no chunk can finish it
+        data = png(26, 26, b"\x21\x43\x65")
+        digest = sha(data)
+        self.send(digest, data[:10], 0, len(data))
+        partial = next((self.library().root / "backup" / "partials").rglob("*.part"))
+        partial.write_bytes(data)
+        self.assertEqual(self.backup(f"upload/{digest}"), (200, {"offset": 0}))
+        self.assertFalse(partial.exists())
+        self.assertEqual(self.send_whole(data)[1]["status"], "imported")
 
     def test_a_caller_keeps_at_most_four_unfinished_uploads(self):
         started = []
@@ -300,11 +316,60 @@ class PhotoBackupTest(unittest.TestCase):
         data = png(18, 18, b"\x09\x09\x09")
         digest = sha(data)
         private_media = module("photo.private_media")
-        with mock.patch.object(private_media, "sealed", side_effect=lambda engine, value: value == digest):
+        with mock.patch.object(private_media, "sealed_state", side_effect=lambda engine, value: value == digest):
             status, payload = self.backup("check", {"items": [{"sha256": digest, "size": len(data)}]})
             self.assertEqual(payload, {"known": [digest], "wanted": []})
             self.assertEqual(self.send_whole(data)[1]["status"], "duplicate")
         self.assertEqual(self.library().count, 0)
+
+    def test_a_protected_store_that_cannot_answer_never_makes_media_known(self):
+        # "known" tells a phone its file is safe here and it never sends it again: when nobody
+        # can say, the phone is told to ask later, and nothing is taken in meanwhile
+        kept, new = png(20, 20, b"\x0a\x0b\x0c"), png(22, 22, b"\x0d\x0e\x0f")
+        self.import_files(kept)
+        private_media = module("photo.private_media")
+        with mock.patch.object(private_media, "sealed_state", return_value=None):
+            status, payload = self.backup("check", {"items": [{"sha256": sha(new), "size": len(new)}]})
+            self.assertEqual(status, 503)
+            self.assertNotIn("known", payload)
+            # what the library has itself is still known
+            status, payload = self.backup("check", {"items": [{"sha256": sha(kept), "size": len(kept)}]})
+            self.assertEqual((status, payload), (200, {"known": [sha(kept)], "wanted": []}))
+
+            status, payload = self.send_whole(new)
+            self.assertEqual(status, 503)
+            self.assertNotIn("status", payload)
+
+            # a store that fails once the bytes are in: nothing is taken in, and it starts again
+            half = len(new) // 2
+            with mock.patch.object(private_media, "sealed_state", return_value=False):
+                self.assertEqual(self.send(sha(new), new[:half], 0, len(new)), (200, {"offset": half}))
+            status, payload = self.send(sha(new), new[half:], half, len(new))
+            self.assertEqual((status, payload.get("offset")), (503, 0))
+            self.assertEqual(self.backup(f"upload/{sha(new)}")[1], {"offset": 0})
+        self.assertEqual(self.library().count, 1)
+
+        # once the store answers, the file goes in
+        self.assertEqual(self.send_whole(new)[1]["status"], "imported")
+
+    def test_a_vault_that_fails_is_unsure_not_sealed_for_a_backup(self):
+        capabilities = import_module("starcore.capabilities")
+        digest = "a" * 64
+        vault = mock.Mock()
+        vault.manifest.name = "Vault"
+        entry = {"version": 1, "operations": {"sealed": "sealed"}}
+        with mock.patch.object(capabilities, "providers", return_value=[(vault, entry)]):
+            with mock.patch.object(capabilities, "_run", return_value=None):
+                self.assertIsNone(capabilities.sealed_state(self.engine, digest))
+                # a library still keeps the file out
+                self.assertTrue(capabilities.sealed(self.engine, digest))
+            answer = mock.Mock(status=200, payload={"sealed": False})
+            with mock.patch.object(capabilities, "_run", return_value=answer):
+                self.assertIs(capabilities.sealed_state(self.engine, digest), False)
+                self.assertFalse(capabilities.sealed(self.engine, digest))
+            answer.payload = {"sealed": True}
+            with mock.patch.object(capabilities, "_run", return_value=answer):
+                self.assertIs(capabilities.sealed_state(self.engine, digest), True)
 
     def test_a_large_chunk_is_written_to_disk_without_being_held_in_memory(self):
         size = 24 * 1024 * 1024

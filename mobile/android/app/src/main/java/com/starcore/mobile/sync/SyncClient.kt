@@ -2,6 +2,8 @@ package com.starcore.mobile.sync
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -71,11 +73,30 @@ class SyncClient(private val config: SyncConfig, private val token: String) {
             }
             val code = connection.responseCode
             val stream = if (code >= 400) connection.errorStream else connection.inputStream
-            val text = stream?.use { it.readBytes().toString(Charsets.UTF_8) }
+            val text = stream?.use { answer(it) }
             val body = try { if (text.isNullOrBlank()) null else JSONObject(text) } catch (_: Exception) { null }
             return SyncResponse(code, body)
         } finally {
             connection.disconnect()
         }
+    }
+
+    /** An answer's text, or null past MAX_ANSWER: no answer of these operations is that long,
+     * and one that is must not be held in memory by a job running in the background. */
+    private fun answer(stream: InputStream): String? {
+        val held = ByteArrayOutputStream()
+        val buffer = ByteArray(1 shl 13)
+        while (true) {
+            val read = stream.read(buffer)
+            if (read < 0) break
+            if (held.size() + read > MAX_ANSWER) return null
+            held.write(buffer, 0, read)
+        }
+        return held.toString("UTF-8")
+    }
+
+    private companion object {
+        /** a check of 500 digests answers under 40 KiB */
+        const val MAX_ANSWER = 1 shl 20
     }
 }

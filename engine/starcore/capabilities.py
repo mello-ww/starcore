@@ -127,8 +127,17 @@ def sealed(engine, digest: str) -> bool:
     it must not let its media back into a library. A provider that fails, or answers anything
     but {sealed: bool}, counts as yes: the file stays out rather than risk taking in what was
     moved away on purpose."""
+    return sealed_state(engine, digest) is not False
+
+
+def sealed_state(engine, digest: str):
+    """`sealed`, for a caller that must tell "it was moved into a store" from "a store could
+    not say": True, False, or None when no provider said yes and at least one could not answer.
+    A library still keeps the file out on None (see `sealed`); a backup must not tell a device
+    that the file is safe on the server, since nobody knows that."""
     if not isinstance(digest, str) or not DIGEST.match(digest):
         return False
+    unsure = False
     for satellite, entry in providers(engine, VAULT, enabled_only=False):
         if "sealed" not in entry["operations"]:
             continue
@@ -138,10 +147,10 @@ def sealed(engine, digest: str) -> bool:
                 or not isinstance(payload.get("sealed"), bool)):
             print(f"[WARNING]: '{satellite.manifest.name}' could not say whether media was moved into it; "
                   "it stays out of the library.")
+            unsure = True
+        elif payload["sealed"]:
             return True
-        if payload["sealed"]:
-            return True
-    return False
+    return None if unsure else False
 
 
 # ---------- protected areas on disk (files.protected) ----------

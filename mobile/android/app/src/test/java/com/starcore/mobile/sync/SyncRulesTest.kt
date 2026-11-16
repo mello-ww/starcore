@@ -104,6 +104,9 @@ class SyncRulesTest {
         assertEquals(Answer.Stop(Phases.OFFLINE, true), SyncRules.answer(502, null, null))
         assertEquals(Answer.Stop(Phases.OFFLINE, true), SyncRules.answer(200, null, null))
         assertNull(SyncRules.runAnswer(200))
+        // a 200 that is not the operation's answer (a Wi-Fi sign-in page) concludes nothing
+        assertEquals(Answer.Stop(Phases.OFFLINE, true), SyncRules.runAnswer(200, answered = false))
+        assertEquals(Answer.Stop(Phases.OFFLINE, true), SyncRules.runAnswer(503))
         assertEquals(Answer.Stop(Phases.SIGNED_OUT, false), SyncRules.runAnswer(401))
         assertEquals(Answer.Stop(Phases.UNAVAILABLE, false), SyncRules.runAnswer(404))
     }

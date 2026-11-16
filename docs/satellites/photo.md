@@ -449,7 +449,9 @@ phone sync - a standalone listener with one shared token, and `sync_upload` - is
 - **`check`** (`POST {device, items: [{sha256, size}]}`, at most 500) -> `{known, wanted}`.
   Known is what is in the library, in the recycle bin, was erased from it, or was moved
   somewhere protected (`media.vault`'s `sealed`); the answer never says which. An item larger
-  than `max_bytes` is in neither list.
+  than `max_bytes` is in neither list. When a protected store can't say whether it holds a file
+  the library doesn't have, `check` and `upload` answer `503` instead: "known" tells a phone its
+  file is safe here, and it would never send it again.
 - **`upload`**: `GET /<sha256>` -> `{offset}`, the bytes held for this file. `POST /<sha256>?offset=&size=&name=&folder=&taken=`
   with an `application/octet-stream` body of at most `chunk_bytes` -> `{offset}`, or at the last
   byte `{status: "imported" | "duplicate", id, offset}`. The bytes go straight to a partial file
@@ -462,8 +464,11 @@ phone sync - a standalone listener with one shared token, and `sync_upload` - is
 
 Partial files live in `backup/partials/<caller>/` under the storage folder, keyed by the
 caller's opaque session or device id: at most 4 per caller (a fifth drops the oldest), and
-one untouched for 7 days is dropped. `backup/devices.json` keeps each caller's name, when it
-was last seen and how many files it sent.
+one untouched for 7 days is dropped. A new upload needs the file's size and 256 MiB free, and
+every chunk its own size and 256 MiB (`507` otherwise, what is held stays). One whose every
+byte arrived but which was never taken in (the server stopped then) starts again from 0.
+`backup/devices.json` keeps each caller's name, when it was last seen and how many files it
+sent.
 
 **Erased stays erased.** Erasing from the recycle bin, by hand or past its retention, keeps the
 item's id (the first 16 hex digits of its SHA-256, nothing else) in `library.json`'s `erased`,

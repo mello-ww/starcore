@@ -165,7 +165,7 @@
       "optional_operations": {
         "devices": "GET -> {devices: [{name, last_seen, received, current}]}: the devices that sync, for a status page; refused to a device credential"
       },
-      "_note": "One-way backup from a device: a client hashes its media, asks check, and sends only what is wanted, in chunks it can resume after any cut. A provider limits the size, a caller's unfinished uploads (the oldest goes beyond 4) and their age (7 days). device_credentials: a full session may ask the Engine for a device credential limited to this capability (POST /api/auth/devices), which reaches only the provider's routes for these operations and never expires; it is listed and revoked with the sessions."
+      "_note": "One-way backup from a device: a client hashes its media, asks check, and sends only what is wanted, in chunks it can resume after any cut. A provider limits the size, a caller's unfinished uploads (the oldest goes beyond 4) and their age (7 days). Known means safe with the provider: a provider that can't tell (a protected store did not answer) answers 503 to check and upload, never known, and a client concludes nothing from an answer that is not the operation's own. device_credentials: a full session may ask the Engine for a device credential limited to this capability (POST /api/auth/devices), which reaches only the provider's routes for these operations and never expires; it is listed and revoked with the sessions."
     }
   },
   "client_capabilities": {

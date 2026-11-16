@@ -7,6 +7,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Security
 
+- **A phone is never told its photos are safe when nobody knows.** The phone's backup asks the
+  server which files it already has. When a protected store (the Locked Folder) could not
+  answer, every file the library didn't have was reported as already there, so the phone would
+  have marked all of it as backed up and never sent it. The server now answers "ask again
+  later" (`503`) and takes nothing in meanwhile; the app also ignores an answer that isn't the
+  server's own (a Wi-Fi sign-in page). Free space is checked at every chunk of an upload, not
+  once (`docs/photos-parity-audit.md`, "Security review of S1 to S4").
 - **Another name for the Locked Folder's folder is still the Locked Folder.** On a Windows
   server, a path such as `\\?\C:\...` or the drive's loopback share opened the vault's folder
   without being recognised as it, so File Explorer, Photo and Music let a session without the
