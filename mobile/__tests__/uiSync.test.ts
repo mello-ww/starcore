@@ -4,10 +4,10 @@ const {readFileSync} = require('fs') as {readFileSync: (path: string, encoding: 
 const {join} = require('path') as {join: (...parts: string[]) => string};
 
 import {CLIENT_CAPABILITIES} from '../src/satellites/ui/contract';
-import {SYNC_CAPABILITIES, SYNC_VERSIONS, syncTarget} from '../src/satellites/ui/sync';
+import {SYNC_CAPABILITIES, SYNC_VERSIONS, syncProvider, syncTarget} from '../src/satellites/ui/sync';
 
 // The sync action (UI contract 1.2): it opens the app's own sync screen for the document's own
-// Satellite, and only where the app has that screen - so far it has none, and hides the control.
+// Satellite, and only where the app has that screen (media.sync v1, src/sync/).
 
 const vocabulary = JSON.parse(readFileSync(join(__dirname, '../../contracts/ui/vocabulary.json'), 'utf-8'));
 
@@ -24,20 +24,22 @@ describe('the sync action', () => {
     }
   });
 
-  it('is hidden while the app has no sync screen', () => {
-    expect(CLIENT_CAPABILITIES.has('device.media-sync')).toBe(false);
-    expect(syncTarget(ACTION, {'media.sync': [OWN]}, 'Gallery')).toBeNull();
+  it('has the sync screen for media.sync v1', () => {
+    expect(CLIENT_CAPABILITIES.has('device.media-sync')).toBe(true);
+    expect(SYNC_VERSIONS).toEqual({'media.sync': [1]});
   });
 
-  describe('with a sync screen', () => {
-    beforeEach(() => {
-      CLIENT_CAPABILITIES.add('device.media-sync');
-      SYNC_VERSIONS['media.sync'] = [1];
+  describe('without the sync screen', () => {
+    beforeEach(() => CLIENT_CAPABILITIES.delete('device.media-sync'));
+    afterEach(() => CLIENT_CAPABILITIES.add('device.media-sync'));
+
+    it('hides the control and finds no provider', () => {
+      expect(syncTarget(ACTION, {'media.sync': [OWN]}, 'Gallery')).toBeNull();
+      expect(syncProvider({'media.sync': [OWN]}, 'media.sync')).toBeNull();
     });
-    afterEach(() => {
-      CLIENT_CAPABILITIES.delete('device.media-sync');
-      delete SYNC_VERSIONS['media.sync'];
-    });
+  });
+
+  describe('with the sync screen', () => {
 
     it("opens it for the document's own Satellite", () => {
       expect(syncTarget(ACTION, {'media.sync': [OTHER, OWN]}, 'Gallery')).toEqual({provider: OWN, capability: 'media.sync'});
@@ -55,6 +57,15 @@ describe('the sync action', () => {
       expect(syncTarget({sync: {capability: 'toString'}}, {}, 'Gallery')).toBeNull();
       expect(syncTarget({sync: 'media.sync'}, {'media.sync': [OWN]}, 'Gallery')).toBeNull();
       expect(syncTarget({navigate: 'home'}, {'media.sync': [OWN]}, 'Gallery')).toBeNull();
+    });
+
+    it("backs up to the named Satellite's provider, or the server's first one", () => {
+      expect(syncProvider({'media.sync': [OTHER, OWN]}, 'media.sync', 'Gallery')).toBe(OWN);
+      expect(syncProvider({'media.sync': [{...OTHER, enabled: false}, OWN]}, 'media.sync')).toBe(OWN);
+      expect(syncProvider({'media.sync': [{...OWN, version: 2}]}, 'media.sync')).toBeNull();
+      expect(syncProvider({'media.sync': [OTHER]}, 'media.sync', 'Gallery')).toBeNull();
+      expect(syncProvider({'media.gallery': [OWN]}, 'media.gallery')).toBeNull();
+      expect(syncProvider(null, 'media.sync')).toBeNull();
     });
   });
 });

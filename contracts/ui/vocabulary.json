@@ -169,7 +169,7 @@
     }
   },
   "client_capabilities": {
-    "_note": "Device features a client may offer a document beyond rendering blocks. media.audio (the shared audio host, docs/media-audio.md) is what the play action needs, media.picker the pick action's; secure.screen, a window that can't be captured, is the Android app's (it applies it to every protected document); device.media-sync, the client's own background backup of the device's media to a media.sync provider, is what the sync action opens; the rest are reserved names no client claims yet. A document that requires one a client doesn't offer is shown as needing a newer app.",
+    "_note": "Device features a client may offer a document beyond rendering blocks. media.audio (the shared audio host, docs/media-audio.md) is what the play action needs, media.picker the pick action's; secure.screen, a window that can't be captured, is the Android app's (it applies it to every protected document); device.media-sync, the client's own background backup of the device's media to a media.sync provider (the Android app's), is what the sync action opens; the rest are reserved names no client claims yet. A document that requires one a client doesn't offer is shown as needing a newer app.",
     "reserved": ["device.biometrics", "device.media-sync", "media.audio", "media.picker", "secure.screen"]
   },
   "limits": {

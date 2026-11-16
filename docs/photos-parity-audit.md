@@ -48,7 +48,7 @@ Legend:
 | 25 | Locked Folder itself (PIN, biometrics, encryption, recovery, move-out) | removed (L8) | removed (L8) | ✅ its own shared interface (L0-L8) | ✅ its own shared interface (L0-L8) | Stays native by design; it only needs a way in from the shared interface. | N + client wiring: an entry point to the Locked Folder on both clients | P0 | S–M |
 | 26 | Import from a server folder (scan / import) | ✅ | ✗ (empty text wrongly says "Import some from your Albums tab") | ✅ fixed in M1 | ✅ fixed in M1 | Lost on web. | J: a form with `source` and Scan / Import → existing `scan`/`import` routes. S: add a `message` to their answers. Optional: `file-browser` | P0 | S |
 | 27 | Upload, download, share, export (download and share fixed in M12; upload and export not) | ✗ upload, ✗ download | ◐ Share sends a bare authenticated URL (the recipient can't open it) | ✅ download, ◐ share where the browser can | ✅ (share; download on Android 10+) | Nothing worked well anywhere before M12. | C: `download`/`share` action (web: authenticated fetch → save; Android: download → share the file) | P1 | M |
-| 28 | Phone sync (background, Wi-Fi only, Sync now, permission) | removed (S0) | removed (S0) | ✗ until S2 | ✗ until S3 | The old sync is removed whole (S0); its replacement is designed below. | C: the `sync` action and `device.media-sync` (S1 to S4) | P0 | L |
+| 28 | Phone sync (background, Wi-Fi only, Sync now, permission) | removed (S0) | removed (S0) | ✅ Devices page (S2); no background backup on the web | ✅ the app's sync screen (S3) | The old sync is removed whole (S0); its replacement is designed below. | C: the `sync` action and `device.media-sync` (S1 to S4) | P0 | L |
 | 29 | Settings (source_paths mappings, default sync folder, retention, default import directory) | ✅ tab | ✅ screen | ✅ fixed in P1: a Settings page of forms | ✅ fixed in P1 | `source_paths` is a list of objects: since L4 the contract's form has repeatable rows. | C: repeatable form rows (contract change 2), then J+S: `gallery/settings` and the forms | P0 entry / P2 C | S / M |
 | 30 | Offline cache (Android) | n/a | ✅ cached list, "Showing cached photos - offline" | n/a | ✅ fixed in M4 (offline pages) | **Lost.** | C: opt-in per-server page-data cache, forgotten on a Locked Folder move (as `forgetCachedPhoto`) | P0 (Android) | M |
 | 31 | Deep link `#/satellite/Photo/LockedFolder` (web) | ✅ | n/a | ✅ fixed in M2 | n/a | Breaks if the shared interface becomes the default. | Client wiring with #25 | P0 | S |
@@ -142,8 +142,9 @@ each must move to the contract or to a generic capability before the stable rele
 inventory below lists. S1 is done (2026-11-16): `media.sync` v1 in Photo and the Engine's
 device credentials** ("Phone backup" in [Photo](satellites/photo.md), "Device credentials" in
 [API](api.md)). **S2 is done (2026-11-16): the `sync` action (contract change 4) and
-Photo's Phone backup page**; the button stays hidden on both clients until S3 gives the app
-`device.media-sync`. Decisions 1 and 2 are taken; 3 waits for S3. Read from
+Photo's Phone backup page. S3 is done (2026-11-16): the app's sync** (`mobile/src/sync/` and
+the Kotlin package `com.starcore.mobile.sync`), so the app has `device.media-sync` and shows
+the button; Mission Control still hides it. All four decisions are taken. Read from
 the code at `5b716a9`. The old sync is removed entirely, then a real automatic backup is built
 as a generic capability. The common order with the Locked Folder is in
 [Remaining work](remaining-work.md).
@@ -211,8 +212,9 @@ The app finds the provider in the catalog and never names it.
   files are sent. After a reinstall or on a new phone, everything is hashed again and nothing
   is sent twice.
 - **Folders:** the phone's own folders (MediaStore buckets: Camera, Screenshots, Downloads,
-  each app's folder), listed with counts; Camera is on by default, the rest off. The folder's
-  path travels as `folder`, which Photo maps to an album with `source_paths`.
+  each app's folder), listed with counts; every folder is on by default, new ones included,
+  and each can be turned off (decision 3). The folder's path travels as `folder`, which Photo
+  maps to an album with `source_paths`.
 - **When:** Wi-Fi only by default, with "Use mobile data" as a switch; "Only while charging"
   off by default; never on a low battery. These are WorkManager constraints, so the system
   enforces them, also for "Sync now" and for opening the app.
@@ -267,9 +269,30 @@ The app finds the provider in the catalog and never names it.
 | S0 (done) | Remove the old sync (the inventory above) | none; the reserved client name changes in S2 | as listed | Sonnet 5.5 high |
 | S1 (done) | `media.sync` v1 in the vocabulary and in Photo: the four routes, streamed to disk, digests of erased items; the Engine's device credentials if decision 1 says so | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `photo/backup.py` (new) and `api.py`, `library.py` (erase records the digest), `engine/starcore/auth.py` and `api/server.py` | Opus 5.5 xhigh |
 | S2 (done) | The `sync` action and `device.media-sync`; Photo's button and Devices page | **contract change 4** | `ui_contract.py`, fixtures, both clients' contract and action runners, `photo/ui.json` | Opus 5.5 high |
-| S3 | The app's sync: the Kotlin package (workers, MediaStore, index, uploader, notification), `mobile/src/sync/` (screen, state), the manifest, `App.tsx` | none | `mobile/android/app/src/main/java/.../sync/`, `mobile/src/sync/`, `AndroidManifest.xml` | Opus 5.5 xhigh |
+| S3 (done) | The app's sync: the Kotlin package (workers, MediaStore, index, uploader, notification), `mobile/src/sync/` (screen, state), the manifest, `App.tsx` | none | `mobile/android/app/src/main/java/.../sync/`, `mobile/src/sync/`, `AndroidManifest.xml` | Opus 5.5 xhigh |
 | S4 | Emulator runs from the table above; then the owner's phone | none | none | Opus 5.5 high |
 | S5 | Security review of S1 to S3 (the credential, the upload route, what the phone stores) | none | none | Fable 5.2 high |
+
+### What S3 built
+
+- **Kotlin** (`mobile/android/app/src/main/java/com/starcore/mobile/sync/`): `SyncRules`
+  (the pure rules: chunks, backoff, what each answer means, the origin and routes; JVM tests in
+  `app/src/test/`), `SyncStore` (each server's settings, its run state, and the credential
+  encrypted with AES-GCM under an Android Keystore key), `SyncIndex` (the SQLite index, one
+  file per server), `MediaScanner` (MediaStore: folders, entries, access, hashing the
+  original), `SyncClient` (the three operations, same origin, no redirects, the device
+  credential as a bearer token), `SyncRun` (one run: scan, reconcile, `status`, hash, `check`
+  in batches of 500, upload in chunks, resume from the server's offset), `SyncWorker` and
+  `WatchWorker` (WorkManager, with the `dataSync` foreground notification), `SyncScheduler`
+  (the content trigger, every 6 hours, now; the person's constraints) and
+  `StarCoreSyncModule` (the React Native module `StarCoreSync`).
+- **JavaScript** (`mobile/src/sync/`): the screen (`MediaSyncScreen`, reached from the
+  document's `sync` action and from Settings' "Phone backup" row), its state line, the
+  permission flow and setup (`POST /api/auth/devices`, then the module). Signing out revokes
+  the credential and forgets the server's index; removing a server forgets it locally. The app
+  starts a run (under the same constraints) when it opens and comes back to the front.
+- **Build:** WorkManager 2.9.1, and Guava 33.0.0-android declared for compiling (it was
+  already in the app at runtime; WorkManager's futures need it).
 
 ### Decisions for the owner
 
@@ -280,7 +303,9 @@ The app finds the provider in the catalog and never names it.
 2. **Erased photos:** the server remembers their digest so a phone never sends them back
    (recommended), or forgets them, so a reinstalled app uploads them again. **Decided
    (2026-11-16): remembered**, built in S1.
-3. **Defaults:** Camera only, Wi-Fi only, charging not required (recommended).
+3. **Defaults:** Camera only, Wi-Fi only, charging not required (recommended). **Decided
+   (2026-11-16): every folder, chosen in the sync screen; Wi-Fi only with "Use mobile data"
+   as a switch; charging not required**, built in S3.
 4. **When the old sync goes:** first, in S0 (recommended: one code path; production keeps the
    old one until the whole stage is pushed and deployed), or only once S3 works.
 

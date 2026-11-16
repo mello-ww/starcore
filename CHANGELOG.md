@@ -82,9 +82,19 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   opens the client's own sync screen for the document's own provider; the document supplies
   nothing of it, and a client without the screen hides the control. `media.sync` opens the
   client capability `device.media-sync`, which replaces the reserved `device.background-tasks`.
+- **Android: the phone backs itself up** (`device.media-sync`). A sync screen, opened from
+  Photo's Phone backup page or Settings' "Phone backup", turns on a background backup of the
+  phone's photos and videos to the server's `media.sync` provider: a new photo is sent within
+  a minute, a run every six hours and when the app opens catches the rest, and a cut upload
+  resumes where it stopped. Every folder by default, each can be turned off; Wi-Fi only unless
+  "Use mobile data" is on; "Only while charging" if chosen; never on a low battery. It shows
+  where it stands and what failed, with "Try again". It uses a device credential limited to
+  the backup, kept under an Android Keystore key, and revoked when you sign out
+  (`docs/photos-parity-audit.md`, S3).
 - **Photo's Phone backup page** (Albums' Phone backup button): each device that backs up to
   Photo, when it was last seen and how many files it sent, and a "Back up this phone" button
-  hidden until the app has its sync screen (`docs/photos-parity-audit.md`, S2).
+  that opens the app's sync screen; Mission Control hides it (`docs/photos-parity-audit.md`,
+  S2).
 - **Photo's phone backup, server side (`media.sync` v1):** `status`, `check` (what the server
   already has, erased and protected media included, without saying which), a resumable
   `upload` written straight to disk in chunks of 8 MiB and checked against its SHA-256, and

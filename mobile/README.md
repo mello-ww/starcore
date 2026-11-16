@@ -18,6 +18,9 @@ Mobile UI  ->  Existing StarCore API  ->  StarCore Engine  ->  Satellites
   interfaces" below): Status, Photos, and File Explorer's read-only preview, the app's file
   browser.
 - The shared audio player (`src/media/`), and Music's native library screens.
+- The phone's background backup (`src/sync/` and the Kotlin `sync` package), client
+  capability `device.media-sync`: any server's `media.sync` provider, reached from a
+  document's `sync` action or Settings' "Phone backup" (`docs/photos-parity-audit.md`).
 - Photos' previous native screens, until they are retired (`docs/remaining-work.md`).
 - Developer Mode (`src/developer/`): the terminal icon at the top right of each tab, or the
   switch in Settings. Off by default and remembered per server on this device; it shows the
@@ -196,8 +199,7 @@ from the cache. The rules shared with the Engine and Mission Control are in
 `__tests__/uiContract.test.ts`.
 
 Status opens its `ui.json` alone; Photos opens its `ui.json` by default and keeps
-its dedicated screens in Developer Mode, where they still serve its settings and phone
-sync. The Locked Folder has no screen of its own: its `ui.json` is its only interface. File Explorer has no screen of its own: its `ui.json` is a
+its dedicated screens in Developer Mode, where they still serve its settings. The Locked Folder has no screen of its own: its `ui.json` is its only interface. File Explorer has no screen of its own: its `ui.json` is a
 read-only preview, which the app opens (Mission Control keeps File Explorer's
 own page by default). Music keeps its dedicated screens until the shared blocks
 reach parity with them (`docs/remaining-work.md`). Satellite icons come from each
@@ -214,7 +216,8 @@ may only shrink.
 ```
 mobile/
 ├── android/              native Android project, with the app's own Kotlin
-│                         modules (audio, downloads, files, privacy, build info)
+│                         modules (audio, downloads, files, privacy, build info,
+│                         sync)
 ├── src/
 │   ├── api/              the StarCore API client (sign-in, sessions)
 │   ├── auth/             SessionManager (framework-free), AuthContext, app lock
@@ -231,6 +234,8 @@ mobile/
 │   │                     grant prompt, biometric unlock and a protected
 │   │                     document's gate
 │   ├── files/            saving, sharing and opening files
+│   ├── sync/             the phone's background backup: its screen, state
+│   │                     line, permissions and setup
 │   ├── components/       shared UI (cards, pills, sliders, charts, TopBarSlot,
 │   │                     FloatingPlayerInset, ZoomableImage)
 │   ├── theme/            tokens.ts (kept in sync with
@@ -289,8 +294,9 @@ The Jest suites in `__tests__/` cover sessions and the app lock (with
 in-memory fakes from `__tests__/fakes.ts`, so a stored token is never trusted
 without the live server), the UI contract against the shared fixtures in
 `contracts/ui/` (`uiContract.test.ts`), the shared renderer and its blocks,
-offline pages, the audio host, files, and the Satellite-specific screens. Run
-`npm run typecheck` and `npm run lint` as well.
+offline pages, the audio host, files, the sync screen, and the Satellite-specific screens. Run
+`npm run typecheck` and `npm run lint` as well. The Kotlin sync rules have JVM tests:
+`cd android && ./gradlew :app:testReleaseUnitTest` (with a JDK 17).
 
 ## Release builds
 

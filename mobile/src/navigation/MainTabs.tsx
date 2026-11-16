@@ -27,6 +27,7 @@ import {MiniPlayer} from '../media/ui/MiniPlayer';
 import {BUILTIN_AUDIO, BUILTIN_SCREENS, type BuiltinScreenParams} from '../satellites/builtins';
 import {TopBarSlot, TopBarSlotProvider} from '../components/TopBarSlot';
 import {FloatingPlayerInsetProvider} from '../components/FloatingPlayerInset';
+import {MediaSyncScreen} from '../sync/MediaSyncScreen';
 
 export type MainTabParamList = {
   Overview: undefined;
@@ -50,12 +51,17 @@ export type SatellitesStackParamList = {
   PhotoConfiguration: undefined;
   PhotoTrash: undefined;
   PhotoViewer: {media: {id: string; mediaType: 'photo' | 'video'; duration: number | null}[]; startIndex: number};
+  /** The app's own sync screen (client capability device.media-sync), opened by a document's
+   * sync action for that document's provider. */
+  MediaSync: {satellite?: string; capability?: string} | undefined;
 } & BuiltinScreenParams;
 
 export type SettingsStackParamList = {
   SettingsHome: undefined;
   Servers: undefined;
   AddServer: {name?: string; address?: string} | undefined;
+  /** The same sync screen, for the server's own media.sync provider. */
+  MediaSync: {satellite?: string; capability?: string} | undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -93,6 +99,7 @@ function SatellitesStack() {
         component={PhotoViewerScreen}
         options={{headerShown: false, presentation: 'fullScreenModal'}}
       />
+      <SatellitesStackNav.Screen name="MediaSync" component={MediaSyncScreen} options={{title: 'Phone backup'}} />
       {BUILTIN_SCREENS.map(screen => (
         <SatellitesStackNav.Screen key={screen.name} name={screen.name} component={screen.component}
           options={screen.title !== undefined ? {title: screen.title} : undefined} />
@@ -110,6 +117,7 @@ function SettingsStack() {
     <SettingsStackNav.Navigator screenOptions={stackScreenOptions}>
       <SettingsStackNav.Screen name="SettingsHome" component={SettingsScreen} options={{title: 'Settings', headerShown: false}} />
       <SettingsStackNav.Screen name="Servers" component={ServersScreen} options={{title: 'Servers'}} />
+      <SettingsStackNav.Screen name="MediaSync" component={MediaSyncScreen} options={{title: 'Phone backup'}} />
       <SettingsStackNav.Screen name="AddServer" options={{headerShown: false}}>
         {({navigation, route}) => (
           <ConnectScreen

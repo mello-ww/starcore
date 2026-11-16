@@ -14,6 +14,7 @@ import com.starcore.mobile.media.MediaPackage
 import com.starcore.mobile.media.PlayerRegistry
 import com.starcore.mobile.privacy.PrivacyPackage
 import com.starcore.mobile.buildinfo.BuildInfoPackage
+import com.starcore.mobile.sync.SyncPackage
 
 /**
  * Standard React Native application bootstrap - autolinking (via
@@ -24,13 +25,14 @@ import com.starcore.mobile.buildinfo.BuildInfoPackage
  * its react-native-video plugin hook that gives it the player's session,
  * and the Privacy package (FLAG_SECURE and image-cache eviction for private
  * content), BuildInfo (Settings > About), and StarCoreFiles (the shared
- * interface's download and share actions, src/files/).
+ * interface's download and share actions, src/files/) and Sync (the background backup of the
+ * phone's media, src/sync/).
  */
 class MainApplication : Application(), ReactApplication {
 
     override val reactNativeHost: ReactNativeHost =
         object : DefaultReactNativeHost(this) {
-            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MediaPackage() + PrivacyPackage() + BuildInfoPackage() + StarCoreFilesPackage()
+            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MediaPackage() + PrivacyPackage() + BuildInfoPackage() + StarCoreFilesPackage() + SyncPackage()
 
             override fun getJSMainModuleName(): String = "index"
 

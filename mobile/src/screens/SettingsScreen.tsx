@@ -13,6 +13,7 @@ import {Surface} from '../components/Surface';
 import {tokens, useAccent, useTopInset} from '../theme';
 import type {SettingsStackParamList} from '../navigation/MainTabs';
 import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
+import {useSyncEntry} from '../sync/useSyncEntry';
 
 const {palette, space, type} = tokens;
 
@@ -35,6 +36,7 @@ const TOGGLE_MESSAGES: Record<string, string> = {
  */
 export function SettingsScreen({navigation}: Props) {
   const {
+    client,
     logout,
     biometricsAvailable,
     biometricsUnavailableReason,
@@ -49,6 +51,7 @@ export function SettingsScreen({navigation}: Props) {
   const top = useTopInset();
   const [busy, setBusy] = useState(false);
   const [bioError, setBioError] = useState<string | null>(null);
+  const backup = useSyncEntry(client, activeServer?.id ?? 'default');
 
   const toggleBiometrics = async (next: boolean) => {
     setBusy(true);
@@ -95,6 +98,25 @@ export function SettingsScreen({navigation}: Props) {
           </View>
         </Surface>
       </Pressable>
+
+      {backup && (
+        <Pressable
+          onPress={() => navigation.navigate('MediaSync', {capability: 'media.sync'})}
+          accessibilityRole="button"
+          testID="settings-backup"
+          style={({pressed}) => pressed && styles.pressed}>
+          <Surface>
+            <View style={styles.row}>
+              <Icon name="upload-cloud" size={20} color={accent} />
+              <View style={styles.rowText}>
+                <Text style={type.title}>Phone backup</Text>
+                <Text style={[type.caption, backup.line.tone === 'attention' && styles.attention]}>{backup.line.text}</Text>
+              </View>
+              <Icon name="chevron-right" size={20} color={palette.text3} />
+            </View>
+          </Surface>
+        </Pressable>
+      )}
 
       {showBiometricCard && (
         <Surface style={styles.card}>
@@ -156,5 +178,6 @@ const styles = StyleSheet.create({
   row: {flexDirection: 'row', alignItems: 'center', gap: space.md},
   rowText: {flex: 1, gap: space.xs},
   error: {color: palette.danger, fontSize: 13},
+  attention: {color: palette.warn},
   pressed: {opacity: 0.85},
 });

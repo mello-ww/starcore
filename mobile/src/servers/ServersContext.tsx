@@ -1,6 +1,8 @@
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
 import * as store from '../storage/preferences';
 import {forgetOfflineServer} from '../satellites/ui/offline';
+import {nativeSync} from '../sync/native';
+import {forgetSync} from '../sync/setup';
 import type {ServerProfile} from './types';
 
 /** A server `addAndActivate` just created and switched to, not yet
@@ -110,6 +112,8 @@ export function ServersProvider({children}: {children: React.ReactNode}) {
       await store.removeServer(id);
       // nothing kept offline outlives the server it came from
       await forgetOfflineServer(id);
+      // nor does the phone's backup to it (its credential stays in the server's device list)
+      await forgetSync(nativeSync(), id);
       const remaining = await store.getServers();
       setServers(remaining);
       if (activeServerId === id) {

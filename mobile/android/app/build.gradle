@@ -141,6 +141,11 @@ android {
 dependencies {
     implementation("com.facebook.react:react-android")
     implementation("com.facebook.react:hermes-android")
+    // the background backup's runs (the sync package)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    // WorkManager's futures: the Guava already in the app at runtime, made visible to compile
+    implementation("com.google.guava:guava:33.0.0-android")
+    testImplementation("junit:junit:4.13.2")
 }
 
 // This project uses the OLD-style autolinking (settings.gradle calls

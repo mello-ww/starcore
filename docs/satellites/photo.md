@@ -323,8 +323,9 @@ the web's single-photo popup is replaced by opening the viewer at once.
 **Phone backup** (Albums' Phone backup button) reads `gallery/backup`: each device that backs
 up here, newest first, when it was last seen (relative) and how many files it sent, the one
 asking marked "this device". Its "Back up this phone" button is the `sync` action (UI contract
-1.2): it opens the client's own sync screen for Photo's `media.sync`. Mission Control has none,
-and the app has none until S3, so both hide the button; the list is all the page shows there.
+1.2): it opens the client's own sync screen for Photo's `media.sync`, which the Android app
+has (`device.media-sync`, S3). Mission Control can't back a device up, so it hides the button
+and the list is all the page shows there.
 
 **Settings** (Albums' Settings button) reads `gallery/settings` and saves each setting through
 the `configuration` route, one form each, as Photo's own page and screen do: the phone folders
@@ -439,7 +440,8 @@ restart.
 Photo provides `media.sync` v1 (`backup.py`): a one-way backup of a device's media into the
 library. The server side is done (S1 of [the parity audit](../photos-parity-audit.md), which
 holds the whole design); the shared interface's Phone backup page and its `sync` action are S2,
-and the app's own sync screen, `device.media-sync`, comes in S3. The previous
+and the Android app's own sync screen and background backup, `device.media-sync`, are S3.
+The app finds Photo in the catalog as `media.sync`'s provider and never names it. The previous
 phone sync - a standalone listener with one shared token, and `sync_upload` - is removed (S0).
 
 - **`status`** (`GET ?device=`) -> `{accepts: ["image", "video"], max_bytes, chunk_bytes,

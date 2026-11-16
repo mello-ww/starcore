@@ -8,6 +8,8 @@ import {secureStorage} from '../platform/secureStorage';
 import type {BiometricAvailability, BiometricUnavailableReason} from '../platform/types';
 import {AppLock, UnlockResult} from './appLock';
 import {forgetOfflineServer} from '../satellites/ui/offline';
+import {nativeSync} from '../sync/native';
+import {forgetSync} from '../sync/setup';
 import {
   BIOMETRIC_ENABLED_KEY,
   BiometricDisableResult,
@@ -135,6 +137,26 @@ export function AuthProvider({
     return () => subscription.remove();
   }, [refreshAvailability]);
 
+  const signedIn = state.status === 'signed-in';
+  useEffect(() => {
+    // the phone's backup, when it is on, runs as the app opens and comes back to the front
+    // (under the constraints the person chose); a backup that isn't set up ignores this
+    const native = nativeSync();
+    if (!signedIn || !native) {
+      return undefined;
+    }
+    const run = () => {
+      native.runNow(serverId).catch(() => undefined);
+    };
+    run();
+    const subscription = AppState.addEventListener('change', status => {
+      if (status === 'active') {
+        run();
+      }
+    });
+    return () => subscription.remove();
+  }, [signedIn, serverId]);
+
   const login = useCallback(
     async (username: string, password: string) => {
       setLoginError(null);
@@ -155,6 +177,9 @@ export function AuthProvider({
   );
 
   const logout = useCallback(async () => {
+    // the phone's backup goes with the session: its credential is revoked while this session
+    // still can, and what it kept for this server is removed
+    await forgetSync(nativeSync(), serverId, client);
     // the stored preference is kept (see SessionManager.logout); only the
     // in-memory flag is reset until the next sign-in re-reads it
     await sessionManager.logout();
@@ -162,7 +187,7 @@ export function AuthProvider({
     await forgetOfflineServer(serverId);
     setBiometricUnlockEnabled(false);
     setState({status: 'signed-out'});
-  }, [sessionManager, serverId]);
+  }, [sessionManager, serverId, client]);
 
   const enableBiometricUnlock = useCallback(async (): Promise<BiometricEnableResult> => {
     if (state.status !== 'signed-in') {

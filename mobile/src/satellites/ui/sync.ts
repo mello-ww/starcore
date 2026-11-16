@@ -4,9 +4,8 @@ import {CLIENT_CAPABILITIES, type CapabilityProvider, type Providers} from './co
  * app's own sync screen for it}. Kept equal to the vocabulary's sync_capabilities. */
 export const SYNC_CAPABILITIES: Record<string, string> = {'media.sync': 'device.media-sync'};
 
-/** The protocol versions of each sync capability this app's sync screen speaks: none until that
- * screen exists. */
-export const SYNC_VERSIONS: Record<string, number[]> = {};
+/** The protocol versions of each sync capability this app's sync screen speaks. */
+export const SYNC_VERSIONS: Record<string, number[]> = {'media.sync': [1]};
 
 /** The screen the sync action pushes, with {satellite, capability}. */
 export const SYNC_SCREEN = 'MediaSync';
@@ -32,4 +31,23 @@ export function syncTarget(
     entry => entry.enabled && entry.satellite === satellite && versions.includes(entry.version),
   );
   return provider ? {provider, capability} : null;
+}
+
+/** The provider the sync screen backs up to: the named Satellite's when it was opened from a
+ * document, otherwise the server's first, enabled and in a version the screen speaks - or
+ * null (the server takes no backups). */
+export function syncProvider(
+  providers: Providers | null | undefined,
+  capability: string,
+  satellite?: string,
+): CapabilityProvider | null {
+  if (!Object.prototype.hasOwnProperty.call(SYNC_CAPABILITIES, capability) || !CLIENT_CAPABILITIES.has(SYNC_CAPABILITIES[capability])) {
+    return null;
+  }
+  const versions = SYNC_VERSIONS[capability] ?? [];
+  return (
+    (providers?.[capability] ?? []).find(
+      entry => entry.enabled && versions.includes(entry.version) && (!satellite || entry.satellite === satellite),
+    ) ?? null
+  );
 }

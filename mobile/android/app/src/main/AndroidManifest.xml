@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- StarCore is typically reached over the local network - a LAN
          address, or a home server's own domain - which docs/deployment.md
@@ -26,6 +27,22 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- The background backup of the phone's media (src/sync/, the Kotlin sync package): it
+         reads images and videos from MediaStore (READ_MEDIA_IMAGES and READ_MEDIA_VIDEO from
+         Android 13, READ_EXTERNAL_STORAGE before; READ_MEDIA_VISUAL_USER_SELECTED only so the
+         sync screen can tell "selected photos only" apart, which is not enough for a backup),
+         sends originals with their position (ACCESS_MEDIA_LOCATION), and shows its progress as
+         a dataSync foreground job. All of them are asked for when the person turns the backup
+         on, never from the background. Nothing on the phone is ever written or deleted. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- allowBackup=false: no app data (including anything AsyncStorage
          writes, like the server address) goes into Android's auto backup -->
@@ -78,6 +95,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/shared_files" />
         </provider>
+
+        <!-- WorkManager's own foreground service, which a long backup run becomes: declared
+             here only to give it its foreground service type (Android 14) -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
 
         <service
             android:name="com.brentvatne.exoplayer.VideoPlaybackService"
