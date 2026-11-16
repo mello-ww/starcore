@@ -106,9 +106,8 @@ the owner 2026-11-15).
   - [x] **S2** - the `sync` action (contract change 4); Photo's button and Devices page.
   - [x] **S3** - the app's sync: WorkManager, MediaStore detection, the local index, folders,
     Wi-Fi and charging rules, progress and errors. `App.tsx` no longer imports `src/photo/`.
-  - [ ] **S4** - emulator runs (done but the reboot, which waits for the owner to unlock; three
-    fixes: see the audit's "What S4 found"), then the owner's phone: the "real phone only" row
-    of the audit's test table.
+  - [ ] **S4** - emulator runs (done, with three fixes: see the audit's "What S4 found"), then
+    the owner's phone: the "real phone only" row of the audit's test table.
   - [ ] **S5** - security review.
 - [x] **P1 - Settings (#29):** the `source_paths` mappings as repeatable form rows (the `rows`
   field kind arrives with contract change 2, in the Locked Folder's L4); the `own: "settings"`

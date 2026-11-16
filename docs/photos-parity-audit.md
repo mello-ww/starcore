@@ -270,7 +270,7 @@ The app finds the provider in the catalog and never names it.
 | S1 (done) | `media.sync` v1 in the vocabulary and in Photo: the four routes, streamed to disk, digests of erased items; the Engine's device credentials if decision 1 says so | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `photo/backup.py` (new) and `api.py`, `library.py` (erase records the digest), `engine/starcore/auth.py` and `api/server.py` | Opus 5.5 xhigh |
 | S2 (done) | The `sync` action and `device.media-sync`; Photo's button and Devices page | **contract change 4** | `ui_contract.py`, fixtures, both clients' contract and action runners, `photo/ui.json` | Opus 5.5 high |
 | S3 (done) | The app's sync: the Kotlin package (workers, MediaStore, index, uploader, notification), `mobile/src/sync/` (screen, state), the manifest, `App.tsx` | none | `mobile/android/app/src/main/java/.../sync/`, `mobile/src/sync/`, `AndroidManifest.xml` | Opus 5.5 xhigh |
-| S4 (emulator done but the reboot) | Emulator runs from the table above; then the owner's phone | none | the fixes below: `engine/starcore/api/response.py` and `server.py`, the Kotlin sync package, `MainApplication.kt`, `MediaSyncScreen.tsx` | Opus 5.5 high |
+| S4 (emulator done) | Emulator runs from the table above; then the owner's phone | none | the fixes below: `engine/starcore/api/response.py` and `server.py`, the Kotlin sync package, `MainApplication.kt`, `MediaSyncScreen.tsx` | Opus 5.5 high |
 | S5 | Security review of S1 to S3 (the credential, the upload route, what the phone stores) | none | none | Fable 5.2 high |
 
 ### What S3 built
@@ -309,7 +309,7 @@ isolated demo engine:
 | Mobile data only, "Use mobile data" off | waits ("Waiting for Wi-Fi"); sent once the switch is on |
 | "Only while charging" on, charger unplugged | waits ("Waiting for the charger"); sent 12 s after plugging in |
 | Doze forced | the watch and the run wait; sent seconds after Doze ends |
-| A reboot | not finished: until the first unlock nothing runs (WorkManager schedules its work again on `BOOT_COMPLETED`), and the emulator's screen lock is the owner's to enter |
+| A reboot, then a new photo without opening the app | nothing runs until the first unlock (WorkManager schedules its work again on `BOOT_COMPLETED`); after it, sent 21 s later |
 
 Fixes:
 
