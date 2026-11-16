@@ -41,16 +41,13 @@ KNOWN_IMPORTS = {
     # the composition root: Music's native screens
     "mobile/src/satellites/builtins.tsx": {"mobile/src/music/": 10},
     "mobile/src/navigation/MainTabs.tsx": {"mobile/src/photo/": 5},
-    # Photo's background sync, started with the app
-    "mobile/src/App.tsx": {"mobile/src/photo/": 1},
 }
 
 # Satellite code naming another Satellite: (file, current count)
 KNOWN_CROSS_SATELLITE = {
-    # not Satellite references: a Python type named "Status" and a column
-    # label, matched by the same pattern
+    # not a Satellite reference: a Python type named "Status", matched by the
+    # same pattern
     "satellites/native/music/library.py": 1,
-    "satellites/native/photo/commands/photo.py": 1,
 }
 
 

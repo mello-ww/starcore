@@ -320,8 +320,8 @@ every provider whether or not it is currently enabled:
   (`starcore.capabilities.sealed`), which asks `media.vault`'s optional `sealed`
   (`GET sealed/<sha256>` -> `{sealed}`, for the server alone: a client gets `403`) of every
   provider; one that fails or answers anything else counts as yes. Photo answers such a file
-  like a duplicate in a directory import, a phone sync upload and the standalone sync
-  listener - so a phone that still has the photo stops re-sending it, and it never reappears
+  like a duplicate in a directory import or an upload (and the new phone sync, S1, will too) -
+  so a phone that still has the photo stops re-sending it, and it never reappears
   in the gallery, search, albums, the map or thumbnails. Moving it back out clears the record.
 
 ## Encryption at rest
@@ -769,7 +769,7 @@ the clients call every 30 seconds while they show the vault. That idle time isn'
 
 All four editable settings (`locked_folder_path`, `session_timeout_seconds`,
 `max_pin_attempts`, `lockout_seconds`) are exposed through the Satellite's own
-`"configuration"` route, the same mechanism Photo's `sync_host`/`sync_port` and
+`"configuration"` route, the same mechanism Photo's `trash_retention_days` and
 `photo_directory` use (see "Exposing configuration" in `docs/satellites.md`) - not a second
 configuration system. `locked_folder_path` must be an absolute path (or `~`-prefixed) and may
 not be a filesystem root; changing it to a new value revokes every existing unlock, and

@@ -70,7 +70,7 @@ class DeveloperSettingsTest(unittest.TestCase):
 
     def test_satellites_mark_their_advanced_settings(self):
         expected = {
-            "/api/satellites/Photo/configuration": ({"sync_host", "sync_port", "sync_default_path"},
+            "/api/satellites/Photo/configuration": ({"sync_default_path"},
                                                     {"photo_directory", "trash_retention_days", "source_paths"}),
             "/api/satellites/Music/configuration": ({"exclude", "min_duration", "missing_metadata", "scan_interval",
                                                      "ffmpeg", "transcode_workers", "transcode_cache_mb"},
@@ -94,7 +94,7 @@ class DeveloperSettingsTest(unittest.TestCase):
             ("GET", "/api/configuration", None),
             ("POST", "/api/configuration", {"section": "server", "key": "port", "value": 1}),
             ("GET", "/api/satellites/Photo/configuration", None),
-            ("POST", "/api/satellites/Photo/configuration", {"key": "sync_port", "value": 1}),
+            ("POST", "/api/satellites/Photo/configuration", {"key": "trash_retention_days", "value": 1}),
             ("POST", "/api/satellites/Music/configuration", {"key": "scan_interval", "value": 5}),
             ("GET", "/api/satellites/Status/diagnostics", None),
             ("POST", "/api/commands/execute", {"command": "status"}),
@@ -111,8 +111,6 @@ class DeveloperSettingsTest(unittest.TestCase):
         self.assertEqual(self.settings("/api/satellites/Music/configuration")["scan_interval"]["value"], 15)
 
     def test_no_secret_is_described_with_the_settings(self):
-        photo = self.engine.registry.get("Photo")
-        token = photo.config.data.get("sync_token") or ""
         for path in ("/api/configuration", "/api/satellites/Photo/configuration",
                      "/api/satellites/Music/configuration", "/api/satellites/LockedFolder/configuration"):
             with self.subTest(path=path):
@@ -121,8 +119,6 @@ class DeveloperSettingsTest(unittest.TestCase):
                 text = json.dumps(payload).lower()
                 self.assertNotIn("sync_token", text)
                 self.assertNotIn("https_key_password", text)
-                if token:
-                    self.assertNotIn(token.lower(), text)
                 self.assertNotIn("correct horse", text)
 
 

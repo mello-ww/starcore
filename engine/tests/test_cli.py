@@ -34,7 +34,6 @@ def isolate(engine, directory: Path):
     music.config.data["sources"] = []
     photo = engine.registry.get("Photo")
     photo.config.data["storage"] = str(directory / "photo")
-    photo.config.data["sync_enabled"] = False
     photo.config.data["photo_directory"] = ""
     locked = engine.registry.get("LockedFolder")
     locked.config.data["storage"] = str(directory / "locked")
@@ -394,18 +393,12 @@ class SatelliteCommandsTest(CommandTestCase):
         code, payload = self.run_json("status metrics")  # the older name of status hardware
         self.assertIn("logical_cores", payload["data"]["cpu"])
 
-    def test_photo_statistics_and_sync_never_show_the_token(self):
+    def test_photo_statistics(self):
         code, payload = self.run_json("photo stats")
         self.assertEqual(code, 0)
         for key in ("photos", "images", "videos", "albums", "size_bytes", "storage"):
             self.assertIn(key, payload["data"])
-
-        from satellites.native.photo import sync
-        described = {"enabled": True, "running": True, "url": "http://x", "token": "very-secret",
-                     "counts": {"received": 0, "imported": 0, "duplicates": 0, "failed": 0}, "events": []}
-        with mock.patch.object(sync, "describe", return_value=described):
-            outcome = self.run_line("photo sync --json")
-        self.assertNotIn("very-secret", outcome.stdout)
+        self.assertNotIn("sync", payload["data"])
 
     def test_photo_scan_previews_without_importing(self):
         from tests.test_photo import png

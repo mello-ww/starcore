@@ -161,8 +161,8 @@ generically to any Satellite.
 
 Which settings exist, their defaults, validation and persistence all belong to the
 Satellite; Mission Control and the Core only provide the button, the modal, and the generic
-request plumbing. Photo Sync's `sync_host`/`sync_port` are the first Satellite to use this -
-see `docs/satellites/photo.md` - and the underlying mechanism is documented for Satellite authors in
+request plumbing. Photo's settings were the first to use this - see `docs/satellites/photo.md` -
+and the underlying mechanism is documented for Satellite authors in
 `docs/satellites.md` under "Exposing configuration".
 
 A setting a Satellite describes with `"type": "path"` (Photo's `photo_directory` and Music's

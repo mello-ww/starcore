@@ -69,9 +69,8 @@ promise as `images.py`. WEBM is intentionally not supported: a full Matroska/EBM
 substantial scope beyond what phone cameras actually produce.
 
 What kind of file something is, is always decided by looking at its bytes, never by its file
-extension or name - the same file arrives with an extensionless temporary name over phone
-sync (see "Phone synchronization" below), so trusting a name would silently break every video
-sent that way. `add_file()` tries `images.probe()` first, then `videos.probe()`; whichever one
+extension or name - an upload is written aside under a temporary name with no extension before
+it reaches the library, so trusting a name would silently break every video sent that way. `add_file()` tries `images.probe()` first, then `videos.probe()`; whichever one
 recognises the content decides the rest.
 
 ## Import
@@ -181,9 +180,8 @@ GET  /api/satellites/photo/thumbnails/<id>    cached thumbnail
 GET  /api/satellites/photo/originals/<id>     the stored original
 POST /api/satellites/photo/scan               preview a directory  {"source": "..."}; the answer includes a readable "message"
 POST /api/satellites/photo/import             import a directory   {"source": "..."}; the answer includes a readable "message"
-GET  /api/satellites/photo/configuration      current sync_host/sync_port/trash_retention_days/source_paths/... settings
+GET  /api/satellites/photo/configuration      current source_paths/sync_default_path/trash_retention_days/... settings
 POST /api/satellites/photo/configuration      change one            {"key": ..., "value": ...}; the answer's "message" says what was saved
-POST /api/satellites/photo/sync_upload        upload one photo/video, authenticated (see "Real automatic phone sync")
 GET  /api/satellites/photo/albums             every physical album, Favorites, and every custom album
 GET  /api/satellites/photo/albums/<id>        one album's photos ("physical:<id>" for a physical album)
 POST /api/satellites/photo/albums             create a custom album  {"name": ...}
@@ -262,10 +260,9 @@ swiping away always stops playback. A photo or video's details panel (web and mo
 shows its stored filename and - when it has one - its physical album's server path, so where a
 file actually came from is never a mystery.
 
-Automatic phone sync (below) has no segment of its own: its enable/disable, Wi-Fi-only, "Sync
-now" and status live inside the Photo configuration screen, alongside `source_paths`,
-`sync_default_path` and every other Photo setting - see "Real automatic phone sync" and
-"Configuration" above.
+The Photo configuration screen holds `source_paths`, `sync_default_path` and every other Photo
+setting - see "Configuration" above. Phone sync has no place there until its new form (see
+"Phone synchronization").
 
 ## Shared interface
 
@@ -300,7 +297,7 @@ What it covers:
 | Map clustering | web only, by rounded coordinates | both clients, a grid about 64 px wide on screen |
 | Import from a folder on the server: check, then import | web only | yes, both clients ("Import from a folder" on Library) |
 | Settings: phone folders (`source_paths`), the default album for synced photos, the recycle bin's retention, the default import folder | yes | yes, both clients: Settings on Albums, one form each, the phone folders as repeatable rows (see below) |
-| Phone sync | yes | opens Photo's own: "Phone sync" on Settings (the web's Configuration tab, the app's Photo configuration) |
+| Phone sync | removed (S0) | removed (S0); its new form comes in S1 to S4 of [the parity audit](../photos-parity-audit.md) |
 | Locked Folder | yes | its tile among the folders on Albums (a lock, shown while the Locked Folder is enabled) opens it with the `section` action: its shared interface, its only one ([the Locked Folder](locked_folder.md#shared-interface)) |
 | Move a photo into the Locked Folder | yes, from the viewer | yes: the viewer (Library, Search, Map, an album) and a selection (Library, an album), through the secure action - see below |
 | Offline cache of the library (Android) | yes, the whole list (metadata only) | yes: Library, Albums and an album, with up to 600 items each (`offline` pages, see the UI contract's "Offline pages"), only the fields they show, and never an item's GPS location or its folder on the server; never the recycle bin, Search or Map |
@@ -324,13 +321,9 @@ album folder for synced photos (`sync_default_path`); the days a deleted item st
 recycle bin; the default folder an import starts from. A row keeps the id it was read with, so
 a mapping that is edited keeps its album's id; a new row gets one from `configuration.py`. A
 refused value (an absolute or `..` path in the library, a phone folder mapped twice, fewer than
-one day) changes nothing and its error shows as the form's notice. The listener's own address
-and port stay in the generic configuration (Developer Mode).
+one day) changes nothing and its error shows as the form's notice.
 
-"Phone sync" on Settings uses the contract's `own` action (`{"own": "sync"}`): Photo's own web
-page opens its Configuration tab, and the app pushes Photo configuration over the shared one,
-so Back returns there. It goes once the phone sync capability replaces it (S0 to S4 in
-[the parity audit](../photos-parity-audit.md)). The Locked Folder's tile uses the `section` action
+The Locked Folder's tile uses the `section` action
 (`{"section": "$.section"}`), and Photo's document names no Satellite it hosts: the albums route
 lists them from the Engine. It opens the Locked Folder's shared interface, by itself (on the
 web at `#/satellite/Photo/LockedFolder`, in the app pushed over Photos' screen), which asks for
@@ -419,149 +412,24 @@ screens keep their existing "add to album" from a photo.
 photo                          summary of the library
 photo list [count]             the most recent photos
 photo import <directory>       import a directory
-photo config                   show Photo Sync's current settings
-photo config <key> <value>     change one, e.g. photo config sync_port 8090
+photo config                   show Photo's current settings
+photo config <key> <value>     change one, e.g. photo config trash_retention_days 14
 ```
 
 `photo config` reads and writes the same settings, the same `config.toml`, as Mission
-Control's Config button on the Photo card - see "Configuring Photo Sync" below.
+Control's Config button on the Photo card. A change is validated, written back to
+`config.toml` with its comments kept, and used straight away: none of Photo's settings needs a
+restart.
 
 ## Phone synchronization
 
-A phone can send photos straight into the library over the local network.
-
-The Satellite runs its own small listener, separate from Mission Control. Reaching StarCore
-from a phone means binding to the local network, and keeping the two apart means that
-exposes one token-protected upload endpoint rather than the whole Core - Mission Control,
-the console and shutdown stay on the loopback address.
-
-### Configuration
-
-```toml
-sync_enabled = true
-sync_host = "127.0.0.1"    # set to "0.0.0.0" to let phones on the local network reach it
-sync_port = 8081
-sync_token = ""            # generated and stored in the library on first start when empty
-sync_max_bytes = 536870912 # 512 MB per upload - phone video needs more headroom than photos ever did
-```
-
-The default is deliberately local-only: the listener runs, but nothing outside the machine
-can reach it until `sync_host` is changed. When `sync_token` is empty a token is generated on
-first start and kept in `data/sync_token`, so a phone set up once keeps working across
-restarts.
-
-### Configuring Photo Sync
-
-`sync_host` and `sync_port` are editable without hand-editing `config.toml`: open the Photo
-card on the Satellites page and use its Config (gear) button, or use the same topbar button
-on Photo's own Mission Control page, or run `photo config` from the CLI (see "Command"
-above). This is Photo's own use of the Satellite configuration mechanism described in
-`docs/satellites.md` under "Exposing configuration" - the Core has no notion of `sync_host`
-or `sync_port` by name; Photo is simply the first Satellite to name a `"configuration"`
-route.
-
-`config.toml` remains the source of truth either way - a change made through Mission Control
-or the CLI is validated (a host may not be empty, a port must be a whole number from 0 to
-65535) and written back to the same file, the same comment-preserving edit `photo config`
-and the Core's own `config` command both use, so nothing else in the file is disturbed.
-
-Because Photo Sync's listener is a background service independent of Mission Control's own
-API server (see "Running a background service" in `docs/satellites.md`), a validated change
-restarts it immediately - `sync_port 8090` takes effect right away, not on the next StarCore
-restart. Mission Control and the CLI both report what actually happened: a successful
-restart names the address it is now listening on, and a port already in use is reported as
-such rather than silently pretending the change took effect. `sync_port = 0` (let the OS
-choose a port) is never reported as a pending restart merely because the live bound port
-differs from the literal `0` on disk - that mismatch is the point of `0`, not a stale value.
-
-### Sending a photo
-
-```
-POST http://<host>:8081/upload?token=<token>
-X-Photo-Filename: holiday.jpg      (optional, percent-encoded, metadata only)
-<the image bytes as the request body>
-```
-
-The token may also be sent as an `X-StarCore-Token` header. The body is the raw file - there
-is no multipart parsing to get wrong, and it is what phone automation tools send most easily.
-Responses are JSON:
-
-```json
-{ "status": "imported", "photo": { ... } }
-{ "status": "duplicate", "photo": null }
-{ "status": "error", "error": "..." }
-```
-
-`400` for an empty or truncated upload, `401` for a bad token, `411` without a
-`Content-Length`, `413` over the size limit, `415` for something that is not a supported
-image. An upload is written aside first and only reaches the library once it has arrived
-whole and been recognised, so an interrupted transfer leaves nothing behind. The filename is
-metadata only - the stored name always comes from the content digest - and it is reduced to
-its last path segment, so it cannot point anywhere.
-
-### From a phone
-
-Opening `http://<host>:8081/?token=<token>` on a phone serves a small page for picking
-photos and sending them, which needs no app installed. Mission Control's Photo page shows
-that address under "Phone sync", along with what has been received.
-
-For automatic synchronization from *any other* phone automation tool, point it at the same
-endpoint - iOS Shortcuts ("Get contents of URL", POST, request body: file) and Android
-automation apps can both send a file that way when a photo is taken. StarCore deduplicates by
-content, so re-sending a photo is always safe.
-
-### Real automatic phone sync
-
-StarCore's own mobile app does this automatically, without any automation app to set up: new
-photos and videos taken on the phone are found and uploaded on their own, in the background,
-Google-Photos-style. This is a *second* way to reach the same ingestion - never a second
-ingestion implementation - built for the case the standalone listener above doesn't cover
-well: a phone that only ever reaches StarCore through its main HTTPS address (see
-`docs/deployment.md`), with no separate port or per-phone token to set up.
-
-It works through `POST /api/satellites/photo/sync_upload?filename=...` (see the API table
-above) - authenticated exactly like every other mobile API call (the app's own logged-in
-session), and calling `sync.accept_authenticated_upload()`, which itself calls the very same
-`SyncService.accept()` the standalone listener's `SyncHandler` calls. Both paths share one
-`SyncService` per running Satellite, so Mission Control's Sync section (and `photo config`'s
-counts) reflect uploads made either way, and this authenticated route is always available
-whenever `sync_enabled = true`, whether or not the standalone listener's own local-network
-socket happened to bind.
-
-On the phone, turning "Automatic sync" on (from the Photo configuration screen - see "Mobile
-app" above) does three things:
-
-- **Periodic background check.** Roughly every 15 minutes (the shortest interval Android's
-  WorkManager honors reliably), via `react-native-background-fetch`, the app looks for photos
-  and videos newer than the last one it already offered this server and uploads them. This
-  runs even if the app isn't open (swiped away, or closed by the system), and even after a
-  reboot. It does not run after an explicit "Force stop" from Android's app settings: Android
-  then blocks all of the app's background work until the app is opened again, which also
-  resumes the schedule.
-- **Immediate sync on open.** The same check also runs right away whenever the app is opened,
-  so there's no waiting for the next periodic tick after taking a photo and immediately
-  checking the app.
-- **Wi-Fi only**, optionally - "where Android allows it reliably" (per the periodic check's
-  own WorkManager network constraint). This applies to the periodic background check; opening
-  the app can still sync over cellular, since there is no reliable way to gate that path on
-  connectivity without a dedicated network-info library the app doesn't otherwise need.
-
-A few things are true regardless of which of the above triggered a given sync:
-
-- **Deduplication** is the server's own content-hash dedup (`PhotoLibrary.add_file()`) - the
-  same one manual imports and the standalone listener already rely on. The app also keeps a
-  lightweight local cursor (the timestamp of the newest asset already offered) purely so it
-  doesn't re-scan and re-offer its whole camera roll on every check; that cursor is never what
-  makes dedup *correct*, only what makes it efficient - re-uploading something StarCore
-  already has is always harmless.
-- **Retry.** If an upload fails (StarCore unreachable, a network blip, ...), the app stops
-  that batch right there rather than skipping ahead, so the failed asset (and anything newer
-  that hasn't been tried yet) is retried on the next check rather than silently skipped.
-- **Never deletes anything from the phone.** Sync only ever reads the camera roll and sends
-  copies onward - exactly like every other way of getting a photo into StarCore.
-- **Per-server.** A phone with more than one StarCore server configured tracks sync
-  independently for each one (its own on/off, Wi-Fi-only setting, and cursor), the same way
-  the app's offline cache and session are already kept per server.
+None for now. The previous phone sync - a standalone listener on its own port with one shared
+token, and the app's background upload through `sync_upload` - is removed (S0 of
+[the parity audit](../photos-parity-audit.md), which keeps the inventory of what it was). Its
+replacement, a backup of the phone's own folders through a generic capability (`media.sync`
+from Photo, `device.media-sync` in the app), comes in S1 to S4. Until then photos come in by
+import from a folder on the server. `source_paths`, `sync_default_path` and physical albums
+stay: the new sync lands files the same way.
 
 ## Albums
 
@@ -571,15 +439,13 @@ or "favorites" system, just a `kind` field on the same shape every album already
 
 - **Physical.** One per `source_paths` mapping (see "Configuration" above) - created the moment
   that mapping is saved, even before any photo has landed in it. Membership is never stored:
-  it's computed from each photo's own `physical_path` (set once, at import time, by
-  `sync.accept_authenticated_upload()` resolving the phone folder against `source_paths`/
-  `sync_default_path` - see `configuration.resolve_physical_path()`). The path is the source of
+  it's computed from each photo's own `physical_path` (set once, when a phone's upload is taken
+  in, by resolving its phone folder against `source_paths`/`sync_default_path` - see
+  `configuration.resolve_physical_path()`; nothing sets it until the new phone sync). The path is the source of
   truth, so nothing here can drift out of sync with it, and there is nothing to add or remove a
   photo from directly (`POST /albums/physical:<id>/...` is rejected - edit the source path
   instead). A photo synced with a phone folder that matches no mapping still gets a physical
-  album: `sync_default_path`. Only a photo imported some other way (a directory scan/import, or
-  the standalone local-network listener) has no physical album at all - the same as before this
-  existed. `GET /albums/physical:unsorted` is a standing catch-all for a physical_path whose
+  album: `sync_default_path`. A photo imported from a directory has no physical album at all. `GET /albums/physical:unsorted` is a standing catch-all for a physical_path whose
   mapping was since removed; it disappears when nothing needs it.
 - **Favorites.** A fixed, always-present virtual album (`id: "favorites"`) - the same
   add/remove-photo routes as any other album, just protected from rename and delete. Favoriting
@@ -597,12 +463,12 @@ included in the Albums screen purely as a UI convenience so all four kinds live 
 ## Ingestion
 
 `PhotoLibrary.add_file()` takes a single file (photo or video) into the library and returns
-its record, or `None` when the exact same content is already stored. Directory import, the
-standalone phone sync listener, and the mobile app's authenticated background sync are all
-built on it: everything that enters the library goes through the same storage layout,
-identifiers, deduplication and metadata, whichever door it came in through. What kind of file
-it is, is decided from its content (see "Supported formats"), never from its name - the one
-thing that makes phone sync's extensionless temporary uploads work at all.
+its record, or `None` when the exact same content is already stored. Directory import and a
+file moved back out of the Locked Folder are built on it, and the new phone sync will be:
+everything that enters the library goes through the same storage layout, identifiers,
+deduplication and metadata, whichever door it came in through. What kind of file it is, is
+decided from its content (see "Supported formats"), never from its name - which is what lets an
+upload written aside under a temporary name be taken in at all.
 
 ## Recycle bin
 

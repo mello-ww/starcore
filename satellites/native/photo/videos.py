@@ -59,7 +59,7 @@ def probe(path) -> dict:
 
     Recognized by content, not by filename - the same way images.probe()
     sniffs JPEG/PNG/WEBP by magic bytes rather than trusting an extension.
-    That matters here because sync.py hands add_file() an upload under a
+    That matters here because an upload reaches add_file() under a
     generic temp filename (no extension at all); probe() still has to work
     from the bytes alone, exactly like it does for a photo upload.
     """

@@ -18,8 +18,7 @@ Mobile UI  ->  Existing StarCore API  ->  StarCore Engine  ->  Satellites
   interfaces" below): Status, Photos, and File Explorer's read-only preview, the app's file
   browser.
 - The shared audio player (`src/media/`), and Music's native library screens.
-- Photos' previous native screens, its background phone sync, and the Locked Folder's unlock
-  prompt and screens, until they are retired (`docs/remaining-work.md`).
+- Photos' previous native screens, until they are retired (`docs/remaining-work.md`).
 - Developer Mode (`src/developer/`): the terminal icon at the top right of each tab, or the
   switch in Settings. Off by default and remembered per server on this device; it shows the
   Console and Config tabs and anything a Satellite marks `developer: true`. A display
@@ -176,8 +175,7 @@ password" on the lock screen signs in against the real server; after that
 login, Settings allows turning the lock off without a fingerprint.
 
 The session token itself is encrypted in the Keystore but deliberately not
-biometric-gated: every API request reads it, and the headless Photo
-background sync task must read it with no UI at all. See
+biometric-gated: every API request reads it. See
 `src/auth/appLock.ts`, `src/auth/session.ts` and `src/platform/types.ts`.
 
 This is local to the device end-to-end: StarCore's server never receives a

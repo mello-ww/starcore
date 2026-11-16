@@ -78,8 +78,7 @@ satellites/native/photo/satellite.py
 
 The Core calls `start` for every enabled Satellite once discovery is finished, and `stop`
 when it shuts down. Both are optional, and a hook that raises is reported as a warning and
-otherwise ignored, so a Satellite that fails to start cannot stop the Core from running. The
-Photo Satellite uses this to run its phone-sync listener.
+otherwise ignored, so a Satellite that fails to start cannot stop the Core from running.
 
 Setting `services = false` under `[satellites]` in `engine/config.toml` starts the Core
 without any Satellite service, which is what the test suite does so a run never binds a port
@@ -269,7 +268,7 @@ uses for the Core's `[server]` settings. `live_value` and `pending_restart` let 
 say a setting was saved but the running service hasn't picked it up yet, for a value that
 can't simply be re-read from a live listener; a Satellite whose service can just be
 restarted (see "Running a background service") can instead apply the change immediately and
-report it through `note` instead, the way Photo Sync does for `sync_host`/`sync_port`.
+report it through `note` instead.
 
 Everything else - which settings exist, their defaults, validation and where they persist -
 belongs entirely to the Satellite. `starcore.satellite_config.SatelliteConfig` (a
@@ -318,7 +317,7 @@ Applied so far:
 | Mission Control | the Console; Mission Control's address and port (Configuration keeps Active sessions); Satellite reload buttons; each Satellite card's version, author and commands |
 | Android | the Console and Config tabs |
 | Music | exclude, min_duration, missing_metadata, scan_interval, ffmpeg, transcode_workers, transcode_cache_mb; transcode format; the Missing files and Transcoding tiles |
-| Photos | sync_host, sync_port, sync_default_path; phone sync's upload counters and log |
+| Photos | sync_default_path |
 | Status | the Diagnostics tab |
 
 File Explorer has nothing advanced on its page, and no setting at all: it browses whatever
@@ -366,8 +365,8 @@ Both categories share the same lifecycle and extension model. The only differenc
   route that shapes the snapshot for display; a bounded SQLite history in StarCore's data
   directory; platform readings behind one backend interface.
 - **Photo** (`satellites/native/photo/`, `docs/satellites/photo.md`) - state, routes, a Mission Control
-  page, a background service (its phone-sync listener) and Satellite configuration, all
-  together.
+  page, a shared interface in `ui.json`, providers of `media.gallery` and `media.picker`, and
+  Satellite configuration, all together.
 - **FileExplorer** (`satellites/native/file_explorer/`) - a Satellite with routes, a
   Mission Control page and a read-only shared interface (`ui.json`, a preview, over display
   routes in `views.py`; see `docs/file-explorer-migration.md`) but no background service (`has_service` is `False`, so its status is

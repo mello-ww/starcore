@@ -5,12 +5,12 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {AuthProvider} from './auth/AuthContext';
 import {DeveloperModeProvider} from './developer/DeveloperModeContext';
 import {OnboardingNavigator} from './navigation/OnboardingNavigator';
-import {configureBackgroundFetch, triggerForegroundSync} from './photo/backgroundSyncTask';
 import {RootNavigator} from './navigation/RootNavigator';
 import {ConnectScreen} from './screens/ConnectScreen';
 import {ServerListScreen} from './screens/ServerListScreen';
 import {purgeLegacyOffline} from './satellites/ui/offline';
 import {ServersProvider, useServers} from './servers/ServersContext';
+import {purgeRetiredKeys} from './storage/retired';
 import {AccentProvider, colors} from './theme';
 
 type ResumeInfo = {name: string; address: string};
@@ -30,15 +30,9 @@ type ResumeInfo = {name: string; address: string};
  */
 export default function App() {
   useEffect(() => {
-    // Configures react-native-background-fetch's periodic phone-sync
-    // schedule and immediately runs one sync pass -
-    // "immediate sync also triggered on app foreground" in the approved
-    // design. Runs once per app start, independent of which server is
-    // active or even whether one is configured yet (runBackgroundSync
-    // iterates every server that has sync turned on), so this belongs above
-    // ServersProvider/ServersGate rather than inside either.
-    configureBackgroundFetch();
-    triggerForegroundSync();
+    // what earlier versions of the app kept and nothing reads any more: removed at every start
+    // until that succeeds
+    purgeRetiredKeys();
     // what the first offline store kept may hold fields pages now omit: removed at every start
     // until that succeeds, whichever server or screen is used next
     purgeLegacyOffline();

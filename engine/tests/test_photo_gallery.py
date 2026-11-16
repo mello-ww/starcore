@@ -156,8 +156,9 @@ class PhotoUiDocumentTest(unittest.TestCase):
                   ("Unfavorite", "$.favorite", "albums/favorites/photos/remove")]
         self.assertEqual(hearts, {"library": toggle, "search": toggle, "album": toggle})
 
-    def test_phone_sync_opens_photos_own_screens_and_a_section_tile_its_section(self):
-        # P1: the settings are shared forms; only phone sync still opens Photo's own screens
+    def test_nothing_opens_photos_own_screens_and_a_section_tile_its_section(self):
+        # P1: the settings are shared forms; S0 removed phone sync, the last thing that opened
+        # Photo's own screens
         owns = []
         def walk(value):
             if isinstance(value, dict):
@@ -169,7 +170,7 @@ class PhotoUiDocumentTest(unittest.TestCase):
                 for item in value:
                     walk(item)
         walk(self.document["pages"])
-        self.assertEqual(owns, [("Phone sync", "sync")])
+        self.assertEqual(owns, [])
         blocks = self.document["pages"]["albums"]["blocks"]
         settings = [block for block in blocks if block.get("label") == "Settings"]
         self.assertEqual(settings[0]["action"], {"navigate": "settings"})
@@ -182,9 +183,9 @@ class PhotoUiDocumentTest(unittest.TestCase):
         self.assertNotIn("LockedFolder", text)
         self.assertNotIn('"own": "locked"', text)
         self.assertEqual(grid["item"]["icon"], "$.icon")
-        # Photo's own web page knows the sync section, and nothing of the vault any more (L8)
+        # Photo's own web page opens a section by its tab's name, and knows nothing of the vault (L8)
         page = (PHOTO_DIR / "mission_control" / "page.js").read_text(encoding="utf-8")
-        self.assertIn('section === "sync" ? "config"', page)
+        self.assertIn('TABS.includes(section) ? section : "photos"', page)
         self.assertNotIn("LockedFolder", page)
         self.assertNotIn("locked_folder", page)
 
@@ -210,7 +211,6 @@ class PhotoUiDocumentTest(unittest.TestCase):
             self.assertIn(key, configuration.SETTINGS)
             self.assertEqual([field["key"] for field in form["fields"]], [value.removeprefix("$form.")])
             saved[key] = form["fields"][0]
-        # the listener's own address and port stay in the generic configuration
         self.assertEqual(set(saved), {"source_paths", "sync_default_path", "trash_retention_days", "photo_directory"})
         rows = saved["source_paths"]
         self.assertEqual((rows["kind"], rows["value"], rows.get("required")), ("rows", "$.source_paths", None))

@@ -1,10 +1,5 @@
-import {REQUEST_TIMEOUT_MS, UPLOAD_TIMEOUT_MS} from '../config';
-import {ApiError, UploadableFile} from './types';
-
-// re-exported so callers can `import {StarCoreClient,
-// UploadableFile} from '../api/client'` in one line, rather than reaching
-// into './types' separately just for this one type
-export type {UploadableFile};
+import {REQUEST_TIMEOUT_MS} from '../config';
+import {ApiError} from './types';
 
 export type TokenProvider = () => Promise<string | null>;
 
@@ -45,54 +40,6 @@ export class StarCoreClient {
     options: {authenticate?: boolean} = {},
   ): Promise<{status: number; body: any; finalUrl: string}> {
     return this.request('POST', path, body, options.authenticate ?? true);
-  }
-
-  /** Uploads a file already on the device as a raw request body - matching
-   * what a Satellite route reading `request.raw` expects (never JSON or
-   * multipart form data). Passing an object
-   * shaped `{uri, type, name}` as fetch's own `body` is React Native's own
-   * documented way to stream a local file's bytes straight from disk,
-   * without ever reading them into a JS string first - the same reason
-   * backgroundSync.ts's own CameraRollSource only ever hands this class a
-   * `uri`, never file contents.
-   *
-   * Uses UPLOAD_TIMEOUT_MS, not REQUEST_TIMEOUT_MS: a phone video upload
-   * over a slow connection can legitimately take minutes, where every other
-   * request in this app should fail fast. */
-  async postFile(path: string, file: UploadableFile): Promise<{status: number; body: any; finalUrl: string}> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
-
-    try {
-      const headers: Record<string, string> = {'Content-Type': file.type || 'application/octet-stream'};
-      const token = await this.getToken();
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${this.baseUrl}${path}`, {
-        method: 'POST',
-        headers,
-        body: {uri: file.uri, type: file.type, name: file.name},
-        signal: controller.signal,
-      });
-
-      const text = await response.text();
-      let parsed: any = {};
-      try {
-        parsed = text ? JSON.parse(text) : {};
-      } catch {
-        parsed = {};
-      }
-      return {status: response.status, body: parsed, finalUrl: response.url};
-    } catch (error: any) {
-      if (error?.name === 'AbortError') {
-        throw new ApiError('The upload to StarCore timed out.', 0);
-      }
-      throw new ApiError('Could not reach StarCore. Check the server address and your connection.', 0);
-    } finally {
-      clearTimeout(timeout);
-    }
   }
 
   private async request(

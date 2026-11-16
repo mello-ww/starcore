@@ -214,10 +214,9 @@ def physical_albums(satellite, photo_library) -> list:
     to nothing at all).
 
     A photo with no physical_path *at all* (None) is a different case
-    entirely: a desktop directory import (scan()/import_directory()), or one
-    from the standalone local-network listener, which never resolves a
-    physical album to begin with (see sync.accept_authenticated_upload()'s
-    own docstring) - not "phone content that needs sorting". Those photos
+    entirely: a directory import (scan()/import_directory()) or a file taken
+    back in, which never resolve a physical album - not "phone content that
+    needs sorting". Those photos
     simply have no physical album, exactly like a photo imported before this
     concept existed, and are never swept into "Unsorted" - so a library with
     no source_paths configured and nothing synced yet still reports no

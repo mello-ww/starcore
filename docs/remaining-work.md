@@ -37,7 +37,7 @@ Clients implement the UI contract and capability protocols, never a Satellite.
 | Satellite | Shared interface | Own code still used |
 |---|---|---|
 | Status | ✅ its only interface on both clients (1.1) | none |
-| Photos | ✅ default on both clients (1.2) | web `page.js` for settings; Android `src/photo/` for settings and phone sync; background sync started by `App.tsx` |
+| Photos | ✅ default on both clients (1.2) | web `page.js` and Android `src/photo/` for settings (phone sync is removed until S1 to S4) |
 | File Explorer | ✅ its shared interface alone on both clients (F1-F7): browsing, a file's page (open, download, share), management (new folder, rename, delete) and upload | none: its `page.js` and `page.css` are removed |
 | Music | ◐ only the player: the shared audio host on both clients, and `play` for any Satellite. No `ui.json` | web `page.js` with its views (home, library, album, artist, playlist, search, settings, stats); Android `src/music/` (11 screen and tab files), wired by `builtins.tsx` |
 | Locked Folder | ✅ its only interface on both clients (1.2, L0-L8): browsing, moves, setup, settings, a forgotten PIN; biometric unlock from the Android app's unlock card | none: its `page.js` and `mobile/src/lockedFolder/` are removed |
@@ -99,23 +99,22 @@ the owner 2026-11-15).
 
 - [ ] **Phone sync (#28):** the old sync is removed whole, then a real automatic backup is
   built as a generic capability (`media.sync` from a Satellite, `device.media-sync` in the app).
-  - [ ] **S0** - remove the old sync: the standalone listener, `sync_upload`, the `sync_*`
+  - [x] **S0** - remove the old sync: the standalone listener, `sync_upload`, the `sync_*`
     settings, the app's background task, its tests and docs.
   - [ ] **S1** - `media.sync` v1 in Photo: `check`, a resumable `upload` streamed to disk,
     `status`, `devices`; the Engine's device credential.
-  - [ ] **S2** - the `sync` action (contract change 3); Photo's button and Devices page.
+  - [ ] **S2** - the `sync` action (contract change 4); Photo's button and Devices page.
   - [ ] **S3** - the app's sync: WorkManager, MediaStore detection, the local index, folders,
     Wi-Fi and charging rules, progress and errors. `App.tsx` no longer imports `src/photo/`.
   - [ ] **S4** - emulator runs, then the owner's phone.
   - [ ] **S5** - security review.
 - [x] **P1 - Settings (#29):** the `source_paths` mappings as repeatable form rows (the `rows`
   field kind arrives with contract change 2, in the Locked Folder's L4); the `own: "settings"`
-  entry goes. Phone sync is reached from Settings with `{"own": "sync"}` until S0 to S4
-  replace it.
+  entry goes. Phone sync was reached from Settings with `{"own": "sync"}` until S0 removed it.
 - [ ] **The Locked Folder (#37):** stage 4.
 - [ ] **P2 - Icons shipped by the Satellite (#38):** a declared `icons/` folder, validated by
   the Engine (single colour, no script), drawn by both clients with a shared icon as fallback
-  (contract change 4).
+  (contract change 5).
 - [ ] **P3** - then remove `satellites/native/photo/mission_control/page.js` and `page.css`,
   `mobile/src/photo/`, its routes in `MainTabs.tsx` and its `DEDICATED_SCREENS` entry.
 - [ ] Optional, from the audit: the summary's tools note (#5), album group hints (#6), bulk
@@ -242,7 +241,7 @@ user-facing text.
    [`roadmap.md`](roadmap.md) (not the light theme, which waits until after it).
 
 **Stages 3 and 4 together (approved by the owner 2026-11-15; L0 is done).** The
-contract changes four times in all, each time in the Engine, both clients, the documents and
+contract changes five times in all, each time in the Engine, both clients, the documents and
 the fixtures together:
 
 | Order | Milestones | Contract | Model and effort |
@@ -256,10 +255,10 @@ the fixtures together:
 | 7 | L8 | none (removal) | Sonnet 5.5 medium |
 | 8 | S0 | none (removal) | Sonnet 5.5 high |
 | 9 | S1 | vocabulary only (`media.sync`) | Opus 5.5 xhigh |
-| 10 | S2 | change 3: the `sync` action | Opus 5.5 high |
+| 10 | S2 | change 4: the `sync` action | Opus 5.5 high |
 | 11 | S3, S4 | none (the app's sync, then devices) | Opus 5.5 xhigh, then high |
 | 12 | S5 | none (security review) | Fable 5.2 high |
-| 13 | P2 | change 4: Satellite icons | Opus 5.5 high |
+| 13 | P2 | change 5: Satellite icons | Opus 5.5 high |
 | 14 | P3 | none (removal) | Sonnet 5.5 medium |
 
 The sync (8 to 12) depends on nothing in the Locked Folder's milestones except L1's check for

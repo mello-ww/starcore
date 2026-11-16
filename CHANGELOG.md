@@ -66,6 +66,15 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   move on both clients (`lockedMove.js`, the viewer's Lock button). Its shared interface is now
   its only one, opened from Photos' tile, and a photo moves in through Photos' shared
   interface (`docs/satellites/locked_folder.md`, L8).
+- **The old phone sync**, before its new form: Photo's standalone listener (its own port, one
+  shared token, its upload page), the `sync` and `sync_upload` routes, the `sync_enabled`,
+  `sync_host`, `sync_port`, `sync_token` and `sync_max_bytes` settings, `photo sync` and the
+  sync line of `photo stats`, the "Phone sync" panel on Photo's own page and the button on
+  Settings; in the app the background task, its section in Photo configuration, the
+  `react-native-background-fetch` and camera roll libraries, and the media, boot and wake lock
+  permissions. The app removes what the task kept on the phone at its next start. Photo's
+  settings now take effect at once, with nothing left to restart. `source_paths` and
+  `sync_default_path` stay for the new sync (`docs/photos-parity-audit.md`, S0).
 
 ### Added
 
@@ -113,9 +122,9 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 - **Photos' settings in its shared interface:** Settings on Albums edits the phone folders as
   repeatable rows (each keeping its album), the default album for synced photos, the recycle
   bin's retention and the default import folder, through the existing `configuration` route,
-  whose answer now carries a `message`. It reads a new `gallery/settings` view. Phone sync is
-  still Photo's own screen, now opened from Settings (`{"own": "sync"}`, which replaces
-  `{"own": "settings"}`) (`docs/satellites/photo.md`).
+  whose answer now carries a `message`. It reads a new `gallery/settings` view. Phone sync
+  stayed Photo's own screen, opened from Settings (`{"own": "sync"}`, which replaced
+  `{"own": "settings"}`), until S0 removed it (`docs/satellites/photo.md`).
 - **A host lists the Satellites it hosts from the Engine** (`starcore.sections`): Photo's
   albums show each as a tile, with its title and icon, that opens through the `section` action.
   Photo's document no longer names the Locked Folder, and in the app a hosted Satellite's own
@@ -359,9 +368,9 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 - **UI contract 1.2: the `own` action** opens a Satellite's own interface (its `page.js`, its
   native screens) at a section it names, from the shared interface - the bridge to what stays
   native during a migration. It reaches no route; a client without an own interface hides it,
-  and Back returns to the shared interface. Photos' shared Albums page uses it for "Settings
-  and phone sync" and "Locked Folder", which open Photo's own screens with their PIN and
-  permissions unchanged. `#/satellite/Photo/LockedFolder` keeps opening Photo's own page while
+  and Back returns to the shared interface. Photos' shared Albums page used it for "Settings
+  and phone sync" and "Locked Folder", which opened Photo's own screens with their PIN and
+  permissions unchanged, until P1, L8 and S0 replaced or removed them. `#/satellite/Photo/LockedFolder` keeps opening Photo's own page while
   Developer Mode shows the shared interface.
 - **Photos' shared interface (preview) moves closer to parity**: an "Import from a folder" page
   (check a server folder, then import it, through the existing `scan` and `import` routes, which

@@ -1,5 +1,5 @@
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import React, {useLayoutEffect, useState} from 'react';
+import React, {useState} from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {colors, spacing, typography, useAccentStyles} from '../theme';
 import {SettingsButton} from '../components/SettingsButton';
@@ -12,11 +12,9 @@ import type {AlbumSummary, Photo} from './types';
 
 type Props = NativeStackScreenProps<SatellitesStackParamList, 'PhotoHome'>;
 
-// "Sync" is deliberately not a section of its own any more - phone sync's
-// enable/Wi-Fi-only/Sync-now/status all live inside Photo configuration
-// now, reached via the gear icon below, not a segment (see "reorganize
-// mobile Photos navigation" in the task brief). The Recycle bin is reached
-// from inside the Albums section, same as the web panel's own Albums tab.
+// Photo's settings are reached through the gear icon below, not a segment.
+// The Recycle bin is reached from inside the Albums section, same as the web
+// panel's own Albums tab.
 type Section = 'library' | 'albums' | 'map' | 'search';
 const SECTIONS: {key: Section; label: string}[] = [
   {key: 'library', label: 'Library'},
@@ -35,16 +33,9 @@ const SECTIONS: {key: Section; label: string}[] = [
  */
 export function PhotoHomeScreen({navigation, route}: Props) {
   const accentStyle = useAccentStyles();
-  const [section, setSection] = useState<Section>('library');
-  // opened by the shared interface's own action ({"own": "sync"} in Photo's ui.json): one
-  // destination on its own, pushed over the shared screen, so Back returns there
-  const opened = route.params?.section;
-
-  useLayoutEffect(() => {
-    if (opened === 'sync') {
-      navigation.replace('PhotoConfiguration');
-    }
-  }, [opened, navigation]);
+  // a section opened by name (the own action) shows the segment of that name, anything else the library
+  const opened = SECTIONS.find(item => item.key === route.params?.section)?.key;
+  const [section, setSection] = useState<Section>(opened ?? 'library');
 
   const openPhoto = (photos: Photo[], index: number) => {
     navigation.navigate('PhotoViewer', {
@@ -56,10 +47,6 @@ export function PhotoHomeScreen({navigation, route}: Props) {
   const openAlbum = (album: AlbumSummary) => {
     navigation.navigate('PhotoAlbum', {albumId: album.id, name: album.name});
   };
-
-  if (opened === 'sync') {
-    return <View style={styles.screen} />;
-  }
 
   return (
     <View style={styles.screen}>

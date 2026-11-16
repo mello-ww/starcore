@@ -1,52 +1,30 @@
-"""Photo Sync's own configuration: what it exposes, validates and persists.
+"""Photo's own configuration: what it exposes, validates and persists.
 
 This is Photo-owned, not Core-owned. The generic satellite configuration
 mechanism (docs/satellites.md) only needs a satellite to name one of its own
 routes "configuration" - everything about which settings exist, their
 defaults, validation and persistence belongs to the satellite itself. The
-Core never sees sync_host or sync_port by name.
+Core never sees any of these settings by name.
+
+None of them describes something running: a saved change is read the next
+time it is needed, so nothing is ever waiting on a restart.
 """
 
 from pathlib import Path
 import secrets
 
-from . import sync
-
 DEFAULTS = {
-    "sync_host": "127.0.0.1",
-    "sync_port": 8081,
     "photo_directory": "",
     "trash_retention_days": 30,
     "source_paths": [],
     "sync_default_path": "camera",
 }
 
-# settings with nothing running to fall out of sync with (unlike sync_host/
-# sync_port, which describe a live listener - see describe()/update() below)
-_STATIC_SETTINGS = {"photo_directory", "trash_retention_days", "source_paths", "sync_default_path"}
-
 SOURCE_PATH_ID_BYTES = 6  # -> 12 hex characters; only needs to be unique among this satellite's own mappings
 
 
 class ConfigurationError(Exception):
-    """Raised when a Photo Sync setting fails validation."""
-
-
-def _validate_host(value) -> str:
-    text = str(value).strip()
-    if not text:
-        raise ConfigurationError("sync_host must not be empty")
-    return text
-
-
-def _validate_port(value) -> int:
-    try:
-        port = int(str(value).strip())
-    except (TypeError, ValueError):
-        raise ConfigurationError(f"sync_port must be a whole number, got '{value}'")
-    if not (0 <= port <= 65535):
-        raise ConfigurationError("sync_port must be between 0 and 65535")
-    return port
+    """Raised when a Photo setting fails validation."""
 
 
 def _validate_directory(value) -> str:
@@ -125,16 +103,6 @@ def _validate_retention_days(value) -> int:
 
 
 SETTINGS = {
-    "sync_host": {
-        "validate": _validate_host,
-        "developer": True,
-        "description": "Address Photo Sync listens on for phone uploads. 0.0.0.0 allows other devices on the local network.",
-    },
-    "sync_port": {
-        "validate": _validate_port,
-        "developer": True,
-        "description": "Port Photo Sync listens on.",
-    },
     "photo_directory": {
         "validate": _validate_directory,
         "description": "Default directory Photo scans and imports from when a request doesn't name one "
@@ -163,12 +131,10 @@ SETTINGS = {
 
 
 def resolve_physical_path(satellite, phone_folder) -> str:
-    """The server-side physical-album path an incoming phone-synced file
-    belongs under: whichever configured source_paths entry's phone_path
-    matches, or sync_default_path when none does (including when the phone
-    didn't say what folder it came from at all - the standalone sync.py
-    listener never does). Used only by sync.accept_authenticated_upload();
-    a directory scan/import never calls this."""
+    """The server-side physical-album path a file from a phone folder belongs under: whichever
+    configured source_paths entry's phone_path matches, or sync_default_path when none does
+    (including when the phone didn't say what folder it came from). A directory scan/import never
+    calls this."""
     phone_folder = str(phone_folder or "").strip()
 
     for entry in satellite.config.get("source_paths", DEFAULTS["source_paths"]):
@@ -188,37 +154,22 @@ def validate(key: str, value):
 
 def trash_retention_days(satellite) -> int:
     """Photo-owned: the recycle bin's own purge routine reads this rather than
-    the Core ever knowing the setting exists, same as sync_host/sync_port."""
+    the Core ever knowing the setting exists."""
     return int(satellite.config.get("trash_retention_days", DEFAULTS["trash_retention_days"]))
 
 
 def describe(satellite) -> dict:
-    """The current settings, and whether the running listener still matches them."""
-    running = sync.service(satellite)
+    """The current settings; what is saved is what is in use (see the module's docstring)."""
     settings = []
 
     for key, meta in SETTINGS.items():
         value = satellite.config.get(key, DEFAULTS[key])
-
-        if key in _STATIC_SETTINGS:
-            # photo_directory has no running listener to fall out of sync
-            # with - the next scan/import just uses whatever is saved, so
-            # there is never a change "pending" the way a listener restart is
-            live = value
-            pending_restart = False
-        else:
-            live = {"sync_host": running.host, "sync_port": running.port}[key] if running is not None else None
-            # sync_port = 0 means "let the OS choose one" - the live port then never
-            # equals the configured value by design, which isn't a change waiting
-            # on a restart (the same edge case the Core's own [server].port has)
-            pending_restart = live is not None and live != value and not (key == "sync_port" and value == 0)
-
         setting = {
             "key": key,
             "value": value,
             "description": meta["description"],
-            "live_value": live,
-            "pending_restart": pending_restart,
+            "live_value": value,
+            "pending_restart": False,
         }
         for optional in ("type", "developer"):
             if optional in meta:
@@ -227,20 +178,13 @@ def describe(satellite) -> dict:
 
     return {
         "settings": settings,
-        "restart_required": any(setting["pending_restart"] for setting in settings),
+        "restart_required": False,
         "note": None,
     }
 
 
 def update(engine, satellite, key: str, value) -> dict:
-    """Validates, persists, and restarts the sync listener so the change is real.
-
-    Unlike Mission Control's own host/port (read once at Core startup), Photo
-    Sync's listener is a satellite-owned background service independent of the
-    API server (see sync.py) - its own start/stop lifecycle hooks can simply be
-    called again, so a saved change can actually take effect immediately
-    instead of only claiming a restart of the whole StarCore process is needed.
-    """
+    """Validates and persists a setting, which is then in use straight away."""
     saved = validate(key, value)
     satellite.config.set(key, saved)
 
@@ -252,28 +196,9 @@ def update(engine, satellite, key: str, value) -> dict:
         note = f"Saved. A deleted photo now stays in the recycle bin for {saved} day(s) before being erased."
     elif key == "source_paths":
         note = f"Saved {len(saved)} phone -> server path mapping(s)." if saved else "Saved. No phone -> server path mappings are configured - synced media all lands under sync_default_path."
-    elif key == "sync_default_path":
-        note = f"Saved. Phone-synced media with no matching source path now lands under '{saved}'."
     else:
-        note = _apply(engine, satellite)
+        note = f"Saved. Phone-synced media with no matching source path now lands under '{saved}'."
 
-    # described only after the change has (or hasn't) taken effect, so
-    # live_value/pending_restart reflect what actually happened
     result = describe(satellite)
     result["note"] = note
     return result
-
-
-def _apply(engine, satellite) -> str:
-    if not satellite.config.get("sync_enabled", True):
-        return "Saved. Photo Sync is currently turned off in config.toml, so nothing needed restarting."
-
-    sync.stop(engine, satellite)
-    sync.start(engine, satellite)
-
-    running = sync.service(satellite)
-    if running is not None:
-        return f"Saved and applied - Photo Sync is now listening on {running.host}:{running.port}."
-
-    return ("Saved, but Photo Sync could not restart with these settings - check that the port "
-            "isn't already in use. The previous listener has been stopped.")

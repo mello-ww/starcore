@@ -227,7 +227,8 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
     - [x] PIN lockouts that survive restarts
 - [x] Photos
     - [x] Library indexing, thumbnails, albums, favorites, map, recycle bin
-    - [x] Phone sync with source-path mapping
+    - [x] Source-path mapping into physical albums
+    - [ ] Phone sync: the old one is removed (S0), its new form is S1 to S5 of `remaining-work.md`
 - [ ] Music
     - [x] SQLite catalog with migrations, stable track identities, incremental and scheduled scans
     - [x] FLAC, MP3, WAV, M4A (AAC/ALAC), Ogg Vorbis and Opus metadata, credits, ReplayGain, quality

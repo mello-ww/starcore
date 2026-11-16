@@ -1,13 +1,13 @@
 const SKELETONS = 12;
 // "trash" is deliberately not a tab of its own - the Recycle bin is one of
 // the four kinds shown inside "albums" (see renderAlbums()); "config" is
-// where source_paths/sync_default_path/trash_retention_days/the standalone
-// listener's own settings all live together (see buildConfigPanel())
+// where source_paths/sync_default_path/trash_retention_days all live
+// together (see buildConfigPanel())
 const TABS = ["photos", "albums", "map", "config"];
 
-// the sections the shared interface's own action opens (ui.json: {"own": "sync"})
+// a section opened by name shows the tab of that name, anything else the photos
 function tabFor(section) {
-    return section === "sync" ? "config" : "photos";
+    return TABS.includes(section) ? section : "photos";
 }
 
 function tabLabel(name) {
@@ -285,83 +285,16 @@ export function mount(context) {
         }
     }
 
-    function renderSync(status) {
-        const syncPanel = configPanel.syncSection;
-        const address = status.running ? `${status.url}/?token=${encodeURIComponent(status.token)}` : null;
-        const state = el("p", "photo-sync-state");
-        state.append(
-            el("i", `state-dot ${status.running ? "on" : "off"}`),
-            el("span", null, status.running
-                ? `Listening on ${status.url}`
-                : status.enabled ? "Not running" : "Turned off in the satellite's configuration"),
-        );
-
-        const facts = el("dl", "facts");
-        for (const [label, value] of [["Received", status.counts.received], ["Imported", status.counts.imported],
-                                      ["Duplicates", status.counts.duplicates], ["Failed", status.counts.failed]]) {
-            const row = document.createElement("div");
-            row.append(el("dt", null, label), el("dd", null, String(value)));
-            facts.appendChild(row);
-        }
-
-        facts.dataset.developer = "";  // upload counters: Developer Mode only
-        syncPanel.replaceChildren(el("p", "eyebrow", "Phone sync"), state, facts);
-
-        if (address) {
-            syncPanel.append(
-                el("p", "muted", "Open this address on a phone connected to the same network and pick the photos to send. Uploads go straight into the library."),
-                buildAddress(address),
-                el("p", "photo-sync-hint", "Reachable from this machine only until sync_host is set to 0.0.0.0 in the satellite's config.toml."),
-            );
-        }
-
-        if (status.events.length) {
-            const log = el("ul", "photo-sync-log");
-            log.dataset.developer = "";  // the upload log: Developer Mode only
-            for (const event of status.events) {
-                const item = document.createElement("li");
-                item.append(
-                    el("span", "photo-sync-name", event.filename),
-                    el("span", `photo-sync-status ${event.status}`, event.detail || event.status),
-                );
-                log.appendChild(item);
-            }
-            syncPanel.append(el("p", "eyebrow", "Recent activity"), log);
-        }
-    }
-
-    function buildAddress(address) {
-        const row = el("div", "photo-address");
-        const value = el("code", null, address);
-        const copy = el("button", "button", "Copy");
-        copy.type = "button";
-        copy.addEventListener("click", async () => {
-            try {
-                await navigator.clipboard.writeText(address);
-                copy.textContent = "Copied";
-            } catch (error) {
-                getSelection().selectAllChildren(value);
-                copy.textContent = "Select and copy";
-            }
-            setTimeout(() => (copy.textContent = "Copy"), 2500);
-        });
-
-        row.append(value, copy);
-        return row;
-    }
-
     /* ---------- data ---------- */
 
     async function refresh() {
         try {
-            const [libraryInfo, listing, status, albumListing, favorites] = await Promise.all([
-                api.get("/library"), api.get("/photos"), api.get("/sync"), api.get("/albums"),
-                api.get("/albums/favorites")]);
+            const [libraryInfo, listing, albumListing, favorites] = await Promise.all([
+                api.get("/library"), api.get("/photos"), api.get("/albums"), api.get("/albums/favorites")]);
             photos = listing.photos;
             albums = albumListing.albums;
             favoriteIds = new Set(favorites.photo_ids || []);
-            renderSummary(libraryInfo, status);
-            renderSync(status);
+            renderSummary(libraryInfo);
             renderGallery();
             if (tab === "albums") {
                 renderAlbums();
@@ -428,7 +361,7 @@ export function mount(context) {
 
     /* ---------- rendering: summary + gallery ---------- */
 
-    function renderSummary(libraryInfo, status) {
+    function renderSummary(libraryInfo) {
         // "images"/"videos" are only reported once the library actually holds
         // a video - a library that predates video support, or one with none
         // yet, still just says "N photos" rather than "N photos · 0 videos"
@@ -441,7 +374,6 @@ export function mount(context) {
             tile("Photos", label),
             tile("Library size", readableSize(libraryInfo.size_bytes)),
             tile("Thumbnails", libraryInfo.thumbnails ? "cached" : "originals", libraryInfo.thumbnails),
-            tile("Phone sync", status.running ? "listening" : "off", status.running),
         );
         renderToolsNote(libraryInfo);
     }
@@ -1520,12 +1452,9 @@ export function mount(context) {
     //
     // Everything Photo-specific in one place: the phone -> server path
     // mappings physical albums are built from, the default sync
-    // destination, the recycle bin's retention period, the default import
-    // directory, and the standalone phone-sync listener's own status/token
-    // (moved in from what used to be a separate "Phone sync" toggle on the
-    // Photos toolbar - see docs/satellites/photo.md, "Mobile app"). All of
-    // it goes through the one generic /configuration route (see
-    // configuration.py) - there is no second settings mechanism here.
+    // destination, the recycle bin's retention period and the default import
+    // directory. All of it goes through the one generic /configuration route
+    // (see configuration.py) - there is no second settings mechanism here.
 
     function buildConfigPanel() {
         const element = el("div", "photo-tab-panel");
@@ -1534,10 +1463,9 @@ export function mount(context) {
 
         const sourcePaths = el("section", "panel photo-config-section");
         const otherSettings = el("section", "panel photo-config-section");
-        const syncSection = el("section", "panel photo-sync");
 
-        element.append(notice, sourcePaths, otherSettings, syncSection);
-        return { element, notice, sourcePaths, otherSettings, syncSection };
+        element.append(notice, sourcePaths, otherSettings);
+        return { element, notice, sourcePaths, otherSettings };
     }
 
     async function loadConfig() {

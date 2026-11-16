@@ -6,6 +6,7 @@ import json
 import shutil
 import struct
 import tempfile
+import tomllib
 import unittest
 import zlib
 
@@ -1195,7 +1196,7 @@ class PhotoAlbumsTest(unittest.TestCase):
     def test_a_photo_can_belong_to_a_physical_album_and_favorites_at_once(self):
         # a physical album can't be created through this test's plain
         # import_photo() helper (that never sets physical_path - see
-        # PhotoSyncPhysicalAlbumTest below for the sync path that does), but
+        # PhotoPhysicalAlbumTest below, which sets it directly), but
         # favoriting an imported photo alongside its (absent) physical album
         # is exactly the "one photo, two independent album memberships"
         # behaviour this exercises without needing a real phone-sync mapping
@@ -1235,7 +1236,7 @@ class PhotoConfigurationSourcePathsTest(unittest.TestCase):
         # route below) persists through satellite.config.set(), which would
         # otherwise write into the real satellites/native/photo/config.toml
         # on disk - every test here redirects that to a throwaway file first,
-        # the same pattern test_photo_sync.py's own PhotoConfigurationTest uses
+        # the same pattern PhotoConfigurationTest below uses
         self.config_path = self.directory / "config.toml"
         self.config_path.write_text("enabled = true\n", encoding="utf-8")
         self.satellite.config.path = self.config_path
@@ -1444,18 +1445,10 @@ class PhotoCommandTest(unittest.TestCase):
         # per-test temp file the way engine/config.toml is - redirect it so a
         # "photo config" test never writes into the working copy on disk. The
         # in-memory config.data is reset to match, since earlier tests' saves
-        # (which mutate config.data directly) would otherwise leak through -
-        # sync_enabled is off so these CLI plumbing tests never touch a real
-        # socket; that live-restart behaviour has its own coverage in
-        # test_photo_sync.py's PhotoConfigurationTest.
-        self.satellite.config.data["sync_enabled"] = False
-        self.satellite.config.data["sync_host"] = "127.0.0.1"
-        self.satellite.config.data["sync_port"] = 0
+        # (which mutate config.data directly) would otherwise leak through.
+        self.satellite.config.data["trash_retention_days"] = 30
         self.config_path = self.directory / "config.toml"
-        self.config_path.write_text(
-            'enabled = true\nsync_enabled = false\nsync_host = "127.0.0.1"\nsync_port = 0\n',
-            encoding="utf-8",
-        )
+        self.config_path.write_text('enabled = true\ntrash_retention_days = 30\n', encoding="utf-8")
         self.satellite.config.path = self.config_path
 
     def tearDown(self):
@@ -1503,50 +1496,197 @@ class PhotoCommandTest(unittest.TestCase):
     def test_photo_config_with_no_arguments_shows_current_settings(self):
         output = self.run_command("photo config")
 
-        self.assertIn("sync_host", output)
-        self.assertIn("sync_port", output)
-        self.assertIn("127.0.0.1", output)
+        self.assertIn("Photo configuration", output)
+        self.assertIn("trash_retention_days", output)
+        self.assertIn("photo_directory", output)
+        self.assertNotIn("sync_port", output)
 
-    def test_photo_config_changes_the_host(self):
-        output = self.run_command("photo config sync_host 0.0.0.0")
+    def test_photo_config_changes_a_setting(self):
+        output = self.run_command("photo config trash_retention_days 14")
 
-        self.assertIn("sync_host = 0.0.0.0", output)
-        self.assertEqual(self.satellite.config.get("sync_host"), "0.0.0.0")
-        self.assertIn("0.0.0.0", self.config_path.read_text(encoding="utf-8"))
+        self.assertIn("trash_retention_days = 14", output)
+        self.assertEqual(self.satellite.config.get("trash_retention_days"), 14)
+        self.assertIn("14", self.config_path.read_text(encoding="utf-8"))
 
-    def test_photo_config_changes_the_port(self):
-        output = self.run_command("photo config sync_port 9090")
-
-        self.assertIn("sync_port = 9090", output)
-        self.assertEqual(self.satellite.config.get("sync_port"), 9090)
-        self.assertIn("9090", self.config_path.read_text(encoding="utf-8"))
-
-    def test_photo_config_reports_when_sync_is_turned_off(self):
-        output = self.run_command("photo config sync_port 9090")
-
-        self.assertIn("currently turned off", output)
-
-    def test_photo_config_rejects_an_invalid_port(self):
-        output = self.run_command("photo config sync_port not-a-number")
+    def test_photo_config_rejects_an_invalid_value(self):
+        output = self.run_command("photo config trash_retention_days not-a-number")
 
         self.assertIn("[ERROR]", output)
-        self.assertNotIn("9090", self.config_path.read_text(encoding="utf-8"))
+        self.assertNotIn("not-a-number", self.config_path.read_text(encoding="utf-8"))
 
-    def test_photo_config_rejects_an_out_of_range_port(self):
-        output = self.run_command("photo config sync_port 70000")
+    def test_photo_config_rejects_a_retired_or_unknown_key(self):
+        for key in ("sync_port", "sync_host", "sync_nonsense"):
+            output = self.run_command(f"photo config {key} 9090")
+            self.assertIn("[ERROR]", output, key)
 
-        self.assertIn("[ERROR]", output)
-
-    def test_photo_config_rejects_an_unknown_key(self):
-        output = self.run_command("photo config sync_nonsense value")
-
-        self.assertIn("[ERROR]", output)
+    def test_photo_has_no_sync_command_any_more(self):
+        self.assertIn("Usage", self.run_command("photo sync"))
+        self.assertNotIn("Sync", self.run_command("photo"))
 
     def test_photo_config_requires_exactly_a_key_and_a_value(self):
-        output = self.run_command("photo config sync_host")
+        output = self.run_command("photo config trash_retention_days")
 
         self.assertIn("[ERROR]", output)
         self.assertIn("Usage", output)
+
+
+class PhotoConfigurationTest(unittest.TestCase):
+    """Photo's own settings, through the generic satellite configuration
+    mechanism - never through any Photo-specific Core code."""
+
+    def setUp(self):
+        self.directory = Path(tempfile.mkdtemp(prefix="starcore-photo-config-"))
+        self.engine = start_engine()
+        self.satellite = self.engine.registry.get("Photo")
+        self.satellite.config.data["storage"] = str(self.directory / "library")
+        self.satellite.config.data["photo_directory"] = ""
+
+        # configuration.update() persists through satellite.config.set(), which
+        # would otherwise write into the real satellites/native/photo/config.toml
+        # on disk - every test here redirects that to a throwaway file first
+        self.config_path = self.directory / "config.toml"
+        self.config_path.write_text("enabled = true\n", encoding="utf-8")
+        self.satellite.config.path = self.config_path
+
+    def tearDown(self):
+        stop_engine(self.engine)
+        shutil.rmtree(self.directory, ignore_errors=True)
+
+    def configuration(self):
+        from importlib import import_module
+        return import_module("satellites.native.photo.configuration")
+
+    def test_nothing_is_ever_pending_a_restart(self):
+        payload = self.configuration().describe(self.satellite)
+
+        self.assertFalse(payload["restart_required"])
+        for setting in payload["settings"]:
+            self.assertEqual(setting["live_value"], setting["value"], setting["key"])
+            self.assertFalse(setting["pending_restart"], setting["key"])
+        self.assertFalse({"sync_host", "sync_port", "sync_enabled", "sync_token"}
+                         & {setting["key"] for setting in payload["settings"]})
+
+    def test_an_unknown_or_retired_setting_is_rejected(self):
+        for key in ("sync_token", "sync_port", "sync_enabled"):
+            with self.assertRaises(self.configuration().ConfigurationError):
+                self.configuration().update(self.engine, self.satellite, key, "anything")
+
+    def test_photo_directory_defaults_to_not_configured(self):
+        payload = self.configuration().describe(self.satellite)
+        by_key = {setting["key"]: setting for setting in payload["settings"]}
+
+        self.assertEqual(by_key["photo_directory"]["value"], "")
+        self.assertEqual(by_key["photo_directory"]["type"], "path")
+
+    def test_changing_photo_directory_persists(self):
+        directory = str(self.directory / "photos")
+
+        result = self.configuration().update(self.engine, self.satellite, "photo_directory", directory)
+
+        self.assertEqual(self.satellite.config.get("photo_directory"), directory)
+        # parsed rather than searched: on Windows the path's backslashes are escaped in the file
+        self.assertEqual(tomllib.loads(self.config_path.read_text(encoding="utf-8"))["photo_directory"], directory)
+        by_key = {setting["key"]: setting for setting in result["settings"]}
+        self.assertEqual(by_key["photo_directory"]["value"], directory)
+        self.assertIn(directory, result["note"])
+
+    def test_photo_directory_may_be_cleared_back_to_not_configured(self):
+        self.configuration().update(self.engine, self.satellite, "photo_directory", str(self.directory))
+        result = self.configuration().update(self.engine, self.satellite, "photo_directory", "")
+
+        self.assertEqual(self.satellite.config.get("photo_directory"), "")
+        self.assertIn("no default directory", result["note"].lower())
+
+    def test_a_relative_photo_directory_is_rejected(self):
+        with self.assertRaises(self.configuration().ConfigurationError):
+            self.configuration().update(self.engine, self.satellite, "photo_directory", "relative/path")
+
+    def test_a_photo_directory_starting_with_tilde_is_accepted(self):
+        result = self.configuration().update(self.engine, self.satellite, "photo_directory", "~/Pictures")
+
+        self.assertEqual(self.satellite.config.get("photo_directory"), "~/Pictures")
+        by_key = {setting["key"]: setting for setting in result["settings"]}
+        self.assertEqual(by_key["photo_directory"]["value"], "~/Pictures")
+
+    def test_the_saved_value_survives_a_fresh_read_of_the_satellite_config(self):
+        self.configuration().update(self.engine, self.satellite, "trash_retention_days", "12")
+
+        from starcore.satellite_config import SatelliteConfig
+        with open(self.config_path, "rb") as file:
+            reloaded = SatelliteConfig(tomllib.load(file), path=self.config_path)
+
+        self.assertEqual(reloaded.get("trash_retention_days"), 12)
+
+    def test_the_generic_mechanism_marks_photo_as_configurable(self):
+        from starcore.api import payloads
+
+        described = payloads.describe_satellite(self.engine, self.satellite)
+
+        self.assertTrue(described["configurable"])
+        self.assertIn("configuration", self.satellite.routes)
+
+    def test_a_satellite_without_a_configuration_route_is_not_configurable(self):
+        from starcore.api import payloads
+
+        status = self.engine.registry.get("Status")
+        described = payloads.describe_satellite(self.engine, status)
+
+        self.assertFalse(described["configurable"])
+
+    def test_the_configuration_route_handles_get_and_post_generically(self):
+        handler = self.satellite.routes["configuration"]
+
+        get_request = type("Request", (), {
+            "method": "GET", "satellite": self.satellite, "engine": self.engine, "path": (), "body": None,
+        })()
+        response = handler(get_request)
+        self.assertIn("settings", response.payload)
+
+        post_request = type("Request", (), {
+            "method": "POST", "satellite": self.satellite, "engine": self.engine, "path": (),
+            "body": {"key": "trash_retention_days", "value": 7},
+        })()
+        response = handler(post_request)
+        self.assertIn("note", response.payload)
+
+    def test_photo_no_longer_runs_anything_of_its_own(self):
+        # the standalone upload listener is gone: Photo has no lifecycle hooks and no sync routes
+        self.assertNotIn("sync", self.satellite.routes)
+        self.assertNotIn("sync_upload", self.satellite.routes)
+        self.assertNotIn("sync", self.satellite.state(self.engine))
+        photo_dir = Path(self.configuration().__file__).resolve().parent
+        self.assertFalse((photo_dir / "sync.py").exists())
+
+    def test_core_source_has_no_photo_specific_configuration_logic(self):
+        """A regression guard, not just a design intention: the Core's own
+        engine_config.py, satellite_config.py, toml_edit.py and api/*.py must
+        never come to know about a Photo setting, or "photo", by name - the
+        generic mechanism (docs/satellites.md) is what has to keep working
+        for any future satellite, not a special case for this one."""
+        core_path = Path(self.configuration().__file__).resolve().parents[2].parent / "engine" / "starcore"
+        offenders = []
+
+        for path in core_path.rglob("*.py"):
+            text = path.read_text(encoding="utf-8").lower()
+            if "sync_default_path" in text or "source_paths" in text or "photo" in text:
+                offenders.append(str(path))
+
+        self.assertEqual(offenders, [])
+
+
+class HandoverFilenameTest(unittest.TestCase):
+    """A file taken back in keeps its name only as metadata, and never one that names a path."""
+
+    def test_a_name_is_cleaned(self):
+        from importlib import import_module
+        safe_filename = import_module("satellites.native.photo.handover").safe_filename
+
+        self.assertEqual(safe_filename("../../etc/passwd"), "passwd")
+        self.assertEqual(safe_filename("..\\..\\boot.ini"), "boot.ini")
+        self.assertEqual(safe_filename("holiday%20photo.png"), "holiday photo.png")
+        for nothing in (None, "", "..", ".", "a/"):
+            self.assertEqual(safe_filename(nothing), "upload", nothing)
+        self.assertEqual(len(safe_filename("x" * 500)), 200)
 
 
 if __name__ == "__main__":

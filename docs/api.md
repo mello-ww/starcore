@@ -339,11 +339,6 @@ authorization on top of the Core's session check without re-validating anything 
 touching `starcore/auth.py` - the Locked Folder Satellite (`docs/satellites/locked_folder.md`) is the
 first and so far only Satellite that needs this.
 
-Photo Sync (`satellites/native/photo/sync.py`) is a separate, deliberately unauthenticated
-HTTP listener on its own port, protected by its own device token instead - it is not part of
-Mission Control's API server and this authentication system does not apply to it. See
-"Photo Sync and authentication" in `docs/satellites/photo.md` for why that separation stays as it is.
-
 ## HTTPS
 
 Configured through the same `[server]` section as everything else in `engine/config.toml`:

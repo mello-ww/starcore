@@ -1,11 +1,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
-import {StarSwitch} from '../components/StarSwitch';
 import {useDeveloperMode} from '../developer/DeveloperModeContext';
 import {colors, radius, spacing, typography, useAccentStyles} from '../theme';
-import {configureBackgroundFetch, runBackgroundSync} from './backgroundSyncTask';
-import {requestMediaLibraryPermission} from './mediaPermission';
-import {getSyncState, setSyncEnabled, setWifiOnly} from './syncState';
 import type {ConfigurationSetting, SourcePathMapping} from './types';
 import {usePhotoApi} from './usePhotoApi';
 import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
@@ -25,15 +21,13 @@ function settingValue<T>(settings: ConfigurationSetting[], key: string, fallback
  * rather than its own bottom-tab segment (per "Photo configuration...
  * reachable via a settings entry" in the task brief): the phone -> server
  * path mappings physical albums are built from, the default sync
- * destination, the recycle bin's retention period, and this server's own
- * automatic phone sync (moved in from the old standalone "Sync" tab - see
- * docs/satellites/photo.md, "Mobile app"). Every setting here goes through
+ * destination and the recycle bin's retention period. Every setting here goes through
  * the same generic /configuration route the web panel's own Configuration
  * tab uses (see configuration.py) - there is no second settings mechanism.
  */
 export function PhotoConfigurationScreen() {
   const accentStyle = useAccentStyles();
-  const {api, serverId} = usePhotoApi();
+  const {api} = usePhotoApi();
   const {enabled: developer} = useDeveloperMode();
   const [settings, setSettings] = useState<ConfigurationSetting[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,12 +35,6 @@ export function PhotoConfigurationScreen() {
   const [savingMappings, setSavingMappings] = useState(false);
   const [defaultPath, setDefaultPath] = useState('');
   const [retentionDays, setRetentionDays] = useState('');
-
-  const [syncLoaded, setSyncLoaded] = useState(false);
-  const [syncEnabled, setSyncEnabledState] = useState(false);
-  const [wifiOnly, setWifiOnlyState] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -64,15 +52,6 @@ export function PhotoConfigurationScreen() {
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    (async () => {
-      const state = await getSyncState(serverId);
-      setSyncEnabledState(state.enabled);
-      setWifiOnlyState(state.wifiOnly);
-      setSyncLoaded(true);
-    })();
-  }, [serverId]);
 
   const saveMappings = async () => {
     setSavingMappings(true);
@@ -114,42 +93,6 @@ export function PhotoConfigurationScreen() {
     setMappings(current => [...current, {phone_path: '', server_path: '', name: ''}]);
   };
 
-  const onToggleSyncEnabled = async (value: boolean) => {
-    if (value) {
-      const granted = await requestMediaLibraryPermission();
-      if (!granted) {
-        Alert.alert(
-          'Permission needed',
-          'StarCore needs access to your photos and videos to sync them automatically. ' +
-            'You can grant this later from your phone’s app settings.',
-        );
-        return;
-      }
-    }
-    setSyncEnabledState(value);
-    await setSyncEnabled(serverId, value);
-    await configureBackgroundFetch();
-  };
-
-  const onToggleWifiOnly = async (value: boolean) => {
-    setWifiOnlyState(value);
-    await setWifiOnly(serverId, value);
-    await configureBackgroundFetch();
-  };
-
-  const onSyncNow = async () => {
-    setSyncing(true);
-    setSyncResult(null);
-    try {
-      await runBackgroundSync();
-      setSyncResult('Sync finished.');
-    } catch (err: any) {
-      Alert.alert('Sync could not finish', err?.message || 'Please try again.');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   if (error && !settings) {
     return (
       <View style={styles.center}>
@@ -158,7 +101,7 @@ export function PhotoConfigurationScreen() {
     );
   }
 
-  if (!settings || !syncLoaded) {
+  if (!settings) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={accentStyle.color} />
@@ -227,34 +170,6 @@ export function PhotoConfigurationScreen() {
         />
       </Section>
 
-      <Section title="Automatic phone sync">
-        <View style={styles.row}>
-          <View style={styles.rowText}>
-            <Text style={typography.body}>Automatic sync</Text>
-            <Text style={[typography.caption, styles.hint]}>
-              New photos and videos on this phone are uploaded to this StarCore server in the background, roughly
-              every 15 minutes, and whenever you open this app. Nothing is ever deleted from your phone.
-            </Text>
-          </View>
-          <StarSwitch value={syncEnabled} onValueChange={onToggleSyncEnabled} />
-        </View>
-        <View style={styles.row}>
-          <View style={styles.rowText}>
-            <Text style={typography.body}>Wi-Fi only</Text>
-            <Text style={[typography.caption, styles.hint]}>
-              Applies to the periodic background check. Opening the app can still sync over cellular.
-            </Text>
-          </View>
-          <StarSwitch value={wifiOnly} onValueChange={onToggleWifiOnly} disabled={!syncEnabled} />
-        </View>
-        <Pressable
-          style={[styles.syncButton, (syncing || !syncEnabled) && styles.syncButtonDisabled]}
-          onPress={onSyncNow}
-          disabled={syncing || !syncEnabled}>
-          {syncing ? <ActivityIndicator color={colors.text} /> : <Text style={styles.syncButtonLabel}>Sync now</Text>}
-        </Pressable>
-        {syncResult && <Text style={[typography.caption, styles.hint]}>{syncResult}</Text>}
-      </Section>
       <FloatingPlayerSpacer />
     </ScrollView>
   );
@@ -377,16 +292,4 @@ const styles = StyleSheet.create({
   primaryButtonLabel: {color: colors.text, fontWeight: '700'},
   configRow: {gap: spacing.xs},
   configInputRow: {flexDirection: 'row', gap: spacing.sm, alignItems: 'center'},
-  row: {flexDirection: 'row', alignItems: 'center', gap: spacing.md},
-  rowText: {flex: 1, gap: 2},
-  syncButton: {
-    backgroundColor: colors.raised,
-    borderRadius: radius.md,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.lineBright,
-  },
-  syncButtonDisabled: {opacity: 0.6},
-  syncButtonLabel: {color: colors.text, fontWeight: '600'},
 });

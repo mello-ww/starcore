@@ -26,17 +26,27 @@ async function mount(params?: {section?: string}) {
 const texts = (tree: ReturnType<typeof renderer.create>) =>
   tree.root.findAllByType(Text).map((node: any) => [node.props.children].flat().join(''));
 
-/** Photo's own screens, opened at a section by its shared interface's own action. */
+const selected = (tree: ReturnType<typeof renderer.create>) =>
+  tree.root
+    .findAll(
+      (node: any) =>
+        typeof node.type === 'string' && node.props.accessibilityRole === 'tab' && node.props.accessibilityState?.selected,
+    )
+    .map((node: any) => node.props.accessibilityLabel ?? '');
+
+/** Photo's own screens, opened at a section by the own action. */
 describe('PhotoHomeScreen sections', () => {
-  it('opens Photo configuration in its place for "sync", so Back returns to the shared screen', async () => {
-    const {navigation} = await mount({section: 'sync'});
-    expect(navigation.replace).toHaveBeenCalledWith('PhotoConfiguration');
+  it('opens at the segment a section names', async () => {
+    const {tree, navigation} = await mount({section: 'albums'});
+    expect(selected(tree)).toEqual(['Albums']);
+    expect(navigation.replace).not.toHaveBeenCalled();
   });
 
-  it('opens as before without a section, or with one it does not know', async () => {
-    for (const params of [undefined, {section: 'elsewhere'}, {section: 'LockedFolder'}]) {
+  it('opens at the library without a section, or with one it does not know (phone sync is gone)', async () => {
+    for (const params of [undefined, {section: 'sync'}, {section: 'elsewhere'}, {section: 'LockedFolder'}]) {
       const {tree, navigation} = await mount(params);
       expect(texts(tree)).toEqual(expect.arrayContaining(['Photos', 'Library', 'Albums']));
+      expect(selected(tree)).toEqual(['Library']);
       expect(navigation.replace).not.toHaveBeenCalled();
       act(() => tree.unmount());
     }

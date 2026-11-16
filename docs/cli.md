@@ -165,13 +165,12 @@ Seek sent - Pixel Phone.
 
 | Command | | Permission |
 |---|---|---|
-| `photo stats` (also just `photo`) | photos, images, videos, albums, size, storage, sync | `photo.read` RO |
+| `photo stats` (also just `photo`) | photos, images, videos, albums, size, storage | `photo.read` RO |
 | `photo list [count]` | newest photos and videos | `photo.read` RO |
 | `photo albums` | albums and their photo counts | `photo.read` RO |
-| `photo sync` | sync listener state, counters, recent uploads (never the sync token) | `photo.read` RO |
 | `photo scan [directory]` | preview what an import would add; imports nothing; terminal | `photo.manage` |
 | `photo import [directory]` | import a directory; terminal | `photo.manage` |
-| `photo config [<key> <value>]` | show or change Photo Sync settings; terminal | `photo.manage` |
+| `photo config [<key> <value>]` | show or change Photo's settings; terminal | `photo.manage` |
 
 Without a directory, scan and import use the configured `photo_directory`.
 Neither ever reads from the Locked Folder.

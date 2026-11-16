@@ -11,11 +11,11 @@ from pathlib import Path
 import hashlib
 import os
 import secrets
+from urllib.parse import unquote
 
 from starcore.api.response import error_response, file_response, json_response
 from starcore.capabilities import refuse_clients
 
-from . import sync
 from .albums import albums
 from .images import UnsupportedImage
 from .library import ID_LENGTH, PhotoImportError, PhotoNotFound, library
@@ -23,6 +23,17 @@ from .private_media import policy
 
 READ_SIZE = 1024 * 1024
 HANDED_OVER = "private, no-store"
+# where a file taken in is written aside, under the library's own storage, before it is added
+INCOMING = "incoming"
+
+
+def safe_filename(name) -> str:
+    """Only ever used as metadata - the stored name comes from the content digest."""
+    if not name:
+        return "upload"
+    cleaned = unquote(str(name)).replace("\\", "/").split("/")[-1]
+    cleaned = "".join(character for character in cleaned if character.isprintable()).strip()
+    return cleaned[:200] if cleaned and cleaned not in (".", "..") else "upload"
 
 
 def _kind(photo: dict) -> str:
@@ -103,10 +114,10 @@ def adopt(request):
     raw = request.raw
     if raw is None or getattr(raw, "length", 0) <= 0:
         return error_response("expected the file as a raw body", status=400)
-    filename = sync.safe_filename(request.query.get("name"))
+    filename = safe_filename(request.query.get("name"))
 
     photo_library = library(request.satellite)
-    incoming = photo_library.root / sync.INCOMING
+    incoming = photo_library.root / INCOMING
     incoming.mkdir(parents=True, exist_ok=True)
     partial = incoming / f"{secrets.token_hex(8)}.part"
     try:

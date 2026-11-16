@@ -111,7 +111,7 @@ class ConfigurationClassTest(unittest.TestCase):
         config = Configuration(_config_path("[server]\n"))
 
         with self.assertRaises(ConfigurationError):
-            config.set("photo", "sync_host", "0.0.0.0")
+            config.set("photo", "photo_directory", "/srv")
 
     def test_an_empty_host_is_rejected(self):
         config = Configuration(_config_path("[server]\n"))

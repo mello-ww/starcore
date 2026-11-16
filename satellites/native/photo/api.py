@@ -3,9 +3,8 @@
 from starcore.api.response import error_response, file_response, json_response
 
 from . import albums as albums_module
-from . import configuration, gallery, handover, sync
+from . import configuration, gallery, handover
 from .albums import AlbumError, AlbumNotFound, albums
-from .images import UnsupportedImage
 from .library import PhotoImportError, PhotoNotFound, library
 from .private_media import policy
 
@@ -24,15 +23,6 @@ def routes() -> dict:
         "originals": originals,
         "scan": scan,
         "import": import_directory,
-        "sync": sync_status,
-        # the mobile app's automatic background sync uploads through this -
-        # see "Real automatic phone sync" in docs/satellites/photo.md and
-        # sync.accept_authenticated_upload(). The standalone local-network
-        # listener sync.py itself runs (its own token, its own port) is
-        # untouched and still what a phone browser can be pointed at
-        # directly; this route is a second, authenticated way to reach the
-        # exact same ingestion, never a second implementation of it.
-        "sync_upload": sync_upload_route,
         "albums": albums_route,
         "trash": trash_route,
         # read-only: the library shaped for ui.json's shared gallery (see gallery.py);
@@ -111,46 +101,6 @@ def resolve_media(request, photo_id: str):
     if photo is None:
         return error_response("no such photo in the library", status=404)
     return json_response({"id": photo["id"], "kind": "video" if photo.get("media_type") == "video" else "image"})
-
-
-def sync_status(request):
-    if request.method != "GET":
-        return error_response("only GET is supported here", status=405)
-
-    return json_response(sync.describe(request.satellite))
-
-
-def sync_upload_route(request):
-    """One photo or video, uploaded from the mobile app's background sync -
-    the authenticated counterpart to sync.py's own standalone listener (see
-    module docstrings there and "Real automatic phone sync" in
-    docs/satellites/photo.md). The filename travels as a query parameter
-    (`?filename=...`), the same fallback sync.py's own handler supports,
-    since a satellite Request carries no raw headers to read one from
-    otherwise; the upload body itself is never JSON, so it arrives as
-    request.raw (see starcore.api.response.RawBody) rather than
-    request.body.
-    """
-    if request.method != "POST":
-        return error_response("only POST is supported here", status=405)
-    if request.raw is None:
-        return error_response("expected a raw file upload, not a JSON body", status=400)
-
-    filename = sync.safe_filename(request.query.get("filename"))
-    phone_folder = request.query.get("folder")
-
-    try:
-        result = sync.accept_authenticated_upload(request.satellite, request.raw, filename, phone_folder=phone_folder)
-    except sync.UploadTooLarge as error:
-        return error_response(str(error), status=413)
-    except ValueError as error:
-        return error_response(str(error), status=400)
-    except UnsupportedImage as error:
-        return error_response(str(error), status=415)
-    except RuntimeError as error:
-        return error_response(str(error), status=503)
-
-    return json_response(result)
 
 
 def configuration_route(request):

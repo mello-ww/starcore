@@ -16,10 +16,6 @@ jest.mock('react-native-gesture-handler', () => {
   const {View} = require('react-native');
   return {GestureHandlerRootView: View};
 });
-jest.mock('../src/photo/backgroundSyncTask', () => ({
-  configureBackgroundFetch: jest.fn(() => Promise.resolve()),
-  triggerForegroundSync: jest.fn(),
-}));
 // the real provider renders nothing until the native side reports insets
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaProvider: ({children}: {children: React.ReactNode}) => children,

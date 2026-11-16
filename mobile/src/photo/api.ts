@@ -1,4 +1,4 @@
-import {StarCoreClient, UploadableFile} from '../api/client';
+import {StarCoreClient} from '../api/client';
 import {ApiError} from '../api/types';
 import {FAVORITES_ALBUM_ID} from './types';
 import type {AlbumDetail, AlbumSummary, ConfigurationResponse, Photo, TrashListing} from './types';
@@ -149,38 +149,6 @@ export class PhotoApi {
     if (status !== 200) {
       throw new ApiError(body?.error || 'Could not permanently erase this photo.', status);
     }
-  }
-
-  /** Uploads one phone photo/video through the authenticated sync route
-   * (api.py's `sync_upload`, backed by sync.accept_authenticated_upload) -
-   * the same content-addressed ingestion (and therefore the same dedup) as
-   * the legacy sync.py upload page, reached through this app's own logged
-   * -in session instead of a second server address/token. See "Real
-   * automatic phone sync" in docs/satellites/photo.md. Used only by
-   * background sync (see photo/backgroundSync.ts); nothing else in the app
-   * uploads a file from the phone. */
-  async uploadSync(
-    file: UploadableFile,
-    folder?: string,
-  ): Promise<{status: 'imported' | 'duplicate'; photo: Photo | null}> {
-    // `folder` is the phone-side folder this asset came from (best-effort -
-    // see backgroundSyncTask.ts's cameraRollSource) - passed straight
-    // through as the same `folder` query param the legacy sync.py upload
-    // page and api.py's sync_upload_route both already accept, so the
-    // server can resolve a physical album via configuration.resolve_
-    // physical_path() exactly as it does for any other authenticated
-    // upload. Omitted entirely (not sent as an empty string) when unknown,
-    // so the server falls back to sync_default_path the same way it would
-    // for a client that never sends this at all.
-    let query = `filename=${encodeURIComponent(file.name)}`;
-    if (folder) {
-      query += `&folder=${encodeURIComponent(folder)}`;
-    }
-    const {status, body} = await this.client.postFile(`${BASE}/sync_upload?${query}`, file);
-    if (status !== 200) {
-      throw new ApiError(body?.error || 'Could not upload this file.', status);
-    }
-    return body as {status: 'imported' | 'duplicate'; photo: Photo | null};
   }
 }
 

@@ -217,7 +217,7 @@ class PhotoLibrary:
         It is the resolved server-side "physical album" path (see
         configuration.py's `source_paths`) for a phone-synced upload whose
         phone folder matched a configured mapping, or the satellite's
-        `sync_default_path` when it didn't - see sync.accept_authenticated_upload().
+        `sync_default_path` when it didn't.
         A directory scan/import (scan()/import_directory()) never sets this;
         those photos simply have no physical album, exactly like a photo
         imported before this concept existed.
@@ -238,8 +238,8 @@ class PhotoLibrary:
 
         # recognized by content, never by filename - the same reason
         # images.probe() already sniffs magic bytes instead of trusting an
-        # extension: a phone sync upload arrives under a generic temp name
-        # (see sync.py's SyncService.accept()), extension-less and all
+        # extension: an upload arrives under a generic temp name
+        # (see handover.py's adopt()), extension-less and all
         try:
             information = images.probe(source)
             media_type = "photo"

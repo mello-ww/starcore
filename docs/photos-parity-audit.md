@@ -48,7 +48,7 @@ Legend:
 | 25 | Locked Folder itself (PIN, biometrics, encryption, recovery, move-out) | removed (L8) | removed (L8) | ✅ its own shared interface (L0-L8) | ✅ its own shared interface (L0-L8) | Stays native by design; it only needs a way in from the shared interface. | N + client wiring: an entry point to the Locked Folder on both clients | P0 | S–M |
 | 26 | Import from a server folder (scan / import) | ✅ | ✗ (empty text wrongly says "Import some from your Albums tab") | ✅ fixed in M1 | ✅ fixed in M1 | Lost on web. | J: a form with `source` and Scan / Import → existing `scan`/`import` routes. S: add a `message` to their answers. Optional: `file-browser` | P0 | S |
 | 27 | Upload, download, share, export (download and share fixed in M12; upload and export not) | ✗ upload, ✗ download | ◐ Share sends a bare authenticated URL (the recipient can't open it) | ✅ download, ◐ share where the browser can | ✅ (share; download on Android 10+) | Nothing worked well anywhere before M12. | C: `download`/`share` action (web: authenticated fetch → save; Android: download → share the file) | P1 | M |
-| 28 | Phone sync (background, Wi-Fi only, Sync now, permission) | status only (Dev Mode log) | ✅ | ✗ | ◐ M2: opens the own screen (`own`) | Device-side; registered in `App.tsx`, so it doesn't depend on the Photos screen. | N: reach `PhotoConfigurationScreen` from the shared interface | P0 | S |
+| 28 | Phone sync (background, Wi-Fi only, Sync now, permission) | removed (S0) | removed (S0) | ✗ until S2 | ✗ until S3 | The old sync is removed whole (S0); its replacement is designed below. | C: the `sync` action and `device.media-sync` (S1 to S4) | P0 | L |
 | 29 | Settings (source_paths mappings, default sync folder, retention, default import directory) | ✅ tab | ✅ screen | ✅ fixed in P1: a Settings page of forms | ✅ fixed in P1 | `source_paths` is a list of objects: since L4 the contract's form has repeatable rows. | C: repeatable form rows (contract change 2), then J+S: `gallery/settings` and the forms | P0 entry / P2 C | S / M |
 | 30 | Offline cache (Android) | n/a | ✅ cached list, "Showing cached photos - offline" | n/a | ✅ fixed in M4 (offline pages) | **Lost.** | C: opt-in per-server page-data cache, forgotten on a Locked Folder move (as `forgetCachedPhoto`) | P0 (Android) | M |
 | 31 | Deep link `#/satellite/Photo/LockedFolder` (web) | ✅ | n/a | ✅ fixed in M2 | n/a | Breaks if the shared interface becomes the default. | Client wiring with #25 | P0 | S |
@@ -122,8 +122,7 @@ Each milestone is small and testable on its own. The order runs from cheapest to
 These still need client code written for Photo or the Locked Folder. To reach the goal above,
 each must move to the contract or to a generic capability before the stable release:
 - The Locked Folder internals: PIN, biometrics, encryption, recovery, move-out (#25, then #37).
-- Phone sync and its background task (#28): a generic device-sync capability.
-- The dedicated web's sync listener log (Developer Mode).
+- Phone sync (#28): removed in S0; a generic device-sync capability replaces it (S1 to S4).
 
 **Towards the stable release**
 - Icons shipped by the Satellite (#38).
@@ -139,8 +138,9 @@ each must move to the contract or to a generic capability before the stable rele
 
 ## Phone sync (#28): what exists, and the design of its replacement (2026-11-15)
 
-**Status: approved by the owner (2026-11-15). Nothing below is implemented yet**; the decisions
-at the end stay open until the milestone that needs them. Read from
+**Status: approved by the owner (2026-11-15). S0 is done: the old sync is removed as the
+inventory below lists. Nothing of the new one is implemented yet**; the decisions at the end
+stay open until the milestone that needs them. Read from
 the code at `5b716a9`. The old sync is removed entirely, then a real automatic backup is built
 as a generic capability. The common order with the Locked Folder is in
 [Remaining work](remaining-work.md).
@@ -173,7 +173,7 @@ has no `ACCESS_MEDIA_LOCATION`, so Android may hand over photos with their GPS p
 | App code | `mobile/src/photo/backgroundSync.ts`, `backgroundSyncTask.ts`, `syncState.ts`, `mediaPermission.ts`; the "Automatic phone sync" section of `PhotoConfigurationScreen.tsx`; `uploadSync` in `photo/api.ts`; `postFile` in `api/client.ts` (nothing else uses it); the two calls in `App.tsx`; the headless task in `index.js` |
 | App build | `react-native-background-fetch` and `@react-native-camera-roll/camera-roll` in `package.json`; in the manifest `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK` and the comments that go with them (the media permissions come back with the new sync) |
 | App storage | `starcore_photo_sync_state:<server>`, removed once at start |
-| Tests | `engine/tests/test_photo_sync.py` whole; the sync parts of `test_photo.py` (`photo config sync_*`, about 1448-1546), `test_cli.py` (37, 397-407), `test_developer_mode.py` (73, 97, 115-122), `test_configuration.py` (114), `test_locked_folder_security.py` (428-443, rewritten against the new route); `mobile/__tests__/backgroundSync.test.ts`, `lockedBackgroundSync.test.tsx`, `startupSync.test.tsx`, the sync part of `serverListStartup.test.tsx`; `KNOWN_IMPORTS`' `App.tsx` line |
+| Tests | `engine/tests/test_photo_sync.py` whole (its configuration tests move to `test_photo.py`); the sync parts of `test_photo.py` (`photo config sync_*`, about 1448-1546), `test_cli.py` (37, 397-407), `test_developer_mode.py` (73, 97, 115-122), `test_configuration.py` (114), `test_locked_folder_security.py` (428-443, against import and the handover until S1 adds the new route); `mobile/__tests__/backgroundSync.test.ts`, `lockedBackgroundSync.test.tsx`, `startupSync.test.tsx`, the sync part of `serverListStartup.test.tsx`; `KNOWN_IMPORTS`' `App.tsx` line |
 | Docs | `satellites/photo.md` ("Phone synchronization", "Configuring Photo Sync", "Real automatic phone sync", the route table, the CLI list); `api.md` (342-345); `deployment.md` (167, 318-319); `cli.md` (171, 174); `mission_control.md` (164); `satellites.md` (82, 270, 319, 367); `mobile/README.md` (21, 180); `roadmap.md` (230); `ui-contract.md`'s target row |
 | CHANGELOG | a "Removed" entry under Unreleased; the two entries that say settings and phone sync "open Photo's own screens" (174, 250) reworded when that stops being true |
 
@@ -261,9 +261,9 @@ The app finds the provider in the catalog and never names it.
 
 | # | What | Contract | Main files | Model |
 |---|---|---|---|---|
-| S0 | Remove the old sync (the inventory above) | none; the reserved client name changes in S2 | as listed | Sonnet 5.5 high |
+| S0 (done) | Remove the old sync (the inventory above) | none; the reserved client name changes in S2 | as listed | Sonnet 5.5 high |
 | S1 | `media.sync` v1 in the vocabulary and in Photo: the four routes, streamed to disk, digests of erased items; the Engine's device credentials if decision 1 says so | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `photo/backup.py` (new) and `api.py`, `library.py` (erase records the digest), `engine/starcore/auth.py` and `api/server.py` | Opus 5.5 xhigh |
-| S2 | The `sync` action and `device.media-sync`; Photo's button and Devices page | **contract change 3** | `ui_contract.py`, fixtures, both clients' contract and action runners, `photo/ui.json` | Opus 5.5 high |
+| S2 | The `sync` action and `device.media-sync`; Photo's button and Devices page | **contract change 4** | `ui_contract.py`, fixtures, both clients' contract and action runners, `photo/ui.json` | Opus 5.5 high |
 | S3 | The app's sync: the Kotlin package (workers, MediaStore, index, uploader, notification), `mobile/src/sync/` (screen, state), the manifest, `App.tsx` | none | `mobile/android/app/src/main/java/.../sync/`, `mobile/src/sync/`, `AndroidManifest.xml` | Opus 5.5 xhigh |
 | S4 | Emulator runs from the table above; then the owner's phone | none | none | Opus 5.5 high |
 | S5 | Security review of S1 to S3 (the credential, the upload route, what the phone stores) | none | none | Fable 5.2 high |
@@ -285,5 +285,5 @@ The app finds the provider in the catalog and never names it.
 | # | What | Contract | Main files | Tests | Model |
 |---|---|---|---|---|---|
 | P1 (done) | Settings (#29) as forms: the `source_paths` mappings as repeatable rows (the `rows` field kind arrives with the Locked Folder's L4), retention, default import folder, default album; `own: "settings"` goes | uses contract change 2 | `photo/ui.json`, `photo/api.py` (a `view/settings` route), `configuration.py` | Engine: the document's routes; both clients' form tests with rows added, removed and refused | Opus 5.5 high |
-| P2 | Icons shipped by a Satellite (#38): an `icons/` folder named in the manifest; the Engine validates each SVG (no DOCTYPE, an allow-list of shape elements and attributes, `currentColor` only, no `style`, `script`, `use`, `image`, `href` or event attribute, 8 KB each, 32 at most) and serves it with a revision; a document names `{"own": "<name>", "fallback": "<shared icon>"}`; both clients check again and tint it; Android gets its SVG renderer | **contract change 4** | `satellite_loader.py`, `ui_contract.py`, `api/server.py`, fixtures, `mission_control/ui/icons.js`, `mobile/src/satellites/ui/` | Engine: every refused construct as a fixture; both clients draw the fallback for a refused or missing icon | Opus 5.5 high |
+| P2 | Icons shipped by a Satellite (#38): an `icons/` folder named in the manifest; the Engine validates each SVG (no DOCTYPE, an allow-list of shape elements and attributes, `currentColor` only, no `style`, `script`, `use`, `image`, `href` or event attribute, 8 KB each, 32 at most) and serves it with a revision; a document names `{"own": "<name>", "fallback": "<shared icon>"}`; both clients check again and tint it; Android gets its SVG renderer | **contract change 5** | `satellite_loader.py`, `ui_contract.py`, `api/server.py`, fixtures, `mission_control/ui/icons.js`, `mobile/src/satellites/ui/` | Engine: every refused construct as a fixture; both clients draw the fallback for a refused or missing icon | Opus 5.5 high |
 | P3 | Remove Photo's `page.js`, `page.css`, `mobile/src/photo/`, its routes in `MainTabs.tsx` and its `DEDICATED_SCREENS` entry, once the owner has validated L5, S4 and P1 | none | those | the suites; `KNOWN_IMPORTS` loses `MainTabs.tsx` and `KNOWN_COUPLINGS` its Photo count | Sonnet 5.5 medium |

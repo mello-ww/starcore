@@ -427,7 +427,7 @@ class LockedFolderSecurityTest(unittest.TestCase):
         self.assertEqual(self.request(f"/api/satellites/Photo/originals/{ids[0]}")[0], 404)
         self.assertEqual(list(self.vault.rglob("*.part")), [])
 
-    def test_a_moved_photo_is_not_taken_back_by_import_or_sync(self):
+    def test_a_moved_photo_is_not_taken_back_by_import_or_any_upload(self):
         ids = self.import_photos(1)
         library = self.library()
         data = library.original_path(library.get(ids[0])).read_bytes()
@@ -441,10 +441,9 @@ class LockedFolderSecurityTest(unittest.TestCase):
         status, payload = self.call("/api/satellites/Photo/import", "POST", {"source": str(again)})
         self.assertEqual((status, payload["imported"], payload["duplicates"]), (200, 0, 1))
 
-        sync = module("photo.sync")
-        service = sync.SyncService(library, "127.0.0.1", 0, "token", 1024 * 1024)
-        service.private = lambda: module("photo.private_media").policy(self.engine)
-        self.assertEqual(service.accept(data, "copy.png")["status"], "duplicate")
+        # every way in ends in add_file with the policy, which answers it like a duplicate
+        policy = module("photo.private_media").policy(self.engine)
+        self.assertIsNone(library.add_file(again / "copy.png", filename="copy.png", private=policy))
         self.assertIsNone(library.get(ids[0]))
 
     def test_a_failed_copy_leaves_the_photo_where_it_was(self):

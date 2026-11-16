@@ -1,7 +1,7 @@
-"""photo - library statistics, albums, sync status, and authorized scan/import.
+"""photo - library statistics, albums, settings, and authorized scan/import.
 
-Uses the same PhotoLibrary, AlbumStore, sync service and configuration
-module as the Photo routes. A scan or import never reaches into the Locked
+Uses the same PhotoLibrary, AlbumStore and configuration module as the
+Photo routes. A scan or import never reaches into the Locked
 Folder: the library's own Locked Folder policy refuses it, as it does for
 Mission Control.
 """
@@ -9,14 +9,14 @@ Mission Control.
 from starcore.cli.runner import table
 from starcore.cli.spec import Argument, Command, CommandError, Unavailable, UsageError, bounded
 
-from .. import configuration, sync
+from .. import configuration
 from ..albums import albums as album_store
 from ..images import thumbnails_available
 from ..library import PhotoImportError, library_for, readable_size
 from ..private_media import policy
 
 NAMESPACE = "photo"
-SUMMARY = "Photo library statistics, albums, sync status, scan and import"
+SUMMARY = "Photo library statistics, albums, settings, scan and import"
 DEFAULT = "stats"
 ALIASES = ("photos",)
 
@@ -53,10 +53,7 @@ def _source(ctx, directory) -> str:
 def stats(ctx):
     photos = _photos(ctx)
     summary = photos.summary()
-    running = sync.service(_satellite(ctx))
-    return {**summary, "albums": len(album_store(_satellite(ctx)).all()),
-            "sync": {"running": bool(running and running.running), "url": running.url if running and running.running
-                     else None}}
+    return {**summary, "albums": len(album_store(_satellite(ctx)).all())}
 
 
 def _render_stats(data: dict) -> str:
@@ -70,7 +67,6 @@ def _render_stats(data: dict) -> str:
         f"Size         {readable_size(data['size_bytes'])}",
         f"Storage      {data['storage']}",
         f"Thumbnails   {'available' if thumbnails_available() else 'unavailable (originals are served instead)'}",
-        f"Sync         {data['sync']['url'] if data['sync']['running'] else 'not running'}",
     ])
 
 
@@ -101,25 +97,6 @@ def list_albums(ctx):
         found.append({"id": album["id"], "name": album["name"], "kind": album.get("kind", "virtual"),
                       "photos": len(present), "updated_at": album["updated_at"]})
     return {"albums": found}
-
-
-def sync_status(ctx):
-    described = sync.describe(_satellite(ctx))
-    # the sync token is a credential for the upload listener: never shown here
-    return {key: value for key, value in described.items() if key != "token"}
-
-
-def _render_sync(data: dict) -> str:
-    state = "running at " + data["url"] if data["running"] else ("enabled, not running" if data["enabled"]
-                                                                  else "disabled")
-    counts = data["counts"]
-    lines = [f"Photo sync   {state}",
-             f"Received     {counts['received']} (imported {counts['imported']}, duplicates {counts['duplicates']}, "
-             f"failed {counts['failed']})"]
-    if data["events"]:
-        lines += ["", "Recent", table(data["events"][:10], [("at", "At"), ("status", "Status"),
-                                                              ("filename", "File")])]
-    return "\n".join(lines)
 
 
 def scan(ctx, directory):
@@ -158,7 +135,7 @@ def config(ctx, key, value):
     if value is None:
         raise UsageError("Usage: photo config [<key> <value>]")
     if not ctx.live:
-        # a change restarts Photo Sync's listener, which belongs to the running StarCore
+        # settings are changed in the running StarCore, the one that reads them
         raise Unavailable("changing Photo settings needs StarCore to be running - start it, then run this again")
     try:
         result = configuration.update(ctx.engine, satellite, key, value)
@@ -176,10 +153,10 @@ def _render_config(data: dict) -> str:
     if not settings:
         return "No configurable settings are registered."
     width = max(len(setting["key"]) for setting in settings)
-    lines = ["Photo Sync configuration", ""]
+    lines = ["Photo configuration", ""]
     lines += [f"{setting['key']:<{width}}  {setting['value']!r:<10}  {setting['description']}" for setting in settings]
     lines += ["", "Change a setting:  photo config <key> <value>",
-              "Changes are saved to config.toml immediately, and Photo Sync restarts on its own to apply them."]
+              "Changes are saved to config.toml and used straight away."]
     return "\n".join(lines)
 
 
@@ -196,16 +173,14 @@ COMMANDS = [
     Command("albums", "List albums and how many photos each holds", list_albums, READ,
             render=lambda data: table(data["albums"], [("name", "Album"), ("photos", "Photos"), ("kind", "Kind"),
                                                        ("id", "Id")]) or "No albums yet."),
-    Command("sync", "Photo sync status and recent uploads", sync_status, READ, render=_render_sync,
-            aliases=("sync-status",), examples=("photo sync", "photo sync --json")),
     Command("scan", "Preview what importing a directory would add, without importing", scan, MANAGE,
             arguments=(DIRECTORY,), remote=False, render=_render_scan,
             examples=("photo scan", "photo scan \"D:\\Pictures\\Phone\"")),
     Command("import", "Import a directory's photos and videos into the library", import_photos, MANAGE,
             arguments=(DIRECTORY,), mutates=True, render=_render_import, examples=("photo import ~/Pictures",)),
-    Command("config", "Show or change Photo Sync settings", config, MANAGE,
+    Command("config", "Show or change Photo settings", config, MANAGE,
             arguments=(Argument("key", "a setting name", required=False),
                        Argument("value", "its new value", required=False)),
             mutates=True, render=_render_config,
-            examples=("photo config", "photo config sync_port 8090")),
+            examples=("photo config", "photo config trash_retention_days 14")),
 ]

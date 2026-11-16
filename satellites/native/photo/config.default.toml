@@ -11,9 +11,3 @@ trash_retention_days = 30 # days a deleted photo stays in the recycle bin before
 # route every synced file to sync_default_path below.
 source_paths = []
 sync_default_path = "camera" # physical album a synced file joins when no source_paths entry matches its phone folder
-
-sync_enabled = true
-sync_host = "127.0.0.1" # set to "0.0.0.0" to let phones on the local network reach it
-sync_port = 8081
-sync_token = "" # generated and stored in the library on first start when empty
-sync_max_bytes = 536870912 # 512 MB per upload - phone video needs more headroom than photos ever did

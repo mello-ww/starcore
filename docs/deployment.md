@@ -164,7 +164,7 @@ host = "127.0.0.1"
 port = 8080
 ```
 
-`host = "0.0.0.0"` exposes Mission Control beyond localhost, on either platform. The same is true for the Photo Satellite's phone-sync listener, configured separately in `satellites/native/photo/config.toml` (`sync_host`, `sync_port`) - it already followed this same one-`config.toml`-per-component pattern before this milestone, so it wasn't changed.
+`host = "0.0.0.0"` exposes Mission Control beyond localhost, on either platform. No Satellite listens on a port of its own: everything goes through Mission Control's address.
 
 `[server]` doesn't have to be edited by hand. All three of the following read and write the exact same `config.toml`, through the same validation, and none of them ever claims a change is live - `[server]` is only read once at startup, so any of these always says a restart is required:
 
@@ -315,9 +315,6 @@ deployment:
   account itself, which is the supported way to reset a lost password: stop StarCore, delete
   `auth.json` from the application-data directory, start it again, and the setup screen
   reappears.
-- Photo Sync (`satellites/native/photo/sync.py`) keeps its own separate device-token
-  authentication on its own port - see "Photo Sync and authentication" in `docs/satellites/photo.md` -
-  and is unaffected by any of this.
 
 ## Runtime data location
 
