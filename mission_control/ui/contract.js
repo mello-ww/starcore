@@ -44,6 +44,10 @@ export const CLIENT_CAPABILITIES = new Set(["media.audio", "media.picker"]);
 export const CAPABILITY_VERSIONS = { "files.browse": [1], "audio.library": [1], "media.gallery": [1], "media.vault": [1] };
 // what a protected document (1.2) may name, and the operations its gate (ui/vault.js) calls
 export const PROTECTED_CAPABILITIES = { "media.vault": ["status", "unlock", "lock", "keep"] };
+// what the sync action (1.2) opens: {Satellite capability: the client capability that is the
+// client's own sync screen}. A browser can't back a device up in the background, so Mission
+// Control offers none of them and hides the control
+export const SYNC_CAPABILITIES = { "media.sync": "device.media-sync" };
 
 const RESERVED_SEGMENTS = new Set(["assets", "enable", "disable", "reload", "ui"]);
 const FIRST_SEGMENT = /^[A-Za-z0-9_-]+$/;
@@ -140,6 +144,16 @@ export function missingRequirements(requires, providers) {
 
 /** The first enabled Satellite that provides `name` in a protocol version
  * this client speaks, from GET /api/catalog's capabilities - or null. */
+/** Whether this client has the screen a sync action (1.2) opens: the client capability
+ * SYNC_CAPABILITIES names for its Satellite capability. */
+export function canOpenSync(action) {
+    const capability = action && action.sync && typeof action.sync === "object" ? action.sync.capability : undefined;
+    if (typeof capability !== "string" || !Object.hasOwn(SYNC_CAPABILITIES, capability)) {
+        return false;
+    }
+    return CLIENT_CAPABILITIES.has(SYNC_CAPABILITIES[capability]);
+}
+
 export function findProvider(providers, name) {
     const versions = CAPABILITY_VERSIONS[name] || [];
     const candidates = (providers && providers[name]) || [];

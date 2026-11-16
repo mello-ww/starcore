@@ -103,7 +103,7 @@ the owner 2026-11-15).
     settings, the app's background task, its tests and docs.
   - [x] **S1** - `media.sync` v1 in Photo: `check`, a resumable `upload` streamed to disk,
     `status`, `devices`; the Engine's device credential.
-  - [ ] **S2** - the `sync` action (contract change 4); Photo's button and Devices page.
+  - [x] **S2** - the `sync` action (contract change 4); Photo's button and Devices page.
   - [ ] **S3** - the app's sync: WorkManager, MediaStore detection, the local index, folders,
     Wi-Fi and charging rules, progress and errors. `App.tsx` no longer imports `src/photo/`.
   - [ ] **S4** - emulator runs, then the owner's phone.

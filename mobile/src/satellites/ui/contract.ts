@@ -94,6 +94,9 @@ export interface UiAction {
   /** 1.2: open the shared interface of a Satellite whose manifest says it is a section of this
    * one (section_of): its name, or a binding to it. */
   section?: Json;
+  /** 1.2: open this app's own sync screen for the Satellite's own provider of `capability`
+   * (src/satellites/ui/sync.ts); hidden where the app has no such screen. */
+  sync?: {capability: string};
 }
 
 /** One block. Deliberately loose: a document is network data, so every

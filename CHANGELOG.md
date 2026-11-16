@@ -78,6 +78,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **The `sync` action (UI contract 1.2, contract change 4):** `{"sync": {"capability": "media.sync"}}`
+  opens the client's own sync screen for the document's own provider; the document supplies
+  nothing of it, and a client without the screen hides the control. `media.sync` opens the
+  client capability `device.media-sync`, which replaces the reserved `device.background-tasks`.
+- **Photo's Phone backup page** (Albums' Phone backup button): each device that backs up to
+  Photo, when it was last seen and how many files it sent, and a "Back up this phone" button
+  hidden until the app has its sync screen (`docs/photos-parity-audit.md`, S2).
 - **Photo's phone backup, server side (`media.sync` v1):** `status`, `check` (what the server
   already has, erased and protected media included, without saying which), a resumable
   `upload` written straight to disk in chunks of 8 MiB and checked against its SHA-256, and

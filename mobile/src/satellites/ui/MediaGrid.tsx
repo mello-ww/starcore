@@ -982,13 +982,14 @@ export function ActionPill({
 
 /** The shared full-screen viewer: swipe between items, a video plays in place (only on the
  * page shown, so swiping away stops it), facts and actions come from the document. */
-/** Whether an action's control is drawn: a secure action only where it can run, a section only
- * where this app opens it (1.2). */
+/** Whether an action's control is drawn: a secure action only where it can run, a section or a
+ * sync only where this app opens it (1.2). */
 function canRun(context: BlockContext, action: any): boolean {
   if (action?.own !== undefined && !context.hasOwnScreens) {
     return false;  // an own action only where the app has the Satellite's own screens
   }
-  return (!action?.secure && action?.section === undefined) || Boolean(context.canRun?.(action));
+  const opens = action?.section !== undefined || action?.sync !== undefined;
+  return (!action?.secure && !opens) || Boolean(context.canRun?.(action));
 }
 
 /** An item's image URLs as the grid and the viewer load them: what leaves the image cache when

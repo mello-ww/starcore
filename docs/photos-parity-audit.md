@@ -141,7 +141,9 @@ each must move to the contract or to a generic capability before the stable rele
 **Status: approved by the owner (2026-11-15). S0 is done: the old sync is removed as the
 inventory below lists. S1 is done (2026-11-16): `media.sync` v1 in Photo and the Engine's
 device credentials** ("Phone backup" in [Photo](satellites/photo.md), "Device credentials" in
-[API](api.md)). Decisions 1 and 2 are taken; 3 waits for S3. Read from
+[API](api.md)). **S2 is done (2026-11-16): the `sync` action (contract change 4) and
+Photo's Phone backup page**; the button stays hidden on both clients until S3 gives the app
+`device.media-sync`. Decisions 1 and 2 are taken; 3 waits for S3. Read from
 the code at `5b716a9`. The old sync is removed entirely, then a real automatic backup is built
 as a generic capability. The common order with the Locked Folder is in
 [Remaining work](remaining-work.md).
@@ -264,7 +266,7 @@ The app finds the provider in the catalog and never names it.
 |---|---|---|---|---|
 | S0 (done) | Remove the old sync (the inventory above) | none; the reserved client name changes in S2 | as listed | Sonnet 5.5 high |
 | S1 (done) | `media.sync` v1 in the vocabulary and in Photo: the four routes, streamed to disk, digests of erased items; the Engine's device credentials if decision 1 says so | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `photo/backup.py` (new) and `api.py`, `library.py` (erase records the digest), `engine/starcore/auth.py` and `api/server.py` | Opus 5.5 xhigh |
-| S2 | The `sync` action and `device.media-sync`; Photo's button and Devices page | **contract change 4** | `ui_contract.py`, fixtures, both clients' contract and action runners, `photo/ui.json` | Opus 5.5 high |
+| S2 (done) | The `sync` action and `device.media-sync`; Photo's button and Devices page | **contract change 4** | `ui_contract.py`, fixtures, both clients' contract and action runners, `photo/ui.json` | Opus 5.5 high |
 | S3 | The app's sync: the Kotlin package (workers, MediaStore, index, uploader, notification), `mobile/src/sync/` (screen, state), the manifest, `App.tsx` | none | `mobile/android/app/src/main/java/.../sync/`, `mobile/src/sync/`, `AndroidManifest.xml` | Opus 5.5 xhigh |
 | S4 | Emulator runs from the table above; then the owner's phone | none | none | Opus 5.5 high |
 | S5 | Security review of S1 to S3 (the credential, the upload route, what the phone stores) | none | none | Fable 5.2 high |

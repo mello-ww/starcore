@@ -200,6 +200,8 @@ GET  /api/satellites/photo/gallery/trash      the recycle bin, with the days eac
 GET  /api/satellites/photo/gallery/import     the default import folder and the formats an import takes in
 GET  /api/satellites/photo/gallery/settings   what the shared Settings page edits: source_paths (each with its id), trash_retention_days,
                                               photo_directory and sync_default_path
+GET  /api/satellites/photo/gallery/backup     the Phone backup page: each device that backs up here, when it was last seen
+                                              and how many files it sent (refused to a device credential)
 GET  /api/satellites/photo/media?kinds=       media.gallery's list: what a media picker may offer
 GET  /api/satellites/photo/media/resolve/<id>  media.gallery's resolve: {id, kind} for a photo of the active library, 404 otherwise
 GET  /api/satellites/photo/media/original/<id> media.gallery's original, for the server alone (403 to a client): the stored original
@@ -318,6 +320,12 @@ one the map area stays blank and the Library, Search and viewer work as usual. D
 remain: on Android a cluster opens the viewer directly (the web shows its thumbnails first), and
 the web's single-photo popup is replaced by opening the viewer at once.
 
+**Phone backup** (Albums' Phone backup button) reads `gallery/backup`: each device that backs
+up here, newest first, when it was last seen (relative) and how many files it sent, the one
+asking marked "this device". Its "Back up this phone" button is the `sync` action (UI contract
+1.2): it opens the client's own sync screen for Photo's `media.sync`. Mission Control has none,
+and the app has none until S3, so both hide the button; the list is all the page shows there.
+
 **Settings** (Albums' Settings button) reads `gallery/settings` and saves each setting through
 the `configuration` route, one form each, as Photo's own page and screen do: the phone folders
 (`source_paths`) as a form field of repeatable rows (UI contract 1.2, "Repeatable rows"), each
@@ -430,7 +438,8 @@ restart.
 
 Photo provides `media.sync` v1 (`backup.py`): a one-way backup of a device's media into the
 library. The server side is done (S1 of [the parity audit](../photos-parity-audit.md), which
-holds the whole design); the app's side, `device.media-sync`, comes in S2 and S3. The previous
+holds the whole design); the shared interface's Phone backup page and its `sync` action are S2,
+and the app's own sync screen, `device.media-sync`, comes in S3. The previous
 phone sync - a standalone listener with one shared token, and `sync_upload` - is removed (S0).
 
 - **`status`** (`GET ?device=`) -> `{accepts: ["image", "video"], max_bytes, chunk_bytes,

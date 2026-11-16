@@ -309,6 +309,53 @@ class PhotoBackupTest(unittest.TestCase):
         self.assertFalse(by_name["Pixel 8"]["current"])
         self.assertTrue(by_name["Laptop"]["current"])
 
+    def test_the_phone_backup_page_shows_each_device(self):
+        self.backup("status?device=Laptop")
+        _status, issued = self.device()
+        self.backup("status?device=Pixel%208", token=issued["token"])
+        self.send_whole(png(10, 11), token=issued["token"])
+
+        status, payload = self.request("/api/satellites/photo/gallery/backup")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["summary"], "2 devices, 1 file received")
+        self.assertTrue(payload["note"])
+        by_kind = {device["kind"]: device for device in payload["devices"]}
+        phone = by_kind["device"]
+        self.assertEqual(phone["name"], "Pixel 8")
+        self.assertEqual((phone["received"], phone["files"], phone["current"]), (1, "1 file", False))
+        self.assertIsInstance(phone["last_seen"], int)
+        self.assertLessEqual(abs(phone["last_seen"] - time.time()), 120)
+        self.assertEqual(by_kind["web"]["name"], "Laptop (this device)")
+        self.assertEqual(by_kind["web"]["files"], "0 files")
+        self.assertTrue(by_kind["web"]["current"])
+
+        # a device credential reads none of it
+        self.assertEqual(self.request("/api/satellites/photo/gallery/backup", token=issued["token"])[0], 403)
+
+    def test_the_phone_backup_page_before_any_device(self):
+        status, payload = self.request("/api/satellites/photo/gallery/backup")
+        self.assertEqual(status, 200)
+        self.assertEqual((payload["devices"], payload["summary"]), ([], ""))
+
+    def test_the_phone_backup_view_names_an_unnamed_device_by_its_kind(self):
+        view = module("photo.gallery").backup_view([
+            {"name": None, "kind": "device", "last_seen": "2026-11-16T10:00:00+00:00", "received": 1234, "current": False},
+            {"name": None, "kind": "local", "last_seen": None, "received": "x", "current": True},
+        ])
+        self.assertEqual([row["name"] for row in view["devices"]], ["A phone", "This server (this device)"])
+        self.assertEqual([row["files"] for row in view["devices"]], ["1,234 files", "0 files"])
+        self.assertEqual([row["last_seen"] for row in view["devices"]], [1794823200, None])
+        self.assertEqual(view["summary"], "2 devices, 1,234 files received")
+
+    def test_the_document_offers_the_sync_of_photos_own_provider(self):
+        document = json.loads((Path(__file__).resolve().parents[2] / "satellites/native/photo/ui.json").read_text(encoding="utf-8"))
+        page = document["pages"]["backup"]
+        self.assertEqual(page["source"], {"route": "gallery/backup"})
+        actions = [block["action"] for block in page["blocks"] if block.get("type") == "button"]
+        self.assertEqual(actions, [{"sync": {"capability": "media.sync"}}])
+        albums = [block.get("action") for block in document["pages"]["albums"]["blocks"]]
+        self.assertIn({"navigate": "backup"}, albums)
+
     # ---------- the device credential ----------
 
     def test_a_device_credential_reaches_only_its_capabilitys_routes(self):

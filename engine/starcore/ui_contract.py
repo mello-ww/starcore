@@ -88,6 +88,10 @@ PICKABLE = {"media.gallery"}
 SECURE_OPERATIONS = {name: set(operations) for name, operations in VOCABULARY["secure_operations"].items()
                      if not name.startswith("_")}
 SECURE_ITEMS = "media.gallery"
+# what the sync action may open (1.2): {Satellite capability: the client capability whose screen
+# it opens} - the document's own Satellite must provide it
+SYNC_CAPABILITIES = {name: client for name, client in VOCABULARY["sync_capabilities"].items()
+                     if not name.startswith("_")}
 # a section of a Satellite's own interface, for the own action (1.2)
 OWN_SECTION = re.compile(r"[a-z][a-z0-9-]{0,31}")
 # a Satellite's name, for the section action (1.2)
@@ -1153,6 +1157,9 @@ class _Validator:
         if "section" in action:
             self.check_section(where, action)
             return
+        if "sync" in action:
+            self.check_sync(where, action)
+            return
         for kind in ("download", "share"):
             if kind in action:
                 self.check_file_action(where, action, kind)
@@ -1272,6 +1279,27 @@ class _Validator:
             self.error(f"{where}.section", "must be a Satellite's name or a binding to one")
         if self.in_bulk:
             self.error(f"{where}.section", "opens one section: not in a selection or a tile's quick actions")
+
+    def check_sync(self, where: str, action: dict):
+        """{sync: {capability}} (1.2): the client opens its own sync screen (the client
+        capability sync_capabilities names) for the document's own Satellite, which must provide
+        `capability`. The document supplies nothing else: no text, no route, no setting - the
+        screen is the client's and reaches the provider through the capability's operations
+        alone. A client without that screen hides the control."""
+        self.since(f"{where}.sync", "the sync action", 2)
+        self.unknown_keys(where, action, {"sync"})
+        sync = action["sync"]
+        if not isinstance(sync, dict) or set(sync) != {"capability"}:
+            self.error(f"{where}.sync", "must be {capability}")
+            return
+        capability = sync["capability"]
+        if not isinstance(capability, str) or capability not in SYNC_CAPABILITIES:
+            self.error(f"{where}.sync.capability", f"must be one of {sorted(SYNC_CAPABILITIES)}")
+            return
+        if self.in_bulk:
+            self.error(f"{where}.sync", "opens one screen: not in a selection or a tile's quick actions")
+        if self.provides is not None and capability not in self.provides:
+            self.error(f"{where}.sync", f"opens the Satellite's own {capability}, and it provides none")
 
     def check_upload(self, where: str, action: dict):
         """{upload: {multiple}, route, conflict?: {confirm?, route}, then?} (1.2): the person

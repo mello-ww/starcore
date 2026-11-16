@@ -14,6 +14,7 @@ GET gallery/trash             what's in the recycle bin, with the days each item
 GET gallery/import            the default import folder and the formats an import takes in
 GET gallery/search?q=&kind=   photos and albums matching a search, for the shared Search page
 GET gallery/map               every photo with a location, for the shared Map page
+GET gallery/backup            the devices that back up here (backup.py), for the Phone backup page
 GET media?kinds=              the media.gallery capability's list: what a picker may offer
 
 Every list of photos also takes `limit` (1-500) and `cursor`: it then answers one page, with the
@@ -521,6 +522,40 @@ def import_view(satellite) -> dict:
         "directory": satellite.config.get("photo_directory", "") or "",
         "formats": f"Takes in {', '.join(name.upper() for name in formats)} files. Originals are never moved, "
                    "changed or deleted, and importing the same folder twice is safe.",
+    }
+
+
+# who sent a backup, when it names no device: by the kind of its credential (AuthStore.caller)
+UNNAMED_DEVICES = {"device": "A phone", "mobile": "The StarCore app", "web": "A browser",
+                   "local": "This server"}
+
+
+def backup_view(devices: list) -> dict:
+    """What the shared Phone backup page shows: each device that backed up here (backup.py's
+    devices, newest first), when it was last seen as Unix seconds and how many files it sent,
+    the one asking marked. A phone backs up from the app's own sync screen, which the page's
+    sync action opens; nothing here starts or sets a backup."""
+    rows = []
+    for device in devices:
+        received = device.get("received") or 0
+        received = received if isinstance(received, int) and received >= 0 else 0
+        name = device.get("name") or UNNAMED_DEVICES.get(device.get("kind"), "A device")
+        rows.append({
+            "name": f"{name} (this device)" if device.get("current") else name,
+            "kind": device.get("kind"),
+            "last_seen": _epoch(_moment(device.get("last_seen"))),
+            "received": received,
+            "files": "1 file" if received == 1 else f"{received:,} files",
+            "current": bool(device.get("current")),
+        })
+    count = len(rows)
+    total = sum(row["received"] for row in rows)
+    return {
+        "devices": rows,
+        "summary": (f"{count} device{'' if count == 1 else 's'}, "
+                    f"{total:,} file{'' if total == 1 else 's'} received") if rows else "",
+        "note": "A phone backs up its photos and videos here from the StarCore app, in the background. "
+                "What the library already has, or what was deleted from the recycle bin, is never sent again.",
     }
 
 

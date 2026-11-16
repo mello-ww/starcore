@@ -634,6 +634,20 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
   - A literal name the client can't open (not a section of this Satellite, or nothing it can
     draw) hides the control. A binding is checked when pressed, and says so as a notice.
   - Not in a selection or a tile's quick actions.
+- **`sync`** (1.2), on its own: `{"sync": {"capability": "media.sync"}}` opens the **client's own
+  sync screen** for the document's own provider of that capability, and nothing else.
+  - The vocabulary's `sync_capabilities` names which screen: `media.sync` opens
+    `device.media-sync`, the client's background backup of the device's media.
+  - The document's own Satellite must provide the capability (checked at load, from its
+    manifest); the client takes its enabled provider from the catalog, never another
+    Satellite's.
+  - The document supplies no text, route or setting of the sync: the screen is the client's,
+    and reaches the provider through the capability's operations alone.
+  - A client without that client capability hides the control, and says so as a notice if the
+    action runs from elsewhere (a list row). Mission Control has none (a browser can't back up
+    in the background); the app's comes with its sync screen (S3 of
+    [the parity audit](photos-parity-audit.md)).
+  - Not in a selection or a tile's quick actions.
 - **`download`** and **`share`** (1.2): `{"download": "originals/{$.id}", "name": "$.title"}`
   fetches one of the Satellite's own routes with the client's own session, then saves the file
   (download) or hands it to the system share sheet (share), named `name` (else the route's last
@@ -809,7 +823,7 @@ says so in place, and a document that `requires` it is not opened.
 | `audio.session` | 1 | `queue`; optional `history`, `radio`, `preferences`, `favorites`, `stream`, `connect` - see [Audio playback](media-audio.md) | none; the audio host uses it beside the same Satellite's `audio.library` |
 | `media.vault` | 1 | `status`, `unlock` (`for` asks for a single-use grant for one move; without it, an unlock of this session that ends after `idle_seconds` without use), `lock`, `move_in` (`{items: [reference], grant?}`); optional `keep` (`POST` -> `{expires_at}`, restarts the idle time), `biometric` (`challenge {key_id, for?}`: the purpose is fixed with the challenge, never beside the signature) and, for the server alone, `sealed` (`GET /<sha256>` -> `{sealed}`, asked of every provider by `starcore.capabilities.sealed`) - see "Moves from a shared interface" in [the Locked Folder](satellites/locked_folder.md) | none: the `secure` action and protected documents use it, through each client's own unlock prompt. It has no operation that lists or reads what it holds |
 | `files.protected` | 1 | `check`: `GET ?path=<absolute path>[&tree=1]` -> `{protected, open, message?}`: whether the path is in a protected area (with `tree=1`, or contains one), and whether this session may reach it now - see "Every Satellite asks the Engine" in [the Locked Folder](satellites/locked_folder.md) | none: server-side only, and `check` refuses a client's request (`403`). The Engine asks every provider, enabled or not (`starcore.capabilities.protection`), before File Explorer, Photo or Music touch a path; a provider that fails keeps the path closed |
-| `media.sync` | 1 | `status` (`GET ?device=` -> `{accepts, max_bytes, chunk_bytes, device}`), `check` (`POST {items: [{sha256, size}]}`, at most 500 -> `{known, wanted}`), `upload` (`GET /<sha256>` -> `{offset}`; `POST /<sha256>?offset=&size=&name=&folder=&taken=` with raw bytes -> `{offset}`, or at the last byte `{status, id, offset}`); optional `devices` (`GET` -> `{devices}`). `"device_credentials": true`: the Engine issues a credential that reaches only these routes - see "Phone backup" in [Photo](satellites/photo.md) | none yet: the app's background backup (`device.media-sync`, S2 and S3 of [the parity audit](photos-parity-audit.md)) |
+| `media.sync` | 1 | `status` (`GET ?device=` -> `{accepts, max_bytes, chunk_bytes, device}`), `check` (`POST {items: [{sha256, size}]}`, at most 500 -> `{known, wanted}`), `upload` (`GET /<sha256>` -> `{offset}`; `POST /<sha256>?offset=&size=&name=&folder=&taken=` with raw bytes -> `{offset}`, or at the last byte `{status, id, offset}`); optional `devices` (`GET` -> `{devices}`). `"device_credentials": true`: the Engine issues a credential that reaches only these routes - see "Phone backup" in [Photo](satellites/photo.md) | none; the `sync` action opens the client's own sync screen for it (`device.media-sync`, the app's from S3 of [the parity audit](photos-parity-audit.md)) |
 
 A capability's operations are required unless the vocabulary lists them under
 `optional_operations`. An operation the version doesn't define is a problem too, so a typo
@@ -1043,7 +1057,7 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 |---|---|---|
 | Blocks | the 22 above, including `chart`, `table`, `image`, `media-list`, `media-grid`, `search`, `map` and `breadcrumb`; the `dashboard` template | more, minor by minor: `tabs`; templates `list-detail`, `settings`, `media-library` |
 | Satellite capabilities | `files.browse` (File Explorer), `audio.library` and `audio.session` (Music), `media.gallery` (Photo), `media.vault` (Locked Folder, `move_in` only through the `secure` action), `files.protected` (Locked Folder, asked by the Engine only), `media.sync` (Photo, a device's backup) | more pickable capabilities (files) |
-| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action and protected documents; `secure.screen` on Android; saving, sharing and opening files (`download`, `share`); sending files (`upload`) | `device.background-tasks` (phone sync) - a native module written once in the app, behind a shared block |
+| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action and protected documents; `secure.screen` on Android; saving, sharing and opening files (`download`, `share`); sending files (`upload`) | `device.media-sync` (the app's background backup, opened by the `sync` action) - a native module written once in the app |
 | Home | `widgets` in each document, drawn by both clients | |
 | Sections | `section_of` and the `section` action; a host lists its sections from the Engine's registry | |
 | Icons | `icon_name` from the shared set, a neutral circle without one | Satellite-provided icons |

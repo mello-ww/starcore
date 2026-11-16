@@ -127,6 +127,23 @@ class DocumentFixturesTest(unittest.TestCase):
         self.assertTrue(any("media.gallery" in error for error in errors), errors)
         self.assertTrue(ui_contract.validate(document, {}))
 
+    def test_a_sync_action_opens_only_the_satellites_own_provider(self):
+        # known only at load, from the Satellite's manifest: the client's sync screen backs up to
+        # the document's own Satellite, so it must provide the capability
+        document = next(case["document"] for case in fixture("documents.json")["valid"] if case["name"] == "sync-action")
+        sync = {"media.sync": {"version": 1, "operations": {"status": "backup/status", "check": "backup/check",
+                                                            "upload": "backup/upload"}}}
+        self.assertEqual(ui_contract.validate(document, sync), [])
+        errors = ui_contract.validate(document, {"media.gallery": {"version": 1, "operations": {"list": "media"}}})
+        self.assertTrue(any("media.sync" in error for error in errors), errors)
+        self.assertTrue(ui_contract.validate(document, {}))
+
+    def test_every_sync_capability_opens_a_reserved_client_capability(self):
+        self.assertEqual(ui_contract.SYNC_CAPABILITIES, {"media.sync": "device.media-sync"})
+        for name, client in ui_contract.SYNC_CAPABILITIES.items():
+            self.assertIn(name, ui_contract.SATELLITE_CAPABILITIES)
+            self.assertIn(client, ui_contract.VOCABULARY["client_capabilities"]["reserved"])
+
     def test_the_vault_offers_every_operation_a_secure_action_may_ask_for(self):
         import tomllib
         manifest = tomllib.loads((REPO / "satellites/native/locked_folder/satellite.toml").read_text(encoding="utf-8"))

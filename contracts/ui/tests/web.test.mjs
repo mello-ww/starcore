@@ -23,6 +23,26 @@ test("the vocabulary is the shared one", () => {
     }
     const isProtected = Object.fromEntries(Object.entries(vocabulary.protected_capabilities).filter(([name]) => !name.startsWith("_")));
     assert.deepEqual(contract.PROTECTED_CAPABILITIES, isProtected);
+    const sync = Object.fromEntries(Object.entries(vocabulary.sync_capabilities).filter(([name]) => !name.startsWith("_")));
+    assert.deepEqual(contract.SYNC_CAPABILITIES, sync);
+    for (const client of Object.values(sync)) {
+        assert.ok(vocabulary.client_capabilities.reserved.includes(client), client);
+    }
+});
+
+test("a sync action opens only a sync screen this client has", () => {
+    // Mission Control can't back a device up in the background: it has no such screen
+    assert.equal(contract.canOpenSync({ sync: { capability: "media.sync" } }), false);
+    assert.equal(contract.canOpenSync({ sync: { capability: "toString" } }), false);
+    assert.equal(contract.canOpenSync({ sync: "media.sync" }), false);
+    assert.equal(contract.canOpenSync({ navigate: "home" }), false);
+    contract.CLIENT_CAPABILITIES.add("device.media-sync");
+    try {
+        assert.equal(contract.canOpenSync({ sync: { capability: "media.sync" } }), true);
+        assert.equal(contract.canOpenSync({ sync: { capability: "media.gallery" } }), false);
+    } finally {
+        contract.CLIENT_CAPABILITIES.delete("device.media-sync");
+    }
 });
 
 test("bindings", () => {

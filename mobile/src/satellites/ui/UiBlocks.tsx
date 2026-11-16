@@ -707,8 +707,9 @@ function ButtonBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
     return null; // opens native screens this app doesn't have for the Satellite
   }
   const files = block.action?.download !== undefined || block.action?.share !== undefined || block.action?.upload !== undefined;
-  if ((files || block.action?.section !== undefined) && !context.canRun?.(block.action)) {
-    return null; // files this phone can't save, share or send here, or a Satellite it doesn't open
+  const opens = block.action?.section !== undefined || block.action?.sync !== undefined;
+  if ((files || opens) && !context.canRun?.(block.action)) {
+    return null; // files this phone can't save, share or send here, or a screen it doesn't have
   }
   const label = asText(resolve(block.label, scope));
   const danger = block.style === 'danger';

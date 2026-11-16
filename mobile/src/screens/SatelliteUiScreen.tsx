@@ -30,6 +30,7 @@ import {
   type GridPages, type OfflineEntry,
 } from '../satellites/ui/offline';
 import {runSecure, secureRunner, type GrantRequest, type SecurePrompt, type SecurePromptProps} from '../satellites/ui/secure';
+import {SYNC_SCREEN, syncTarget} from '../satellites/ui/sync';
 import {VaultApi} from '../vault/api';
 import {attachGate, createVaultGate, protectedProvider, type GateAttachment, type GateState} from '../vault/gate';
 import {VAULT_GRANT_PROMPT} from '../vault/VaultGrantPrompt';
@@ -658,6 +659,17 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         (navigation as any).push(screen, {section: String(action.own)});
         return true;
       }
+      if (action.sync !== undefined) {
+        // 1.2: the app's own sync screen for this Satellite's provider - pushed over this one;
+        // the document supplies nothing of it
+        const target = syncTarget(action, providers, name);
+        if (!target) {
+          showToast("That isn't available in this app.", true);
+          return false;
+        }
+        (navigation as any).push(SYNC_SCREEN, {satellite: target.provider.satellite, capability: target.capability});
+        return true;
+      }
       if (action.download !== undefined || action.share !== undefined) {
         // 1.2: a file from the Satellite's own route, fetched with this session by the app's own
         // module: saved to Downloads, opened in the phone's own viewer (`open`), or handed to the
@@ -913,7 +925,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const runSecureRef = useRef(runSecureAction);
   runSecureRef.current = runSecureAction;
   // whether an action's control is drawn here: a secure action only where it can run, a section
-  // only where this app opens it (a binding is checked when pressed), and download, open, share or
+  // only where this app opens it (a binding is checked when pressed), a sync only where this app
+  // has that sync screen for this Satellite's own provider, and download, open, share or
   // upload only where this phone can (saving needs Android 10 or later). A protected document
   // shares nothing, and opens nothing in another app: that would leave a copy in the app's cache.
   const canRun = useCallback(
@@ -924,7 +937,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       (action?.section === undefined ||
         (typeof action.section === 'string' && action.section.startsWith('$')) ||
         opensHosted(hostedSatellite(satellites, name, action.section))) &&
-      (!action?.secure || Boolean(secureRunner(action, providers, name, SECURE_PROMPTS))),
+      (!action?.secure || Boolean(secureRunner(action, providers, name, SECURE_PROMPTS))) &&
+      (action?.sync === undefined || Boolean(syncTarget(action, providers, name))),
     [providers, name, gated, satellites],
   );
 

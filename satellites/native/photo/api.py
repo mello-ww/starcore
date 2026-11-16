@@ -62,6 +62,8 @@ def gallery_route(request):
             return json_response(gallery.import_view(request.satellite))
         if path == ("settings",):
             return json_response(gallery.settings_view(request.satellite))
+        if path == ("backup",):
+            return json_response(gallery.backup_view(backup.device_list(request)))
         if path == ("map",):
             return json_response(gallery.map_view(request.satellite, gallery.viewport(request.query),
                                                   overview=request.query.get("overview") == "1"))

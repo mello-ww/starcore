@@ -186,10 +186,14 @@ def devices(request):
     device credential, which reads nothing."""
     if request.method != "GET":
         return error_response("only GET is supported here", status=405)
-    caller = _caller(request)
-    if caller["kind"] == "device":
+    if _caller(request)["kind"] == "device":
         return error_response("a device credential can't list devices", status=403)
-    return json_response({"devices": backup(request.satellite).devices(caller["id"])})
+    return json_response({"devices": device_list(request)})
+
+
+def device_list(request) -> list:
+    """Who backs up here, newest first, `current` marking the caller of this request."""
+    return backup(request.satellite).devices(_caller(request)["id"])
 
 
 # ---------- the store ----------

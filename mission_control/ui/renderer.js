@@ -10,7 +10,7 @@
 
 import { createChart, meter, sparkline } from "./charts.js";
 import {
-    BLOCK_TYPES, checkDocument, findProvider, formatValue, isSafeRoute, isVisible,
+    BLOCK_TYPES, canOpenSync, checkDocument, findProvider, formatValue, isSafeRoute, isVisible,
     missingRequirements, resolve, resolveTemplate, toneOf,
 } from "./contract.js";
 import { emptyRow, formBody, formProblem, formValues } from "./forms.js";
@@ -176,11 +176,13 @@ export function mount(context) {
     // the media-grid block and its viewer (1.2), which keep their own state across renders
     // whether an action's control is drawn here: a secure action only where it can run, an own
     // action only where this Satellite has an own interface, a section only where the host can
-    // open it, and share only where this browser can hand a file to the system share sheet -
-    // never in a protected document, which shares nothing
+    // open it, a sync only where this client has that sync screen (never so far), and share only
+    // where this browser can hand a file to the system share sheet - never in a protected
+    // document, which shares nothing
     function canRun(action) {
         return !action || ((action.own === undefined || Boolean(own))
             && (action.section === undefined || canOpenSection(action.section))
+            && (action.sync === undefined || canOpenSync(action))
             && (action.share === undefined || (!isProtected() && canShareFiles(globalThis.navigator)))
             && (!action.secure || Boolean(secureProvider(action, state.catalog && state.catalog.capabilities, satelliteName))));
     }
@@ -675,6 +677,12 @@ export function mount(context) {
                 return false;
             }
             return true;
+        }
+        if (action.sync !== undefined) {
+            // 1.2: the client's own sync screen - a browser has none, so the control is hidden
+            // (canRun) and this is only reached from a row or tile that drew it anyway
+            setNotice("That isn't available in Mission Control.", "error");
+            return false;
         }
         if (action.download !== undefined || action.share !== undefined) {
             // 1.2: a file from the Satellite's own route, with this session: saved, opened in a
