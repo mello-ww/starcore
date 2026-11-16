@@ -62,6 +62,18 @@ object MediaScanner {
     /** The collections the backup watches for new media. */
     fun watched(): List<Uri> = listOf(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
 
+    /** MediaStore's state, one generation per volume: it differs after any change to the
+     * phone's media. Null before Android 11, which has no generations. */
+    fun state(context: Context): String? {
+        if (Build.VERSION.SDK_INT < 30) return null
+        return try {
+            MediaStore.getExternalVolumeNames(context).sorted()
+                .joinToString(",") { "$it:${MediaStore.getGeneration(context, it)}" }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** Every image and video outside the excluded folders. */
     fun scan(context: Context, excluded: Set<String>): List<MediaEntry> {
         val entries = mutableListOf<MediaEntry>()

@@ -121,9 +121,16 @@ class SyncStore(context: Context) {
         prefs.edit().putString("$server.run", json.toString()).apply()
     }
 
-    /** Everything kept for a server: its settings, credential and run state. */
+    /** MediaStore's state (MediaScanner.state) when the last run scanned for this server. */
+    fun scannedAt(server: String): String? = prefs.getString("$server.scanned", null)
+
+    fun saveScannedAt(server: String, state: String) {
+        prefs.edit().putString("$server.scanned", state).apply()
+    }
+
+    /** Everything kept for a server: its settings, credential, run state and scan state. */
     fun forget(server: String) {
-        prefs.edit().remove("$server.config").remove("$server.token").remove("$server.run").apply()
+        prefs.edit().remove("$server.config").remove("$server.token").remove("$server.run").remove("$server.scanned").apply()
     }
 
     private fun key(): SecretKey {

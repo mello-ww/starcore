@@ -29,7 +29,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, p
         // a new image or video starts the next run
         SyncScheduler.watch(applicationContext, server)
         var foreground = false
-        val retry = SyncRun(applicationContext, store, config, { isStopped }) { done, total ->
+        val run = SyncRun(applicationContext, store, config, { isStopped }) { done, total ->
             if (total == 0) return@SyncRun
             val notification = SyncNotifications.progress(applicationContext, done, total)
             if (!foreground) {
@@ -43,7 +43,11 @@ class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, p
             if (foreground) {
                 SyncNotifications.show(applicationContext, notification)
             }
-        }.run()
+        }
+        val retry = run.run()
+        // an item left to retry after its backoff gets a run of its own then, not at the next
+        // periodic one
+        if (!isStopped) run.later?.let { SyncScheduler.later(applicationContext, config, it) }
         return if (retry) Result.retry() else Result.success()
     }
 

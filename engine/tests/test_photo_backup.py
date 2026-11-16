@@ -19,6 +19,7 @@ import io
 import json
 import os
 import shutil
+import socket
 import tempfile
 import time
 import tracemalloc
@@ -186,6 +187,29 @@ class PhotoBackupTest(unittest.TestCase):
 
         # sent again in full: a duplicate, taken in once
         self.assertEqual(self.send_whole(data)[1]["status"], "duplicate")
+
+    def test_a_sender_gone_silent_mid_chunk_does_not_hold_the_file(self):
+        # the phone lost its network mid-chunk: its connection stays open but nothing more arrives
+        data = png(64, 48, b"\x30\x60\x90")
+        digest, size = sha(data), len(data)
+        half = size // 2
+        head = (f"POST /api/satellites/photo/backup/upload/{digest}?offset=0&size={size} HTTP/1.1\r\n"
+                f"Host: 127.0.0.1\r\nAuthorization: Bearer {self.token}\r\n"
+                f"Content-Type: application/octet-stream\r\nContent-Length: {size}\r\n\r\n").encode()
+        with mock.patch("starcore.api.server.RAW_BODY_TIMEOUT", 1), \
+                socket.create_connection(("127.0.0.1", self.engine.api.port), timeout=15) as stalled:
+            stalled.sendall(head + data[:half])
+            answer = b""
+            while chunk := stalled.recv(65536):  # the server answers, then closes the connection
+                answer += chunk
+        self.assertTrue(answer.startswith(b"HTTP/1.0 400") or answer.startswith(b"HTTP/1.1 400"), answer[:40])
+
+        # the file is free again: the next attempt goes on from what the server kept
+        status, payload = self.backup(f"upload/{digest}")
+        held = payload["offset"]
+        self.assertLessEqual(held, half)
+        self.assertEqual(self.send(digest, data[held:], held, size),
+                         (200, {"status": "imported", "id": digest[:16], "offset": size}))
 
     def test_a_folder_without_a_mapping_lands_in_the_default_album_and_a_video_keeps_its_date(self):
         data = png(12, 9, b"\x20\x20\x20")

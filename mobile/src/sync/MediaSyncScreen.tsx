@@ -28,6 +28,7 @@ const ACCESS_NOTICES: Record<Exclude<AccessOutcome, 'full'>, string> = {
   denied: 'A backup needs to read your photos and videos.',
   blocked: "A backup needs to read your photos and videos. Allow them in this app's settings.",
 };
+const ACCESS_TEXTS = new Set<string>(Object.values(ACCESS_NOTICES));
 
 type Props = {route: {params?: {satellite?: string; capability?: string}}};
 
@@ -119,9 +120,19 @@ export function MediaSyncScreen({route}: Props) {
   const access = state?.access;
   useEffect(() => {
     if (access === 'full') {
+      // access given in the system settings settles what was asked of the person
+      setNeedsSettings(false);
+      setNotice(current => (current && ACCESS_TEXTS.has(current) ? null : current));
+    }
+  }, [access]);
+
+  // each finished run follows new media, so the folders' counts are read again then
+  const lastRun = state?.lastRun;
+  useEffect(() => {
+    if (access === 'full') {
       loadFolders();
     }
-  }, [access, loadFolders]);
+  }, [access, lastRun, loadFolders]);
 
   const run = async (work: () => Promise<unknown>) => {
     setBusy(true);

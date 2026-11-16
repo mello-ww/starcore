@@ -90,7 +90,12 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   "Use mobile data" is on; "Only while charging" if chosen; never on a low battery. It shows
   where it stands and what failed, with "Try again". It uses a device credential limited to
   the backup, kept under an Android Keystore key, and revoked when you sign out
-  (`docs/photos-parity-audit.md`, S3).
+  (`docs/photos-parity-audit.md`, S3). Tried on the emulator (S4): an item that failed is tried
+  again when its backoff is over, not at the next six-hour run, and a photo taken while the
+  app's process was dead is caught when the process starts.
+- **The Engine ends an upload that goes silent:** a raw request body (an upload's chunk) that
+  sends nothing for 60 seconds is ended there, its connection closed; what arrived is kept, so
+  a phone that lost its network resumes from it instead of finding the file still being sent.
 - **Photo's Phone backup page** (Albums' Phone backup button): each device that backs up to
   Photo, when it was last seen and how many files it sent, and a "Back up this phone" button
   that opens the app's sync screen; Mission Control hides it (`docs/photos-parity-audit.md`,

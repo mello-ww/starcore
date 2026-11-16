@@ -42,6 +42,9 @@ RELOAD_SEGMENT = "reload"
 UI_SEGMENT = "ui"
 
 FILE_CHUNK = 64 * 1024
+# how long a streamed (non-JSON) request body may go without a byte arriving
+# before the server gives up on it
+RAW_BODY_TIMEOUT = 60
 
 # headers a reverse proxy adds to say who it is forwarding for. A request from
 # this machine that carries one of them came through a proxy (nginx sets both
@@ -455,8 +458,22 @@ class RequestHandler(BaseHTTPRequestHandler):
                 length = self._content_length()
                 if length is None:
                     return  # a clean error response was already sent
+                # a client that goes silent mid-body (its network dropped) would
+                # otherwise hold this thread, and whatever the handler reserved
+                # for the upload, until the half-open connection dies on its own
+                self.connection.settimeout(RAW_BODY_TIMEOUT)
                 raw = RawBody(self.rfile, length)
 
+        try:
+            self._run_satellite_route(engine, satellite, segments, path, method, handler, body, raw)
+        finally:
+            if raw is not None:
+                self.connection.settimeout(None)
+                if not raw.finished:
+                    # what is left of the body would be read as the next request
+                    self.close_connection = True
+
+    def _run_satellite_route(self, engine, satellite, segments, path, method, handler, body, raw):
         query = {key: values[-1] for key, values in parse_qs(urlparse(self.path).query).items()}
         request = Request(engine, satellite, method, tuple(segments[2:]), query, body, raw, token=self._session_token)
 

@@ -15,6 +15,7 @@ import com.starcore.mobile.media.PlayerRegistry
 import com.starcore.mobile.privacy.PrivacyPackage
 import com.starcore.mobile.buildinfo.BuildInfoPackage
 import com.starcore.mobile.sync.SyncPackage
+import com.starcore.mobile.sync.SyncScheduler
 
 /**
  * Standard React Native application bootstrap - autolinking (via
@@ -49,5 +50,7 @@ class MainApplication : Application(), ReactApplication {
         if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
             load()
         }
+        // the background backup catches up on media changed while the process was dead
+        SyncScheduler.catchUp(this)
     }
 }

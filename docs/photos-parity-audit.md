@@ -270,7 +270,7 @@ The app finds the provider in the catalog and never names it.
 | S1 (done) | `media.sync` v1 in the vocabulary and in Photo: the four routes, streamed to disk, digests of erased items; the Engine's device credentials if decision 1 says so | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `photo/backup.py` (new) and `api.py`, `library.py` (erase records the digest), `engine/starcore/auth.py` and `api/server.py` | Opus 5.5 xhigh |
 | S2 (done) | The `sync` action and `device.media-sync`; Photo's button and Devices page | **contract change 4** | `ui_contract.py`, fixtures, both clients' contract and action runners, `photo/ui.json` | Opus 5.5 high |
 | S3 (done) | The app's sync: the Kotlin package (workers, MediaStore, index, uploader, notification), `mobile/src/sync/` (screen, state), the manifest, `App.tsx` | none | `mobile/android/app/src/main/java/.../sync/`, `mobile/src/sync/`, `AndroidManifest.xml` | Opus 5.5 xhigh |
-| S4 | Emulator runs from the table above; then the owner's phone | none | none | Opus 5.5 high |
+| S4 (emulator done but the reboot) | Emulator runs from the table above; then the owner's phone | none | the fixes below: `engine/starcore/api/response.py` and `server.py`, the Kotlin sync package, `MainApplication.kt`, `MediaSyncScreen.tsx` | Opus 5.5 high |
 | S5 | Security review of S1 to S3 (the credential, the upload route, what the phone stores) | none | none | Fable 5.2 high |
 
 ### What S3 built
@@ -293,6 +293,54 @@ The app finds the provider in the catalog and never names it.
   starts a run (under the same constraints) when it opens and comes back to the front.
 - **Build:** WorkManager 2.9.1, and Guava 33.0.0-android declared for compiling (it was
   already in the app at runtime; WorkManager's futures need it).
+
+### What S4 found
+
+The emulator runs, on Android 17 (API 37, 16 KB pages) with the release build against an
+isolated demo engine:
+
+| Run | Result |
+|---|---|
+| Permission dialogs: refused, selected photos only, all photos | pass, after fix 1 |
+| A file pushed to `DCIM/Camera` with the app in the background | sent within the content trigger's delay (15 s to 2 min) |
+| A folder turned off | its files are not sent |
+| Airplane mode in the middle of a 120 MB video, for 23 s and for over a minute | resumes from the server's offset once the network is back, after fix 2 |
+| The app's process killed, then a new photo | sent 22 s later, after fix 3 |
+| Mobile data only, "Use mobile data" off | waits ("Waiting for Wi-Fi"); sent once the switch is on |
+| "Only while charging" on, charger unplugged | waits ("Waiting for the charger"); sent 12 s after plugging in |
+| Doze forced | the watch and the run wait; sent seconds after Doze ends |
+| A reboot | not finished: until the first unlock nothing runs (WorkManager schedules its work again on `BOOT_COMPLETED`), and the emulator's screen lock is the owner's to enter |
+
+Fixes:
+
+1. **The screen after "all photos" in the system settings.** Coming back from the settings
+   with full access, the screen kept its "Open settings" button and notice. It now clears them
+   whenever the access changes, and reads the folders again after each finished run.
+2. **No resume after a network cut.** The phone's request stalled without an error; the server
+   kept the file claimed by that request, so the next one got "being sent already" until the
+   next periodic run. The Engine now ends a raw request body that stays silent for 60 seconds
+   (`RAW_BODY_TIMEOUT`): the bytes received are kept, the file is released and the connection
+   is closed. The app also schedules a run for when the soonest failed item's backoff is over
+   (the `later` work), instead of waiting six hours.
+3. **A change while the app's process is dead.** WorkManager 2.9.1 cancels the content-trigger
+   job that starts the dead process, within milliseconds, so the change that woke it was lost
+   until the next run. The cause is inside WorkManager's start-up reconciliation; 2.10 needs
+   `compileSdk` 35, a change to the whole Android build. The app now compares MediaStore's
+   generations with those of the last scan when its process starts, and starts a run when they
+   differ (`SyncScheduler.catchUp`).
+
+Notes:
+
+- A cold start of the app shows the server list: the opening run starts once a server is
+  chosen. A dead process woken by a change is covered by fix 3.
+- The app never asks for `POST_NOTIFICATIONS`: the progress notification shows only if
+  notifications are allowed for the app. A run started in the background may be refused the
+  foreground notification; it goes on without it.
+- A run over mobile data can start a minute or two after it is allowed: Android's flexible
+  job scheduling.
+- If the process dies at the very moment a change wakes it, that change waits for the next run
+  (opening the app, the next change, or the six-hour run).
+- "Backed up from this phone" counts the items of the folders backed up now.
 
 ### Decisions for the owner
 

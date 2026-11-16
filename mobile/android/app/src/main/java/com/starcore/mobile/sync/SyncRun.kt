@@ -20,6 +20,11 @@ class SyncRun(
     private val stopped: () -> Boolean,
     private val progress: (done: Int, total: Int) -> Unit,
 ) {
+    /** After a run that went through: how long until the soonest failed item may be tried
+     * again (SyncRules.laterDelay), so a run is scheduled for it; null when none waits. */
+    var later: Long? = null
+        private set
+
     /** true when the run should be rescheduled with backoff. */
     fun run(): Boolean {
         val server = config.server
@@ -34,7 +39,10 @@ class SyncRun(
         }
         val client = SyncClient(config, token)
         return try {
-            SyncIndex(context, server).use { index -> sync(client, index) }
+            SyncIndex(context, server).use { index ->
+                sync(client, index)
+                later = SyncRules.laterDelay(index.nextDue(), System.currentTimeMillis())
+            }
             false
         } catch (stop: RunStopped) {
             store.saveRun(server, stop.phase)
@@ -48,7 +56,10 @@ class SyncRun(
     private fun sync(client: SyncClient, index: SyncIndex) {
         val server = config.server
         store.saveRun(server, Phases.SCANNING)
+        // read before the scan, so a change made during it is seen as new (SyncScheduler.catchUp)
+        val state = MediaScanner.state(context)
         index.reconcile(MediaScanner.scan(context, config.excluded))
+        if (state != null) store.saveScannedAt(server, state)
         index.releaseDue(System.currentTimeMillis())
 
         val status = client.status()

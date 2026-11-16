@@ -77,6 +77,8 @@ object SyncRules {
     const val DEFAULT_CHUNK = 8L * 1024 * 1024
     /** never more per request than this, whatever the provider says */
     const val MAX_CHUNK = 64L * 1024 * 1024
+    /** the shortest wait before a run scheduled for a failed item's retry */
+    const val MIN_LATER = 15_000L
     private const val FIRST_BACKOFF = 60_000L
     private const val MAX_BACKOFF = 6 * 60 * 60_000L
     private val ROUTE = Regex("^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$")
@@ -144,6 +146,15 @@ object SyncRules {
         }
         val removed = indexed.keys.filter { it !in seen }.sorted()
         return Reconciled(added, changed, removed)
+    }
+
+    /** How long after a run the next one should start so that the soonest failed item is retried
+     * once its backoff is over (`nextDue`, from the index), or null when no item waits on its own
+     * backoff. Never less than MIN_LATER, so an item that came due during the run doesn't start
+     * a run at once. */
+    fun laterDelay(nextDue: Long?, now: Long): Long? {
+        if (nextDue == null || nextDue == Long.MAX_VALUE) return null
+        return maxOf(nextDue - now, MIN_LATER)
     }
 
     /** Whether a failed item may be tried again now (its backoff is over). */

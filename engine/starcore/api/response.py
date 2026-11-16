@@ -82,13 +82,30 @@ class RawBody:
         self._rfile = rfile
         self.length = length
         self._remaining = length
+        # True once the body stopped arriving (the client went silent past the
+        # server's read timeout, or the connection dropped): read() then ends it
+        # early, so the handler keeps what came and answers instead of waiting
+        # forever, and the connection is closed afterwards
+        self.cut = False
 
     def read(self, size: int = 65536) -> bytes:
         if self._remaining <= 0:
             return b""
-        chunk = self._rfile.read(min(size, self._remaining))
+        try:
+            chunk = self._rfile.read(min(size, self._remaining))
+        except OSError:  # socket.timeout included
+            chunk = b""
+        if not chunk:
+            self.cut = True
+            self._remaining = 0
+            return b""
         self._remaining -= len(chunk)
         return chunk
+
+    @property
+    def finished(self) -> bool:
+        """Whether the whole body was read, so the connection can serve the next request."""
+        return not self.cut and self._remaining <= 0
 
     def __iter__(self):
         while True:

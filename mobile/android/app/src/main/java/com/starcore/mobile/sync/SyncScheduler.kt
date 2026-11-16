@@ -15,8 +15,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * When the backup runs, all through WorkManager (which keeps its work across reboots): a run
- * when MediaStore's images or videos change, one every six hours, and one when the app opens or
- * the person asks. Every run has the same constraints, so the system enforces the person's
+ * when MediaStore's images or videos change, one every six hours, one when the app opens or
+ * the person asks, and one when a failed item's backoff is over. Every run has the same constraints, so the system enforces the person's
  * choices: Wi-Fi only unless mobile data is allowed, the charger if they asked for it, never a
  * low battery. No timer loop, no foreground service left running.
  */
@@ -73,6 +73,18 @@ object SyncScheduler {
         work.enqueueUniqueWork(name, policy, request)
     }
 
+    /** A run in `delayMillis`, when the soonest failed item's backoff is over, under the same
+     * constraints. Replaces the one scheduled before (a later run reschedules it if needed). */
+    fun later(context: Context, config: SyncConfig, delayMillis: Long) {
+        val request = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints(config))
+            .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .setInputData(input(config.server))
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(name(config.server, "later"), ExistingWorkPolicy.REPLACE, request)
+    }
+
     /** Watches MediaStore's images and videos (a new one starts a run within seconds). */
     fun watch(context: Context, server: String) = enqueueWatch(context, server, ExistingWorkPolicy.KEEP)
 
@@ -92,10 +104,33 @@ object SyncScheduler {
         WorkManager.getInstance(context).enqueueUniqueWork(name(server, "watch"), policy, request)
     }
 
+    /**
+     * When the app's process starts: a run for each server whose backup is on if the phone's
+     * media changed since its last scan. The watch can miss a change that came while the
+     * process was dead (WorkManager may cancel the job that starts the process before it
+     * runs), so the change that woke the process is caught here. Off the main thread.
+     */
+    fun catchUp(context: Context) {
+        val app = context.applicationContext
+        Thread {
+            try {
+                val state = MediaScanner.state(app) ?: return@Thread
+                val store = SyncStore(app)
+                for (server in store.servers()) {
+                    val config = store.config(server) ?: continue
+                    if (!config.enabled || store.scannedAt(server) == state) continue
+                    runNow(app, config)
+                }
+            } catch (_: Exception) {
+                // the watch and the periodic run still follow the change
+            }
+        }.start()
+    }
+
     /** Whether a run is going on now, or waiting for its constraints. */
     fun activity(context: Context, server: String): Pair<Boolean, Boolean> {
         val work = WorkManager.getInstance(context)
-        val infos = listOf("now", "periodic").flatMap {
+        val infos = listOf("now", "periodic", "later").flatMap {
             try { work.getWorkInfosForUniqueWork(name(server, it)).get() } catch (_: Exception) { emptyList() }
         }
         val running = infos.any { it.state == WorkInfo.State.RUNNING }
@@ -110,6 +145,6 @@ object SyncScheduler {
 
     fun cancel(context: Context, server: String) {
         val work = WorkManager.getInstance(context)
-        listOf("now", "periodic", "watch").forEach { work.cancelUniqueWork(name(server, it)) }
+        listOf("now", "periodic", "later", "watch").forEach { work.cancelUniqueWork(name(server, it)) }
     }
 }

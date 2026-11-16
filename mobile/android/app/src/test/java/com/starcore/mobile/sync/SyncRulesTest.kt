@@ -43,6 +43,16 @@ class SyncRulesTest {
     }
 
     @Test
+    fun aRunIsScheduledForTheSoonestRetry() {
+        assertEquals(60_000L, SyncRules.laterDelay(1_060_000, 1_000_000))
+        // came due during the run: soon, not at once
+        assertEquals(SyncRules.MIN_LATER, SyncRules.laterDelay(990_000, 1_000_000))
+        // waits for "Try again", or nothing failed
+        assertNull(SyncRules.laterDelay(Long.MAX_VALUE, 1_000_000))
+        assertNull(SyncRules.laterDelay(null, 1_000_000))
+    }
+
+    @Test
     fun anEditIsANewFile() {
         assertFalse(SyncRules.changed(10, 20, 3, 10, 20, 3))
         assertTrue(SyncRules.changed(10, 20, 3, 11, 20, 3))

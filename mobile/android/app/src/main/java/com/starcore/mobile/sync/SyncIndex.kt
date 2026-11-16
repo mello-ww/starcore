@@ -76,6 +76,14 @@ class SyncIndex(context: Context, server: String) : Closeable {
             "state = ? AND next_try <= ?", arrayOf(ItemState.FAILED.code, "$now"))
     }
 
+    /** When the soonest failed item that is retried on its own (not one waiting for "Try again")
+     * comes due, or null when there is none. */
+    fun nextDue(): Long? =
+        db.rawQuery("SELECT MIN(next_try) FROM $TABLE WHERE state = ? AND next_try < ?",
+            arrayOf(ItemState.FAILED.code, "${Long.MAX_VALUE}")).use { cursor ->
+            if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
+        }
+
     /** "Try again": every failed item is pending again, its attempts forgotten. */
     fun retryAll() {
         db.update(TABLE, ContentValues().apply { reset(this) }, "state = ?", arrayOf(ItemState.FAILED.code))

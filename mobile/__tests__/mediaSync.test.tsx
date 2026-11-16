@@ -275,6 +275,31 @@ describe('the sync screen', () => {
     expect(byId('sync-open-settings')).toHaveLength(1);
   });
 
+  it('forgets what it asked once all photos are allowed in the system settings', async () => {
+    jest.useFakeTimers();
+    try {
+      jest.spyOn(PermissionsAndroid, 'requestMultiple').mockResolvedValue({
+        'android.permission.READ_MEDIA_VISUAL_USER_SELECTED': 'granted',
+      } as any);
+      const native = fakeNative({...NOT_SET_UP, access: 'partial'});
+      await open(native);
+      await act(async () => {
+        await switchOf('sync-enabled').props.onValueChange(true);
+      });
+      expect(byId('sync-open-settings')).toHaveLength(1);
+
+      (native.state as jest.Mock).mockResolvedValue({...NOT_SET_UP, access: 'full'});
+      await act(async () => {
+        jest.advanceTimersByTime(2500);
+      });
+      await act(async () => {});
+      expect(byId('sync-open-settings')).toHaveLength(0);
+      expect(byId('sync-notice')).toHaveLength(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('changes when and what it backs up', async () => {
     const native = fakeNative({...SET_UP, excluded: ['2']});
     await open(native);
