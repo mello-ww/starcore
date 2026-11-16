@@ -78,6 +78,16 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Photo's phone backup, server side (`media.sync` v1):** `status`, `check` (what the server
+  already has, erased and protected media included, without saying which), a resumable
+  `upload` written straight to disk in chunks of 8 MiB and checked against its SHA-256, and
+  `devices`. Media erased from the recycle bin is remembered by its digest and never taken back
+  by a backup. The app's side comes next (`docs/photos-parity-audit.md`, S1).
+- **Device credentials:** `POST /api/auth/devices` issues, to a signed-in session, a credential
+  limited to one capability that allows it (so far `media.sync`): it reaches only that
+  provider's routes for it, never expires, is stored hashed, and is listed and revoked with the
+  sessions (`docs/api.md`, "Device credentials").
+
 - **Biometric unlock turned on from the Android app's unlock card:** a full unlock offers "Use
   biometrics next time", and the PIN that unlocks then enrols the phone; an enrolled phone's
   card offers "Stop using biometrics on this phone". A move's prompt offers neither. This was

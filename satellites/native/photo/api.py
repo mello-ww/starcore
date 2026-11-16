@@ -3,7 +3,7 @@
 from starcore.api.response import error_response, file_response, json_response
 
 from . import albums as albums_module
-from . import configuration, gallery, handover
+from . import backup, configuration, gallery, handover
 from .albums import AlbumError, AlbumNotFound, albums
 from .library import PhotoImportError, PhotoNotFound, library
 from .private_media import policy
@@ -30,6 +30,8 @@ def routes() -> dict:
         "gallery": gallery_route,
         # the media.gallery capability's list (see satellite.toml): what a media picker offers
         "media": media_route,
+        # the media.sync capability (backup.py): a device's one-way backup into the library
+        "backup": backup.route,
         # naming a route "configuration" is the whole contract with the Core's
         # generic satellite configuration mechanism - see docs/satellites.md
         "configuration": configuration_route,

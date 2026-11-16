@@ -149,6 +149,19 @@
         "check": "GET ?path=<absolute path>[&tree=1] -> {protected, open, message?}: protected when the path is inside an area the provider guards (with tree=1, also a folder that contains one); open when this session may reach it through other Satellites now; message, the provider's words for a refusal"
       },
       "_note": "Server-side only: what the Engine asks before any Satellite serves, lists, indexes, renames or deletes a path on disk (starcore.capabilities.protection). Every provider is asked, enabled or not, and a path is open only when each one says so; a provider that fails or answers anything else keeps the path closed. No client reads it: a provider refuses a request that doesn't come through the Engine."
+    },
+    "media.sync": {
+      "versions": [1],
+      "device_credentials": true,
+      "operations": {
+        "status": "GET ?device= -> {accepts: [\"image\", \"video\"], max_bytes, chunk_bytes, device: {name, last_seen, received}}: what the provider takes, and what it holds from this caller; device names it",
+        "check": "POST {device, items: [{sha256, size}]} (at most 500) -> {known: [sha256], wanted: [sha256]}: known when the provider has it, had it or must not take it again (in the library, in its bin, erased earlier, moved somewhere protected), never saying which; wanted when it would take it; in neither when it is larger than max_bytes",
+        "upload": "GET /<sha256> -> {offset}: the bytes already held from this caller for that digest. POST /<sha256>?offset=&size=&name=&folder=&taken= with the bytes from offset as an application/octet-stream body of at most chunk_bytes -> {offset}, or once the last byte is in {status: imported|duplicate, id, offset}. Written straight to disk; the whole file's SHA-256 must match (422 otherwise, and it starts again from 0); a wrong offset answers 409 with the right one"
+      },
+      "optional_operations": {
+        "devices": "GET -> {devices: [{name, last_seen, received, current}]}: the devices that sync, for a status page; refused to a device credential"
+      },
+      "_note": "One-way backup from a device: a client hashes its media, asks check, and sends only what is wanted, in chunks it can resume after any cut. A provider limits the size, a caller's unfinished uploads (the oldest goes beyond 4) and their age (7 days). device_credentials: a full session may ask the Engine for a device credential limited to this capability (POST /api/auth/devices), which reaches only the provider's routes for these operations and never expires; it is listed and revoked with the sessions."
     }
   },
   "client_capabilities": {

@@ -101,7 +101,7 @@ the owner 2026-11-15).
   built as a generic capability (`media.sync` from a Satellite, `device.media-sync` in the app).
   - [x] **S0** - remove the old sync: the standalone listener, `sync_upload`, the `sync_*`
     settings, the app's background task, its tests and docs.
-  - [ ] **S1** - `media.sync` v1 in Photo: `check`, a resumable `upload` streamed to disk,
+  - [x] **S1** - `media.sync` v1 in Photo: `check`, a resumable `upload` streamed to disk,
     `status`, `devices`; the Engine's device credential.
   - [ ] **S2** - the `sync` action (contract change 4); Photo's button and Devices page.
   - [ ] **S3** - the app's sync: WorkManager, MediaStore detection, the local index, folders,

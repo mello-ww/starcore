@@ -324,6 +324,29 @@ This is what lets the Mission Control "Active sessions" panel (and, later, a mob
 device. Revoking the caller's own current session ends it immediately, exactly like
 `/api/auth/logout`.
 
+### Device credentials
+
+```
+POST /api/auth/devices   { "capability": "media.sync", "device_name": "..." }
+                         -> { "token", "session_id", "kind": "device", "device_name", "capability",
+                              "created", "expires": null, "provider", "operations" }
+```
+
+A device credential lets a device do one job in the background without a session that ends
+after 7 days: it is limited to one Satellite capability whose vocabulary entry says
+`"device_credentials": true` (so far only `media.sync`, a phone's backup). Only a signed-in
+session may ask for one (`401` otherwise, a device credential included); a capability that
+allows none gets `400`, one nothing provides `404`, and past 32 at once `409`. The token is in
+this answer only and is stored as its SHA-256.
+
+With it, `_authorized()` lets a request through only to the capability's enabled provider and
+only below the routes its operations name (`provider` and `operations` in the answer); anything
+else, the Engine's own endpoints included, gets `403`. It is never a session:
+`/api/auth/status` answers `"authenticated": false` for it. It is listed by
+`GET /api/auth/sessions` as `"kind": "device"` with its `capability` and `"expires": null`, and
+revoked like a session. A provider that keeps something per caller asks `engine.auth.caller(token)`
+for its opaque id.
+
 Passwords are hashed with `hashlib.pbkdf2_hmac` (260,000 iterations, a random 16-byte salt
 per account) via the shared `hash_secret()` helper in `starcore/auth.py` - never stored,
 logged, or returned anywhere. The Locked Folder Satellite's PIN (see `docs/satellites/locked_folder.md`)

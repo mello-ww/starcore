@@ -214,6 +214,11 @@ GET  /api/satellites/photo/trash/<id>/thumbnail   preview a trashed photo's thum
 GET  /api/satellites/photo/trash/<id>/original    preview a trashed photo's original
 POST /api/satellites/photo/trash/<id>/restore     move a photo back out of the recycle bin
 POST /api/satellites/photo/trash/<id>/erase       permanently delete a photo that is in the recycle bin
+GET  /api/satellites/photo/backup/status      media.sync's status: what a backup takes, and this caller's record
+POST /api/satellites/photo/backup/check       media.sync's check: {items: [{sha256, size}]} -> {known, wanted}
+GET  /api/satellites/photo/backup/upload/<sha256>    media.sync's upload: the offset held for this file
+POST /api/satellites/photo/backup/upload/<sha256>    ?offset=&size=&name=&folder=&taken= and the raw bytes from offset
+GET  /api/satellites/photo/backup/devices     media.sync's devices: who backs up here (refused to a device credential)
 ```
 
 A photo id that is currently in the recycle bin behaves as if it doesn't exist anywhere except
@@ -261,8 +266,8 @@ shows its stored filename and - when it has one - its physical album's server pa
 file actually came from is never a mystery.
 
 The Photo configuration screen holds `source_paths`, `sync_default_path` and every other Photo
-setting - see "Configuration" above. Phone sync has no place there until its new form (see
-"Phone synchronization").
+setting - see "Configuration" above. The phone's backup gets its own screen with
+the app's side of it (see "Phone backup").
 
 ## Shared interface
 
@@ -421,15 +426,42 @@ Control's Config button on the Photo card. A change is validated, written back t
 `config.toml` with its comments kept, and used straight away: none of Photo's settings needs a
 restart.
 
-## Phone synchronization
+## Phone backup
 
-None for now. The previous phone sync - a standalone listener on its own port with one shared
-token, and the app's background upload through `sync_upload` - is removed (S0 of
-[the parity audit](../photos-parity-audit.md), which keeps the inventory of what it was). Its
-replacement, a backup of the phone's own folders through a generic capability (`media.sync`
-from Photo, `device.media-sync` in the app), comes in S1 to S4. Until then photos come in by
-import from a folder on the server. `source_paths`, `sync_default_path` and physical albums
-stay: the new sync lands files the same way.
+Photo provides `media.sync` v1 (`backup.py`): a one-way backup of a device's media into the
+library. The server side is done (S1 of [the parity audit](../photos-parity-audit.md), which
+holds the whole design); the app's side, `device.media-sync`, comes in S2 and S3. The previous
+phone sync - a standalone listener with one shared token, and `sync_upload` - is removed (S0).
+
+- **`status`** (`GET ?device=`) -> `{accepts: ["image", "video"], max_bytes, chunk_bytes,
+  device: {name, last_seen, received}}`. `max_bytes` is 16 GiB, `chunk_bytes` 8 MiB.
+- **`check`** (`POST {device, items: [{sha256, size}]}`, at most 500) -> `{known, wanted}`.
+  Known is what is in the library, in the recycle bin, was erased from it, or was moved
+  somewhere protected (`media.vault`'s `sealed`); the answer never says which. An item larger
+  than `max_bytes` is in neither list.
+- **`upload`**: `GET /<sha256>` -> `{offset}`, the bytes held for this file. `POST /<sha256>?offset=&size=&name=&folder=&taken=`
+  with an `application/octet-stream` body of at most `chunk_bytes` -> `{offset}`, or at the last
+  byte `{status: "imported" | "duplicate", id, offset}`. The bytes go straight to a partial file
+  on disk, never whole into memory. A wrong offset answers `409` with the right one; a file whose
+  SHA-256 doesn't match answers `422` and starts again at 0; a file the library can't read
+  answers `415`. `folder` is the phone's folder, mapped to an album by `source_paths` (or
+  `sync_default_path`); `taken` (Unix seconds) dates media whose file has no date of its own.
+- **`devices`** (`GET`) -> `{devices: [{name, kind, last_seen, received, current}]}`, newest
+  first, for a status page. A device credential gets `403`: it reads nothing.
+
+Partial files live in `backup/partials/<caller>/` under the storage folder, keyed by the
+caller's opaque session or device id: at most 4 per caller (a fifth drops the oldest), and
+one untouched for 7 days is dropped. `backup/devices.json` keeps each caller's name, when it
+was last seen and how many files it sent.
+
+**Erased stays erased.** Erasing from the recycle bin, by hand or past its retention, keeps the
+item's id (the first 16 hex digits of its SHA-256, nothing else) in `library.json`'s `erased`,
+so a backup never sends it again. Importing a folder on purpose still takes such a file in.
+
+**Authentication.** A phone backs up with a device credential the Engine issues for
+`media.sync` (`POST /api/auth/devices`, see "Device credentials" in [API](../api.md)): it reaches
+only the routes above, never expires and is revoked with the sessions. A signed-in session may
+call them too.
 
 ## Albums
 

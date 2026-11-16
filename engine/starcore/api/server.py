@@ -11,6 +11,7 @@ import ssl
 
 from . import payloads
 from .response import RawBody, Request, Response
+from .. import capabilities, ui_contract
 from ..auth import AuthError, AuthStore, LoginThrottle, SESSION_COOKIE, SESSION_TTL_SECONDS
 from ..cli import bridge
 from ..core import SatelliteError
@@ -24,8 +25,10 @@ AUTH_PREFIX = "/api/auth/"
 AUTH_OPEN_ENDPOINTS = {"/api/auth/status", "/api/auth/setup", "/api/auth/login", "/api/auth/logout"}
 CATALOG_ENDPOINT = "/api/catalog"
 REDISCOVER_ENDPOINT = "/api/catalog/rediscover"
+DEVICES_ENDPOINT = "/api/auth/devices"
 WRITE_ENDPOINTS = ("/api/commands/execute", "/api/shutdown", "/api/restart", REDISCOVER_ENDPOINT,
-                   "/api/auth/setup", "/api/auth/login", "/api/auth/logout", "/api/auth/sessions/revoke")
+                   "/api/auth/setup", "/api/auth/login", "/api/auth/logout", "/api/auth/sessions/revoke",
+                   DEVICES_ENDPOINT)
 
 # reserved below a satellite, so a satellite cannot claim any of these as a
 # route name of its own - "assets" is the satellite's Mission Control files,
@@ -246,6 +249,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._handle_auth_logout()
             elif path == "/api/auth/sessions/revoke":
                 self._handle_auth_revoke_session()
+            elif path == DEVICES_ENDPOINT:
+                self._handle_auth_create_device()
             elif path == "/api/commands/execute":
                 self._handle_execute()
             elif path == "/api/shutdown":
@@ -278,6 +283,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         exists, and can only reach the setup screen, which then asks for the
         one-time setup code StarCore printed at startup. Sends the 401 itself
         on failure, so callers only need to check the return value and return.
+
+        A device credential (see AuthStore.create_device) passes only for the
+        routes of its capability's provider that the capability's operations
+        name, and gets 403 anywhere else.
         """
         if not path.startswith("/api/") or path in AUTH_OPEN_ENDPOINTS:
             return True
@@ -295,7 +304,36 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._session_token = token
             return True
 
+        device = engine.auth.device_credential(token)
+        if device is not None:
+            if self._device_may_reach(path, device["capability"]):
+                self._session_token = token
+                return True
+            self._send_json({"error": "this device credential reaches only its own capability's routes"},
+                            status=403)
+            return False
+
         self._send_json({"error": "authentication required"}, status=401)
+        return False
+
+    def _device_may_reach(self, path: str, capability: str) -> bool:
+        """Whether a device credential limited to `capability` may make this request: only a
+        capability the vocabulary allows device credentials for, only its enabled provider, and
+        only the routes its operations name (a route and what is below it)."""
+        known = ui_contract.SATELLITE_CAPABILITIES.get(capability)
+        if not known or not known["device_credentials"] or not path.startswith(SATELLITE_PREFIX):
+            return False
+        satellite, entry = capabilities.provider(self.server.engine, capability)
+        if satellite is None:
+            return False
+        segments = [unquote(segment) for segment in path[len(SATELLITE_PREFIX):].split("/") if segment]
+        if not segments or self.server.engine.registry.get(segments[0]) is not satellite:
+            return False
+        rest = segments[1:]
+        for route in entry["operations"].values():
+            parts = route.split("/")
+            if rest[:len(parts)] == parts:
+                return True
         return False
 
     def _proxied(self) -> bool:
@@ -686,6 +724,40 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json({"revoked": session_id})
+
+    def _handle_auth_create_device(self):
+        """POST /api/auth/devices {capability, device_name} -> a device credential limited to
+        that capability: {token, session_id, kind: "device", device_name, capability, created,
+        expires: null, provider, operations}. The token is in this answer only. Only a signed-in
+        session may ask (never a device credential), and only for a capability the vocabulary
+        allows one for, with a provider on this server."""
+        engine = self.server.engine
+        body = self._read_json_body()
+        if body is None:
+            return  # a clean error response was already sent
+
+        token = AuthStore.token_from_request(self.headers.get("Cookie", ""), self.headers.get("Authorization", ""))
+        if not engine.auth.validate_session(token):
+            self._send_json({"error": "sign in to add a device"}, status=401)
+            return
+        body = body if isinstance(body, dict) else {}
+        capability = body.get("capability")
+        known = ui_contract.SATELLITE_CAPABILITIES.get(capability) if isinstance(capability, str) else None
+        if not known or not known["device_credentials"]:
+            self._send_json({"error": "no device credential can be issued for this capability"}, status=400)
+            return
+        satellite, entry = capabilities.provider(engine, capability)
+        if satellite is None:
+            self._send_json({"error": f"nothing provides {capability} on this server"}, status=404)
+            return
+        try:
+            device_token, device = engine.auth.create_device(engine.auth.session_username(token), capability,
+                                                             body.get("device_name"))
+        except AuthError as error:
+            self._send_json({"error": str(error)}, status=409)
+            return
+        self._send_json({**device, "token": device_token, "provider": satellite.manifest.name,
+                         "operations": dict(entry["operations"])})
 
     def _handle_shutdown(self):
         engine = self.server.engine

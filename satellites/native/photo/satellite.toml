@@ -11,3 +11,9 @@ icon_name = "camera"
 [provides."media.gallery"]
 version = 1
 operations = { list = "media", thumbnail = "thumbnails", resolve = "media/resolve", original = "media/original", release = "media/release", adopt = "media/adopt" }
+
+# a device's one-way backup into the library (backup.py): a device credential limited to it
+# reaches only these routes
+[provides."media.sync"]
+version = 1
+operations = { status = "backup/status", check = "backup/check", upload = "backup/upload", devices = "backup/devices" }

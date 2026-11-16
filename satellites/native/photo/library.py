@@ -83,6 +83,10 @@ class PhotoLibrary:
         self.index_path = self.root / "library.json"
         self.thumbnail_size = int(thumbnail_size)
         self._photos = {}
+        # what was erased from the recycle bin (by hand or past its retention), by id - the first
+        # ID_LENGTH hex digits of its SHA-256 - with when: only that, so a backup never sends it
+        # again (knows()) while nothing else of it is kept
+        self._erased = {}
         # held for every change of a photo's state (bin, restore, erase, purge, a move out of the
         # library), so a photo can't be binned between the last check and its removal
         self._changing = threading.RLock()
@@ -141,6 +145,13 @@ class PhotoLibrary:
         """A photo whether active or trashed - only for the recycle-bin
         routes themselves (previewing, restoring, permanently erasing)."""
         return self._photos.get(photo_id)
+
+    def knows(self, digest: str) -> bool:
+        """Whether media with this SHA-256 is in the library, in its recycle bin, or was erased
+        from there - what a backup must not send again (backup.py). A directory import is not
+        refused for an erased digest: someone importing a folder asks for it on purpose."""
+        photo_id = str(digest)[:ID_LENGTH]
+        return photo_id in self._photos or photo_id in self._erased
 
     def original_path(self, photo: dict) -> Path:
         path = (self.root / photo["path"]).resolve()
@@ -205,7 +216,8 @@ class PhotoLibrary:
 
     # ---------- import ----------
 
-    def add_file(self, source, filename: str = None, save: bool = True, physical_path: str = None, private=None):
+    def add_file(self, source, filename: str = None, save: bool = True, physical_path: str = None, private=None,
+                 captured_at: str = None):
         """Takes a single file into the library.
 
         Returns the new record, or None when that exact image is already stored.
@@ -215,9 +227,12 @@ class PhotoLibrary:
         `physical_path` is metadata only - it never changes where the file is
         actually stored (still the content-addressed photos/<id> layout below).
         It is the resolved server-side "physical album" path (see
-        configuration.py's `source_paths`) for a phone-synced upload whose
+        configuration.py's `source_paths`) for a phone backup upload whose
         phone folder matched a configured mapping, or the satellite's
-        `sync_default_path` when it didn't.
+        `sync_default_path` when it didn't (backup.py).
+
+        `captured_at` (ISO, local time) is when the sender says the media was taken: used only
+        when the file's own metadata has no date, as for a video.
         A directory scan/import (scan()/import_directory()) never sets this;
         those photos simply have no physical album, exactly like a photo
         imported before this concept existed.
@@ -281,7 +296,7 @@ class PhotoLibrary:
             "media_type": media_type,
             "duration": information.get("duration") if media_type == "video" else None,
             "imported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "captured_at": exif["captured_at"],
+            "captured_at": exif["captured_at"] or captured_at,
             "metadata": {
                 "megapixels": images.megapixels(information["width"], information["height"]),
                 **{key: value for key, value in exif.items() if key != "captured_at"},
@@ -399,7 +414,11 @@ class PhotoLibrary:
 
             self._delete_stored_files(photo)
             del self._photos[photo_id]
+            self._remember_erased(photo_id)
             self._save()
+
+    def _remember_erased(self, photo_id: str) -> None:
+        self._erased[photo_id] = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     def _purge_expired(self, retention_days: int) -> None:
         cutoff = datetime.now(timezone.utc).timestamp() - retention_days * 86400
@@ -412,6 +431,7 @@ class PhotoLibrary:
             for photo_id in expired:
                 self._delete_stored_files(self._photos[photo_id])
                 del self._photos[photo_id]
+                self._remember_erased(photo_id)
 
             if expired:
                 self._save()
@@ -508,8 +528,12 @@ class PhotoLibrary:
                 photo.setdefault("physical_path", None)
             self._photos = photos
 
+        erased = index.get("erased")
+        if isinstance(erased, dict):
+            self._erased = {key: value for key, value in erased.items() if isinstance(key, str)}
+
     def _save(self):
-        write_index(self.index_path, {"version": INDEX_VERSION, "photos": self._photos})
+        write_index(self.index_path, {"version": INDEX_VERSION, "photos": self._photos, "erased": self._erased})
 
 
 def _backfill_metadata(photo: dict) -> None:

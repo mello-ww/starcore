@@ -101,8 +101,11 @@ FORMATS_1_1 = set(SINCE_1_1["formats"])
 # operations every provider must offer and those it may. A Satellite may also
 # declare a capability that isn't listed (the registry reports it as declared).
 # Clients draw a shared block only for the capabilities they list themselves.
+# device_credentials: whether the Engine issues a device credential limited to it
+# (POST /api/auth/devices).
 SATELLITE_CAPABILITIES = {name: {"versions": set(spec["versions"]), "operations": set(spec["operations"]),
-                                 "optional": set(spec.get("optional_operations", {}))}
+                                 "optional": set(spec.get("optional_operations", {})),
+                                 "device_credentials": spec.get("device_credentials") is True}
                           for name, spec in VOCABULARY["satellite_capabilities"].items()}
 # the shared block bound to each capability
 CAPABILITY_BLOCKS = {"file-browser": "files.browse"}

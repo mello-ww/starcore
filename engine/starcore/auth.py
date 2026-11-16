@@ -18,6 +18,12 @@ same way a browser does, by calling login() with the user's password, and
 sessions exist and revoke one by name (see list_sessions()/revoke_session()).
 A Satellite that guards something of its own builds on this rather than inventing its
 own notion of "is this really the user".
+
+A device credential is the one other kind of token: issued to a signed-in caller for one
+Satellite capability whose vocabulary entry allows it (media.sync, a phone's backup), it reaches
+only that capability provider's routes (the server checks, see api/server.py), never expires,
+and is stored only as its SHA-256. It is listed and revoked with the sessions. It never
+validates as a session: validate_session() and everything built on it answer no for it.
 """
 
 from pathlib import Path
@@ -35,6 +41,7 @@ SESSION_TTL_SECONDS = 7 * 24 * 60 * 60  # a week - long enough that a browser
                                           # daily re-login, short enough that
                                           # a stale token doesn't live forever
 SESSION_COOKIE = "starcore_session"
+DEVICE_LIMIT = 32  # device credentials at once; another needs one revoked first
 
 
 class AuthError(Exception):
@@ -135,7 +142,7 @@ class AuthStore:
 
     def _load(self) -> dict:
         if not self.path.exists():
-            return {"user": None, "sessions": {}}
+            return {"user": None, "sessions": {}, "devices": {}}
 
         try:
             with open(self.path, "r", encoding="utf-8") as file:
@@ -143,12 +150,15 @@ class AuthStore:
         except (json.JSONDecodeError, OSError) as error:
             print(f"[WARNING]: auth store {self.path} is unreadable ({error}). "
                   f"Starting with no user and no sessions - a fresh setup will be required.")
-            return {"user": None, "sessions": {}}
+            return {"user": None, "sessions": {}, "devices": {}}
 
         if not isinstance(data, dict):
-            return {"user": None, "sessions": {}}
+            return {"user": None, "sessions": {}, "devices": {}}
         data.setdefault("user", None)
         data.setdefault("sessions", {})
+        # device credentials, by the SHA-256 of their token (never the token itself)
+        if not isinstance(data.get("devices"), dict):
+            data["devices"] = {}
         return data
 
     def _save(self):
@@ -279,6 +289,9 @@ class AuthStore:
         response would be handing out a working credential a second time,
         exactly what "never expose ... through ... API responses" forbids for
         any secret.
+
+        Device credentials are listed too, as kind "device" with the capability they are
+        limited to and no expiry.
         """
         now = time.time()
         sessions = []
@@ -293,12 +306,23 @@ class AuthStore:
                 "expires": session["expires"],
                 "current": token == current_token,
             })
+        current_key = _device_key(current_token) if current_token else None
+        for key, device in self._data["devices"].items():
+            sessions.append({
+                "session_id": device.get("session_id", ""),
+                "kind": "device",
+                "device_name": device.get("device_name"),
+                "capability": device.get("capability"),
+                "created": device.get("created"),
+                "expires": None,
+                "current": key == current_key,
+            })
         sessions.sort(key=lambda entry: entry["created"] or 0, reverse=True)
         return sessions
 
     def revoke_session(self, session_id: str) -> bool:
-        """Revokes one session by its opaque id (from list_sessions()), not
-        by its token - the API never receives a token to revoke by, since
+        """Revokes one session or device credential by its opaque id (from list_sessions()),
+        not by its token - the API never receives a token to revoke by, since
         the caller only ever gets the session_id back. Returns True if a
         session was actually found and removed."""
         for token, session in list(self._data["sessions"].items()):
@@ -306,7 +330,63 @@ class AuthStore:
                 del self._data["sessions"][token]
                 self._save()
                 return True
+        for key, device in list(self._data["devices"].items()):
+            if device.get("session_id") == session_id:
+                del self._data["devices"][key]
+                self._save()
+                return True
         return False
+
+    # ---------- device credentials ----------
+
+    def create_device(self, username: str, capability: str, device_name: str = None) -> tuple:
+        """Issues a device credential limited to `capability`: (token, its entry as
+        list_sessions() shows it). The token is returned once and kept only as its SHA-256.
+        Whether the capability allows one is the caller's check (the server asks the
+        vocabulary); this only refuses past DEVICE_LIMIT."""
+        if not self.is_bootstrapped:
+            raise AuthError("StarCore has no administrator account yet")
+        if not isinstance(capability, str) or not capability:
+            raise AuthError("a device credential needs a capability")
+        if len(self._data["devices"]) >= DEVICE_LIMIT:
+            raise AuthError(f"at most {DEVICE_LIMIT} device credentials at once - revoke one first")
+        token = secrets.token_urlsafe(32)
+        name = (str(device_name).strip()[:80] or None) if device_name else None
+        device = {
+            "username": username,
+            "capability": capability,
+            "device_name": name,
+            "session_id": secrets.token_hex(8),
+            "created": time.time(),
+        }
+        self._data["devices"][_device_key(token)] = device
+        self._save()
+        return token, {"session_id": device["session_id"], "kind": "device", "device_name": name,
+                       "capability": capability, "created": device["created"], "expires": None}
+
+    def device_credential(self, token: str):
+        """{session_id, capability, device_name, username} of a device credential, or None for
+        any other token (a session included)."""
+        if not token:
+            return None
+        device = self._data["devices"].get(_device_key(token))
+        if device is None:
+            return None
+        return {"session_id": device.get("session_id", ""), "capability": device.get("capability"),
+                "device_name": device.get("device_name"), "username": device.get("username", "")}
+
+    def caller(self, token: str):
+        """Who a token is, for a Satellite that keeps something per caller (what one device
+        sent): {id, kind: web|mobile|device, name} for a valid session or a device credential,
+        None otherwise. id is the opaque session_id list_sessions() shows."""
+        if self.validate_session(token):
+            session = self._data["sessions"][token]
+            return {"id": session.get("session_id", ""), "kind": session.get("kind", "web"),
+                    "name": session.get("device_name")}
+        device = self.device_credential(token)
+        if device is not None:
+            return {"id": device["session_id"], "kind": "device", "name": device["device_name"]}
+        return None
 
     def purge_expired_sessions(self):
         now = time.time()
@@ -334,3 +414,9 @@ class AuthStore:
                 return value.strip()
 
         return ""
+
+
+def _device_key(token: str) -> str:
+    """What a device credential is stored under: the SHA-256 of its token. The token is 256
+    random bits, so a plain digest is enough; nothing slow is needed against guessing."""
+    return hashlib.sha256(str(token).encode("utf-8")).hexdigest()

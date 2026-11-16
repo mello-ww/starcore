@@ -139,8 +139,9 @@ each must move to the contract or to a generic capability before the stable rele
 ## Phone sync (#28): what exists, and the design of its replacement (2026-11-15)
 
 **Status: approved by the owner (2026-11-15). S0 is done: the old sync is removed as the
-inventory below lists. Nothing of the new one is implemented yet**; the decisions at the end
-stay open until the milestone that needs them. Read from
+inventory below lists. S1 is done (2026-11-16): `media.sync` v1 in Photo and the Engine's
+device credentials** ("Phone backup" in [Photo](satellites/photo.md), "Device credentials" in
+[API](api.md)). Decisions 1 and 2 are taken; 3 waits for S3. Read from
 the code at `5b716a9`. The old sync is removed entirely, then a real automatic backup is built
 as a generic capability. The common order with the Locked Folder is in
 [Remaining work](remaining-work.md).
@@ -262,7 +263,7 @@ The app finds the provider in the catalog and never names it.
 | # | What | Contract | Main files | Model |
 |---|---|---|---|---|
 | S0 (done) | Remove the old sync (the inventory above) | none; the reserved client name changes in S2 | as listed | Sonnet 5.5 high |
-| S1 | `media.sync` v1 in the vocabulary and in Photo: the four routes, streamed to disk, digests of erased items; the Engine's device credentials if decision 1 says so | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `photo/backup.py` (new) and `api.py`, `library.py` (erase records the digest), `engine/starcore/auth.py` and `api/server.py` | Opus 5.5 xhigh |
+| S1 (done) | `media.sync` v1 in the vocabulary and in Photo: the four routes, streamed to disk, digests of erased items; the Engine's device credentials if decision 1 says so | vocabulary: one Satellite capability | `contracts/ui/vocabulary.json`, `photo/backup.py` (new) and `api.py`, `library.py` (erase records the digest), `engine/starcore/auth.py` and `api/server.py` | Opus 5.5 xhigh |
 | S2 | The `sync` action and `device.media-sync`; Photo's button and Devices page | **contract change 4** | `ui_contract.py`, fixtures, both clients' contract and action runners, `photo/ui.json` | Opus 5.5 high |
 | S3 | The app's sync: the Kotlin package (workers, MediaStore, index, uploader, notification), `mobile/src/sync/` (screen, state), the manifest, `App.tsx` | none | `mobile/android/app/src/main/java/.../sync/`, `mobile/src/sync/`, `AndroidManifest.xml` | Opus 5.5 xhigh |
 | S4 | Emulator runs from the table above; then the owner's phone | none | none | Opus 5.5 high |
@@ -273,9 +274,10 @@ The app finds the provider in the catalog and never names it.
 1. **Credential:** a device credential limited to `media.sync` (recommended: backup goes on
    without signing in every week, and a stolen one reads nothing), or the app's session as
    today (no Engine change; backup stops 7 days after each sign-in until the app is opened and
-   signed in again).
+   signed in again). **Decided (2026-11-16): the device credential**, built in S1.
 2. **Erased photos:** the server remembers their digest so a phone never sends them back
-   (recommended), or forgets them, so a reinstalled app uploads them again.
+   (recommended), or forgets them, so a reinstalled app uploads them again. **Decided
+   (2026-11-16): remembered**, built in S1.
 3. **Defaults:** Camera only, Wi-Fi only, charging not required (recommended).
 4. **When the old sync goes:** first, in S0 (recommended: one code path; production keeps the
    old one until the whole stage is pushed and deployed), or only once S3 works.
