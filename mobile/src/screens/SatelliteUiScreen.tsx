@@ -101,6 +101,7 @@ function LockedDocument({
       biometricPrompt={`Unlock ${title}`}
       withPin={withPin}
       biometricDeps={biometricDeps}
+      offerBiometrics
       onUnlocked={onUnlocked}
       onForgot={onForgot}
     />

@@ -267,7 +267,7 @@ false). Neither Satellite imports the other or names it in its code.
 
 The Locked Folder provides the `media.vault` capability: `status`, `unlock`, `lock`, `move_in`
 and, optionally, `keep`, `biometric` and `sealed` (for the server alone, below). It has no
-operation that lists or reads the vault; viewing it stays in its own screens. The design, its security audit and the accepted risks are in
+operation that lists or reads the vault; viewing it is the Locked Folder's own document, behind its own unlock. The design, its security audit and the accepted risks are in
 [`archive/m5-locked-folder-actions-audit.md`](../archive/m5-locked-folder-actions-audit.md).
 
 ```
@@ -500,7 +500,7 @@ without the old password) loses it.
 
 Nothing changes in how either client works: both list and fetch files through the same
 routes, and the server decrypts as it sends. Web: video seeks with Range requests; responses
-are `no-store`. Android: images are fetched into memory (`PrivateImage`), videos stream with
+are `no-store`. Android: images are fetched into memory (the shared screen's), videos stream with
 the session token, `FLAG_SECURE` stays on, and relocking is unchanged. The phone shows an
 "encrypted" note and a "needs attention" state naming the problem; recovery and encryption
 itself are done in Mission Control. Biometric unlock is unchanged - it never needed the PIN,
@@ -590,45 +590,38 @@ POST /api/satellites/LockedFolder/biometric/revoke     { "key_id" }             
 
 ## Mission Control and the Android app
 
-**Mission Control:** the Photos page has a "Locked Folder" tab (`#/satellite/Photo/LockedFolder`)
-with five states - set up a location, create a PIN, locked (PIN entry with a countdown during
-a lockout, and "Forgot your PIN?" when a recovery key exists), needs attention (a security
-problem, with the recovery form when it can help), and unlocked (a grid of photos and videos,
-other files listed below, a viewer with "Move to Photos" and "Delete", upload, and settings
-for changing the PIN, encryption, the recovery key, backups and delinking). A
-photo's viewer in Photos has a lock button that moves it in, asking for the PIN first when
-needed and locking again straight after, whether the move worked or not. If that lock can't be
-sent (the connection dropped), the notice says so and when the server's time limit locks the
-vault by itself - never a plain "Moved" - and the lock is tried again when the browser is back
-online or with a `sendBeacon` as the page goes away
-(`satellites/native/photo/mission_control/lockedMove.js`). The tab locks again when you switch tabs, leave
-Photos, or close or reload the page (a `sendBeacon` to `/lock`), and when the server's time
-limit runs out.
+Both clients draw the Locked Folder's shared interface (below), its only interface since L8:
+Photos' tile under "Folders" opens it, on the web at `#/satellite/Photo/LockedFolder`. Moving
+a photo in is Photos' own action in its shared interface (Move to Locked Folder), through
+`media.vault`, with the PIN asked for that move alone and the vault locked again straight after.
 
-**Android:** Photos has a "Locked" section with the same states (a location is chosen from
-Mission Control), biometric unlock as above, and a private viewer with "Move to Photos"; a
-photo's viewer has "Lock". While the section is open the window is `FLAG_SECURE` (no
-screenshots or screen recording, a blank card in recent apps). Its viewer and the PIN prompts
-are Modals, windows of their own, which carry the flag themselves (`SecureWindow`, since L7). Vault images are fetched with
-the session token and shown from memory, never through the image loader's disk cache. Moving a
-photo in also drops it from the app's cached photo list and evicts its gallery thumbnail from
-the image cache. The section locks again when it closes, when the app goes to the background,
-when the server is switched, and when the server's time limit runs out.
+The client's unlock card asks the PIN in its own prompt and offers "Forgot your PIN?", which
+opens the document's forgot page. The vault locks again when the document closes, when the
+server or session changes, when the app stays in the background (or the web page goes away,
+`pagehide`), and when the server's time limit runs out. While the vault shows open, the client
+calls `keep` every 30 seconds, so the server's idle time doesn't lock it under them. Its
+images are fetched into memory, never through the image loader's disk cache. On Android the
+window is `FLAG_SECURE` while the document shows (no screenshots or screen recording, a blank
+card in recent apps), and its prompts and dialogs, Modals with windows of their own, carry the
+flag themselves (`SecureWindow`, since L7).
 
-While the vault shows open, both call `keep` every 30 seconds, so the server's idle time
-doesn't lock it under them.
+**Biometric unlock, on Android:** a full unlock's card offers "Use biometrics next time" on a
+phone that has biometrics and isn't enrolled; with it on, the PIN that unlocks also enrols the
+phone (the key ceremony above), and the unlock still goes ahead if enrolling fails. An
+enrolled phone's card unlocks with biometrics and offers "Stop using biometrics on this
+phone", which removes the key from the phone and the server. A grant's prompt (a move) offers
+neither.
 
-File Explorer's own page still draws a lock badge next to the vault and refuses to enter it
-until unlocked.
+File Explorer draws the vault as a locked folder and refuses to enter it until unlocked
+(`files.protected`).
 
 ## Shared interface
 
 The Locked Folder has a shared interface, `satellites/native/locked_folder/ui.json` (UI
 contract 1.2), drawn by the shared renderers over its own routes (L3 of the plan below). It is
-a **preview**: its own page and screens stay the default on both clients until it reaches parity
-and the owner validates it, and Developer Mode offers the document beside them - on the web the
-top bar's switch at `#/satellite/Photo/LockedFolder`, in the app a pill on Photos' card in the
-Satellites list. Nothing about the vault is in Photo's document.
+its only interface on both clients: the owner validated it on the web and the phone (L5), and
+L8 removed its own page and screens, with Photo's Locked Folder tab and Lock move. Nothing about
+the vault is in Photo's document.
 
 - **Protected:** `"protected": {"capability": "media.vault", "setup": "setup", "forgot":
   "forgot"}`. The clients ask `status` first, show their own unlock card when it is locked, and
@@ -677,14 +670,13 @@ Satellites list. Nothing about the vault is in Photo's document.
   form, and a new recovery key is shown only in the client's own dialog (`reveal`), see
   [UI contract](../ui-contract.md), "Secrets and reveal". After every action the client asks
   `status` again, so a new PIN shows the unlock card and a delink the setup page.
-- **Every route still needs what it needs** from the own page: an unlock for `settings`, the
+- **Every route still needs what it needed** before the shared interface: an unlock for `settings`, the
   location and `encryption/*`, the current PIN to change it, the PIN again to delete a backup or
   replace the recovery key, the recovery key for `recover` (`engine/tests/test_locked_folder_ui.py`).
-- **Not in it yet:** enrolling a phone for biometric unlock, and removing one, stay in the
-  Android app's own Locked Folder screens: the shared prompt unlocks with biometrics where the
-  phone enrolled, but the enrolment is a native key ceremony no document can declare yet. The
-  PIN attempts, lockout and timeouts stay in the Satellite's generic configuration. Both are
-  for L5's parity check.
+- **Biometric unlock** is turned on and off from the Android app's unlock card (see "Mission
+  Control and the Android app" above), not from the document: the enrolment is a native key
+  ceremony no document declares. The PIN attempts, lockout and timeouts stay in the Satellite's
+  generic configuration.
 
 ### End to end on the local demo (L5, 2026-11-15)
 
@@ -747,8 +739,8 @@ Engine's registry (`engine/starcore/sections.py`, every enabled Satellite whose 
 `{"section": "$.section"}`. One deviation from the plan: a manifest has no title, so a tile's
 title is the hosted Satellite's document `title` ("Locked Folder"), or else its name split into
 words; its icon is the manifest's `icon_name`. A tile names nothing about what the vault holds.
-Opened, the tile shows the Locked Folder's own page or screen by default: in the app a hosted
-Satellite's own screen is its host's, opened at a section named after it.
+Opened, the tile shows the Locked Folder's shared interface, by itself, whichever interface
+Photos shows.
 
 ## Configuration
 
@@ -962,18 +954,13 @@ provider that fails or answers nonsense keeping every path closed; `check` needi
 path; and Music refusing to scan the vault (even unlocked, also in the background, also with
 the provider disabled) while a scan of its parent folder, or of the configured library, skips it.
 
-`satellites/native/photo/tests/lockedMove.test.mjs` (`node --test`) covers moving a photo in
-from Photo's own web page: locking again after a successful and after a failed move, an
-already unlocked session moving without a prompt, cancelling or a missing PIN moving nothing,
-and a lock that can't be sent being reported with when the vault locks by itself, then tried
-again once when back online or as the page goes away.
-
 ## Security audit and plan: the Locked Folder in the shared interface (2026-11-15)
 
-**Status: approved by the owner (2026-11-15). L0 to L4 are done: A1, A2, A3, A5, A6, A7 and
-A9 are fixed, and the Locked Folder has a shared interface with its setup and settings, a
-preview (see "Shared interface" above). L5 was run on the web, L6 is done, and L7 reviewed L0 to L6 (the review is at the
-end of this page). L8, removing the own page and screens, is what is left.** Read from the code at `5b716a9`. It is the audit stage 4 of [Remaining work](../remaining-work.md)
+**Status: approved by the owner (2026-11-15), and done (2026-11-16). A1, A2, A3, A5, A6, A7
+and A9 are fixed; the Locked Folder has a shared interface with its setup, settings and forgot
+pages, validated by the owner on the web and the phone (L5); L6 moved media through
+capabilities, L7 reviewed L0 to L6 (the review is at the end of this page), and L8 removed the
+own page and screens.** Read from the code at `5b716a9`. It is the audit stage 4 of [Remaining work](../remaining-work.md)
 asks for, as M5 had ([its audit](../archive/m5-locked-folder-actions-audit.md)). The common
 order with Photos and the phone sync is in Remaining work.
 
@@ -1089,10 +1076,10 @@ tile stays where it is and Photo names nothing.
 | L5 (done) | End to end on the local demo (web and emulator) with a generated PIN; the owner validates on the web and the phone | none | none | the M5 list, plus: kill the client while unlocked and see it lock by itself. Results: "End to end on the local demo (L5)" under "Shared interface"; validated by the owner on the web and the phone. Its finding, a forgotten PIN, became `protected.forgot` (contract change 3) | Opus 5.5 high |
 | L6 (done) | Moves through capabilities (`sealed`, `original`, `release`, `adopt`); comments that name the other Satellite go | vocabulary: optional operations | `locked_folder/vault.py`, `photo/private_media.py`, `photo/api.py`, `capabilities.py` (POST calls) | the existing move tests unchanged; `KNOWN_CROSS_SATELLITE` loses three lines | Opus 5.5 xhigh |
 | L7 (done) | Security review of L0 to L6: see "Security review of L0 to L6" at the end of this page | none | `locked_folder/runtime.py` and `api.py`, `capabilities.py`, the app's `SecureWindow` | another name for the vault is still the vault; `check` refuses a client; the app's marker is in its prompts | Fable 5.2 high |
-| L8 | Remove `locked_folder/mission_control/page.js`, `mobile/src/lockedFolder/`, Photo's `LockedFolderTab` | none | those | the suites | Sonnet 5.5 medium |
+| L8 (done) | Remove `locked_folder/mission_control/page.js`, `mobile/src/lockedFolder/`, Photo's `LockedFolderTab`, and Photo's own Lock move on both clients; turning biometric unlock on and off moves to the app's unlock card | none | those, `mobile/src/vault/VaultUnlock.tsx` and `api.ts` | the suites; the unlock card enrols with the PIN only when asked, never for a grant, and stops on the phone and the server | Sonnet 5.5 medium |
 
-Until L8 the Locked Folder's own page and screens keep working; in L2 they got the same `keep`
-call, every 30 seconds while they show the vault open, so the idle time doesn't lock them.
+Until L8 the Locked Folder's own page and screens kept working, with the same `keep` call from
+L2 on, every 30 seconds while they showed the vault open.
 L2's fixtures refuse a protected document without the capability, with an offline page, with
 widgets or with `share`; the one for `secrets` outside a protected document comes with
 `secrets`, in L4.
@@ -1171,5 +1158,3 @@ folders, R2 from React Native's own source (0.73.6).
   Explorer: it is the owner's own action, as in M5.
 - A4 (what a session is worth: unhashed session tokens, the cookie behind a TLS proxy, cleartext
   in the app) is Stabilisation's, unchanged.
-- The forgotten-PIN path in the shared interface (the L5 finding) is a contract change, before
-  L8.

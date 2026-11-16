@@ -137,7 +137,7 @@ class GitignoreDoesNotHideSourceTest(unittest.TestCase):
             "satellites/native/locked_folder/config.default.toml",
             "satellites/native/locked_folder/satellite.toml",
             "satellites/native/locked_folder/api.py",
-            "satellites/native/locked_folder/mission_control/page.js",
+            "satellites/native/locked_folder/ui.json",
             "satellites/native/photo/config.default.toml",
             "docs/deployment.md",
             "docs/satellites/locked_folder.md",

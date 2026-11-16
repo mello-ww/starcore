@@ -2,7 +2,7 @@ import type {StarCoreClient} from '../api/client';
 import {ApiError} from '../api/types';
 import {isSafeRoute, type CapabilityProvider} from '../satellites/ui/contract';
 import type {GrantRequest} from '../satellites/ui/secure';
-import type {BiometricApi} from './biometricUnlock';
+import type {EnrollingBiometricApi} from './biometricUnlock';
 
 /**
  * A media.vault provider's routes (contracts/ui/vocabulary.json), as the catalog names them: what
@@ -36,7 +36,7 @@ function failure(body: any, status: number, fallback: string): VaultError {
   return new VaultError(body?.error || fallback, status, Number(body?.retry_after) || 0);
 }
 
-export class VaultApi implements BiometricApi {
+export class VaultApi implements EnrollingBiometricApi {
   constructor(private client: StarCoreClient, readonly provider: CapabilityProvider) {}
 
   /** The provider's route for an operation, or null when it doesn't offer it. */
@@ -136,6 +136,20 @@ export class VaultApi implements BiometricApi {
       throw failure(body, status, 'Biometric unlock failed.');
     }
     return typeof body?.grant === 'string' ? body.grant : null;
+  }
+
+  /** Registers this phone's public key for biometric unlock; the PIN proves it is the owner. */
+  async enrollBiometrics(pin: string, publicKey: string, deviceName: string): Promise<string> {
+    const {status, body} = await this.post(
+      'biometric',
+      {pin, public_key: publicKey, device_name: deviceName},
+      'Could not turn on biometric unlock.',
+      '/enroll',
+    );
+    if (status !== 200 || typeof body?.key_id !== 'string') {
+      throw failure(body, status, 'Could not turn on biometric unlock.');
+    }
+    return body.key_id;
   }
 
   async revokeBiometrics(keyId: string): Promise<void> {

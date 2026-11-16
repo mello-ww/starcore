@@ -6,7 +6,6 @@ import {
   Dimensions,
   FlatList,
   Image,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -14,15 +13,9 @@ import {
 } from 'react-native';
 import {canShareFiles, fileName, shareFile} from '../files';
 import Video from 'react-native-video';
-import {PrimaryButton} from '../components/PrimaryButton';
-import {SecureWindow} from '../components/SecureWindow';
 import {ZoomableImage} from '../components/ZoomableImage';
-import {LockedFolderUnlock} from '../lockedFolder/LockedFolderUnlock';
-import {useLockedFolder} from '../lockedFolder/useLockedFolder';
-import {privacy} from '../platform/privacy';
 import {colors, spacing, typography, useAccentStyles} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
-import {forgetCachedPhoto} from './cache';
 import {forgetOfflineSatellite} from '../satellites/ui/offline';
 import {durationLabel} from './duration';
 import {photoRemoved} from './photoEvents';
@@ -66,9 +59,6 @@ export function PhotoViewerScreen({route, navigation}: Props) {
   const accentStyle = useAccentStyles();
   const {media: initialMedia, startIndex} = route.params;
   const {api, imageSource, serverId} = usePhotoApi();
-  const {api: lockedApi, biometricDeps} = useLockedFolder();
-  // set while asking for the Locked Folder PIN before moving this photo in
-  const [unlockFor, setUnlockFor] = useState<MediaItem | null>(null);
   const [media, setMedia] = useState<MediaItem[]>(initialMedia);
   const [details, setDetails] = useState(false);
   const [photoDetail, setPhotoDetail] = useState<Photo | null>(null);
@@ -126,45 +116,6 @@ export function PhotoViewerScreen({route, navigation}: Props) {
     const nextIndex = Math.min(currentIndexRef.current, remaining.length - 1);
     currentIndexRef.current = nextIndex;
     setViewableIndex(nextIndex);
-  };
-
-  // "Lock": moves this photo into the Locked Folder, asking for the PIN (or
-  // biometrics) first unless this session already has it open. The server
-  // does the verified move; the app then forgets its own copies - the
-  // cached list entry and the gallery's cached thumbnail.
-  const onMoveToLocked = async (item: MediaItem) => {
-    let status;
-    try {
-      status = await lockedApi.status();
-    } catch (err: any) {
-      Alert.alert('Could not reach the Locked Folder', err?.message || 'Please try again.');
-      return;
-    }
-    if (!status) {
-      Alert.alert('No Locked Folder', 'This StarCore server doesn’t have a Locked Folder.');
-    } else if (!status.configured || !status.pin_set) {
-      Alert.alert('Set up the Locked Folder first', 'Open the Locked section of Photos to create a PIN.');
-    } else if (!status.unlocked) {
-      setUnlockFor(item);
-    } else {
-      await finishMoveToLocked(item);
-    }
-  };
-
-  const finishMoveToLocked = async (item: MediaItem) => {
-    setUnlockFor(null);
-    try {
-      await lockedApi.moveIn([item.id]);
-    } catch (err: any) {
-      Alert.alert('Could not move this', err?.message || 'Please try again.');
-      return;
-    } finally {
-      // the unlock was only for the move
-      lockedApi.lock().catch(() => undefined);
-    }
-    privacy.evictImages([imageSource(item.id, 'thumbnail').uri, imageSource(item.id, 'original').uri]);
-    await forgetCachedPhoto(serverId, item.id).catch(() => undefined);
-    dropFromViewer(item.id);
   };
 
   const onToggleFavorite = async (photoId: string) => {
@@ -233,26 +184,8 @@ export function PhotoViewerScreen({route, navigation}: Props) {
         />
         <ViewerAction label="Share" onPress={() => onShare(current)} />
         <ViewerAction label="Details" onPress={toggleDetails} />
-        <ViewerAction label="Lock" accessibilityLabel="Move to Locked Folder" onPress={() => onMoveToLocked(current)} />
         <ViewerAction label="Delete" onPress={onDelete} destructive />
       </View>
-
-      {unlockFor && (
-        <Modal visible transparent animationType="fade" onRequestClose={() => setUnlockFor(null)}>
-          <View style={styles.unlockBackdrop}>
-            <SecureWindow />
-            <View style={styles.unlockSheet}>
-              <LockedFolderUnlock
-                api={lockedApi}
-                biometricDeps={biometricDeps}
-                intro="Enter your PIN to move this photo into the Locked Folder."
-                onUnlocked={() => finishMoveToLocked(unlockFor)}
-              />
-              <PrimaryButton title="Cancel" variant="secondary" onPress={() => setUnlockFor(null)} />
-            </View>
-          </View>
-        </Modal>
-      )}
 
       {details && (
         <View style={styles.detailsPanel}>
@@ -401,6 +334,4 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   detailRow: {flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md},
-  unlockBackdrop: {flex: 1, justifyContent: 'center', padding: spacing.lg, backgroundColor: 'rgba(0,0,0,0.7)'},
-  unlockSheet: {gap: spacing.sm},
 });

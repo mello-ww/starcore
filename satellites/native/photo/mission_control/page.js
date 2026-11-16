@@ -1,33 +1,18 @@
-import { moveIntoLockedFolder, moveNotice, retryLockLater } from "./lockedMove.js";
-
 const SKELETONS = 12;
 // "trash" is deliberately not a tab of its own - the Recycle bin is one of
 // the four kinds shown inside "albums" (see renderAlbums()); "config" is
 // where source_paths/sync_default_path/trash_retention_days/the standalone
 // listener's own settings all live together (see buildConfigPanel())
-const TABS = ["photos", "albums", "map", "locked", "config"];
+const TABS = ["photos", "albums", "map", "config"];
 
-// the Locked Folder is its own satellite (own data, own PIN, own routes);
-// Photos only hosts its interface as a tab - see section_of in its
-// satellite.toml and its own mission_control/page.js
-const LOCKED_FOLDER = "LockedFolder";
-const LOCKED_URL = `/api/satellites/${LOCKED_FOLDER}`;
-
-// the sections the shared interface's own action opens (ui.json: {"own": "sync"}), and the
-// Locked Folder's own name, which is how Mission Control links to it as a section of this page
+// the sections the shared interface's own action opens (ui.json: {"own": "sync"})
 function tabFor(section) {
-    if (section === LOCKED_FOLDER || section === "locked") {
-        return "locked";
-    }
     return section === "sync" ? "config" : "photos";
 }
 
 function tabLabel(name) {
     if (name === "map") {
         return "Map";
-    }
-    if (name === "locked") {
-        return "Locked Folder";
     }
     if (name === "config") {
         return "Configuration";
@@ -105,36 +90,21 @@ export function mount(context) {
     const trashPanel = buildTrashPanel();
     const mapPanel = buildMapPanel();
     const configPanel = buildConfigPanel();
-    const lockedPanel = el("div", "photo-tab-panel photo-locked-panel");
-    const lockedApi = {
-        url: (path) => `${LOCKED_URL}${path}`,
-        get: (path) => requestJson(`${LOCKED_URL}${path}`),
-        post: (path, payload) => requestJson(`${LOCKED_URL}${path}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload || {}),
-        }),
-    };
-    let lockedModule = null;     // the Locked Folder's page module, loaded on first use
-    let lockedCleanup = null;    // set while its tab is showing; locks it again when called
-    let lockedAvailable = false; // whether a Locked Folder satellite answers at all
     const notice = el("p", "photo-notice");
     notice.hidden = true;
 
     const body = el("div", "stack");
-    body.append(summary, toolsNote, tabBar, notice, photosPanel.element, albumsPanel.element, mapPanel.element, lockedPanel,
+    body.append(summary, toolsNote, tabBar, notice, photosPanel.element, albumsPanel.element, mapPanel.element,
         configPanel.element);
     root.replaceChildren(buildHead(), body);
 
     setTab(tabFor(context.section));
     skeleton();
     refresh();
-    detectLockedFolder();
     document.addEventListener("keydown", onKeyDown);
 
     const cleanup = () => {
         document.removeEventListener("keydown", onKeyDown);
-        leaveLockedFolder();
         closeViewer();
         if (mapState) {
             mapState.map.remove();
@@ -143,8 +113,8 @@ export function mount(context) {
             locationMap.map.remove();
         }
     };
-    // Mission Control calls this when the route names a section of this page
-    // (#/satellite/Photo/LockedFolder) while it is already showing
+    // Mission Control calls this when the route names a section of this page while it is
+    // already showing
     cleanup.showSection = (section) => setTab(tabFor(section));
     return cleanup;
 
@@ -172,12 +142,6 @@ export function mount(context) {
                 gear.setAttribute("aria-hidden", "true");
                 button.prepend(gear);
             }
-            if (name === "locked") {
-                const lock = el("span", "photo-tab-lock");
-                lock.innerHTML = LOCK_ICON;
-                button.prepend(lock);
-                button.hidden = true;  // until detectLockedFolder() finds one
-            }
             button.dataset.tab = name;
             button.addEventListener("click", () => setTab(name));
             group.appendChild(button);
@@ -186,12 +150,6 @@ export function mount(context) {
     }
 
     function setTab(name) {
-        if (name === "locked" && !lockedAvailable) {
-            name = "photos";
-        }
-        if (tab === "locked" && name !== "locked") {
-            leaveLockedFolder();
-        }
         tab = name;
         for (const button of tabBar.querySelectorAll(".photo-tab")) {
             button.classList.toggle("active", button.dataset.tab === name);
@@ -200,13 +158,10 @@ export function mount(context) {
         photosPanel.element.hidden = name !== "photos";
         albumsPanel.element.hidden = name !== "albums";
         mapPanel.element.hidden = name !== "map";
-        lockedPanel.hidden = name !== "locked";
         configPanel.element.hidden = name !== "config";
         rememberSection(name);
 
-        if (name === "locked") {
-            enterLockedFolder();
-        } else if (name === "albums") {
+        if (name === "albums") {
             renderAlbums();
         } else if (name === "map") {
             renderMap();
@@ -215,112 +170,13 @@ export function mount(context) {
         }
     }
 
-    /* ---------- Locked Folder tab ---------- */
-
-    async function detectLockedFolder() {
-        try {
-            await lockedApi.get("/status");
-            lockedAvailable = true;
-        } catch (error) {
-            lockedAvailable = false;  // no Locked Folder satellite on this server
-        }
-        tabBar.querySelector('[data-tab="locked"]').hidden = !lockedAvailable;
-        if (viewer) {
-            viewer.lockButton.hidden = !lockedAvailable;
-        }
-        if (tabFor(context.section) === "locked") {
-            if (lockedAvailable) {
-                setTab("locked");
-            } else {
-                showNotice("This StarCore server has no Locked Folder.", true);
-            }
-        }
-    }
-
-    async function loadLockedModule() {
-        if (!lockedModule) {
-            const stylesheet = `${LOCKED_URL}/assets/page.css`;
-            if (!document.querySelector(`link[href="${stylesheet}"]`)) {
-                const link = document.createElement("link");
-                link.rel = "stylesheet";
-                link.href = stylesheet;
-                document.head.appendChild(link);
-            }
-            lockedModule = await import(`${LOCKED_URL}/assets/page.js`);
-        }
-        return lockedModule;
-    }
-
-    async function enterLockedFolder() {
-        if (lockedCleanup) {
-            return;
-        }
-        lockedPanel.replaceChildren(el("p", "lf-muted", "Loading…"));
-        try {
-            const module = await loadLockedModule();
-            if (tab !== "locked" || lockedCleanup) {
-                return;
-            }
-            lockedCleanup = module.mount({ element: lockedPanel, api: lockedApi, onPhotosChanged: refresh });
-        } catch (error) {
-            lockedPanel.replaceChildren(el("p", "photo-notice", `The Locked Folder could not be loaded: ${error.message}`));
-        }
-    }
-
-    function leaveLockedFolder() {
-        if (lockedCleanup) {
-            lockedCleanup();  // locks it again
-            lockedCleanup = null;
-        }
-        lockedPanel.replaceChildren();
-    }
-
     function rememberSection(name) {
         // keeps the address in step with the tab, without a navigation
         const base = `#/satellite/${encodeURIComponent(satellite.name)}`;
-        const wanted = name === "locked" ? `${base}/${LOCKED_FOLDER}` : name === "config" ? `${base}/settings` : base;
+        const wanted = name === "config" ? `${base}/settings` : base;
         if (location.hash.startsWith(base) && location.hash !== wanted) {
             // keeps Mission Control's mark on the entry (a visit from the shared interface)
             history.replaceState(history.state, "", wanted);
-        }
-    }
-
-    // Moves the photo on screen into the Locked Folder - asking for the PIN
-    // first when this session hasn't unlocked it - then drops it from every
-    // list here, the same way deleting it does.
-    async function moveViewedPhotoToLockedFolder() {
-        const photo = viewerList[index];
-        if (!photo || !lockedAvailable) {
-            return;
-        }
-        viewer.lockButton.disabled = true;
-        try {
-            // locks again after the move whatever happened (lockedMove.js)
-            const result = await moveIntoLockedFolder(lockedApi, [photo.id], {
-                requestUnlock: async () => (await loadLockedModule()).requestUnlock(lockedApi),
-            });
-            if (result.outcome === "setup") {
-                closeViewer();
-                setTab("locked");
-                return;
-            }
-            if (result.locked === false) {
-                retryLockLater(lockedApi);
-            }
-            if (result.outcome === "moved") {
-                await forgetPhoto(photo);
-            }
-            const message = moveNotice(result);
-            if (message) {
-                showNotice(message.text, message.isError);
-            }
-        } catch (error) {
-            // the status couldn't be read: nothing was unlocked or moved
-            showNotice(`The photo could not be moved: ${error.message}`, true);
-        } finally {
-            if (viewer) {
-                viewer.lockButton.disabled = false;
-            }
         }
     }
 
@@ -2084,22 +1940,17 @@ export function mount(context) {
         favoriteButton.innerHTML = HEART_ICON;
         const deleteButton = el("button", "photo-viewer-delete");
         deleteButton.innerHTML = DELETE_ICON;
-        const lockButton = el("button", "photo-viewer-lock");
-        lockButton.innerHTML = LOCK_ICON;
-        lockButton.hidden = !lockedAvailable;
         const closeButton = el("button", "photo-viewer-close", "✕");
         const previous = el("button", "photo-viewer-step previous", "‹");
         const next = el("button", "photo-viewer-step next", "›");
 
-        for (const button of [infoButton, favoriteButton, lockButton, deleteButton, closeButton, previous, next]) {
+        for (const button of [infoButton, favoriteButton, deleteButton, closeButton, previous, next]) {
             button.type = "button";
         }
         infoButton.title = "Details";
         infoButton.setAttribute("aria-expanded", "false");
         favoriteButton.title = "Add to Favorites";
         deleteButton.title = "Move to Recycle Bin";
-        lockButton.title = "Move to Locked Folder";
-        lockButton.setAttribute("aria-label", "Move to Locked Folder");
         closeButton.title = "Close";
         previous.title = "Previous";
         next.title = "Next";
@@ -2107,7 +1958,6 @@ export function mount(context) {
         infoButton.addEventListener("click", () => toggleInfo());
         favoriteButton.addEventListener("click", () => toggleViewedFavorite());
         deleteButton.addEventListener("click", () => deleteViewedPhoto());
-        lockButton.addEventListener("click", () => moveViewedPhotoToLockedFolder());
         closeButton.addEventListener("click", closeViewer);
         previous.addEventListener("click", () => step(-1));
         next.addEventListener("click", () => step(1));
@@ -2121,7 +1971,7 @@ export function mount(context) {
         const identity = el("div", "photo-viewer-identity");
         identity.append(el("p", "eyebrow", "StarCore · Photo"), title);
         const actions = el("div", "photo-viewer-bar-actions");
-        actions.append(position, infoButton, favoriteButton, lockButton, deleteButton, closeButton);
+        actions.append(position, infoButton, favoriteButton, deleteButton, closeButton);
         bar.append(identity, actions);
 
         const stage = el("div", "photo-viewer-stage");
@@ -2135,7 +1985,7 @@ export function mount(context) {
 
         element.append(bar, stage, panel);
         return {
-            element, image, video, title, position, meta, panel, infoButton, favoriteButton, deleteButton, lockButton,
+            element, image, video, title, position, meta, panel, infoButton, favoriteButton, deleteButton,
             previous, next,
             locationUnavailable, locationMapEl,
         };
@@ -2161,7 +2011,7 @@ export function mount(context) {
         await forgetPhoto(photo);
     }
 
-    // drops a photo that left the library view (recycle bin or Locked Folder)
+    // drops a photo that left the library view (the recycle bin)
     // from every list on this page, then steps the viewer on
     async function forgetPhoto(photo) {
         viewerList = viewerList.filter((candidate) => candidate.id !== photo.id);
@@ -2271,12 +2121,6 @@ async function requestJson(url, init) {
     }
     return payload;
 }
-
-const LOCK_ICON = `
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="3.5" y="7" width="9" height="6.5" rx="1.3"/>
-        <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>
-    </svg>`;
 
 const RENAME_ICON = `
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

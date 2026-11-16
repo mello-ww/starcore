@@ -198,15 +198,15 @@ from the cache. The rules shared with the Engine and Mission Control are in
 `__tests__/uiContract.test.ts`.
 
 Status opens its `ui.json` alone; Photos opens its `ui.json` by default and keeps
-its dedicated screens in Developer Mode, where they still serve its settings, phone
-sync and the Locked Folder. File Explorer has no screen of its own: its `ui.json` is a
+its dedicated screens in Developer Mode, where they still serve its settings and phone
+sync. The Locked Folder has no screen of its own: its `ui.json` is its only interface. File Explorer has no screen of its own: its `ui.json` is a
 read-only preview, which the app opens (Mission Control keeps File Explorer's
 own page by default). Music keeps its dedicated screens until the shared blocks
 reach parity with them (`docs/remaining-work.md`). Satellite icons come from each
 Satellite's `icon_name`.
 
 Code written for one Satellite lives only in its own folder (`src/music/`,
-`src/photo/`, `src/lockedFolder/`), wired in by
+`src/photo/`), wired in by
 `src/satellites/builtins.tsx` and the navigation. Everything else is generic;
 `engine/tests/test_client_modularity.py` lists the couplings left, and that list
 may only shrink.
@@ -240,7 +240,7 @@ mobile/
 │   ├── developer/        Developer Mode
 │   ├── storage/          plain (non-secret) local preferences
 │   ├── music/ photo/     Satellite-specific screens, until they are retired
-│   │   lockedFolder/     (docs/remaining-work.md)
+│   │                     (docs/remaining-work.md)
 │   └── config.ts         build-time constants only - no server address,
 │                          no credentials, ever
 └── __tests__/            Jest tests (see "Testing" below)

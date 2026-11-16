@@ -76,7 +76,7 @@ describe('SatellitesListScreen', () => {
     expect(texts(tree)).not.toContain('LockedFolder');
   });
 
-  it('offers a hosted Satellite’s preview document on its host’s card, in Developer Mode only', async () => {
+  it('offers nothing for a hosted Satellite on its host’s card, even a preview: its host opens it', async () => {
     const photo = {...satelliteA, name: 'Photo', ui: {contract: 'starcore.ui/1.2', revision: 'p1', error: null, preview: true}};
     const hosted = {...satelliteB, name: 'Vaulty', section_of: 'Photo',
       ui: {contract: 'starcore.ui/1.2', revision: 'v1', error: null, preview: true}};
@@ -96,11 +96,10 @@ describe('SatellitesListScreen', () => {
       await act(async () => {
         tree = renderer.create(<SatellitesListScreen navigation={navigation} route={route} />);
       });
-      // not a card of its own: only the pill on its host's names it
+      // not a card of its own, nor a pill on its host's: a hosted Satellite has no screen of the
+      // app's own, so its shared interface is its only one
       expect(texts(tree)).not.toContain('Container control');
-      expect(pill(tree)).toHaveLength(1);
-      act(() => pill(tree)[0].props.onPress());
-      expect(navigation.navigate).toHaveBeenCalledWith('SatelliteUi', {name: 'Vaulty', revision: 'v1'});
+      expect(pill(tree)).toHaveLength(0);
     } finally {
       (useDeveloperMode as jest.Mock).mockReturnValue({enabled: false});
     }

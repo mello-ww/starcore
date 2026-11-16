@@ -99,11 +99,7 @@ export function SatellitesListScreen({navigation}: Props) {
           const dedicated = declarative ? undefined : DEDICATED_SCREENS[item.name];
           const preview = developer && hasSharedPreview(item);
           const own = developer ? ownScreenBeside(item) : undefined;
-          // the Satellites this one hosts (section_of) are opened from inside it, not listed:
-          // their preview documents are offered here, on their host's card
-          const hostedPreviews = developer
-            ? (satellites ?? []).filter(other => other.section_of === item.name && hasSharedPreview(other))
-            : [];
+          // the Satellites this one hosts (section_of) are not listed: they are opened from inside it
           const openable = canOpen(item);
           return (
           <Pressable
@@ -140,18 +136,6 @@ export function SatellitesListScreen({navigation}: Props) {
                   <Text style={styles.previewLabel}>Shared interface (preview)</Text>
                 </Pressable>
               )}
-              {hostedPreviews.map(hosted => (
-                <Pressable
-                  key={hosted.name}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open the shared ${hosted.name} interface`}
-                  testID={`shared-preview-${hosted.name}`}
-                  onPress={() => navigation.navigate('SatelliteUi', {name: hosted.name, revision: hosted.ui?.revision})}
-                  style={({pressed}) => [styles.previewPill, pressed && styles.pressed]}>
-                  <Icon name="layers" size={14} color={palette.text2} />
-                  <Text style={styles.previewLabel}>{hosted.name}: shared interface (preview)</Text>
-                </Pressable>
-              ))}
               {own && (
                 <Pressable
                   accessibilityRole="button"

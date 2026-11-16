@@ -8,14 +8,7 @@ jest.mock('../src/photo/PhotoLibraryTab', () => ({PhotoLibraryTab: () => null}))
 jest.mock('../src/photo/PhotoAlbumsTab', () => ({PhotoAlbumsTab: () => null}));
 jest.mock('../src/photo/PhotoMapTab', () => ({PhotoMapTab: () => null}));
 jest.mock('../src/photo/PhotoSearchTab', () => ({PhotoSearchTab: () => null}));
-jest.mock('../src/photo/LockedFolderTab', () => {
-  const {Text: MockText} = require('react-native');
-  return {LockedFolderTab: () => <MockText>Locked Folder tab</MockText>};
-});
 jest.mock('../src/components/SettingsButton', () => ({SettingsButton: () => null}));
-const mockStatus = jest.fn();
-const mockLocked = {api: {status: mockStatus}};
-jest.mock('../src/lockedFolder/useLockedFolder', () => ({useLockedFolder: () => mockLocked}));
 
 function navigationMock() {
   return {navigate: jest.fn(), replace: jest.fn(), push: jest.fn(), goBack: jest.fn()} as any;
@@ -35,39 +28,13 @@ const texts = (tree: ReturnType<typeof renderer.create>) =>
 
 /** Photo's own screens, opened at a section by its shared interface's own action. */
 describe('PhotoHomeScreen sections', () => {
-  beforeEach(() => mockStatus.mockReset());
-
   it('opens Photo configuration in its place for "sync", so Back returns to the shared screen', async () => {
-    mockStatus.mockResolvedValue({configured: true});
     const {navigation} = await mount({section: 'sync'});
     expect(navigation.replace).toHaveBeenCalledWith('PhotoConfiguration');
   });
 
-  it('shows the Locked Folder alone for "locked" - its own tab, with its own PIN', async () => {
-    mockStatus.mockResolvedValue({configured: true, unlocked: false});
-    const {tree, navigation} = await mount({section: 'locked'});
-    expect(texts(tree)).toEqual(expect.arrayContaining(['Locked Folder', 'Locked Folder tab']));
-    expect(texts(tree)).not.toContain('Library');
-    expect(navigation.replace).not.toHaveBeenCalled();
-  });
-
-  it('shows the same for its Satellite’s name - the section a hosted Satellite’s own screen opens at', async () => {
-    mockStatus.mockResolvedValue({configured: true, unlocked: false});
-    const {tree} = await mount({section: 'LockedFolder'});
-    expect(texts(tree)).toEqual(expect.arrayContaining(['Locked Folder', 'Locked Folder tab']));
-    expect(texts(tree)).not.toContain('Library');
-  });
-
-  it('says so when the server has no Locked Folder', async () => {
-    mockStatus.mockResolvedValue(null);
-    const {tree} = await mount({section: 'locked'});
-    expect(texts(tree)).toContain('This StarCore server has no Locked Folder.');
-    expect(texts(tree)).not.toContain('Locked Folder tab');
-  });
-
   it('opens as before without a section, or with one it does not know', async () => {
-    mockStatus.mockResolvedValue(null);
-    for (const params of [undefined, {section: 'elsewhere'}]) {
+    for (const params of [undefined, {section: 'elsewhere'}, {section: 'LockedFolder'}]) {
       const {tree, navigation} = await mount(params);
       expect(texts(tree)).toEqual(expect.arrayContaining(['Photos', 'Library', 'Albums']));
       expect(navigation.replace).not.toHaveBeenCalled();

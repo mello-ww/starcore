@@ -151,8 +151,10 @@ def settings(live, root, info: dict) -> dict:
         "path_missing": not root.is_dir(),
         "biometric_devices": devices,
         "biometric_note": (f"{devices} {'phone' if devices == 1 else 'phones'} can unlock with biometrics. "
-                           "Changing the PIN turns that off everywhere." if devices else
-                           "Phones can add fingerprint or face unlock from the StarCore app."),
+                           "Changing the PIN turns that off everywhere; a phone turns it off from its unlock "
+                           "card." if devices else
+                           "A phone can add fingerprint or face unlock from the StarCore app: \"Use "
+                           "biometrics next time\" on its unlock card."),
         "encryption": _encryption_summary(info, state, available, unencrypted),
         "recovery": (("A recovery key is set up." if has_key else
                       "No recovery key: if this server's key is lost, or the PIN forgotten, these files "

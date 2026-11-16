@@ -1,7 +1,7 @@
 """The Locked Folder's shared interface (ui.json, UI contract 1.2): the document validates as a
-protected preview, every route it names is one of the Locked Folder's own and refuses a session
+protected document, every route it names is one of the Locked Folder's own and refuses a session
 that hasn't unlocked the vault (the setup page's excepted, which says nothing about where the
-vault is), every management route it reaches still needs what it needs from its own screens
+vault is), every management route it reaches still needs what it always has
 (the PIN, the recovery key, an unlock), and the views it reads give its pages what they bind.
 
 See docs/satellites/locked_folder.md, "Shared interface".
@@ -99,9 +99,9 @@ class LockedFolderUiDocumentTest(unittest.TestCase):
     def setUp(self):
         self.document = ui_contract.load(LOCKED_FOLDER_DIR / "ui.json")
 
-    def test_it_is_a_protected_preview_with_a_setup_page_and_nothing_kept(self):
+    def test_it_is_a_protected_document_with_a_setup_page_and_nothing_kept(self):
         self.assertEqual(self.document["contract"], "starcore.ui/1.2")
-        self.assertTrue(self.document["preview"])
+        self.assertNotIn("preview", self.document)  # its only interface
         self.assertEqual(self.document["protected"], {"capability": "media.vault", "setup": "setup", "forgot": "forgot"})
         self.assertNotIn("params", self.document["pages"]["setup"])
         self.assertNotIn("params", self.document["pages"]["forgot"])

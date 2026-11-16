@@ -61,8 +61,18 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   its shared interface is now the only one, on the web as on Android, and the storage is shown
   by the shared `metric` bars. The "own page" switch in Developer Mode no longer appears for it
   (`docs/file-explorer-migration.md`, F7).
+- **The Locked Folder's own web page and Android screens** (`locked_folder/mission_control/page.js`
+  and `page.css`, `mobile/src/lockedFolder/`), with Photos' Locked Folder tab and its own Lock
+  move on both clients (`lockedMove.js`, the viewer's Lock button). Its shared interface is now
+  its only one, opened from Photos' tile, and a photo moves in through Photos' shared
+  interface (`docs/satellites/locked_folder.md`, L8).
 
 ### Added
+
+- **Biometric unlock turned on from the Android app's unlock card:** a full unlock offers "Use
+  biometrics next time", and the PIN that unlocks then enrols the phone; an enrolled phone's
+  card offers "Stop using biometrics on this phone". A move's prompt offers neither. This was
+  only in the Locked Folder's old screens.
 
 - **"Forgot your PIN?" in a protected document (UI contract 1.2):** a protected document may
   name a `forgot` page (`protected.forgot`, a page without params that the server serves

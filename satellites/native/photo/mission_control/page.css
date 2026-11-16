@@ -201,16 +201,6 @@
 }
 
 .photo-tab[hidden],
-.photo-viewer-lock[hidden] {
-    display: none;
-}
-
-.photo-tab-lock {
-    display: inline-flex;
-    vertical-align: -2px;
-    margin-right: 6px;
-}
-
 .photo-notice-ok {
     border-color: var(--sc-line, var(--line));
     background: var(--sc-card, var(--surface));
@@ -480,7 +470,6 @@
 
 .photo-viewer-info,
 .photo-viewer-delete,
-.photo-viewer-lock,
 .photo-viewer-close {
     display: flex;
     align-items: center;
@@ -497,7 +486,6 @@
 }
 
 .photo-viewer-info:hover,
-.photo-viewer-lock:hover,
 .photo-viewer-close:hover {
     border-color: var(--sapphire);
     color: var(--text);

@@ -259,6 +259,15 @@ describe('a media.vault provider’s routes', () => {
     await expect(api.biometricChallenge('key-1')).resolves.toBeNull();
   });
 
+  it('turns biometric unlock on with the PIN, through the biometric operation', async () => {
+    const post = jest.fn<Promise<Answer>, unknown[]>(async () => ({status: 200, body: {key_id: 'key-9'}}));
+    const api = new VaultApi({post} as any, PROVIDER);
+    await expect(api.enrollBiometrics('2468', 'PUB', 'Phone')).resolves.toBe('key-9');
+    expect(post).toHaveBeenCalledWith('/api/satellites/Vault/biometric/enroll', {pin: '2468', public_key: 'PUB', device_name: 'Phone'});
+    post.mockResolvedValueOnce({status: 401, body: {error: 'incorrect PIN'}} as any);
+    await expect(api.enrollBiometrics('0000', 'PUB', 'Phone')).rejects.toMatchObject({status: 401});
+  });
+
   it('keeps an unlock alive, and says so when the store is locked again', async () => {
     const post = jest.fn<Promise<Answer>, unknown[]>(async () => ({status: 200, body: {expires_at: 'later'}}));
     const api = new VaultApi({post} as any, PROVIDER);

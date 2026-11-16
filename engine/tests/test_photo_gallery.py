@@ -182,10 +182,11 @@ class PhotoUiDocumentTest(unittest.TestCase):
         self.assertNotIn("LockedFolder", text)
         self.assertNotIn('"own": "locked"', text)
         self.assertEqual(grid["item"]["icon"], "$.icon")
-        # Photo's own web page knows both sections, and the Locked Folder's link as well
+        # Photo's own web page knows the sync section, and nothing of the vault any more (L8)
         page = (PHOTO_DIR / "mission_control" / "page.js").read_text(encoding="utf-8")
         self.assertIn('section === "sync" ? "config"', page)
-        self.assertIn('section === LOCKED_FOLDER || section === "locked"', page)
+        self.assertNotIn("LockedFolder", page)
+        self.assertNotIn("locked_folder", page)
 
 
     def test_settings_are_forms_saved_through_the_configuration_route(self):

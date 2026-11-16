@@ -43,17 +43,12 @@ describe('which interface a Satellite opens in', () => {
     expect(ownScreenBeside(satellite('Gallery', {contract: 'starcore.ui/1.2', revision: 'r3', error: null}))).toBeUndefined();
   });
 
-  it('a hosted Satellite’s own screen is its host’s, opened at a section named after it', () => {
-    const hosted = satellite('Vaulty', {contract: 'starcore.ui/1.2', revision: 'r5', error: null, preview: true}, 'Photo');
-    expect(ownScreen(hosted)).toEqual({screen: 'PhotoHome', params: {section: 'Vaulty'}});
-    expect(opensSharedInterface(hosted)).toBe(false);
-    expect(hasSharedPreview(hosted)).toBe(true);
+  it('a hosted Satellite has no screen of the app’s own: its shared interface, by itself', () => {
+    const hosted = satellite('Vaulty', {contract: 'starcore.ui/1.2', revision: 'r5', error: null}, 'Photo');
+    expect(ownScreen(hosted)).toBeUndefined();
+    expect(opensSharedInterface(hosted)).toBe(true);
+    expect(ownScreenBeside(hosted)).toBeUndefined();
     expect(canOpen(hosted)).toBe(true);
-    // its document no longer a preview: the shared one by default, the host's screen beside it
-    const switched = satellite('Vaulty', {contract: 'starcore.ui/1.2', revision: 'r6', error: null}, 'Photo');
-    expect(opensSharedInterface(switched)).toBe(true);
-    expect(ownScreenBeside(switched)).toEqual({screen: 'PhotoHome', params: {section: 'Vaulty'}});
-    // a host the app has no screen of its own for gives nothing
-    expect(ownScreen(satellite('Vaulty', null as any, 'Elsewhere'))).toBeUndefined();
+    expect(canOpen(satellite('Vaulty', null as any, 'Photo'))).toBe(false);
   });
 });

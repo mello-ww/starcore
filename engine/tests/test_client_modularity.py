@@ -25,7 +25,7 @@ import unittest
 REPO = Path(__file__).resolve().parents[2]
 
 # folders of Satellite-specific client code, which may know their own Satellite
-SATELLITE_SPECIFIC = ("mobile/src/music/", "mobile/src/photo/", "mobile/src/lockedFolder/")
+SATELLITE_SPECIFIC = ("mobile/src/music/", "mobile/src/photo/")
 
 # generic code that still names a Satellite: (file, current count) - lower a
 # count, or drop the line, when a coupling goes; never raise one or add a line
@@ -47,8 +47,6 @@ KNOWN_IMPORTS = {
 
 # Satellite code naming another Satellite: (file, current count)
 KNOWN_CROSS_SATELLITE = {
-    # Photo hosts the Locked Folder's page as a tab (until sections are discovered)
-    "satellites/native/photo/mission_control/page.js": 1,
     # not Satellite references: a Python type named "Status" and a column
     # label, matched by the same pattern
     "satellites/native/music/library.py": 1,
@@ -121,7 +119,7 @@ def comments(path: Path) -> list:
 
 def satellite_name_pattern() -> re.Pattern:
     """A Satellite's name in prose: its manifest name, spelled out ("Locked Folder"), plural,
-    capitalised, and its folders (locked_folder, src/photo/, lockedFolder/)."""
+    capitalised, and its folders (locked_folder, src/photo/)."""
     words = set()
     for name in satellite_names():
         spelled = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", name)

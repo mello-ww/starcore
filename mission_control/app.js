@@ -182,20 +182,15 @@ function usesOwnPage(satellite) {
 // The own action (UI contract 1.2) opens a Satellite's own page at a section from its shared
 // interface: that visit is a history entry of its own, marked in history.state, so Back
 // returns to the shared interface and a reload stays on the own page. A section that is
-// another Satellite hosted by this one (section_of) and still drawn by its own page is on the
-// host's own page, which hosts it - so #/satellite/<host>/<hosted> keeps working whichever
-// interface is chosen. One with a shared interface is drawn by itself (hostedInterface).
+// another Satellite hosted by this one (section_of) is drawn by itself, in its shared interface,
+// whichever interface its host shows (hostedInterface).
 const OWN_VISIT = "starcore.ownPage";
 
 function visitsOwnPage(satellite) {
     if (route.name !== "satellite" || route.satellite.toLowerCase() !== satellite.name.toLowerCase()) {
         return false;
     }
-    if (history.state && history.state[OWN_VISIT] === satellite.name) {
-        return true;
-    }
-    const hosted = hostedSection(satellite, route.section);
-    return Boolean(hosted) && usesOwnPage(hosted);
+    return Boolean(history.state && history.state[OWN_VISIT] === satellite.name);
 }
 
 // the Satellite `name` when its manifest says it is a section of `host`
@@ -208,7 +203,7 @@ function hostedSection(host, name) {
 // (#/satellite/<host>/<hosted>/<section>), its hash beneath its host's
 function hostedInterface(satellite) {
     const hosted = hostedSection(satellite, route.section);
-    if (hosted && hasUiDocument(hosted) && !usesOwnPage(hosted)) {
+    if (hosted && hasUiDocument(hosted)) {
         return { satellite: hosted, section: route.inner, hosted: true };
     }
     return { satellite, section: route.section, hosted: false };

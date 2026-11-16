@@ -2,8 +2,10 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Pressable, StyleSheet, Text, TextInput, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {PrimaryButton} from '../components/PrimaryButton';
+import {StarSwitch} from '../components/StarSwitch';
+import {deviceInfo} from '../platform/device';
 import {colors, spacing, tokens, typography, useAccentStyles} from '../theme';
-import {isEnrolled, unlockWithBiometrics} from './biometricUnlock';
+import {canEnroll, disable, enroll, isEnrolled, unlockWithBiometrics} from './biometricUnlock';
 import type {BiometricDeps, BiometricUnlockResult} from './biometricUnlock';
 
 /**
@@ -11,7 +13,11 @@ import type {BiometricDeps, BiometricUnlockResult} from './biometricUnlock';
  * phone has turned it on for this server and store. Biometrics are offered once automatically
  * when this appears, and the PIN always works as the fallback. What the PIN and a match do is
  * the caller's - a full unlock for a protected document, a single-use grant for the secure
- * action. The PIN lives only in the field and the one request it is sent with.
+ * action. The PIN lives only in the field and the requests it is sent with.
+ *
+ * With `offerBiometrics` (a full unlock), a phone that can use biometrics but hasn't turned them
+ * on for this store offers "Use biometrics next time": the PIN that unlocks also turns them on.
+ * One that has offers to stop using them on this phone.
  */
 export function VaultUnlock({
   withPin,
@@ -22,7 +28,7 @@ export function VaultUnlock({
   intro = 'Enter your PIN to see what’s inside.',
   biometricPrompt,
   autoBiometrics = true,
-  forgotHelp,
+  offerBiometrics = false,
   onForgot,
 }: {
   /** What the PIN does; throws as the store's unlock does (401 wrong, `retryAfter` locked out). */
@@ -37,9 +43,9 @@ export function VaultUnlock({
   /** The system biometric prompt's words; the title by default. */
   biometricPrompt?: string;
   autoBiometrics?: boolean;
-  /** What to do about a forgotten PIN, behind a "Forgot your PIN?" link. */
-  forgotHelp?: string;
-  /** What "Forgot your PIN?" opens instead (a protected document's forgot page). */
+  /** Offer to turn biometric unlock on with the PIN, or off: for a full unlock only. */
+  offerBiometrics?: boolean;
+  /** What "Forgot your PIN?" opens (a protected document's forgot page). */
   onForgot?: () => void;
 }) {
   const accentStyle = useAccentStyles();
@@ -48,7 +54,9 @@ export function VaultUnlock({
   const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(0);
   const [enrolled, setEnrolled] = useState(false);
-  const [showForgot, setShowForgot] = useState(false);
+  // whether this phone could turn biometrics on here, and whether the person wants that
+  const [enrollable, setEnrollable] = useState(false);
+  const [remember, setRemember] = useState(false);
   const tried = useRef(false);
   const mounted = useRef(true);
   useEffect(
@@ -128,6 +136,27 @@ export function VaultUnlock({
     });
   }, [biometricDeps, autoBiometrics, tryBiometrics]);
 
+  useEffect(() => {
+    if (!offerBiometrics || !biometricDeps || !canEnroll(biometricDeps) || enrolled) {
+      setEnrollable(false);
+      return;
+    }
+    Promise.resolve()
+      .then(() => biometricDeps.signer.isAvailable())
+      .then(result => mounted.current && setEnrollable(Boolean(result?.available)))
+      .catch(() => mounted.current && setEnrollable(false));
+  }, [offerBiometrics, biometricDeps, enrolled]);
+
+  const stopBiometrics = async () => {
+    if (!biometricDeps) {
+      return;
+    }
+    await disable(biometricDeps).catch(() => undefined);
+    if (mounted.current) {
+      setEnrolled(false); // and "Use biometrics next time" is offered again
+    }
+  };
+
   const submit = async () => {
     if (!pin) {
       return;
@@ -136,6 +165,10 @@ export function VaultUnlock({
     setMessage(null);
     try {
       await withPin(pin);
+      if (enrollable && remember && biometricDeps && canEnroll(biometricDeps)) {
+        // unlocked already: biometrics that can't be turned on now are simply not on
+        await enroll(biometricDeps, pin, deviceInfo.displayName()).catch(() => false);
+      }
       if (!mounted.current) {
         return;
       }
@@ -183,13 +216,25 @@ export function VaultUnlock({
           {message}
         </Text>
       ) : null}
+      {enrollable && (
+        <View style={styles.remember}>
+          <Text style={[typography.caption, styles.rememberLabel]}>Use biometrics next time</Text>
+          <StarSwitch
+            value={remember}
+            onValueChange={setRemember}
+            disabled={busy}
+            accessibilityLabel="Use biometrics next time"
+            testID="vault-remember-biometrics"
+          />
+        </View>
+      )}
       <View style={styles.actions}>
         <PrimaryButton title="Unlock" onPress={submit} disabled={!pin || wait > 0} loading={busy} />
         {enrolled && (
           <PrimaryButton title="Use biometrics" variant="secondary" onPress={tryBiometrics} disabled={busy || wait > 0} />
         )}
       </View>
-      {onForgot ? (
+      {onForgot && (
         <Pressable
           onPress={onForgot}
           accessibilityRole="button"
@@ -198,19 +243,18 @@ export function VaultUnlock({
           style={styles.forgot}>
           <Text style={[typography.caption, accentStyle.text]}>Forgot your PIN?</Text>
         </Pressable>
-      ) : forgotHelp ? (
-        showForgot ? (
-          <Text style={[typography.caption, styles.center]}>{forgotHelp}</Text>
-        ) : (
-          <Pressable
-            onPress={() => setShowForgot(true)}
-            accessibilityRole="button"
-            hitSlop={12}
-            style={styles.forgot}>
-            <Text style={[typography.caption, accentStyle.text]}>Forgot your PIN?</Text>
-          </Pressable>
-        )
-      ) : null}
+      )}
+      {offerBiometrics && enrolled && (
+        <Pressable
+          onPress={stopBiometrics}
+          disabled={busy}
+          accessibilityRole="button"
+          hitSlop={12}
+          testID="vault-stop-biometrics"
+          style={styles.forgot}>
+          <Text style={[typography.caption, styles.center]}>Stop using biometrics on this phone</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -237,6 +281,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   center: {textAlign: 'center'},
+  remember: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    minHeight: 44,
+  },
+  rememberLabel: {flex: 1},
   input: {
     alignSelf: 'stretch',
     minHeight: 48,

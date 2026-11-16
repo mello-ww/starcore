@@ -45,9 +45,14 @@ export interface BiometricApi {
   revokeBiometrics(keyId: string): Promise<void>;
 }
 
-/** ...and turning it on, which only the providing Satellite's own screens do. */
+/** ...and turning it on, with the PIN, from the unlock card of a full unlock. */
 export interface EnrollingBiometricApi extends BiometricApi {
   enrollBiometrics(pin: string, publicKey: string, deviceName: string): Promise<string>;
+}
+
+/** Whether these routes can also turn biometric unlock on. */
+export function canEnroll(deps: BiometricDeps): deps is BiometricDeps<EnrollingBiometricApi> {
+  return typeof (deps.api as Partial<EnrollingBiometricApi>).enrollBiometrics === 'function';
 }
 
 export interface BiometricDeps<Api extends BiometricApi = BiometricApi> {

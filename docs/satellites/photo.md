@@ -301,7 +301,7 @@ What it covers:
 | Import from a folder on the server: check, then import | web only | yes, both clients ("Import from a folder" on Library) |
 | Settings: phone folders (`source_paths`), the default album for synced photos, the recycle bin's retention, the default import folder | yes | yes, both clients: Settings on Albums, one form each, the phone folders as repeatable rows (see below) |
 | Phone sync | yes | opens Photo's own: "Phone sync" on Settings (the web's Configuration tab, the app's Photo configuration) |
-| Locked Folder | yes | its tile among the folders on Albums (a lock, shown while the Locked Folder is enabled) opens it with the `section` action: its own page or screen by default, its shared interface (a preview, [the Locked Folder](locked_folder.md#shared-interface)) in Developer Mode |
+| Locked Folder | yes | its tile among the folders on Albums (a lock, shown while the Locked Folder is enabled) opens it with the `section` action: its shared interface, its only one ([the Locked Folder](locked_folder.md#shared-interface)) |
 | Move a photo into the Locked Folder | yes, from the viewer | yes: the viewer (Library, Search, Map, an album) and a selection (Library, an album), through the secure action - see below |
 | Offline cache of the library (Android) | yes, the whole list (metadata only) | yes: Library, Albums and an album, with up to 600 items each (`offline` pages, see the UI contract's "Offline pages"), only the fields they show, and never an item's GPS location or its folder on the server; never the recycle bin, Search or Map |
 
@@ -332,12 +332,11 @@ page opens its Configuration tab, and the app pushes Photo configuration over th
 so Back returns there. It goes once the phone sync capability replaces it (S0 to S4 in
 [the parity audit](../photos-parity-audit.md)). The Locked Folder's tile uses the `section` action
 (`{"section": "$.section"}`), and Photo's document names no Satellite it hosts: the albums route
-lists them from the Engine. By default it opens the Locked Folder's own interface - Photo's own
-web page at `#/satellite/Photo/LockedFolder`, and in the app the Locked Folder on its own
-screen, pushed over the shared one - which asks for its PIN or biometrics as before, locks
-again on leaving and blocks screenshots on Android. Photo's document never reaches the vault's
-routes or media. The Locked Folder's own shared interface, a preview, opens there instead once
-Developer Mode switches it on ([the Locked Folder](locked_folder.md#shared-interface)).
+lists them from the Engine. It opens the Locked Folder's shared interface, by itself (on the
+web at `#/satellite/Photo/LockedFolder`, in the app pushed over Photos' screen), which asks for
+its PIN or biometrics, locks again on leaving and blocks screenshots on Android. Photo's
+document never reaches the vault's routes or media
+([the Locked Folder](locked_folder.md#shared-interface)).
 
 **Move to Locked Folder** is the contract's `secure` action (`media.vault` / `move_in`), on the
 viewer and on a selection. The document names neither the Locked Folder nor a route.

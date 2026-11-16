@@ -37,10 +37,10 @@ Clients implement the UI contract and capability protocols, never a Satellite.
 | Satellite | Shared interface | Own code still used |
 |---|---|---|
 | Status | ✅ its only interface on both clients (1.1) | none |
-| Photos | ✅ default on both clients (1.2) | web `page.js` for settings and the Locked Folder; Android `src/photo/` for settings, phone sync and the Locked Folder; background sync started by `App.tsx` |
+| Photos | ✅ default on both clients (1.2) | web `page.js` for settings; Android `src/photo/` for settings and phone sync; background sync started by `App.tsx` |
 | File Explorer | ✅ its shared interface alone on both clients (F1-F7): browsing, a file's page (open, download, share), management (new folder, rename, delete) and upload | none: its `page.js` and `page.css` are removed |
 | Music | ◐ only the player: the shared audio host on both clients, and `play` for any Satellite. No `ui.json` | web `page.js` with its views (home, library, album, artist, playlist, search, settings, stats); Android `src/music/` (11 screen and tab files), wired by `builtins.tsx` |
-| Locked Folder | ◐ only moving photos in, from Photos (`secure` + `media.vault`) | web `page.js` (about 1,200 lines: browsing, PIN, encryption, recovery), hosted by Photo's page; Android `src/lockedFolder/` (its screens and the unlock prompt) |
+| Locked Folder | ✅ its only interface on both clients (1.2, L0-L8): browsing, moves, setup, settings, a forgotten PIN; biometric unlock from the Android app's unlock card | none: its `page.js` and `mobile/src/lockedFolder/` are removed |
 | Docker | – a placeholder with no interface | none |
 
 Music was the first Satellite to be redesigned and the first to give the shared system
@@ -150,7 +150,7 @@ closed it.
 - [x] **L6** - the vault and the library move files through capabilities: `media.vault`'s
   `sealed` and `media.gallery`'s `original`, `release` and `adopt`, for the server alone
   (a request through the Engine carries its `caller`). `KNOWN_CROSS_SATELLITE` lost the vault's
-  and `private_media.py`'s entries; Photo's `page.js` (the Locked Folder tab) stays until L8.
+  and `private_media.py`'s entries.
 - [x] **L7** - security review of L0 to L6 (`docs/satellites/locked_folder.md`, "Security review
   of L0 to L6"). Fixed: on a Windows server another name for the vault's folder
   (`\\?\C:\...`, the drive's loopback share) got past `files.protected`, which now tells the
@@ -164,25 +164,27 @@ closed it.
 - [ ] **L7 follow-up - a browser's cache after a move in:** Mission Control asks the browser to
   fetch a moved item's thumbnail and original again, which replaces the copies it cached (the
   Android app already evicts its image cache).
-- [ ] **L8** - remove the Locked Folder's `page.js` and `mobile/src/lockedFolder/`.
+- [x] **L8** - removed the Locked Folder's `page.js` and `mobile/src/lockedFolder/`, Photo's
+  Locked Folder tab and its own Lock move on both clients (2026-11-16). Turning biometric unlock
+  on and off, which only the old Android screens did, moved to the app's unlock card.
 
 What those milestones cover, as first listed:
 
-- [ ] **Browse, view and move out** from the shared interface while unlocked, through
+- [x] **Browse, view and move out** from the shared interface while unlocked, through
   `media.vault` operations that answer only with a grant, never a listing without one.
-- [ ] **Its management:** setting and changing the PIN, the location, turning encryption on
+- [x] **Its management:** setting and changing the PIN, the location, turning encryption on
   (the recovery key shown once), recovering with that key, deleting the backup, biometric
   devices. Secrets are typed and shown only in client-owned prompts, so the contract needs a
   prompt for setting a secret and one for showing a secret once.
-- [ ] **The unlock prompt as generic app code:** from `mobile/src/lockedFolder/` to an
+- [x] **The unlock prompt as generic app code:** from `mobile/src/lockedFolder/` to an
   implementation of the `media.vault` protocol (for example `mobile/src/vault/`).
-- [ ] **Sections discovered from the catalog,** so Photo no longer names the Locked Folder
+- [x] **Sections discovered from the catalog,** so Photo no longer names the Locked Folder
   (in its `page.js`, which hosts it today, in `gallery.py`'s tile and in its `ui.json`
   labels, which would then come from the provider).
-- [ ] **Between Satellites:** Photo's `private_media.py` and the vault's `vault.py` reach each
+- [x] **Between Satellites:** Photo's `private_media.py` and the vault's `vault.py` reach each
   other through capabilities (File Explorer's guard already did, in L1: it is now
   `protection.py`, over `files.protected`). Their comments naming each other go with them.
-- [ ] Then remove the Locked Folder's `page.js` and `mobile/src/lockedFolder/`.
+- [x] Then remove the Locked Folder's `page.js` and `mobile/src/lockedFolder/`.
 
 Its audit and plan go in [`satellites/locked_folder.md`](satellites/locked_folder.md).
 

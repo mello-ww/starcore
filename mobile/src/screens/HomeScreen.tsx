@@ -57,18 +57,10 @@ export interface OwnScreen {
   params?: {section: string};
 }
 
-/**
- * The screen of this app's own for a Satellite: its dedicated screen or, for a Satellite another
- * one hosts (section_of), its host's dedicated screen opened at a section named after it - as
- * Mission Control opens the host's own page at that section.
- */
+/** The screen of this app's own for a Satellite: its dedicated screen, if it has one. */
 export function ownScreen(satellite: SatelliteSummary): OwnScreen | undefined {
   const own = DEDICATED_SCREENS[satellite.name];
-  if (own) {
-    return {screen: own};
-  }
-  const host = satellite.section_of ? DEDICATED_SCREENS[satellite.section_of] : undefined;
-  return host ? {screen: host, params: {section: satellite.name}} : undefined;
+  return own ? {screen: own} : undefined;
 }
 
 /**

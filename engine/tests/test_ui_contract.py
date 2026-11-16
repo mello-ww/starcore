@@ -312,9 +312,9 @@ class UiApiTest(unittest.TestCase):
         explorer = next(item for item in payload["satellites"] if item["name"] == "FileExplorer")
         self.assertEqual(explorer["provides"]["files.browse"]["operations"], {"list": "entries"})
         self.assertNotIn("preview", explorer["ui"])  # F6: its default interface on every client
-        # L3: a preview, so the clients keep its own screens until it is validated
+        # L8: its only interface, so no longer a preview
         locked = next(item for item in payload["satellites"] if item["name"] == "LockedFolder")
-        self.assertTrue(locked["ui"]["preview"])
+        self.assertNotIn("preview", locked["ui"])
         # a Satellite without a ui.json still has an entry, with no definition
         music = next(item for item in payload["satellites"] if item["name"] == "Music")
         self.assertIsNone(music["ui"])
