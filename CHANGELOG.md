@@ -76,6 +76,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Removed
 
+- **Photos' own Mission Control page and Android screens** (`photo/mission_control/page.js` and
+  `page.css`, `mobile/src/photo/`, their routes and tests): its shared interface is now the only
+  one on both clients, its settings being forms (P1). The Satellite publishes no page, and the
+  app's dedicated-screen table keeps only Music's (`docs/remaining-work.md`, P3).
 - **File Explorer's own Mission Control page** (`page.js`, `page.css` and its four storage themes):
   its shared interface is now the only one, on the web as on Android, and the storage is shown
   by the shared `metric` bars. The "own page" switch in Developer Mode no longer appears for it

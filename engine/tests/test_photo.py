@@ -660,18 +660,11 @@ class PhotoSatelliteTest(unittest.TestCase):
         self.assertEqual(self.satellite.type, "native")
         self.assertTrue(self.satellite.manifest.description)
 
-    def test_the_satellite_publishes_a_page(self):
+    def test_the_satellite_publishes_no_page_of_its_own(self):
         status, payload = self.json_request("/api/satellites/photo")
 
         self.assertEqual(status, 200)
-        self.assertEqual(payload["page"], {"module": "page.js", "stylesheet": "page.css"})
-
-    def test_page_assets_are_served(self):
-        for asset, expected in (("page.js", "javascript"), ("page.css", "text/css")):
-            status, content_type, body = self.request(f"/api/satellites/photo/assets/{asset}")
-            self.assertEqual(status, 200)
-            self.assertIn(expected, content_type)
-            self.assertTrue(body)
+        self.assertIsNone(payload["page"])
 
     def test_assets_cannot_escape_the_satellite(self):
         for path in ("/api/satellites/photo/assets/../../config.toml", "/api/satellites/photo/assets/..%2fapi.py"):

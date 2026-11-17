@@ -47,14 +47,13 @@ export function formatUptime(seconds: number): string {
  * yet, and for a server older than a Satellite's ui.json. Listed in
  * docs/remaining-work.md, and removed from there.
  */
-export const DEDICATED_SCREENS: Record<string, 'PhotoHome' | 'MusicHome'> = {
-  Photo: 'PhotoHome',
+export const DEDICATED_SCREENS: Record<string, 'MusicHome'> = {
   Music: 'MusicHome',
 };
 
 /** A screen of this app's own and the params it opens with. */
 export interface OwnScreen {
-  screen: 'PhotoHome' | 'MusicHome';
+  screen: 'MusicHome';
   params?: {section: string};
 }
 

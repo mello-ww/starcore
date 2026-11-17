@@ -79,9 +79,9 @@ class WorkingDirectoryIndependenceTest(unittest.TestCase):
                 self.assertTrue(engine.api.web_root.is_dir())
                 self.assertTrue((engine.api.web_root / "index.html").is_file())
 
-                photo = engine.registry.get("Photo")
-                self.assertTrue(photo.assets_path.is_dir())
-                self.assertTrue((photo.assets_path / "page.js").is_file())
+                music = engine.registry.get("Music")
+                self.assertTrue(music.assets_path.is_dir())
+                self.assertTrue((music.assets_path / "page.js").is_file())
             finally:
                 stop_engine(engine)
         finally:

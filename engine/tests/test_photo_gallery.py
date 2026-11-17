@@ -191,11 +191,6 @@ class PhotoUiDocumentTest(unittest.TestCase):
         self.assertNotIn("LockedFolder", text)
         self.assertNotIn('"own": "locked"', text)
         self.assertEqual(grid["item"]["icon"], "$.icon")
-        # Photo's own web page opens a section by its tab's name, and knows nothing of the vault (L8)
-        page = (PHOTO_DIR / "mission_control" / "page.js").read_text(encoding="utf-8")
-        self.assertIn('TABS.includes(section) ? section : "photos"', page)
-        self.assertNotIn("LockedFolder", page)
-        self.assertNotIn("locked_folder", page)
 
 
     def test_settings_are_forms_saved_through_the_configuration_route(self):
@@ -486,8 +481,8 @@ class PhotoGalleryApiTest(unittest.TestCase):
         photo = next(entry for entry in entries if entry["name"] == "Photo")
         self.assertTrue(photo["ui"]["revision"])
         self.assertNotIn("preview", photo["ui"])
-        # its own page and screens stay, for Developer Mode
-        self.assertTrue(photo["page"])
+        # its own page and screens are retired (P3): the document is its only interface
+        self.assertIsNone(photo["page"])
 
 
     # ---------- media.gallery: what the media picker chooses from ----------

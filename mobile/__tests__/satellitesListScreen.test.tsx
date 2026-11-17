@@ -65,7 +65,7 @@ describe('SatellitesListScreen', () => {
   });
 
   it('does not list a satellite that lives inside another (the Locked Folder, in Photos)', async () => {
-    const lockedFolder = {...satelliteB, name: 'LockedFolder', section_of: 'Photo'};
+    const lockedFolder = {...satelliteB, name: 'LockedFolder', section_of: 'Music'};
     __mocks.list.mockResolvedValue([satelliteA, lockedFolder]);
     let tree!: ReturnType<typeof renderer.create>;
     await act(async () => {
@@ -77,8 +77,8 @@ describe('SatellitesListScreen', () => {
   });
 
   it('offers nothing for a hosted Satellite on its host’s card, even a preview: its host opens it', async () => {
-    const photo = {...satelliteA, name: 'Photo', ui: {contract: 'starcore.ui/1.2', revision: 'p1', error: null, preview: true}};
-    const hosted = {...satelliteB, name: 'Vaulty', section_of: 'Photo',
+    const photo = {...satelliteA, name: 'Music', ui: {contract: 'starcore.ui/1.2', revision: 'p1', error: null, preview: true}};
+    const hosted = {...satelliteB, name: 'Vaulty', section_of: 'Music',
       ui: {contract: 'starcore.ui/1.2', revision: 'v1', error: null, preview: true}};
     __mocks.list.mockResolvedValue([photo, hosted]);
     const pill = (tree: ReturnType<typeof renderer.create>) =>
@@ -166,8 +166,8 @@ describe('SatellitesListScreen', () => {
     expect(texts(tree)).toEqual(expect.arrayContaining(['status', 'Showing cached data - offline']));
   });
 
-  it('opens the dedicated Photo screens for a Photo whose server has no ui.json', async () => {
-    const photoSatellite = {...satelliteA, name: 'Photo', description: 'Photo library'};
+  it('opens the dedicated Music screens for a Music whose server has no ui.json', async () => {
+    const photoSatellite = {...satelliteA, name: 'Music', description: 'Music library'};
     __mocks.list.mockResolvedValue([photoSatellite]);
     let tree!: ReturnType<typeof renderer.create>;
     await act(async () => {
@@ -176,7 +176,7 @@ describe('SatellitesListScreen', () => {
 
     act(() => tree.root.findByProps({disabled: false}).props.onPress());
 
-    expect(navigation.navigate).toHaveBeenCalledWith('PhotoHome');
+    expect(navigation.navigate).toHaveBeenCalledWith('MusicHome');
   });
 
 

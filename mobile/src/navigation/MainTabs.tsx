@@ -15,11 +15,6 @@ import {ServersScreen} from '../screens/ServersScreen';
 import {SettingsScreen} from '../screens/SettingsScreen';
 import {useServers} from '../servers/ServersContext';
 import {tokens, useAccent} from '../theme';
-import {PhotoAlbumScreen} from '../photo/PhotoAlbumScreen';
-import {PhotoConfigurationScreen} from '../photo/PhotoConfigurationScreen';
-import {PhotoHomeScreen} from '../photo/PhotoHomeScreen';
-import {PhotoTrashTab} from '../photo/PhotoTrashTab';
-import {PhotoViewerScreen} from '../photo/PhotoViewerScreen';
 import {AudioHost} from '../media/AudioHost';
 import {AudioDisc, AudioFlight} from '../media/ui/AudioDisc';
 import {FullPlayer} from '../media/ui/FullPlayer';
@@ -44,13 +39,6 @@ export type SatellitesStackParamList = {
    * `revision` is the one GET /api/satellites reported, so a cached copy of
    * exactly that document opens without a request. */
   SatelliteUi: {name: string; page?: string; params?: Record<string, any>; revision?: string | null};
-  /** A Satellite's previous native screens, registered here until they are retired
-   * (docs/remaining-work.md). `section` comes from a shared interface's own action. */
-  PhotoHome: {section?: string} | undefined;
-  PhotoAlbum: {albumId: string; name: string};
-  PhotoConfiguration: undefined;
-  PhotoTrash: undefined;
-  PhotoViewer: {media: {id: string; mediaType: 'photo' | 'video'; duration: number | null}[]; startIndex: number};
   /** The app's own sync screen (client capability device.media-sync), opened by a document's
    * sync action for that document's provider. */
   MediaSync: {satellite?: string; capability?: string} | undefined;
@@ -86,19 +74,6 @@ function SatellitesStack() {
     <SatellitesStackNav.Navigator screenOptions={stackScreenOptions}>
       <SatellitesStackNav.Screen name="SatellitesList" component={SatellitesListScreen} options={{title: 'Satellites', headerShown: false}} />
       <SatellitesStackNav.Screen name="SatelliteUi" component={SatelliteUiScreen} />
-      <SatellitesStackNav.Screen name="PhotoHome" component={PhotoHomeScreen} options={{title: ''}} />
-      <SatellitesStackNav.Screen name="PhotoAlbum" component={PhotoAlbumScreen} />
-      <SatellitesStackNav.Screen
-        name="PhotoConfiguration"
-        component={PhotoConfigurationScreen}
-        options={{title: 'Photo configuration'}}
-      />
-      <SatellitesStackNav.Screen name="PhotoTrash" component={PhotoTrashTab} options={{title: 'Recycle bin'}} />
-      <SatellitesStackNav.Screen
-        name="PhotoViewer"
-        component={PhotoViewerScreen}
-        options={{headerShown: false, presentation: 'fullScreenModal'}}
-      />
       <SatellitesStackNav.Screen name="MediaSync" component={MediaSyncScreen} options={{title: 'Phone backup'}} />
       {BUILTIN_SCREENS.map(screen => (
         <SatellitesStackNav.Screen key={screen.name} name={screen.name} component={screen.component}

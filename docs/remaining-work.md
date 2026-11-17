@@ -37,7 +37,7 @@ Clients implement the UI contract and capability protocols, never a Satellite.
 | Satellite | Shared interface | Own code still used |
 |---|---|---|
 | Status | ✅ its only interface on both clients (1.1) | none |
-| Photos | ✅ default on both clients (1.2) | web `page.js` and Android `src/photo/` for settings (phone sync is removed until S1 to S4) |
+| Photos | ✅ its only interface on both clients (1.2) | none: `page.js` and `src/photo/` removed (P3) |
 | File Explorer | ✅ its shared interface alone on both clients (F1-F7): browsing, a file's page (open, download, share), management (new folder, rename, delete) and upload | none: its `page.js` and `page.css` are removed |
 | Music | ◐ only the player: the shared audio host on both clients, and `play` for any Satellite. No `ui.json` | web `page.js` with its views (home, library, album, artist, playlist, search, settings, stats); Android `src/music/` (11 screen and tab files), wired by `builtins.tsx` |
 | Locked Folder | ✅ its only interface on both clients (1.2, L0-L8): browsing, moves, setup, settings, a forgotten PIN; biometric unlock from the Android app's unlock card | none: its `page.js` and `mobile/src/lockedFolder/` are removed |
@@ -119,8 +119,10 @@ the owner 2026-11-15).
   the Engine (single colour, no script) and served as path data, drawn by both clients with a
   shared icon as fallback (contract change 5). Every Satellite's `mission_control/icon.svg`
   became `icons/logo.svg`; Photo's Albums tab has its own icon.
-- [ ] **P3** - then remove `satellites/native/photo/mission_control/page.js` and `page.css`,
-  `mobile/src/photo/`, its routes in `MainTabs.tsx` and its `DEDICATED_SCREENS` entry.
+- [x] **P3** - removed `satellites/native/photo/mission_control/page.js` and `page.css`,
+  `mobile/src/photo/` (with its tests), its routes in `MainTabs.tsx` and its `DEDICATED_SCREENS`
+  entry. The Satellite publishes no page of its own; `KNOWN_IMPORTS` lost `MainTabs.tsx` and
+  `KNOWN_COUPLINGS` its Photo count.
 - [ ] Optional, from the audit: the summary's tools note (#5), album group hints (#6), bulk
   remove from an album (#10), map cluster preview (#15), exposure details and map link (#20),
   select all and bulk routes (#23), one album save per pick (#32).

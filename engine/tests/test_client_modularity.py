@@ -25,22 +25,20 @@ import unittest
 REPO = Path(__file__).resolve().parents[2]
 
 # folders of Satellite-specific client code, which may know their own Satellite
-SATELLITE_SPECIFIC = ("mobile/src/music/", "mobile/src/photo/")
+SATELLITE_SPECIFIC = ("mobile/src/music/",)
 
 # generic code that still names a Satellite: (file, current count) - lower a
 # count, or drop the line, when a coupling goes; never raise one or add a line
 KNOWN_COUPLINGS = {
-    # the dedicated Photo and Music screens (the Satellites list reads the same table)
-    "mobile/src/screens/HomeScreen.tsx": 2,
+    # the dedicated Music screens (the Satellites list reads the same table)
+    "mobile/src/screens/HomeScreen.tsx": 1,
 }
 
 # generic mobile code that imports a Satellite-specific folder: (file, {folder: count}).
-# The composition root is where native Satellite code is wired in; the Photo
-# screens are still registered by the navigation. Lower a count when one goes.
+# The composition root is where native Satellite code is wired in. Lower a count when one goes.
 KNOWN_IMPORTS = {
     # the composition root: Music's native screens
     "mobile/src/satellites/builtins.tsx": {"mobile/src/music/": 10},
-    "mobile/src/navigation/MainTabs.tsx": {"mobile/src/photo/": 5},
 }
 
 # Satellite code naming another Satellite: (file, current count)

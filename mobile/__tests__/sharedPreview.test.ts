@@ -15,7 +15,7 @@ describe('which interface a Satellite opens in', () => {
   });
 
   it('keeps the app’s own screen first for a preview, and offers the shared one beside it', () => {
-    const preview = satellite('Photo', {contract: 'starcore.ui/1.2', revision: 'r2', error: null, preview: true});
+    const preview = satellite('Music', {contract: 'starcore.ui/1.2', revision: 'r2', error: null, preview: true});
     expect(opensSharedInterface(preview)).toBe(false);
     expect(hasSharedPreview(preview)).toBe(true);
   });
@@ -27,28 +27,28 @@ describe('which interface a Satellite opens in', () => {
   });
 
   it('has nothing to open without a valid document', () => {
-    const refused = satellite('Photo', {contract: null, revision: null, error: 'ui.json is invalid', preview: true});
+    const refused = satellite('Music', {contract: null, revision: null, error: 'ui.json is invalid', preview: true});
     expect(opensSharedInterface(refused)).toBe(false);
     expect(hasSharedPreview(refused)).toBe(false);
     expect(ownScreenBeside(refused)).toBeUndefined();
   });
 
   it('opens a document that is no longer a preview by default, with the app’s own screen beside it', () => {
-    const switched = satellite('Photo', {contract: 'starcore.ui/1.2', revision: 'r4', error: null});
+    const switched = satellite('Music', {contract: 'starcore.ui/1.2', revision: 'r4', error: null});
     expect(opensSharedInterface(switched)).toBe(true);
     expect(hasSharedPreview(switched)).toBe(false);
-    expect(ownScreenBeside(switched)).toEqual({screen: 'PhotoHome'});
+    expect(ownScreenBeside(switched)).toEqual({screen: 'MusicHome'});
     // a preview, or a Satellite the app has no screen of its own for, has nothing to offer here
-    expect(ownScreenBeside(satellite('Photo', {contract: 'starcore.ui/1.2', revision: 'r2', error: null, preview: true}))).toBeUndefined();
+    expect(ownScreenBeside(satellite('Music', {contract: 'starcore.ui/1.2', revision: 'r2', error: null, preview: true}))).toBeUndefined();
     expect(ownScreenBeside(satellite('Gallery', {contract: 'starcore.ui/1.2', revision: 'r3', error: null}))).toBeUndefined();
   });
 
   it('a hosted Satellite has no screen of the app’s own: its shared interface, by itself', () => {
-    const hosted = satellite('Vaulty', {contract: 'starcore.ui/1.2', revision: 'r5', error: null}, 'Photo');
+    const hosted = satellite('Vaulty', {contract: 'starcore.ui/1.2', revision: 'r5', error: null}, 'Music');
     expect(ownScreen(hosted)).toBeUndefined();
     expect(opensSharedInterface(hosted)).toBe(true);
     expect(ownScreenBeside(hosted)).toBeUndefined();
     expect(canOpen(hosted)).toBe(true);
-    expect(canOpen(satellite('Vaulty', null as any, 'Photo'))).toBe(false);
+    expect(canOpen(satellite('Vaulty', null as any, 'Music'))).toBe(false);
   });
 });

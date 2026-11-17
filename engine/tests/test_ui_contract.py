@@ -407,7 +407,7 @@ class UiApiTest(unittest.TestCase):
         self.assertEqual(status, 405)
 
     def test_assets_and_frontend_revalidate_instead_of_redownloading(self):
-        for path in ("/app.js", "/api/satellites/Photo/assets/page.css"):
+        for path in ("/app.js", "/api/satellites/Music/assets/page.css"):
             status, _, headers = request(self.engine, path)
             self.assertEqual(status, 200, path)
             self.assertEqual(headers["Cache-Control"], "no-cache")

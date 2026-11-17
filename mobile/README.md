@@ -21,7 +21,6 @@ Mobile UI  ->  Existing StarCore API  ->  StarCore Engine  ->  Satellites
 - The phone's background backup (`src/sync/` and the Kotlin `sync` package), client
   capability `device.media-sync`: any server's `media.sync` provider, reached from a
   document's `sync` action or Settings' "Phone backup" (`docs/photos-parity-audit.md`).
-- Photos' previous native screens, until they are retired (`docs/remaining-work.md`).
 - Developer Mode (`src/developer/`): the terminal icon at the top right of each tab, or the
   switch in Settings. Off by default and remembered per server on this device; it shows the
   Console and Config tabs and anything a Satellite marks `developer: true`. A display
@@ -198,16 +197,14 @@ from the cache. The rules shared with the Engine and Mission Control are in
 `src/satellites/ui/contract.ts`, tested against `contracts/ui/` by
 `__tests__/uiContract.test.ts`.
 
-Status opens its `ui.json` alone; Photos opens its `ui.json` by default and keeps
-its dedicated screens in Developer Mode, where they still serve its settings. The Locked Folder has no screen of its own: its `ui.json` is its only interface. File Explorer has no screen of its own: its `ui.json` is a
+Status and Photos open their `ui.json` alone; their screens are retired. The Locked Folder has no screen of its own: its `ui.json` is its only interface. File Explorer has no screen of its own: its `ui.json` is a
 read-only preview, which the app opens (Mission Control keeps File Explorer's
 own page by default). Music keeps its dedicated screens until the shared blocks
 reach parity with them (`docs/remaining-work.md`). A Satellite's icons are its own (UI contract
 1.2: path data the Engine validated from its `icons/` folder, stroked by the native
 `StarCoreGlyph` view through `src/components/Glyph.tsx`), else its `icon_name`.
 
-Code written for one Satellite lives only in its own folder (`src/music/`,
-`src/photo/`), wired in by
+Code written for one Satellite lives only in its own folder (`src/music/`), wired in by
 `src/satellites/builtins.tsx` and the navigation. Everything else is generic;
 `engine/tests/test_client_modularity.py` lists the couplings left, and that list
 may only shrink.
@@ -243,7 +240,7 @@ mobile/
 │   │                     mission_control/tokens.css) and the accent
 │   ├── developer/        Developer Mode
 │   ├── storage/          plain (non-secret) local preferences
-│   ├── music/ photo/     Satellite-specific screens, until they are retired
+│   ├── music/            Music's screens, until they are retired
 │   │                     (docs/remaining-work.md)
 │   └── config.ts         build-time constants only - no server address,
 │                          no credentials, ever
