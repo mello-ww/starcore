@@ -2,6 +2,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import {Glyph} from '../components/Glyph';
 import {useAuth} from '../auth/AuthContext';
 import {useServers} from '../servers/ServersContext';
 import {SatellitesApi} from '../satellites/api';
@@ -114,7 +115,7 @@ export function SatellitesListScreen({navigation}: Props) {
             }>
             <Surface style={styles.card}>
               <View style={styles.row}>
-                <Icon name={satelliteIcon(item.name, item.icon_name)} size={20} color={accent} />
+                <Glyph name={satelliteIcon(item)} icons={item.icons ?? null} size={20} color={accent} />
                 <Text style={[type.title, styles.name]} numberOfLines={1}>
                   {item.name}
                 </Text>

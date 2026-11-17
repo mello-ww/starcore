@@ -6,7 +6,7 @@ from .satellite_registry import SatelliteRegistry
 from .manifest import SatelliteManifest
 from .satellite_config import SatelliteConfig
 from .module_loader import load_module_from_file, register_package
-from . import ui_contract
+from . import icons, ui_contract
 
 
 class SatelliteLoadError(Exception):
@@ -59,7 +59,7 @@ class SatelliteLoader:
         does, without importing any of the Satellite's code - what
         StarCore.rediscover() refreshes. Raises SatelliteLoadError."""
         manifest = self.read_manifest(satellite_dir)
-        return manifest, ui_contract.load_definition(satellite_dir, manifest.name, manifest.provides)
+        return manifest, ui_contract.load_definition(satellite_dir, manifest.name, manifest.provides, manifest.icons)
 
     def read_manifest(self, satellite_dir: Path) -> SatelliteManifest:
         manifest_path = satellite_dir / "satellite.toml"
@@ -81,9 +81,12 @@ class SatelliteLoader:
         except (tomllib.TOMLDecodeError, KeyError) as error:
             raise SatelliteLoadError(f"satellite.toml for satellite in {satellite_dir} is invalid ({error})")
 
-        if manifest.icon and not (satellite_dir / "mission_control" / manifest.icon).is_file():
-            print(f"[WARNING]: icon '{manifest.icon}' declared for satellite '{manifest.name}' "
-                  f"was not found under mission_control/. Falling back to the generic icon.")
+        manifest.icons, problems = icons.load_icons(satellite_dir, manifest_data.get("icons"))
+        for problem in problems:
+            print(f"[WARNING]: satellite '{manifest.name}': {problem}.")
+        if manifest.icon is not None and (not isinstance(manifest.icon, str) or manifest.icon not in manifest.icons):
+            print(f"[WARNING]: icon '{manifest.icon}' of satellite '{manifest.name}' is not one of its [icons]. "
+                  f"Clients draw its icon_name instead.")
             manifest.icon = None
         if manifest.icon_name and manifest.icon_name not in ui_contract.ICONS:
             print(f"[WARNING]: icon_name '{manifest.icon_name}' of satellite '{manifest.name}' is not in "
@@ -121,7 +124,7 @@ class SatelliteLoader:
         routes = self._load_routes(satellite_dir, package, manifest.name)
         page = self._load_page(satellite_dir)
         lifecycle = self._load_lifecycle(satellite_dir, package, manifest.name)
-        ui = ui_contract.load_definition(satellite_dir, manifest.name, manifest.provides)
+        ui = ui_contract.load_definition(satellite_dir, manifest.name, manifest.provides, manifest.icons)
         return Satellite(manifest, config, satellite_type, satellite_dir, state_provider, routes, page, lifecycle, ui)
 
     def _load_state_provider(self, satellite_dir: Path, package: str, satellite_name: str):

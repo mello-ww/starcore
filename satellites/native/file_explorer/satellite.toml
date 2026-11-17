@@ -2,9 +2,14 @@ name = "FileExplorer"
 version = "1.0.0"
 author = "mellow"
 description = "Browse, upload and manage files anywhere on this machine that StarCore itself can reach."
-icon = "icon.svg"
+# its own icon, one of [icons] below (icons/<name>.svg)
+icon = "logo"
 # from the shared icon set every client can draw (contracts/ui/vocabulary.json)
 icon_name = "folder"
+
+# its own icons, icons/<name>.svg, each with the shared icon drawn if its file is refused
+[icons]
+logo = "folder"
 
 # a Satellite capability others can use without knowing this Satellite: any
 # interface with a file-browser block, and Mission Control's folder picker,

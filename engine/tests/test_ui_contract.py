@@ -324,6 +324,13 @@ class UiApiTest(unittest.TestCase):
         self.assertRegex(payload["catalog_revision"], r"^[0-9a-f]{16}$")
         entry = next(item for item in payload["satellites"] if item["name"] == "Showcase")
         self.assertEqual(entry["icon_name"], "layers")
+        self.assertEqual((entry["icon"], entry["icons"]), (None, {}))
+        # P2: a Satellite's own icons, as paths the clients draw, with its shared icon to fall back on
+        photo = next(item for item in payload["satellites"] if item["name"] == "Photo")
+        self.assertEqual(photo["icon"], "logo")
+        self.assertEqual(set(photo["icons"]), {"logo", "albums"})
+        self.assertEqual(photo["icons"]["albums"]["fallback"], "folder")
+        self.assertTrue(photo["icons"]["logo"]["paths"][0].startswith("M"))
         self.assertEqual(entry["ui"], {"contract": "starcore.ui/1.0", "revision": self.showcase.ui.revision,
                                        "error": None})
         explorer = next(item for item in payload["satellites"] if item["name"] == "FileExplorer")
@@ -400,7 +407,7 @@ class UiApiTest(unittest.TestCase):
         self.assertEqual(status, 405)
 
     def test_assets_and_frontend_revalidate_instead_of_redownloading(self):
-        for path in ("/app.js", "/api/satellites/Status/assets/icon.svg"):
+        for path in ("/app.js", "/api/satellites/Photo/assets/page.css"):
             status, _, headers = request(self.engine, path)
             self.assertEqual(status, 200, path)
             self.assertEqual(headers["Cache-Control"], "no-cache")

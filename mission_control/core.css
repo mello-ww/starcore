@@ -168,7 +168,6 @@
     color: var(--sc-accent);
 }
 
-.sc-themed .card-head .satellite-icon .icon-mask,
 .sc-themed .card-head .satellite-icon svg {
     width: 20px;
     height: 20px;

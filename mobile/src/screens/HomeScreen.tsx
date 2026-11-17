@@ -3,6 +3,7 @@ import React, {useCallback, useMemo, useState} from 'react';
 import {Pressable, RefreshControl, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
+import {Glyph} from '../components/Glyph';
 import {useAuth} from '../auth/AuthContext';
 import {AccentCustomColor} from '../components/AccentCustomColor';
 import {DeveloperModeButton} from '../developer/DeveloperModeButton';
@@ -275,7 +276,7 @@ export function HomeScreen() {
         {listed?.map(satellite => (
           <View key={satellite.name} style={styles.card}>
             <View style={styles.cardHead}>
-              <Icon name={satelliteIcon(satellite.name, satellite.icon_name)} size={20} color={accentColor} />
+              <Glyph name={satelliteIcon(satellite)} icons={satellite.icons ?? null} size={20} color={accentColor} />
               <Text style={[type.title, styles.cardTitle]} numberOfLines={1}>
                 {satellite.name}
               </Text>

@@ -10,6 +10,7 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.soloader.SoLoader
 import com.brentvatne.react.ReactNativeVideoManager
 import com.starcore.mobile.files.StarCoreFilesPackage
+import com.starcore.mobile.glyph.GlyphPackage
 import com.starcore.mobile.media.MediaPackage
 import com.starcore.mobile.media.PlayerRegistry
 import com.starcore.mobile.privacy.PrivacyPackage
@@ -26,14 +27,14 @@ import com.starcore.mobile.sync.SyncScheduler
  * its react-native-video plugin hook that gives it the player's session,
  * and the Privacy package (FLAG_SECURE and image-cache eviction for private
  * content), BuildInfo (Settings > About), and StarCoreFiles (the shared
- * interface's download and share actions, src/files/) and Sync (the background backup of the
- * phone's media, src/sync/).
+ * interface's download and share actions, src/files/), Sync (the background backup of the
+ * phone's media, src/sync/) and Glyph (a Satellite's own icons, src/components/Glyph.tsx).
  */
 class MainApplication : Application(), ReactApplication {
 
     override val reactNativeHost: ReactNativeHost =
         object : DefaultReactNativeHost(this) {
-            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MediaPackage() + PrivacyPackage() + BuildInfoPackage() + StarCoreFilesPackage() + SyncPackage()
+            override fun getPackages(): List<ReactPackage> = PackageList(this).packages + MediaPackage() + PrivacyPackage() + BuildInfoPackage() + StarCoreFilesPackage() + SyncPackage() + GlyphPackage()
 
             override fun getJSMainModuleName(): String = "index"
 

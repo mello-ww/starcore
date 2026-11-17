@@ -8,7 +8,6 @@ def describe_satellite(engine, satellite) -> dict:
         "version": satellite.manifest.version,
         "author": satellite.manifest.author,
         "description": satellite.manifest.description,
-        "icon": satellite.manifest.icon,
         # set when this satellite's interface is a section of another
         # satellite's page - see SatelliteManifest.section_of
         "section_of": satellite.manifest.section_of,
@@ -34,6 +33,10 @@ def describe_definition(satellite) -> dict:
         # a name from the shared icon set every client can draw - see
         # SatelliteManifest.icon_name
         "icon_name": satellite.manifest.icon_name,
+        # its own icon (a name in `icons`, or None) and its own icons as paths
+        # clients draw - see SatelliteManifest.icons
+        "icon": satellite.manifest.icon,
+        "icons": satellite.manifest.icons,
         # Satellite capabilities it provides to others - see docs/ui-contract.md
         "provides": satellite.manifest.provides,
         # its declarative interface (ui.json): contract and revision only; the
@@ -54,7 +57,6 @@ def catalog_revision(engine) -> str:
             "version": satellite.manifest.version,
             "type": satellite.type,
             "enabled": satellite.enabled,
-            "icon": satellite.manifest.icon,
             "section_of": satellite.manifest.section_of,
             "page": satellite.page,
             "routes": sorted(satellite.routes),

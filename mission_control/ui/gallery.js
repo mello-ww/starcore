@@ -49,8 +49,9 @@ function el(tag, className, text) {
     return node;
 }
 
-function glyph(name, size = 18) {
-    return icon(name, size) || el("span");
+// `own`: the document's own icons (UI contract 1.2), which a name may also be one of
+function drawGlyph(name, size = 18, own = null) {
+    return icon(name, size, own) || el("span");
 }
 
 /** Whether a page holds a collection (a media grid or a map, also inside a card): such a page
@@ -98,10 +99,11 @@ export function quickAction(block, scope, canRun) {
     return null;
 }
 
-/** The shared icon an item without an image shows (`item.icon`), or null. */
-export function tileIcon(block, scope) {
+/** The icon an item without an image shows (`item.icon`): a shared one, or one of the
+ * document's own (`own`, UI contract 1.2) - else null. */
+export function tileIcon(block, scope, own = null) {
     const name = block.item && block.item.icon !== undefined ? resolve(block.item.icon, scope) : null;
-    return typeof name === "string" && ICONS.has(name) ? name : null;
+    return typeof name === "string" && (ICONS.has(name) || Boolean(own && Object.hasOwn(own, name))) ? name : null;
 }
 
 /** What a tile's `kind` resolves to: "video", or "image" for anything else. */
@@ -133,6 +135,8 @@ export function clock(seconds) {
  */
 export function createGallery(host) {
     const picking = host.picking || null;
+    // every icon here may be one of the document's own (host.icons(), UI contract 1.2)
+    const glyph = (name, size) => drawGlyph(name, size, typeof host.icons === "function" ? host.icons() : null);
     let grids = new WeakMap();
     // the one viewer a page can have open: {block, key, index, overlay, stageKey}
     let viewer = null;
@@ -454,7 +458,7 @@ export function createGallery(host) {
         }
         tile.dataset.key = key;
         tile.setAttribute("aria-label", [label || (kind === "video" ? "Video" : "Image"), index + 1].join(", "));
-        const thumb = frame(source(block.item.image, itemScope), "ui-media-tile-frame", "", tileIcon(block, itemScope) || "image");
+        const thumb = frame(source(block.item.image, itemScope), "ui-media-tile-frame", "", tileIcon(block, itemScope, typeof host.icons === "function" ? host.icons() : null) || "image");
         if (kind === "video") {
             const badge = el("span", "ui-media-badge");
             badge.appendChild(glyph("play", 12));

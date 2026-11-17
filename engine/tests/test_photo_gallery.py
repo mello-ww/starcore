@@ -7,14 +7,22 @@ import json
 import re
 import shutil
 import tempfile
+import tomllib
 import unittest
 
-from starcore import ui_contract
+from starcore import icons, ui_contract
 from tests.support import start_engine, stop_engine
 from tests.test_photo import png
 
 REPO = Path(__file__).resolve().parents[2]
 PHOTO_DIR = REPO / "satellites" / "native" / "photo"
+
+
+def photo_document() -> dict:
+    """Photo's ui.json as the Engine serves it: with the own icons its satellite.toml declares."""
+    manifest = tomllib.loads((PHOTO_DIR / "satellite.toml").read_text("utf-8"))
+    declared, _ = icons.load_icons(PHOTO_DIR, manifest.get("icons"))
+    return ui_contract.load(PHOTO_DIR / "ui.json", icons=declared)
 
 
 def routes_in(value, found=None):
@@ -34,7 +42,7 @@ def routes_in(value, found=None):
 
 class PhotoUiDocumentTest(unittest.TestCase):
     def setUp(self):
-        self.document = ui_contract.load(PHOTO_DIR / "ui.json")
+        self.document = photo_document()
 
     def test_the_document_is_valid_and_no_longer_a_preview(self):
         # M6: both clients open the shared interface by default; Photo's own screens stay in
@@ -561,7 +569,7 @@ class PhotoGalleryApiTest(unittest.TestCase):
         self.assertEqual(self.json_request(f"/api/satellites/photo/gallery/albums/{album['id']}")[1]["items"], [])
 
     def test_the_album_page_adds_photos_through_the_picker(self):
-        document = ui_contract.load(PHOTO_DIR / "ui.json")
+        document = photo_document()
         blocks = document["pages"]["album"]["blocks"]
         add = next(block for block in blocks if block.get("label") == "Add photos")
         self.assertEqual(add["action"]["pick"]["capability"], "media.gallery")

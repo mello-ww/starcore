@@ -1,6 +1,7 @@
 import React, {memo, useCallback, useEffect, useRef, useState} from 'react';
 import {ActivityIndicator, Alert, Animated, Clipboard, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import {Glyph, useOwnIcons} from '../../components/Glyph';
 import {Bars, ChartScale, ColumnChart, Meter, Sparkline} from '../../components/charts';
 import {PrimaryButton} from '../../components/PrimaryButton';
 import {Slider} from '../../components/Slider';
@@ -13,7 +14,7 @@ import {emptyRow, formBody, formProblem, formValues} from './forms';
 import {createListPaging, type ListPagingStatus} from './listPaging';
 import {useImageSource} from './memoryImages';
 import {
-  BLOCK_TYPES, findProvider, formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate, toneOf,
+  BLOCK_TYPES, findProvider, formatValue, isIconName, isSafeRoute, isVisible, resolve, resolveTemplate, toneOf,
   type Providers, type Scope, type UiAction, type UiBlock,
 } from './contract';
 import type {UiPreferences} from './preferences';
@@ -369,11 +370,12 @@ export const ListRow = memo(
     const formats = block.item?.format ?? {};
     const itemScope = {...scope, data: item};
     const iconName = resolve(block.item?.icon, itemScope);
+    const own = useOwnIcons();
     const title = asText(resolve(block.item?.title, itemScope));
     const subtitle = block.item?.subtitle !== undefined ? resolve(block.item.subtitle, itemScope) : undefined;
     return (
       <Row
-        icon={typeof iconName === 'string' && ICONS.has(iconName) ? iconName : undefined}
+        icon={isIconName(iconName, own) ? iconName : undefined}
         tone={block.item?.tone !== undefined ? resolve(block.item.tone, itemScope) : undefined}
         title={title}
         subtitle={subtitle !== undefined && subtitle !== null && subtitle !== '' ? formatValue(subtitle, formats.subtitle) : undefined}
@@ -672,7 +674,7 @@ function Row({
   const content = (
     <>
       {tone !== undefined && <Dot tone={tone} />}
-      {icon && <Icon name={icon} size={18} color={accent} />}
+      {icon && <Glyph name={icon} size={18} color={accent} />}
       <View style={styles.rowMain}>
         <Text style={styles.rowTitle} numberOfLines={tone !== undefined ? 2 : 1}>
           {title}

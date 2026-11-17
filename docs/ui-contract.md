@@ -301,7 +301,43 @@ Every block may also have:
 
 `tone` is `neutral`, `ok`, `warn` or `danger`, or a binding to one. `icon` names come from
 the shared icon set in `vocabulary.json` (Feather glyph names), which both clients draw
-natively.
+natively, or, from 1.2, from the Satellite's own icons (below).
+
+### A Satellite's own icons
+
+From 1.2 (contract change 5), a Satellite may ship icons of its own beside the shared set. It
+declares them in its `satellite.toml`, each with the shared icon that stands for it when its
+file is refused, and puts each in `icons/<name>.svg`:
+
+```toml
+icon = "logo"          # the Satellite's own icon, one of [icons]
+
+[icons]
+logo = "image"
+albums = "folder"
+```
+
+- **Only the Engine reads the SVG** (`engine/starcore/icons.py`). It accepts a strict subset,
+  the one Feather icons use: at most 8 KiB, no DOCTYPE or entity, a `0 0 24 24` view box,
+  `fill="none"`, `stroke="currentColor"`, a stroke width from 0.5 to 3, and only `svg`, `g`,
+  `path`, `line`, `polyline`, `polygon`, `circle`, `ellipse` and `rect` with their geometry
+  (`title` and `desc` are ignored). No script, style, link, transform, colour, text or foreign
+  element. A refused file is reported at load and keeps its fallback.
+- **It turns each shape into path data** of absolute `M`, `L`, `C` and `Z` only (arcs and
+  quadratic curves become cubic ones), at most 32 per icon, and serves
+  `{fallback, stroke, paths}` per name, or `{fallback}` alone for a refused file.
+- **The served document carries them** as `icons`, added by the Engine; a `ui.json` may not
+  write `icons` itself, so the document's revision changes with an icon file. `GET
+  /api/satellites` gives each Satellite the same `icons` and its `icon`.
+- **A document names them** wherever it names a shared icon (navigation, list items, tiles,
+  quick and viewer actions, widgets), also through a binding. An own name is lower case,
+  `[a-z][a-z0-9-]`, at most 32 characters, and never a shared icon's name, so a name means one
+  icon everywhere.
+- **Clients never parse an SVG.** They check the paths against that grammar, then stroke them
+  in their own colour with round caps and joins, scaled from the 24-unit box: Mission Control
+  builds the `<path>` nodes (`ui/icons.js`), the app a native view (`StarCoreGlyph`,
+  `mobile/src/components/Glyph.tsx`). So an own icon is single colour and takes the client's
+  tokens like a shared one. A client that can't draw one draws its fallback.
 
 There is deliberately no layout language: no arbitrary nesting, styles, colours or sizes.
 Blocks look like the rest of StarCore on each platform because each client draws them.
@@ -859,7 +895,7 @@ does, not speculatively, and a new version is added beside the old one.
 ## Discovery, caching and rediscovery
 
 ```
-GET  /api/satellites                 each entry: icon_name, provides, ui {contract, revision, error};
+GET  /api/satellites                 each entry: icon_name, icon, icons, provides, ui {contract, revision, error};
                                      plus catalog_revision for the whole set
 GET  /api/satellites/<name>/ui       {satellite, revision, document}; ETag = revision; 304 on If-None-Match
 GET  /api/catalog                    {contract, revision, capabilities, pending}; ETag; 304
@@ -960,8 +996,8 @@ Control keeps nothing: a browser tab without StarCore has nowhere to load from.
 `POST /api/catalog/rediscover`. It refreshes metadata from disk without touching code:
 
 - For each loaded Satellite, it re-reads `ui.json` and the presentational parts of
-  `satellite.toml` (`icon_name`, `provides`). These are plain files, read and validated, never
-  imported.
+  `satellite.toml` (`icon_name`, `icon`, `icons`, `provides`) with its icon files. These are
+  plain files, read and validated, never imported.
 - A new Satellite folder is reported as **pending**: loading it means importing its Python,
   which only happens at the next restart. There is no unsafe hot-loading.
 - A loaded Satellite whose name or version changed on disk is reported as **reload
@@ -1018,7 +1054,8 @@ A client that meets a block or action it doesn't know skips it (see "Trust and v
   - they render only known blocks;
   - they call only safe, relative routes;
   - they show all text as plain text, never HTML;
-  - they load icons from their own set;
+  - they draw icons from their own set, or a Satellite's own as checked path data, never an
+    SVG;
   - they execute nothing.
 - Satellite code is Python with full rights on the server, so the trust decision is
   **installing** a Satellite. A declarative interface keeps a careless one from going further
@@ -1060,7 +1097,7 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 | Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action and protected documents; `secure.screen` on Android; `device.media-sync` on Android (the app's background backup of the phone's media, opened by the `sync` action; [the parity audit](photos-parity-audit.md), S3); saving, sharing and opening files (`download`, `share`); sending files (`upload`) | |
 | Home | `widgets` in each document, drawn by both clients | |
 | Sections | `section_of` and the `section` action; a host lists its sections from the Engine's registry | |
-| Icons | `icon_name` from the shared set, a neutral circle without one | Satellite-provided icons |
+| Icons | the shared set; from 1.2 a Satellite's own (`icons/`, validated by the Engine, drawn as paths), with `icon_name` or a neutral circle as fallback | |
 | Rediscovery | Mission Control button and API | also on Android; and a CLI command |
 | Formats | 12, including rates, dates and relative times | |
 

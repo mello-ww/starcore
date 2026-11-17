@@ -164,6 +164,9 @@ export function mount(context) {
         openTables: new WeakSet(),
     };
 
+    // the document's own icons (UI contract 1.2): what the Engine added to the document it served
+    const ownIcons = () => (state.document && state.document.icons) || null;
+
     // the document's own routes. For a protected document a 403 means "locked again": its gate
     // asks the server, and nothing of the store stays on screen once it says so
     const call = (url, options) => requestJson(url, options).catch((error) => {
@@ -201,6 +204,8 @@ export function mount(context) {
 
     const gallery = createGallery({
         satelliteBase,
+        // the document's own icons (UI contract 1.2), which its names may be one of
+        icons: () => ownIcons(),
         // what the person chooses here (a grid's size), remembered for this Satellite in this
         // browser - this server's own Mission Control, so per server as well
         preferences: {
@@ -275,7 +280,7 @@ export function mount(context) {
         if (block.item.tone !== undefined) {
             row.appendChild(stateDot(resolve(block.item.tone, itemScope)));
         }
-        const glyph = icon(resolve(block.item.icon, itemScope));
+        const glyph = icon(resolve(block.item.icon, itemScope), 18, ownIcons());
         if (glyph) {
             const holder = el("span", "ui-list-icon");
             holder.appendChild(glyph);
@@ -1776,7 +1781,7 @@ export function mount(context) {
             if (item.page === current) {
                 tab.setAttribute("aria-current", "page");
             }
-            const glyph = icon(item.icon, 16);
+            const glyph = icon(item.icon, 16, ownIcons());
             if (glyph) {
                 tab.appendChild(glyph);
             }
@@ -2086,7 +2091,7 @@ export function mount(context) {
  * text and lists - drawn from `data` (the Satellite's published state, or
  * the widget's own source). It opens the Satellite, and never acts on it.
  */
-export function renderWidget(widget, data, { developer = false, title, onOpen } = {}) {
+export function renderWidget(widget, data, { developer = false, title, onOpen, icons = null } = {}) {
     loadStylesheet();
     const scope = { data, page: data, params: {}, state: {}, sources: {} };
     const words = (value) => {
@@ -2097,7 +2102,8 @@ export function renderWidget(widget, data, { developer = false, title, onOpen } 
     card.tabIndex = 0;
     card.setAttribute("role", "link");
     const head = el("div", "ui-widget-head");
-    const glyph = icon(widget.icon, 16);
+    // `icons`: the Satellite's own icons (UI contract 1.2), which its widget may name
+    const glyph = icon(widget.icon, 16, icons);
     if (glyph) {
         head.appendChild(glyph);
     }

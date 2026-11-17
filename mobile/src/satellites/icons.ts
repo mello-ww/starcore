@@ -3,11 +3,15 @@ import {tokens} from '../theme';
 
 import {ICONS} from './ui/contract';
 
-/** A Feather icon name for a satellite: the shared icon it declares in its
- * satellite.toml (icon_name), else a neutral circle. A Satellite's own SVG
- * icon is something this app can't draw yet (docs/remaining-work.md). */
-export function satelliteIcon(_name: string, iconName?: string | null): string {
-  return iconName && ICONS.has(iconName) ? iconName : 'circle';
+/** The icon name for a satellite, for a `Glyph` given its `icons`: its own icon (UI contract
+ * 1.2, from its icons/ folder), else the shared icon it declares in its satellite.toml
+ * (icon_name), else a neutral circle. */
+export function satelliteIcon(satellite: Pick<SatelliteSummary, 'icon' | 'icon_name' | 'icons'>): string {
+  const own = satellite.icon;
+  if (own && satellite.icons && Object.prototype.hasOwnProperty.call(satellite.icons, own)) {
+    return own;
+  }
+  return satellite.icon_name && ICONS.has(satellite.icon_name) ? satellite.icon_name : 'circle';
 }
 
 export const STATUS_LABELS: Record<SatelliteSummary['status'], string> = {

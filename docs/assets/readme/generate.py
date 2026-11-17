@@ -1,7 +1,7 @@
 """Generates the README's SVG assets from StarCore's own branding.
 
 Colours come from mission_control/tokens.css, the mark from Mission Control's
-sidebar, and the Satellite icons from each Satellite's mission_control/icon.svg,
+sidebar, and the Satellite icons from each Satellite's icons/logo.svg,
 so the GitHub page can't drift from the real interface. Standard library only.
 
     python docs/assets/readme/generate.py
@@ -40,8 +40,8 @@ SATELLITES = [
 
 
 def icon_body(folder: str) -> str:
-    """The drawing inside a Satellite's icon.svg (its <svg> wrapper dropped)."""
-    text = (REPO / folder / "mission_control/icon.svg").read_text("utf-8")
+    """The drawing inside a Satellite's icons/logo.svg (its <svg> wrapper dropped)."""
+    text = (REPO / folder / "icons/logo.svg").read_text("utf-8")
     return re.search(r"<svg[^>]*>(.*)</svg>", text, re.S).group(1).strip()
 
 

@@ -35,7 +35,7 @@ satellites/native/status/
     api.py        metrics, history, diagnostics, view
     ui.json       the interface, for every client (UI contract 1.1)
     commands/status.py           the CLI namespace
-    mission_control/icon.svg     its icon (no page of its own: the interface is ui.json)
+    icons/logo.svg               its icon (no page of its own: the interface is ui.json)
 ```
 
 Standard library only - no psutil or other package. While Status's service runs (it starts

@@ -35,7 +35,7 @@ satellites/native/file_explorer/
     paths.py                path resolution and safety
     protection.py           refuses protected areas, as the Engine answers (files.protected)
     ui.json                 the interface, for every client (UI contract 1.2)
-    mission_control/icon.svg  its icon (no page of its own: the interface is ui.json)
+    icons/logo.svg          its icon (no page of its own: the interface is ui.json)
 ```
 
 It provides the `files.browse` capability (`list` → `entries`), which any interface's

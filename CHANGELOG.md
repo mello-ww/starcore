@@ -5,6 +5,18 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ## Unreleased
 
+### Added
+
+- **Satellites ship their own icons (UI contract 1.2, contract change 5).** A Satellite lists
+  them in its `satellite.toml` (`[icons]`, each with a shared icon as fallback) and puts them
+  in `icons/`. The Engine alone reads the SVG: it accepts a strict single-colour subset (no
+  script, style, link, transform or colour) and turns every shape into plain path data, which
+  `GET /api/satellites` and the served `ui.json` carry. A document may name an own icon
+  wherever it names a shared one. Mission Control and the Android app (a new native view) draw
+  the paths in their own colour, so the app now shows each Satellite's own mark too. Every
+  Satellite's `mission_control/icon.svg` moved to `icons/logo.svg`, and Photo's Albums tab has
+  its own icon.
+
 ### Security
 
 - **A phone is never told its photos are safe when nobody knows.** The phone's backup asks the

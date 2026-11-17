@@ -5,7 +5,7 @@
   "entry": "library",
   "navigation": [
     {"page": "library", "label": "Library", "icon": "image"},
-    {"page": "albums", "label": "Albums", "icon": "folder"},
+    {"page": "albums", "label": "Albums", "icon": "albums"},
     {"page": "search", "label": "Search", "icon": "search"},
     {"page": "map", "label": "Map", "icon": "map-pin"}
   ],

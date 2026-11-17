@@ -292,7 +292,7 @@ class StarCore:
         """Refreshes Satellite *metadata* from disk; never loads or reloads code.
 
         For every loaded Satellite, re-reads its ui.json and the presentational
-        parts of its satellite.toml (icon_name, provides) - plain files, so
+        parts of its satellite.toml (icon, icon_name, icons, provides) - plain files, so
         this is safe while everything keeps running. Anything that would need
         new code is only reported:
 
@@ -322,12 +322,16 @@ class StarCore:
             if manifest.name != name or manifest.version != satellite.manifest.version:
                 reload_required.append(name)
                 continue
-            before = (satellite.manifest.icon_name, satellite.manifest.provides,
+            before = (satellite.manifest.icon, satellite.manifest.icon_name, satellite.manifest.icons,
+                      satellite.manifest.provides,
                       satellite.ui.revision if satellite.ui else None, satellite.ui.error if satellite.ui else None)
+            satellite.manifest.icon = manifest.icon
             satellite.manifest.icon_name = manifest.icon_name
+            satellite.manifest.icons = manifest.icons
             satellite.manifest.provides = manifest.provides
             satellite.ui = ui
-            after = (manifest.icon_name, manifest.provides, ui.revision if ui else None, ui.error if ui else None)
+            after = (manifest.icon, manifest.icon_name, manifest.icons, manifest.provides,
+                     ui.revision if ui else None, ui.error if ui else None)
             if before != after:
                 updated.append(name)
 

@@ -63,6 +63,12 @@ FILE_BROWSER_SELECT = set(VOCABULARY["file_browser_select"])
 ACTION_THEN = set(VOCABULARY["action_then"])
 METHODS = set(VOCABULARY["methods"])
 ICONS = set(VOCABULARY["icons"])
+# a Satellite's own icon (1.2, engine/starcore/icons.py): its name, never a shared one's, and the
+# path data the Engine turns its file into - absolute M, L, C and Z only, which is all a client draws
+OWN_ICON_NAME = re.compile(r"[a-z][a-z0-9-]{0,31}")
+_ICON_NUMBER = r"-?\d+(?:\.\d+)?"
+_ICON_PAIR = f"{_ICON_NUMBER} {_ICON_NUMBER}"
+ICON_PATH = re.compile(rf"M{_ICON_PAIR}(?:[ML]{_ICON_PAIR}|C{_ICON_PAIR} {_ICON_PAIR} {_ICON_PAIR}|Z)*")
 CHART_KINDS = set(VOCABULARY["chart_kinds"])
 COLUMN_ALIGN = set(VOCABULARY["column_align"])
 PAGE_TEMPLATES = set(VOCABULARY["page_templates"])
@@ -199,6 +205,11 @@ def valid_binding(value: str) -> bool:
     return value in BINDING_WORDS or value.startswith(BINDING_ROOTS)
 
 
+def valid_icon_path(value) -> bool:
+    """True for one path of a Satellite's own icon as the Engine serves it."""
+    return isinstance(value, str) and len(value) <= LIMITS["icon_bytes"] and ICON_PATH.fullmatch(value) is not None
+
+
 def revision(document) -> str:
     """A content hash of a document: the same document always gets the same
     revision, so it doubles as its ETag and as the cache key on clients."""
@@ -206,9 +217,9 @@ def revision(document) -> str:
     return sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
-def load(path: Path, provides=None) -> dict:
+def load(path: Path, provides=None, icons=None) -> dict:
     """Reads and validates one ui.json (with the Satellite's declared capabilities, when
-    known). Raises UiDocumentError."""
+    known), with the Satellite's own icons added under `icons`. Raises UiDocumentError."""
     try:
         raw = path.read_bytes()
     except OSError as error:
@@ -219,6 +230,12 @@ def load(path: Path, provides=None) -> dict:
         document = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise UiDocumentError(f"is not valid JSON ({error})")
+    if isinstance(document, dict):
+        if "icons" in document:
+            raise UiDocumentError("is invalid: icons: a Satellite declares its own icons in satellite.toml "
+                                  "([icons]); the Engine adds them to the document it serves")
+        if icons:
+            document["icons"] = icons
     errors = validate(document, provides)
     if errors:
         more = f" (and {len(errors) - 1} more)" if len(errors) > 1 else ""
@@ -252,6 +269,8 @@ class _Validator:
         # scope declare neither)
         self.state_keys = set()
         self.source_names = set()
+        # the icon names the document may use: the shared set and its Satellite's own (1.2)
+        self.icons = ICONS
 
     def since(self, where: str, what: str, minor: int = 1):
         """`what` arrived in 1.`minor`: refused in a document that declares an older minor."""
@@ -278,8 +297,10 @@ class _Validator:
         self.minor = version[1]
 
         known = {"contract", "title", "requires", "entry", "navigation", "pages", "header", "widgets", "preview",
-                 "protected"}
+                 "protected", "icons"}
         self.unknown_keys("", document, known)
+        if "icons" in document:
+            self.check_icons(document["icons"])
         if "title" in document and not isinstance(document["title"], str):
             self.error("title", "must be a string")
         if "preview" in document:
@@ -327,7 +348,7 @@ class _Validator:
                 self.error(where, "a navigation page cannot require params")
             if not isinstance(item.get("label"), str) or not item["label"]:
                 self.error(where, "needs a label")
-            if "icon" in item and item["icon"] not in ICONS:
+            if "icon" in item and item["icon"] not in self.icons:
                 self.error(where, f"unknown icon {item['icon']!r}")
 
         if "protected" in document:
@@ -341,6 +362,37 @@ class _Validator:
                 self.error("widgets", "a protected document has no widgets: nothing of it is shown outside it")
             self.check_widgets(document["widgets"])
         return self.errors
+
+    def check_icons(self, icons):
+        """The Satellite's own icons, as the Engine adds them (1.2): each name is then one the
+        document may use, and a client draws its paths, or its fallback without them."""
+        self.since("icons", "a Satellite's own icons", 2)
+        if not isinstance(icons, dict):
+            self.error("icons", "must be an object of icons")
+            return
+        if len(icons) > LIMITS["icons"]:
+            self.error("icons", f"at most {LIMITS['icons']} icons")
+        own = set()
+        for name, icon in icons.items():
+            where = f"icons.{name}"
+            if not OWN_ICON_NAME.fullmatch(name) or name in ICONS:
+                self.error(where, "a name is lower case letters, digits and '-', and never a shared icon's")
+                continue
+            if not isinstance(icon, dict):
+                self.error(where, "must be {fallback, stroke?, paths?}")
+                continue
+            self.unknown_keys(where, icon, {"fallback", "stroke", "paths"})
+            if icon.get("fallback") not in ICONS:
+                self.error(f"{where}.fallback", "must name a shared icon")
+            if "paths" in icon or "stroke" in icon:
+                stroke, paths = icon.get("stroke"), icon.get("paths")
+                if isinstance(stroke, bool) or not isinstance(stroke, (int, float)) or not 0.5 <= stroke <= 3:
+                    self.error(f"{where}.stroke", "must be a number between 0.5 and 3")
+                if (not isinstance(paths, list) or not paths or len(paths) > LIMITS["icon_paths"]
+                        or not all(valid_icon_path(path) for path in paths)):
+                    self.error(f"{where}.paths", f"must be 1 to {LIMITS['icon_paths']} paths of absolute M, L, C and Z")
+            own.add(name)
+        self.icons = ICONS | own
 
     def check_protected(self, protected):
         """protected: {capability, setup, forgot?} (1.2): the document belongs to a store the
@@ -410,7 +462,7 @@ class _Validator:
             ids.add(widget_id)
             if "title" in widget:
                 self.check_text(f"{where}.title", widget["title"])
-            if "icon" in widget and widget["icon"] not in ICONS:
+            if "icon" in widget and widget["icon"] not in self.icons:
                 self.error(f"{where}.icon", f"unknown icon {widget['icon']!r}")
             self.check_scoped_blocks(where, widget)
             if "action" in widget:
@@ -765,8 +817,8 @@ class _Validator:
         for key in ("title", "subtitle", "value"):
             if key in item:
                 self.check_text(f"{where}.item.{key}", item[key])
-        if "icon" in item and item["icon"] not in ICONS:
-            self.check_binding(f"{where}.item.icon", item["icon"], required=True, choices=ICONS)
+        if "icon" in item and item["icon"] not in self.icons:
+            self.check_binding(f"{where}.item.icon", item["icon"], required=True, choices=self.icons)
         formats = item.get("format", {})
         if not isinstance(formats, dict) or any(value not in FORMATS for value in formats.values()):
             self.error(f"{where}.item.format", "must map 'subtitle'/'value' to a known format")
@@ -874,8 +926,8 @@ class _Validator:
                 self.check_binding(f"{where}.item.kind", item["kind"], required=True, choices=MEDIA_KINDS)
             if "duration" in item:
                 self.check_number_or_binding(f"{where}.item.duration", item["duration"])
-            if "icon" in item and item["icon"] not in ICONS:
-                self.check_binding(f"{where}.item.icon", item["icon"], required=True, choices=ICONS)
+            if "icon" in item and item["icon"] not in self.icons:
+                self.check_binding(f"{where}.item.icon", item["icon"], required=True, choices=self.icons)
             formats = item.get("format", {})
             if not isinstance(formats, dict) or not set(formats) <= {"subtitle", "group"} or any(
                     value not in FORMATS for value in formats.values()):
@@ -1062,7 +1114,7 @@ class _Validator:
                     self.in_bulk = False
             if icon and "icon" not in entry:
                 self.error(at, "needs an 'icon'")
-            if "icon" in entry and entry["icon"] not in ICONS:
+            if "icon" in entry and entry["icon"] not in self.icons:
                 self.error(f"{at}.icon", f"unknown icon {entry['icon']!r}")
             if "style" in entry and entry["style"] not in BUTTON_STYLES:
                 self.error(f"{at}.style", f"must be one of {sorted(BUTTON_STYLES)}")
@@ -1555,15 +1607,16 @@ class UiDefinition:
         return described
 
 
-def load_definition(satellite_dir: Path, satellite_name: str, provides=None):
+def load_definition(satellite_dir: Path, satellite_name: str, provides=None, icons=None):
     """The UiDefinition for a Satellite directory, or None when it has no
     ui.json. Only reads and validates a JSON file - never imports code.
-    `provides` is the Satellite's normalised [provides] table."""
+    `provides` is the Satellite's normalised [provides] table, `icons` its own
+    icons (engine/starcore/icons.py), served in the document."""
     path = satellite_dir / UI_FILENAME
     if not path.is_file():
         return None
     try:
-        return UiDefinition(load(path, provides))
+        return UiDefinition(load(path, provides, icons))
     except UiDocumentError as error:
         message = f"{UI_FILENAME} {error}"
         print(f"[WARNING]: {message} (satellite '{satellite_name}'). Its interface is not offered to clients.")

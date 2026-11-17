@@ -5,13 +5,14 @@ import {
   ActivityIndicator, BackHandler, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import {Glyph, GlyphIcons} from '../components/Glyph';
 import {useAuth} from '../auth/AuthContext';
 import {useDeveloperMode} from '../developer/DeveloperModeContext';
 import {useAppActive} from '../hooks/useAppActive';
 import {useServers} from '../servers/ServersContext';
 import {UiApi} from '../satellites/ui/api';
 import {
-  ICONS, findProvider, formatValue, isSafeRoute, isVisible, missingRequirements, resolve, resolveTemplate,
+  findProvider, formatValue, isIconName, isSafeRoute, isVisible, missingRequirements, resolve, resolveTemplate,
   type CapabilityProvider, type Providers, type Scope, type UiAction, type UiDocument, type UiSource,
 } from '../satellites/ui/contract';
 import {SatellitesApi} from '../satellites/api';
@@ -1122,8 +1123,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
                   onPress={() => go(item.page)}
                   testID={`ui-tab-${item.page}`}
                   style={[styles.tab, active && {backgroundColor: accent}]}>
-                  {item.icon && ICONS.has(item.icon) && (
-                    <Icon name={item.icon} size={15} color={active ? onColor : palette.text2} />
+                  {isIconName(item.icon, document.icons ?? null) && (
+                    <Glyph name={item.icon} size={15} color={active ? onColor : palette.text2} />
                   )}
                   <Text style={[styles.tabLabel, active && {color: onColor}]}>{item.label}</Text>
                 </Pressable>
@@ -1142,6 +1143,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   );
   return (
     <MemoryImages.Provider value={gated}>
+    <GlyphIcons icons={document.icons ?? null}>
     <View style={styles.screen}>
       {gridIndex >= 0 ? (
         <VirtualMediaGrid
@@ -1239,6 +1241,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         </View>
       )}
     </View>
+    </GlyphIcons>
     </MemoryImages.Provider>
   );
 }

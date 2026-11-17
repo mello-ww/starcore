@@ -3,6 +3,11 @@ version = "1.0.0"
 author = "mellow"
 # this part is optional
 description = "System monitoring satellite."
-icon = "icon.svg"
+# its own icon, one of [icons] below (icons/<name>.svg)
+icon = "logo"
 # from the shared icon set every client can draw (contracts/ui/vocabulary.json)
 icon_name = "activity"
+
+# its own icons, icons/<name>.svg, each with the shared icon drawn if its file is refused
+[icons]
+logo = "activity"

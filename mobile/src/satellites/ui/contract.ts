@@ -155,6 +155,8 @@ export interface UiDocument {
   pages: Record<string, UiPage>;
   /** 1.2: doesn't replace the Satellite's own screens yet (they stay the default). */
   preview?: boolean;
+  /** 1.2: the Satellite's own icons, which the Engine adds to the document it serves. */
+  icons?: OwnIcons;
   /** 1.2: a store the app unlocks first, through the capability its own Satellite provides;
    * `setup` is the page shown while it isn't set up (src/vault/gate.ts). */
   protected?: {capability: string; setup: string; forgot?: string};
@@ -217,6 +219,9 @@ export function checkDocument(document: any): string | null {
       return 'A protected interface keeps nothing offline.';
     }
   }
+  if (document.icons !== undefined && !knownIcons(document.icons)) {
+    return "This interface ships icons this app can't draw. Update StarCore for Android to use it.";
+  }
   // secrets and reveal (1.2): this app's own prompts, only for a store it unlocks, and only for
   // what it knows how to ask
   for (const action of routeActions(document)) {
@@ -228,6 +233,52 @@ export function checkDocument(document: any): string | null {
     }
   }
   return null;
+}
+
+/** A Satellite's own icon (1.2, contract change 5), as the Engine validated it from its icons/
+ * folder: a shared fallback, and path data of absolute M, L, C and Z only, which this app strokes
+ * in its own colour (src/components/Glyph.tsx). The app never reads an SVG. */
+export interface OwnIcon {
+  fallback: string;
+  stroke?: number;
+  paths?: string[];
+}
+export type OwnIcons = Record<string, OwnIcon>;
+
+const OWN_ICON_NAME = /^[a-z][a-z0-9-]{0,31}$/;
+const ICON_NUMBER = '-?\\d+(?:\\.\\d+)?';
+const ICON_PAIR = `${ICON_NUMBER} ${ICON_NUMBER}`;
+export const ICON_PATH = new RegExp(`^M${ICON_PAIR}(?:[ML]${ICON_PAIR}|C${ICON_PAIR} ${ICON_PAIR} ${ICON_PAIR}|Z)*$`);
+const ICON_LIMITS = {icons: 64, paths: 32, bytes: 8192};
+
+/** Whether a document's `icons` table is one this app can draw. */
+export function knownIcons(icons: unknown): icons is OwnIcons {
+  if (!icons || typeof icons !== 'object' || Array.isArray(icons)) {
+    return false;
+  }
+  const entries = Object.entries(icons as Record<string, any>);
+  if (entries.length > ICON_LIMITS.icons) {
+    return false;
+  }
+  return entries.every(([name, entry]) => {
+    if (!OWN_ICON_NAME.test(name) || ICONS.has(name) || !entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return false;
+    }
+    if (Object.keys(entry).some(key => !['fallback', 'stroke', 'paths'].includes(key)) || !ICONS.has(entry.fallback)) {
+      return false;
+    }
+    if (entry.paths === undefined && entry.stroke === undefined) {
+      return true;
+    }
+    return typeof entry.stroke === 'number' && entry.stroke >= 0.5 && entry.stroke <= 3
+      && Array.isArray(entry.paths) && entry.paths.length > 0 && entry.paths.length <= ICON_LIMITS.paths
+      && entry.paths.every((d: unknown) => typeof d === 'string' && d.length <= ICON_LIMITS.bytes && ICON_PATH.test(d));
+  });
+}
+
+/** Whether `name` is an icon this app can draw: a shared one, or one of `own`. */
+export function isIconName(name: unknown, own?: OwnIcons | null): name is string {
+  return typeof name === 'string' && (ICONS.has(name) || Boolean(own && Object.prototype.hasOwnProperty.call(own, name)));
 }
 
 /** Whether every entry of an action's `secrets` is a kind this app asks for. */

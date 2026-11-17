@@ -1,3 +1,5 @@
+import type {OwnIcons} from './ui/contract';
+
 /** Mirrors GET /api/satellites - see docs/api.md. Only the fields this app actually
  * uses; StarCore's Satellite entry has more (commands, state, page) that
  * belong to Mission Control, not this app. */
@@ -6,7 +8,10 @@ export interface SatelliteSummary {
   version: string;
   author: string;
   description: string;
+  /** Its own icon: a name in `icons` (UI contract 1.2), or null. */
   icon: string | null;
+  /** Its own icons, as the Engine validated them from its icons/ folder (src/components/Glyph.tsx). */
+  icons?: OwnIcons;
   type: 'native' | 'link';
   enabled: boolean;
   status: 'running' | 'stopped' | 'disabled' | 'error';

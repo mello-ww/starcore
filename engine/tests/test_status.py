@@ -645,16 +645,12 @@ class StatusEngineTest(unittest.TestCase):
         # its interface is its ui.json alone: no page of its own for Mission Control
         self.assertIsNone(entry["page"])
 
-    def test_the_icon_is_still_served(self):
-        connection = HTTPConnection("127.0.0.1", self.engine.api.port, timeout=10)
-        try:
-            connection.request("GET", "/api/satellites/status/assets/icon.svg")
-            response = connection.getresponse()
-            response.read()
-            self.assertEqual(response.status, 200)
-            self.assertIn("svg", response.headers.get("Content-Type", ""))
-        finally:
-            connection.close()
+    def test_its_own_icon_is_in_the_listing(self):
+        status, payload = self.request("/api/satellites")
+        entry = next(item for item in payload["satellites"] if item["name"] == "Status")
+        self.assertEqual(entry["icon"], "logo")
+        self.assertEqual(entry["icons"]["logo"]["fallback"], "activity")
+        self.assertEqual(entry["icons"]["logo"]["paths"], ["M2.5 13L6.5 13L8.5 7L11.5 19L14 10L15.5 13L21.5 13"])
 
     # ---------- CLI ----------
 

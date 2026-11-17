@@ -61,25 +61,45 @@ const SHAPES = {
 
 export const ICON_NAMES = Object.keys(SHAPES);
 
-/** An <svg> for a shared icon name, or null for a name outside the set. */
-export function icon(name, size = 18) {
-    const shapes = SHAPES[name];
+/**
+ * An <svg> for an icon name, or null for a name this client can't draw. `own` is a
+ * Satellite's own icons (UI contract 1.2: a document's `icons`, or a catalog entry's), as the
+ * Engine validated them: {name: {fallback, stroke?, paths?}}. Their paths are absolute M, L, C
+ * and Z only, stroked here like the shared set; one without paths draws its shared fallback.
+ */
+export function icon(name, size = 18, own = null) {
+    const mine = own && typeof name === "string" && Object.hasOwn(own, name) ? own[name] : null;
+    if (mine && Array.isArray(mine.paths)) {
+        const svg = frame(size, mine.stroke);
+        for (const d of mine.paths) {
+            const node = document.createElementNS(SVG, "path");
+            node.setAttribute("d", String(d));
+            svg.appendChild(node);
+        }
+        return svg;
+    }
+    const shapes = Object.hasOwn(SHAPES, mine ? mine.fallback : name) ? SHAPES[mine ? mine.fallback : name] : null;
     if (!shapes) {
         return null;
     }
-    const svg = document.createElementNS(SVG, "svg");
-    for (const [attribute, value] of Object.entries({
-        viewBox: "0 0 24 24", width: size, height: size, fill: "none", stroke: "currentColor",
-        "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true",
-    })) {
-        svg.setAttribute(attribute, String(value));
-    }
+    const svg = frame(size, 2);
     for (const [tag, attributes] of shapes) {
         const node = document.createElementNS(SVG, tag);
         for (const [attribute, value] of Object.entries(attributes)) {
             node.setAttribute(attribute, String(value));
         }
         svg.appendChild(node);
+    }
+    return svg;
+}
+
+function frame(size, stroke) {
+    const svg = document.createElementNS(SVG, "svg");
+    for (const [attribute, value] of Object.entries({
+        viewBox: "0 0 24 24", width: size, height: size, fill: "none", stroke: "currentColor",
+        "stroke-width": stroke, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true",
+    })) {
+        svg.setAttribute(attribute, String(value));
     }
     return svg;
 }

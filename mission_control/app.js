@@ -279,25 +279,58 @@ function buildGenericIcon() {
     return svg;
 }
 
-// small square carrying a satellite's own icon (served through the same
-// generic assets route as its Mission Control page), or the generic fallback
-// when it has none / its declared icon couldn't be loaded
+// the shared icon set (ui/icons.js), loaded once for the icons a satellite names from it
+let sharedIcons = null;
+function loadSharedIcons() {
+    sharedIcons = sharedIcons || import("/ui/icons.js").catch(() => null);
+    return sharedIcons;
+}
+
+// what stands for a satellite: its own icon - the paths the Engine validated
+// from its icons/ folder, stroked in the text colour (UI contract 1.2) -, else
+// the shared icon it names (its own one's fallback, or icon_name), else the
+// generic mark
+function buildSatelliteGlyph(satellite) {
+    const own = satellite.icon && satellite.icons && Object.hasOwn(satellite.icons, satellite.icon)
+        ? satellite.icons[satellite.icon] : null;
+    if (own && Array.isArray(own.paths)) {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        for (const [attribute, value] of Object.entries({
+            fill: "none", stroke: "currentColor", "stroke-width": String(own.stroke),
+            "stroke-linecap": "round", "stroke-linejoin": "round",
+        })) {
+            svg.setAttribute(attribute, value);
+        }
+        for (const d of own.paths) {
+            svg.appendChild(shape("path", { d: String(d) }));
+        }
+        return svg;
+    }
+    const generic = buildGenericIcon();
+    const name = own ? own.fallback : satellite.icon_name;
+    if (name) {
+        loadSharedIcons().then((icons) => {
+            const drawn = icons && icons.icon(name);
+            if (drawn && generic.isConnected) {
+                generic.replaceWith(drawn);
+            }
+        });
+    }
+    return generic;
+}
+
+// what a satellite's icon looks like, for the signatures that decide a redraw
+function iconSignature(satellite) {
+    return JSON.stringify([satellite.icon, satellite.icon_name, satellite.icon && satellite.icons ? satellite.icons[satellite.icon] : null]);
+}
+
+// small square carrying a satellite's icon, so cards, the topbar and the sidebar
+// show it at one size
 function buildSatelliteIcon(satellite, extraClass = "") {
     const wrapper = element("span", `satellite-icon${extraClass ? ` ${extraClass}` : ""}`);
     wrapper.setAttribute("aria-hidden", "true");
-    if (satellite.icon) {
-        // painted through a mask so the icon takes the text colour; as an <img>,
-        // an SVG drawn in currentColor always comes out black
-        const url = satelliteUrl(satellite.name, `/assets/${satellite.icon}`);
-        const mark = element("span", "icon-mask");
-        mark.style.setProperty("--icon", `url("${url}")`);
-        wrapper.appendChild(mark);
-        const probe = new Image();
-        probe.addEventListener("error", () => mark.replaceWith(buildGenericIcon()));
-        probe.src = url;
-    } else {
-        wrapper.appendChild(buildGenericIcon());
-    }
+    wrapper.appendChild(buildSatelliteGlyph(satellite));
     return wrapper;
 }
 
@@ -539,13 +572,7 @@ function openSatellite(satellite) {
 function buildHomeIcon(satellite) {
     const mark = element("span", "home-card-icon");
     mark.setAttribute("aria-hidden", "true");
-    if (satellite.icon) {
-        // a mask lets the satellite's own stroke icon take the accent colour
-        mark.style.setProperty("--icon", `url("${satelliteUrl(satellite.name, `/assets/${satellite.icon}`)}")`);
-        mark.classList.add("masked");
-    } else {
-        mark.appendChild(buildGenericIcon());
-    }
+    mark.appendChild(buildSatelliteGlyph(satellite));
     return mark;
 }
 
@@ -597,7 +624,7 @@ function buildHomeCard(satellite) {
 function renderHomeSatellites() {
     const listed = satellites.filter((satellite) => !isSection(satellite));
     const signature = listed
-        .map((satellite) => [satellite.name, satellite.status, satellite.icon, satellite.description,
+        .map((satellite) => [satellite.name, satellite.status, iconSignature(satellite), satellite.description,
             satellite.configurable, hasPage(satellite)].join(":"))
         .join("|");
     if (signature === homeSignature) {
@@ -690,6 +717,7 @@ async function renderHomeWidgets() {
             cards.push(widgetRenderer.renderWidget(widget, state, {
                 developer: developerContext.enabled,
                 title: satellite.name,
+                icons: satellite.icons || null,
                 onOpen: (section) => {
                     location.hash = section ? `${satelliteHash(satellite)}/${section}` : satelliteHash(satellite);
                 },
@@ -960,7 +988,7 @@ function developerHint(count, noun = "setting") {
 
 function renderSatelliteNav() {
     const pages = satellites.filter((satellite) => hasPage(satellite) && !isSection(satellite));
-    const signature = pages.map((satellite) => `${satellite.name}:${satellite.status}:${satellite.icon}`).join("|");
+    const signature = pages.map((satellite) => `${satellite.name}:${satellite.status}:${iconSignature(satellite)}`).join("|");
     if (signature === navSignature) {
         return;
     }

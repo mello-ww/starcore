@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import {GestureDetector, GestureHandlerRootView, type GestureType} from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/Feather';
+import {Glyph, useOwnIcons} from '../../components/Glyph';
 import Video from 'react-native-video';
 import {usePinchColumnsGesture} from '../../components/pinchColumns';
 import {SecureWindow} from '../../components/SecureWindow';
@@ -12,7 +13,7 @@ import {ZoomableImage} from '../../components/ZoomableImage';
 import {MemoryImages, useImageSource} from './memoryImages';
 import {keptPages} from './offline';
 import {tokens, useAccent} from '../../theme';
-import {formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate, type Scope, type UiAction, type UiBlock} from './contract';
+import {formatValue, isIconName, isSafeRoute, isVisible, resolve, resolveTemplate, type Scope, type OwnIcons, type UiAction, type UiBlock} from './contract';
 import type {BlockContext} from './UiBlocks';
 
 const {palette, space, type, radii} = tokens;
@@ -60,11 +61,12 @@ export function quickAction(block: UiBlock, scope: Scope, canRunHere: (action: U
   return null;
 }
 
-/** The shared icon an item without an image shows (`item.icon`), or null. */
-export function tileIcon(block: UiBlock, scope: Scope): string | null {
+/** The icon an item without an image shows (`item.icon`): a shared one, or one of the
+ * document's own (`own`, UI contract 1.2) - else null. */
+export function tileIcon(block: UiBlock, scope: Scope, own: OwnIcons | null = null): string | null {
   const icon = (block.item as any)?.icon;
   const name = icon !== undefined ? resolve(icon, scope) : null;
-  return typeof name === 'string' && ICONS.has(name) ? name : null;
+  return isIconName(name, own) ? name : null;
 }
 
 export function mediaKind(value: unknown): 'image' | 'video' {
@@ -215,6 +217,8 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
   const {width: windowWidth} = useWindowDimensions();
   const {color: accent, onColor} = useAccent();
   const reduced = useReducedMotion();
+  // the document's own icons (UI contract 1.2), which an item's icon may name
+  const own = useOwnIcons();
   const item = (block.item ?? {}) as Record<string, any>;
   const formats = (item.format ?? {}) as Record<string, string>;
   // the screen's context is a new object every render: depend only on its stable functions
@@ -621,7 +625,7 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
             accent={accent}
             onAccent={onColor}
             reduced={reduced}
-            icon={tileIcon(block, entry.scope)}
+            icon={tileIcon(block, entry.scope, own)}
             quick={picking || selecting ? null : quickAction(block, entry.scope, action => canRun(context, action))}
             onQuick={runAction}
             onPress={opens(entry) ? onPress : undefined}
@@ -890,7 +894,7 @@ const Tile = memo(function Tile({
             />
           </Animated.View>
         ) : (
-          <Icon name={icon || 'image'} size={icon ? 28 : 18} color={palette.text3} />
+          <Glyph name={icon || 'image'} size={icon ? 28 : 18} color={palette.text3} />
         )}
         {entry.kind === 'video' && (
           <View style={styles.badge} pointerEvents="none">
@@ -906,7 +910,7 @@ const Tile = memo(function Tile({
             accessibilityLabel={asText(resolve(quick.label, entry.scope))}
             testID={`media-quick-${entry.key}`}
             style={({pressed}) => [styles.quick, quick.style === 'primary' && {backgroundColor: accent}, pressed && styles.pressed]}>
-            <Icon name={quick.icon} size={15} color={quick.style === 'primary' ? onAccent : '#fff'} />
+            <Glyph name={quick.icon} size={15} color={quick.style === 'primary' ? onAccent : '#fff'} />
           </Pressable>
         )}
         {selectable && selecting && (
@@ -974,7 +978,7 @@ export function ActionPill({
         disabled && styles.disabled,
         pressed && styles.pressed,
       ]}>
-      {typeof entry.icon === 'string' && <Icon name={entry.icon} size={15} color={color} />}
+      {typeof entry.icon === 'string' && <Glyph name={entry.icon} size={15} color={color} />}
       <Text style={[styles.pillLabel, {color}]}>{label}</Text>
     </Pressable>
   );
@@ -1197,7 +1201,7 @@ function ViewerButton({icon, label, onPress, active}: {icon: string; label: stri
       accessibilityState={active !== undefined ? {selected: active} : undefined}
       hitSlop={8}
       style={({pressed}) => [styles.viewerButton, active && {backgroundColor: accent}, pressed && styles.pressed]}>
-      <Icon name={icon} size={20} color={active ? onColor : palette.text} />
+      <Glyph name={icon} size={20} color={active ? onColor : palette.text} />
     </Pressable>
   );
 }

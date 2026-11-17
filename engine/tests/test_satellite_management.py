@@ -514,32 +514,48 @@ class StatusAndIconTest(unittest.TestCase):
         self.assertIsNone(describe_satellite(engine, satellite)["icon"])
         _stop(engine)
 
-    def test_a_declared_icon_that_exists_is_reported(self):
+    def test_a_declared_icon_is_served_as_paths(self):
+        engine, native, _ = _engine(services=True)
+        fixture = _build_fake_satellite(native, with_lifecycle=False)
+        with open(fixture["dir"] / "satellite.toml", "a", encoding="utf-8") as file:
+            file.write('icon = "logo"\n[icons]\nlogo = "box"\n')
+        (fixture["dir"] / "icons").mkdir()
+        (fixture["dir"] / "icons" / "logo.svg").write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            'stroke-width="2"><line x1="2" y1="12" x2="22" y2="12"/></svg>', encoding="utf-8")
+        engine.loader._discover_directory(native, "native")
+        satellite = engine.registry.get("Fake")
+
+        described = describe_satellite(engine, satellite)
+        self.assertEqual(described["icon"], "logo")
+        self.assertEqual(described["icons"], {"logo": {"fallback": "box", "stroke": 2.0, "paths": ["M2 12L22 12"]}})
+        _stop(engine)
+
+    def test_a_declared_icon_that_is_missing_keeps_its_fallback(self):
+        engine, native, _ = _engine(services=True)
+        fixture = _build_fake_satellite(native, with_lifecycle=False)
+        with open(fixture["dir"] / "satellite.toml", "a", encoding="utf-8") as file:
+            file.write('icon = "logo"\n[icons]\nlogo = "box"\n')
+        with redirect_stdout(io.StringIO()) as output:
+            engine.loader._discover_directory(native, "native")
+        satellite = engine.registry.get("Fake")
+
+        self.assertEqual(satellite.manifest.icon, "logo")
+        self.assertEqual(satellite.manifest.icons, {"logo": {"fallback": "box"}})
+        self.assertIn("icons/logo.svg is missing", output.getvalue())
+        _stop(engine)
+
+    def test_an_icon_that_isnt_declared_falls_back_to_none(self):
         engine, native, _ = _engine(services=True)
         fixture = _build_fake_satellite(native, with_lifecycle=False)
         with open(fixture["dir"] / "satellite.toml", "a", encoding="utf-8") as file:
             file.write('icon = "icon.svg"\n')
-        assets = fixture["dir"] / "mission_control"
-        assets.mkdir()
-        (assets / "icon.svg").write_text("<svg></svg>", encoding="utf-8")
-        engine.loader._discover_directory(native, "native")
-        satellite = engine.registry.get("Fake")
-
-        self.assertEqual(satellite.manifest.icon, "icon.svg")
-        self.assertEqual(describe_satellite(engine, satellite)["icon"], "icon.svg")
-        _stop(engine)
-
-    def test_a_declared_icon_that_is_missing_falls_back_to_none(self):
-        engine, native, _ = _engine(services=True)
-        fixture = _build_fake_satellite(native, with_lifecycle=False)
-        with open(fixture["dir"] / "satellite.toml", "a", encoding="utf-8") as file:
-            file.write('icon = "missing.svg"\n')
-        engine.loader._discover_directory(native, "native")
+        with redirect_stdout(io.StringIO()):
+            engine.loader._discover_directory(native, "native")
         satellite = engine.registry.get("Fake")
 
         self.assertIsNone(satellite.manifest.icon)
         _stop(engine)
-
 
 if __name__ == "__main__":
     unittest.main()

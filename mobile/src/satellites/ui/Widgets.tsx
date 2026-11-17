@@ -1,10 +1,11 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import {Glyph} from '../../components/Glyph';
 import {TOUCH_TARGET, tokens, useAccent} from '../../theme';
 import type {SatelliteSummary} from '../types';
 import {UiApi} from './api';
-import {ICONS, resolve, resolveTemplate, type Scope, type UiWidget} from './contract';
+import {isIconName, resolve, resolveTemplate, type Scope, type UiWidget} from './contract';
 import {BlockContext, UiWidgetBlocks} from './UiBlocks';
 
 const {palette, radii, space, type} = tokens;
@@ -144,7 +145,9 @@ function WidgetCard({
       style={({pressed}) => [styles.card, pressed && styles.pressed]}
       testID={`home-widget-${widget.id}`}>
       <View style={styles.head}>
-        {widget.icon && ICONS.has(widget.icon) && <Icon name={widget.icon} size={18} color={accent} />}
+        {isIconName(widget.icon, satellite.icons ?? null) && (
+          <Glyph name={widget.icon} icons={satellite.icons ?? null} size={18} color={accent} />
+        )}
         <Text style={[type.eyebrow, styles.title]} numberOfLines={1}>
           {title.toUpperCase()}
         </Text>

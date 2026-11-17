@@ -115,9 +115,10 @@ the owner 2026-11-15).
   field kind arrives with contract change 2, in the Locked Folder's L4); the `own: "settings"`
   entry goes. Phone sync was reached from Settings with `{"own": "sync"}` until S0 removed it.
 - [ ] **The Locked Folder (#37):** stage 4.
-- [ ] **P2 - Icons shipped by the Satellite (#38):** a declared `icons/` folder, validated by
-  the Engine (single colour, no script), drawn by both clients with a shared icon as fallback
-  (contract change 5).
+- [x] **P2 - Icons shipped by the Satellite (#38):** a declared `icons/` folder, validated by
+  the Engine (single colour, no script) and served as path data, drawn by both clients with a
+  shared icon as fallback (contract change 5). Every Satellite's `mission_control/icon.svg`
+  became `icons/logo.svg`; Photo's Albums tab has its own icon.
 - [ ] **P3** - then remove `satellites/native/photo/mission_control/page.js` and `page.css`,
   `mobile/src/photo/`, its routes in `MainTabs.tsx` and its `DEDICATED_SCREENS` entry.
 - [ ] Optional, from the audit: the summary's tools note (#5), album group hints (#6), bulk

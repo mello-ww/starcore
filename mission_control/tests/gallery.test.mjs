@@ -74,6 +74,11 @@ test("an item's icon is a shared icon, or none", () => {
     assert.equal(tileIcon({ item: { icon: "folder" } }, { data: {} }), "folder");
     assert.equal(tileIcon({ item: { icon: "$.icon" } }, { data: { icon: "<svg>" } }), null);
     assert.equal(tileIcon({ item: {} }, { data: {} }), null);
+    // one of the document's own icons (UI contract 1.2), only when the document has it
+    const own = { albums: { fallback: "folder", stroke: 1.6, paths: ["M1 1L2 2"] } };
+    assert.equal(tileIcon({ item: { icon: "$.icon" } }, { data: { icon: "albums" } }, own), "albums");
+    assert.equal(tileIcon({ item: { icon: "$.icon" } }, { data: { icon: "albums" } }), null);
+    assert.equal(tileIcon({ item: { icon: "$.icon" } }, { data: { icon: "toString" } }, own), null);
 });
 
 test("a tile's quick action is the first visible entry that can run here", () => {

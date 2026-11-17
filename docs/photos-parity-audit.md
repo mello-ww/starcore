@@ -125,7 +125,37 @@ each must move to the contract or to a generic capability before the stable rele
 - Phone sync (#28): removed in S0; a generic device-sync capability replaces it (S1 to S4).
 
 **Towards the stable release**
-- Icons shipped by the Satellite (#38).
+- **P2. Icons shipped by the Satellite** (#38, contract change 5, M–L). **Done (2026-11-17).**
+  The plan (2026-11-17):
+  - *Declared:* a Satellite's `satellite.toml` lists its own icons in an `[icons]` table,
+    `name = "<shared icon>"`, each drawn from `icons/<name>.svg` beside it, the shared icon
+    being what clients draw when the file is refused. `icon` names the Satellite's own icon
+    among them (it was a file under `mission_control/`); `icon_name` stays its shared icon.
+    An own name is lower case, at most 32 characters, and never a shared icon's name.
+  - *Validated by the Engine only* (`engine/starcore/icons.py`): at most 8 KiB, no DOCTYPE or
+    entity, a `0 0 24 24` view box, elements `svg`, `g`, `path`, `line`, `polyline`,
+    `polygon`, `circle`, `ellipse`, `rect` (and `title`, `desc`, ignored) with their geometry
+    and stroke attributes only, `fill="none"`, `stroke="currentColor"`: no script, style,
+    link, transform or colour. Each shape becomes absolute `M`, `L`, `C` and `Z` path data
+    (arcs and quadratic curves turned into cubic ones), at most 32 shapes. Clients never parse
+    an SVG: they draw these paths with the stroke width given, in their own colour, so an icon
+    is single colour and tinted by the client's tokens.
+  - *Served:* `GET /api/satellites` gives each Satellite its `icons`
+    (`{name: {fallback, stroke, paths}}`, `fallback` alone for a refused file) and `icon`; the
+    served `ui.json` carries the same `icons`, added by the Engine (a document may not write
+    it), so its revision changes with an icon file. Rediscovery picks up a changed icon.
+  - *Named in a document* wherever a shared icon can be (navigation, list items, tiles, quick
+    and viewer actions, widgets), also through a binding; the three validators accept the
+    document's own names.
+  - *Drawn:* Mission Control's `ui/icons.js` draws own paths as inline SVG built node by node;
+    the app adds a native `StarCoreGlyph` view (Kotlin, `com.starcore.mobile.glyph`) and a
+    shared `Glyph` component that falls back to the shared set. Home, the Satellites list and
+    the sidebar draw a Satellite's own icon.
+  - *Moved:* every Satellite's `mission_control/icon.svg` becomes `icons/logo.svg`; Photo also
+    ships an `albums` icon for its Albums tab.
+  - *Tests:* Engine tests for validation and normalisation (refused files, each shape, arcs),
+    contract fixtures with an own icon, both clients' contract and renderer tests, a Kotlin
+    test of the path reader, then the web and the emulator on the local demo.
 
 **Optional (don't block the switch)**
 - Summary and tools note (#5).

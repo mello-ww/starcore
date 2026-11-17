@@ -93,6 +93,9 @@ export function checkDocument(document) {
             return "A protected interface keeps nothing offline.";
         }
     }
+    if (document.icons !== undefined && !knownIcons(document.icons)) {
+        return "This interface ships icons this Mission Control can't draw.";
+    }
     // secrets and reveal (1.2): this client's own prompts, only for a store it unlocks, and only
     // for what it knows how to ask
     for (const action of routeActions(document)) {
@@ -104,6 +107,40 @@ export function checkDocument(document) {
         }
     }
     return null;
+}
+
+// a Satellite's own icons (1.2, contract change 5), which the Engine adds to the document it
+// serves: a name of their own, a shared fallback, and path data of absolute M, L, C and Z only,
+// which this client strokes in its own colour. It never reads an SVG
+const OWN_ICON_NAME = /^[a-z][a-z0-9-]{0,31}$/;
+const ICON_NUMBER = "-?\\d+(?:\\.\\d+)?";
+const ICON_PAIR = `${ICON_NUMBER} ${ICON_NUMBER}`;
+export const ICON_PATH = new RegExp(`^M${ICON_PAIR}(?:[ML]${ICON_PAIR}|C${ICON_PAIR} ${ICON_PAIR} ${ICON_PAIR}|Z)*$`);
+const ICON_LIMITS = { icons: 64, paths: 32, bytes: 8192 };
+
+/** Whether a document's `icons` table is one this client can draw. */
+export function knownIcons(icons) {
+    if (!icons || typeof icons !== "object" || Array.isArray(icons)) {
+        return false;
+    }
+    const entries = Object.entries(icons);
+    if (entries.length > ICON_LIMITS.icons) {
+        return false;
+    }
+    return entries.every(([name, entry]) => {
+        if (!OWN_ICON_NAME.test(name) || ICONS.has(name) || !entry || typeof entry !== "object" || Array.isArray(entry)) {
+            return false;
+        }
+        if (Object.keys(entry).some((key) => !["fallback", "stroke", "paths"].includes(key)) || !ICONS.has(entry.fallback)) {
+            return false;
+        }
+        if (entry.paths === undefined && entry.stroke === undefined) {
+            return true;
+        }
+        return typeof entry.stroke === "number" && entry.stroke >= 0.5 && entry.stroke <= 3
+            && Array.isArray(entry.paths) && entry.paths.length > 0 && entry.paths.length <= ICON_LIMITS.paths
+            && entry.paths.every((d) => typeof d === "string" && d.length <= ICON_LIMITS.bytes && ICON_PATH.test(d));
+    });
 }
 
 /** Whether every entry of an action's `secrets` is a kind this client asks for. */

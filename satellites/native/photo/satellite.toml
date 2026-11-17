@@ -2,9 +2,15 @@ name = "Photo"
 version = "1.0.0"
 author = "mellow"
 description = "Local photo library satellite."
-icon = "icon.svg"
+# its own icon, one of [icons] below (icons/<name>.svg)
+icon = "logo"
 # from the shared icon set every client can draw (contracts/ui/vocabulary.json)
 icon_name = "camera"
+
+# its own icons, icons/<name>.svg, each with the shared icon drawn if its file is refused
+[icons]
+logo = "camera"
+albums = "folder"
 
 # what any interface can pick from through the client's media picker (the pick action in
 # docs/ui-contract.md): the active library only - never the recycle bin or the Locked Folder

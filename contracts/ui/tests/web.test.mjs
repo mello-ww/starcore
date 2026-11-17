@@ -91,6 +91,21 @@ test("documents: valid ones render, ones every client must refuse are refused", 
     }
 });
 
+test("a Satellite's own icons: the shared vocabulary's limits, and only absolute M, L, C and Z", () => {
+    assert.equal(vocabulary.limits.icons, 64);
+    assert.equal(vocabulary.limits.icon_paths, 32);
+    assert.ok(contract.ICON_PATH.test("M2 12L22 12C22 17.523 17.523 22 12 22Z"));
+    assert.ok(contract.ICON_PATH.test("M-1.5 0L1 1ZM3 3L4 4"));
+    for (const path of ["", "L1 1", "M1 1l2 2", "M1 1 L2 2", "M1 1H2", "M1e3 1", "M1 1Q1 1 2 2", "M1 1C1 1 2 2"]) {
+        assert.ok(!contract.ICON_PATH.test(path), path);
+    }
+    assert.ok(contract.knownIcons({ albums: { fallback: "folder" } }));
+    assert.ok(!contract.knownIcons({ albums: { fallback: "folder", paths: ["M1 1L2 2"] } }));  // no stroke
+    assert.ok(!contract.knownIcons({ albums: { fallback: "folder", stroke: 2, paths: [] } }));
+    assert.ok(!contract.knownIcons({ "Albums": { fallback: "folder" } }));
+    assert.ok(!contract.knownIcons([]));
+});
+
 test("requirements and capability providers", () => {
     const providers = {
         "files.browse": [

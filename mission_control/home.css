@@ -184,20 +184,6 @@ body {
     color: var(--sc-danger);
 }
 
-.icon-mask {
-    display: block;
-    width: 14px;
-    height: 14px;
-    background: currentColor;
-    -webkit-mask: var(--icon) center / contain no-repeat;
-    mask: var(--icon) center / contain no-repeat;
-}
-
-.satellite-icon.small .icon-mask {
-    width: 11px;
-    height: 11px;
-}
-
 /* neutral until hovered or active; .sidebar outranks core.css's accent card icon */
 .sidebar .nav-item .satellite-icon {
     background: transparent;
@@ -205,7 +191,6 @@ body {
     color: var(--sc-text-3);
 }
 
-.nav-item .satellite-icon .icon-mask,
 .nav-item .satellite-icon svg {
     width: 15px;
     height: 15px;
@@ -624,12 +609,6 @@ body[data-route="overview"] #updated {
     height: 100%;
 }
 
-.home-card-icon.masked {
-    background: var(--sc-accent);
-    -webkit-mask: var(--icon) center / contain no-repeat;
-    mask: var(--icon) center / contain no-repeat;
-}
-
 .home-card-state {
     display: inline-flex;
     flex: none;
@@ -758,10 +737,6 @@ body[data-route="overview"] #updated {
 @media (max-width: 1040px) and (min-width: 601px) {
     .sidebar .nav-item .satellite-icon {
         display: flex;
-    }
-
-    .sidebar .nav-item .satellite-icon .icon-mask {
-        display: block;
     }
 }
 

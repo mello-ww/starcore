@@ -2,6 +2,21 @@
   "_about": "Whole documents. `valid` must load; each `invalid` entry must be refused by the Engine with an error mentioning `error`. Entries with \"client\": true must also be refused by both clients' own checks (contract compatibility and structure), since a client cannot assume every server validated what it sends.",
   "valid": [
     {
+      "name": "own-icons",
+      "_why": "1.2: a Satellite's own icons, which the Engine adds to the document it serves: a navigation item, a list item, a viewer action and a binding may name one, and a refused file keeps its fallback alone.",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home",
+        "icons": {
+          "albums": {"fallback": "folder", "stroke": 1.6, "paths": ["M7 4.5L18.5 4.5C19.328 4.5 20 5.172 20 6L20 16", "M3.5 16.5L7 13L10 16Z"]},
+          "spare": {"fallback": "box"}
+        },
+        "navigation": [{"page": "home", "label": "Albums", "icon": "albums"}],
+        "pages": {"home": {"blocks": [
+          {"type": "list", "items": "$.rows", "item": {"title": "$.name", "icon": "spare"}},
+          {"type": "media-grid", "items": "$.tiles", "item": {"image": "t/{$.id}", "icon": "$.icon"},
+           "viewer": {"image": "o/{$.id}", "actions": [{"label": "Keep", "icon": "albums", "action": {"route": "keep/{$.id}", "method": "POST"}}]}}
+        ]}}}
+    },
+    {
       "name": "media-blocks",
       "_why": "1.2: an image and a media-list, both loaded from the Satellite's own routes.",
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
@@ -791,6 +806,13 @@
     {"name": "sync-not-an-object", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"source": {"route": "items"}, "blocks": [{"type": "button", "label": "Back up this phone", "action": {"sync": "media.sync"}}]}}}, "error": "sync"},
     {"name": "sync-with-a-setting", "_why": "the sync screen is the client's: the document sets nothing of it", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"source": {"route": "items"}, "blocks": [{"type": "button", "label": "Back up this phone", "action": {"sync": {"capability": "media.sync", "wifi_only": false}}}]}}}, "error": "sync"},
     {"name": "sync-with-a-route", "_why": "a sync action opens a screen, it calls nothing", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"source": {"route": "items"}, "blocks": [{"type": "button", "label": "Back up this phone", "action": {"sync": {"capability": "media.sync"}, "route": "backup/status"}}]}}}, "error": "route"},
-    {"name": "sync-in-a-selection", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"source": {"route": "items"}, "blocks": [{"type": "media-grid", "items": [], "item": {"image": "t"}, "selection": {"actions": [{"label": "Back up", "action": {"sync": {"capability": "media.sync"}}}]}}]}}}, "error": "not in a selection"}
+    {"name": "sync-in-a-selection", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"source": {"route": "items"}, "blocks": [{"type": "media-grid", "items": [], "item": {"image": "t"}, "selection": {"actions": [{"label": "Back up", "action": {"sync": {"capability": "media.sync"}}}]}}]}}}, "error": "not in a selection"},
+    {"name": "own-icon-undeclared", "_why": "a name neither shared nor the Satellite's own", "document": {"contract": "starcore.ui/1.2", "entry": "home", "navigation": [{"page": "home", "label": "Home", "icon": "albums"}], "pages": {"home": {"blocks": []}}}, "error": "unknown icon"},
+    {"name": "own-icon-shadows-a-shared-one", "client": true, "document": {"contract": "starcore.ui/1.2", "entry": "home", "icons": {"camera": {"fallback": "camera"}}, "pages": {"home": {"blocks": []}}}, "error": "icons.camera"},
+    {"name": "own-icon-bad-fallback", "client": true, "document": {"contract": "starcore.ui/1.2", "entry": "home", "icons": {"albums": {"fallback": "albums"}}, "pages": {"home": {"blocks": []}}}, "error": "icons.albums.fallback"},
+    {"name": "own-icon-raw-svg", "_why": "a client draws only absolute M, L, C and Z: never markup or other commands", "client": true, "document": {"contract": "starcore.ui/1.2", "entry": "home", "icons": {"albums": {"fallback": "folder", "stroke": 1.6, "paths": ["<path d='M0 0'/>"]}}, "pages": {"home": {"blocks": []}}}, "error": "icons.albums.paths"},
+    {"name": "own-icon-relative-path", "client": true, "document": {"contract": "starcore.ui/1.2", "entry": "home", "icons": {"albums": {"fallback": "folder", "stroke": 1.6, "paths": ["M1 1l2 2a1 1 0 0 1 2 2"]}}, "pages": {"home": {"blocks": []}}}, "error": "icons.albums.paths"},
+    {"name": "own-icon-stroke", "client": true, "document": {"contract": "starcore.ui/1.2", "entry": "home", "icons": {"albums": {"fallback": "folder", "stroke": 12, "paths": ["M1 1L2 2"]}}, "pages": {"home": {"blocks": []}}}, "error": "icons.albums.stroke"},
+    {"name": "own-icons-before-1.2", "document": {"contract": "starcore.ui/1.1", "entry": "home", "icons": {"albums": {"fallback": "folder"}}, "pages": {"home": {"blocks": []}}}, "error": "icons"}
   ]
 }

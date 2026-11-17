@@ -96,26 +96,30 @@ every hook call). None of this is per-Satellite branching - a Satellite with no 
 at all is simply `"running"` whenever it's enabled, since there's nothing that could be
 stopped out from under it.
 
-A Satellite can also declare an icon in its `satellite.toml`:
+A Satellite can also declare its icons in its `satellite.toml`:
 
 ```toml
-icon = "icon.svg"
+icon = "logo"
 icon_name = "camera"
+
+[icons]
+logo = "camera"
 ```
 
-naming a file under its own `mission_control/` directory. It's validated at load time - a
-declared file that doesn't exist is dropped with a warning rather than failing the whole
-Satellite - and served through the same `GET /api/satellites/<name>/assets/<icon>` route as
-any other Mission Control asset (see "Contributing a Mission Control page" below), so nothing
-new is needed to serve it. `describe_satellite()` reports it as `icon`, or `null` if the
-Satellite didn't declare one; Mission Control falls back to a generic icon in that case. The
-Core holds no name-to-icon mapping of its own - a Satellite that wants a recognizable mark in
-the sidebar and on its card provides its own image, the same way it provides its own page.
+`[icons]` lists the Satellite's own icons, each drawn from `icons/<name>.svg` beside its
+`satellite.toml` and paired with the shared icon that stands for it when its file is refused.
+`icon` names the one that stands for the Satellite itself, in the sidebar, on its card, on Home
+and in the app's Satellites list. The Engine validates every file at load time and turns it
+into path data both clients draw in their own colour (`engine/starcore/icons.py`; the rules
+are in [UI contract](ui-contract.md), "A Satellite's own icons"). A refused file or a missing
+one is reported with a warning and keeps its fallback, rather than failing the whole
+Satellite; an `icon` that isn't in `[icons]` is dropped. Its `ui.json` may name its own icons
+wherever it names a shared one. The Core holds no name-to-icon mapping of its own.
 
 `icon_name` names an icon from the shared set every client draws natively
-(`contracts/ui/vocabulary.json`, Feather glyph names). The Android app can't draw a
-Satellite's own SVG, so this is the icon it shows; a name outside the set is dropped with a
-warning, and clients fall back to a generic icon.
+(`contracts/ui/vocabulary.json`, Feather glyph names): what stands for the Satellite when it
+ships no icon of its own. A name outside the set is dropped with a warning, and clients fall
+back to a generic icon.
 
 A Satellite whose interface lives inside another Satellite's page can say so:
 

@@ -2,10 +2,15 @@ name = "LockedFolder"
 version = "1.0.0"
 author = "mellow"
 description = "A PIN-protected private area for photos and files, opened from Photos."
-icon = "icon.svg"
+# its own icon, one of [icons] below (icons/<name>.svg)
+icon = "logo"
 # from the shared icon set every client can draw (contracts/ui/vocabulary.json)
 icon_name = "lock"
 section_of = "Photo" # opened as a tab of Photo, not from its own navigation entry
+
+# its own icons, icons/<name>.svg, each with the shared icon drawn if its file is refused
+[icons]
+logo = "lock"
 
 # a protected store media can be moved into from a shared interface (the secure action) -
 # deliberately no operation that lists or reads the vault: only its own document's routes do,

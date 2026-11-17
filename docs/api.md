@@ -21,7 +21,7 @@ GET  /api/status                  current Core status, including "build": {versi
 GET  /api/satellites              every loaded Satellite, and the catalog revision
 GET  /api/satellites/<name>       a single Satellite, matched case-insensitively
 GET  /api/catalog                 the UI contract this Engine speaks and every Satellite capability's providers
-POST /api/catalog/rediscover      re-read Satellite metadata (ui.json, icon_name, provides) from disk - never code
+POST /api/catalog/rediscover      re-read Satellite metadata (ui.json, icon_name, icons, provides) from disk - never code
 GET  /api/commands                every registered CLI command and its metadata
 GET  /api/configuration           the configurable settings and their current value
 POST /api/commands/execute        run a registered command
@@ -51,7 +51,6 @@ Responses are JSON. A Satellite entry contains its manifest information, its typ
   "version": "1.0.0",
   "author": "mellow",
   "description": "System monitoring satellite.",
-  "icon": "icon.svg",
   "type": "native",
   "enabled": true,
   "status": "running",
@@ -59,6 +58,8 @@ Responses are JSON. A Satellite entry contains its manifest information, its typ
   "state": { "refresh_rate": 1 },
   "configurable": false,
   "icon_name": "activity",
+  "icon": "logo",
+  "icons": {"logo": {"fallback": "activity", "stroke": 1.6, "paths": ["M2.5 13L6.5 13L8.5 7L11.5 19L14 10L15.5 13L21.5 13"]}},
   "provides": {},
   "ui": null
 }
@@ -76,9 +77,7 @@ a Satellite's name. `"error"` means the Satellite's last `start`/`stop` hook fai
 `docs/satellites.md`) that isn't currently running, whether because it's between starts or
 because `[satellites].services` is off entirely; a Satellite with no background service at
 all is simply `"running"` whenever it's enabled, since there's nothing to actually be
-stopped. `icon` is the filename of an icon the Satellite declared in its own `satellite.toml`
-(served through the same `assets` route below), or `null` if it didn't - Mission Control
-falls back to a generic icon in that case.
+stopped.
 
 `configurable` is `true` when the Satellite has named one of its own routes
 `"configuration"` - it is the entire signal Mission Control uses to decide whether to show
@@ -86,6 +85,12 @@ that Satellite a Config button, and the only thing the Core itself knows about a
 settings. See "Exposing configuration" in the Satellites documentation.
 
 `icon_name` is a name from the shared icon set every client draws natively, or `null`.
+`icons` are the Satellite's own icons, as the Engine validated them from its `icons/` folder:
+`{name: {fallback, stroke, paths}}`, where `paths` is path data of absolute `M`, `L`, `C` and
+`Z` in a 24-unit box that clients stroke in their own colour, and `fallback` the shared icon to
+draw instead; a file the Engine refused has `fallback` alone. `icon` names the one among them
+that stands for the Satellite, or is `null` (see "Status and icon" in `docs/satellites.md`).
+The Satellite's served `ui.json` carries the same `icons`.
 `provides` lists the Satellite capabilities it offers others, as `{capability: {version,
 operations}}`. `ui` describes its declarative interface (`ui.json`):
 `{"contract": "starcore.ui/1.0", "revision": "...", "error": null}` when the Engine validated

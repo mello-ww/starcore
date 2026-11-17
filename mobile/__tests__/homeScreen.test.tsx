@@ -32,7 +32,7 @@ const {__mocks} = jest.requireMock('../src/satellites/api') as {__mocks: {list: 
 const {__navigation} = jest.requireMock('@react-navigation/native') as {__navigation: {navigate: jest.Mock}};
 
 const music = {
-  name: 'Music', version: '1', author: 'a', description: 'Local music library satellite.', icon: 'icon.svg',
+  name: 'Music', version: '1', author: 'a', description: 'Local music library satellite.', icon: null,
   type: 'native' as const, enabled: true, status: 'running' as const, configurable: true,
 };
 const docker = {
