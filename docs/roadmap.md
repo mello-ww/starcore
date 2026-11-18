@@ -106,7 +106,6 @@ Potential risks:
   file can use live sessions.
 - Before the first administrator is created the API is open by design; this is only safe
   while the server stays on `127.0.0.1`.
-- Unexpected server errors return the exception text (`internal error: ...`).
 - The Android app allows cleartext HTTP for any host (deliberate, for LAN servers), so
   without HTTPS the session token crosses the network in the clear.
 - `npm audit` reports 33 advisories in the Android project. Almost all are build-time

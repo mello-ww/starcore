@@ -202,6 +202,8 @@ def execute(engine, command: str, token: str = "") -> dict:
     try:
         outcome = engine.run_command(command, runner.remote_context(engine, token))
     except Exception as error:
-        return {"command": command, "output": "", "error": str(error), "exit_code": 1}
+        # the text stays on the server: an exception can name paths, settings or data
+        print(f"[ERROR]: the command could not be run ({type(error).__name__}).")
+        return {"command": command, "output": "", "error": "internal error", "exit_code": 1}
 
     return {"command": command, "output": outcome.output, "error": None, "exit_code": outcome.exit_code}

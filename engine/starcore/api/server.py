@@ -8,6 +8,8 @@ import ipaddress
 import itertools
 import json
 import ssl
+import sys
+import traceback
 
 from . import payloads
 from .response import RawBody, Request, Response
@@ -230,9 +232,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._handle_api(path)
             else:
                 self._handle_frontend(path)
-        except Exception as error:
-            if not self._responded:
-                self._send_json({"error": f"internal error: {error}"}, status=500)
+        except Exception:
+            self._internal_error()
 
     def do_POST(self):
         path = urlparse(self.path).path
@@ -268,9 +269,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._handle_satellite(path, "POST")
             else:
                 self._method_not_allowed()
-        except Exception as error:
-            if not self._responded:
-                self._send_json({"error": f"internal error: {error}"}, status=500)
+        except Exception:
+            self._internal_error()
 
     def _authorized(self, path: str) -> bool:
         """True if this request may proceed without further checks.
@@ -375,6 +375,16 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         self._method_not_allowed()
+
+    def _internal_error(self):
+        """An unexpected failure: the trace goes to the server's own output, the client gets
+        a fixed message - an exception's text can name paths, settings or data."""
+        method = self.command or "?"
+        path = urlparse(self.path or "").path
+        print(f"[ERROR]: {method} {path} failed unexpectedly:", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        if not self._responded:
+            self._send_json({"error": "internal error"}, status=500)
 
     def log_message(self, format, *args):
         # the CLI can share this process, so requests are not logged into its output

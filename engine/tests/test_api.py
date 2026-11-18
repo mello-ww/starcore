@@ -1,4 +1,6 @@
 from http.client import HTTPConnection
+import contextlib
+import io
 import json
 import time
 import unittest
@@ -176,6 +178,23 @@ class ApiTest(unittest.TestCase):
 
         self.assertIn(status, (403, 404))
         self.assertNotIn("[server]", body)
+
+    def test_an_unexpected_failure_keeps_its_text_on_the_server(self):
+        def fail():
+            raise RuntimeError("C:/secret/path could not be opened")
+
+        original = self.engine.rediscover
+        self.engine.rediscover = fail
+        trace = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(trace):
+                status, payload = self.json_request("/api/catalog/rediscover", method="POST", payload={})
+        finally:
+            self.engine.rediscover = original
+
+        self.assertEqual(status, 500)
+        self.assertEqual(payload, {"error": "internal error"})
+        self.assertIn("C:/secret/path", trace.getvalue())  # the owner still sees what happened
 
 
 class ShutdownTest(unittest.TestCase):
