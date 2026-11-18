@@ -1,8 +1,9 @@
 import React, {useMemo, useState} from 'react';
 import {ActivityIndicator, Modal, PanResponder, Pressable, StyleSheet, Text, View} from 'react-native';
+import Icon from 'react-native-vector-icons/Feather';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ModalSafeArea} from '../../components/ModalSafeArea';
-import {colors, spacing, touchTarget, typography, useAccent, useAccentStyles} from '../../theme';
+import {colors, spacing, touchTarget, typography, useAccent} from '../../theme';
 import {useAudioHost, usePlayerState} from '../AudioHost';
 import {Artwork} from './Artwork';
 import {DevicesPanel} from './DevicesPanel';
@@ -33,7 +34,6 @@ export function FullPlayer() {
 const noLinks = (): {album?: (id: string) => void; artist?: (id: string) => void} => ({});
 
 function PlayerBody() {
-  const accentStyle = useAccentStyles();
   const {color: accent, onColor} = useAccent();
   // an active toggle: a soft accent pill behind the accent glyph
   const tint = {backgroundColor: `${accent}29`};
@@ -110,7 +110,7 @@ function PlayerBody() {
             </Text>
           </View>
           <Pressable onPress={() => setLiked([track.id], !liked.has(track.id))} style={styles.touch} accessibilityRole="button" accessibilityLabel="Like">
-            <Text style={[styles.heart, liked.has(track.id) && accentStyle.text]}>{liked.has(track.id) ? '♥' : '♡'}</Text>
+            <Icon name="heart" size={26} color={liked.has(track.id) ? accent : colors.text} />
           </Pressable>
         </View>
 
@@ -124,16 +124,19 @@ function PlayerBody() {
 
         <View style={styles.controls}>
           <Pressable onPress={() => player.setShuffle(!state.queue.shuffle)} style={[styles.toggle, state.queue.shuffle && tint]} accessibilityRole="button" accessibilityLabel="Shuffle">
-            <Text style={[styles.small, state.queue.shuffle && accentStyle.text]}>⇄</Text>
+            <Icon name="shuffle" size={22} color={state.queue.shuffle ? accent : colors.textDim} />
           </Pressable>
-          <Pressable onPress={() => player.previous()} style={styles.touch} accessibilityRole="button" accessibilityLabel="Previous"><Text style={styles.big}>⏮</Text></Pressable>
+          <Pressable onPress={() => player.previous()} style={styles.touch} accessibilityRole="button" accessibilityLabel="Previous"><Icon name="skip-back" size={28} color={colors.text} /></Pressable>
           <Pressable onPress={() => player.toggle()} style={[styles.play, {backgroundColor: accent}]} accessibilityLabel={playing ? 'Pause' : 'Play'}>
             {state.buffering && state.playing && !remote ? <ActivityIndicator color={onColor} /> :
-              <Text style={[styles.playGlyph, {color: onColor}]}>{playing ? '❚❚' : '▶'}</Text>}
+              <Icon name={playing ? 'pause' : 'play'} size={24} color={onColor} />}
           </Pressable>
-          <Pressable onPress={() => player.next()} style={styles.touch} accessibilityRole="button" accessibilityLabel="Next"><Text style={styles.big}>⏭</Text></Pressable>
+          <Pressable onPress={() => player.next()} style={styles.touch} accessibilityRole="button" accessibilityLabel="Next"><Icon name="skip-forward" size={28} color={colors.text} /></Pressable>
           <Pressable onPress={() => player.cycleRepeat()} style={[styles.toggle, state.queue.repeat !== 'off' && tint]} accessibilityRole="button" accessibilityLabel={`Repeat ${state.queue.repeat}`}>
-            <Text style={[styles.small, state.queue.repeat !== 'off' && accentStyle.text]}>{state.queue.repeat === 'one' ? '↻1' : '↻'}</Text>
+            <View style={styles.repeatGlyph}>
+              <Icon name="repeat" size={22} color={state.queue.repeat !== 'off' ? accent : colors.textDim} />
+              {state.queue.repeat === 'one' && <Text style={[styles.repeatOne, {color: accent}]}>1</Text>}
+            </View>
           </Pressable>
         </View>
 
@@ -170,6 +173,8 @@ const styles = StyleSheet.create({
   error: {color: colors.alert},
   controls: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: spacing.md},
   small: {color: colors.textDim, fontSize: 22},
+  repeatGlyph: {alignItems: 'center', justifyContent: 'center'},
+  repeatOne: {position: 'absolute', fontSize: 9, fontWeight: '700'},
   big: {color: colors.text, fontSize: 30},
   play: {width: 68, height: 68, borderRadius: 34, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center'},
   playGlyph: {fontSize: 24},

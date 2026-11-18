@@ -79,7 +79,7 @@ export function MiniPlayer() {
           accessibilityRole="button"
           accessibilityLabel="Like"
           accessibilityState={{selected: isLiked}}>
-          <Text style={[styles.icon, isLiked && {color: accent}]}>{isLiked ? '♥' : '♡'}</Text>
+          <Icon name="heart" size={18} color={isLiked ? accent : colors.text} />
         </Pressable>
         {state.buffering && state.playing ? (
           <View style={[styles.play, {backgroundColor: accent}]}>
