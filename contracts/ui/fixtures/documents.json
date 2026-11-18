@@ -205,6 +205,20 @@
                    ]}}}
     },
     {
+      "name": "play-tracks",
+      "_why": "1.2: a page plays its own Satellite's tracks: a row plays the list from that row, a button shuffles it, another plays what a route answers, and a row adds one track to the queue. The Satellite must provide audio.library.",
+      "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.audio"], "capabilities": ["audio.library"]},
+                   "entry": "album", "pages": {"album": {"source": {"route": "albums/1"}, "blocks": [
+                     {"type": "button", "label": "Play", "action": {"play": {"tracks": "$.tracks", "context": "$.context"}}},
+                     {"type": "button", "label": "Shuffle", "action": {"play": {"tracks": "$.tracks", "shuffle": true, "context": "$.context"}}},
+                     {"type": "button", "label": "Radio", "action": {"play": {"route": "radio/album/{$.id}", "context": "radio"}}},
+                     {"type": "media-list", "items": "$.tracks", "item": {"title": "$.title", "subtitle": "$.artist"},
+                      "action": {"play": {"tracks": "$page.tracks", "start": "$.id", "context": "$page.context"}}},
+                     {"type": "media-list", "items": "$.others", "item": {"title": "$.title"},
+                      "action": {"play": {"tracks": ["$"], "queue": "end"}}}
+                   ]}}}
+    },
+    {
       "name": "smallest",
       "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": []}}}
     },
@@ -756,6 +770,58 @@
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "button", "label": "Play", "action": {"play": {"search": "  "}}}]}}},
       "error": "non-empty"
+    },
+    {
+      "name": "play-two-sources",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "Play", "action": {"play": {"tracks": "$.tracks", "route": "radio"}}}]}}},
+      "error": "exactly one"
+    },
+    {
+      "name": "play-literal-tracks",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "Play", "action": {"play": {"tracks": [{"id": "abc"}]}}}]}}},
+      "error": "play.tracks"
+    },
+    {
+      "name": "play-route-outside",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "Play", "action": {"play": {"route": "/api/auth"}}}]}}},
+      "error": "relative to the satellite"
+    },
+    {
+      "name": "play-literal-start",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "Play", "action": {"play": {"tracks": "$.tracks", "start": "abc"}}}]}}},
+      "error": "must bind a track id"
+    },
+    {
+      "name": "play-queue-with-start",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "Play", "action": {"play": {"tracks": "$.tracks", "start": "$.id", "queue": "next"}}}]}}},
+      "error": "not with start or shuffle"
+    },
+    {
+      "name": "play-unknown-queue",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "Play", "action": {"play": {"tracks": "$.tracks", "queue": "first"}}}]}}},
+      "error": "play.queue"
+    },
+    {
+      "name": "play-start-with-shuffle",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "Play", "action": {"play": {"tracks": "$.tracks", "start": "$.id", "shuffle": true}}}]}}},
+      "error": "not with shuffle"
+    },
+    {
+      "name": "play-long-context",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "Play", "action": {"play": {"tracks": "$.tracks", "context": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}}}]}}},
+      "error": "at most 80"
+    },
+    {
+      "name": "play-search-with-shuffle",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "button", "label": "Play", "action": {"play": {"search": "jazz", "shuffle": true}}}]}}},
+      "error": "unknown key"
+    },
+    {
+      "name": "play-in-quick",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": "$.albums", "item": {"image": "artwork/{$.id}"},
+         "quick": [{"label": "Play", "icon": "play", "action": {"play": {"route": "albums/{$.id}"}}}]}]}}},
+      "error": "not in a selection"
     },
     {"name": "not-an-object", "document": [], "error": "must be an object", "client": true},
     {"name": "no-contract", "document": {"entry": "home", "pages": {"home": {"blocks": []}}}, "error": "contract", "client": true},

@@ -719,12 +719,41 @@ export function mount(context) {
             return runUpload(action, bindings);
         }
         if (action.play) {
-            // 1.2: played by the shell's audio host, from whichever Satellite provides audio.library
+            // 1.2: played by the shell's audio host - a search from whichever Satellite provides
+            // audio.library, or this Satellite's own tracks (it must be the one the host plays from)
             try {
                 const host = await import("/media/host.js");
-                const found = await host.playSearch(String(resolve(action.play.search, bindings) ?? ""));
-                setNotice(found ? null : "Nothing to play was found.", found ? "info" : "error");
-                return found > 0;
+                const play = action.play;
+                if (play.search !== undefined) {
+                    const found = await host.playSearch(String(resolve(play.search, bindings) ?? ""));
+                    setNotice(found ? null : "Nothing to play was found.", found ? "info" : "error");
+                    return found > 0;
+                }
+                let tracks;
+                // a route's answer may name what it plays from (a radio station's context)
+                let context = play.context !== undefined ? resolve(play.context, bindings) : null;
+                if (play.route !== undefined) {
+                    const route = resolveTemplate(play.route, bindings);
+                    if (!route || !isSafeRoute(route)) {
+                        setNotice("That action points outside its Satellite and was refused.", "error");
+                        return false;
+                    }
+                    const answer = await requestJson(`${satelliteBase}/${route}`);
+                    tracks = answer && answer.tracks;
+                    if (play.context === undefined && answer && typeof answer.context === "string") {
+                        context = answer.context;
+                    }
+                } else {
+                    tracks = resolve(play.tracks, bindings);
+                }
+                const played = await host.playTracks(satelliteName, tracks, {
+                    start: play.start !== undefined ? resolve(play.start, bindings) : null,
+                    shuffle: play.shuffle === true,
+                    queue: play.queue,
+                    context,
+                });
+                setNotice(played ? null : "There is nothing to play here.", played ? "info" : "error");
+                return played > 0;
             } catch (error) {
                 setNotice(error.message, "error");
                 return false;

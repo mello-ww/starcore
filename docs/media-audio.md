@@ -365,27 +365,31 @@ Engine's validation (`engine/starcore/ui_contract.py`), `contracts/ui/vocabulary
 fixtures in `contracts/ui/fixtures/`, both renderers, every `ui.json` it affects,
 [UI contract](ui-contract.md) and this file.
 
-**Change 6 - `play` with tracks.** Today `play` takes `{"search": ...}` only. Added:
+**Change 6 - `play` with tracks.** **Done (A1).** `play` took `{"search": ...}` only. Added:
 
 ```json
-{"play": {"tracks": "$page.tracks", "start": "$.id", "context": "album:{$params.id}"}}
-{"play": {"route": "radio/track/{$.id}", "context": "radio:track-{$.id}"}}
+{"play": {"tracks": "$page.tracks", "start": "$.id", "context": "$page.context"}}
+{"play": {"route": "radio/track/{$.id}"}}
 {"play": {"tracks": "$.tracks", "shuffle": true}}
-{"play": {"tracks": ["$."], "queue": "next"}}
+{"play": {"tracks": ["$"], "queue": "next"}}
 ```
 
-- `tracks` binds a list of `Track` objects in the page data (a row's own, `["$."]`, for one);
+- `tracks` binds a list of `Track` objects in the page data (a row's own, `["$"]`, for one;
+  at most 50 single bindings);
   `route` instead GETs one of the Satellite's own routes whose answer has `tracks`. Exactly one
   of `search`, `tracks` and `route`.
 - `start` is the id of the first track to play (the first by default); `shuffle` shuffles;
   `queue` is `next` or `end` (Play next, Add to queue) instead of replacing the queue.
-- `context` (text or a template, at most 80 characters) is what the host reports with each
-  play (`audio.session`'s `history`), as the own pages do (`album:<id>`, `mix:<id>`).
+- `context` (text or a binding, at most 80 characters) is what the host reports with each
+  play (`audio.session`'s `history`), as the own pages do (`album:<id>`, `mix:<id>`). Bindings
+  build no strings, so Music's answers carry it: `context` on an album, an artist, a mix, a
+  radio station, a mood and a genre. With `route` and no `context`, the answer's own is used.
 - With `tracks` or `route`, the provider is **the document's own Satellite**, which must provide
   `audio.library` (checked at load, as for `sync`). The host plays those ids through that
   provider's `resolve`, never a stream URL from the document.
-- Allowed in a row's or a tile's `menu` and `quick` (change 7); not in a selection.
-- A long list is never sent whole. With `route` the answer may be paged (`tracks` with a
+- Allowed in a row's or a tile's `menu` and `quick` (change 7); not in a selection (nor, until
+  change 7, in a tile's `quick`).
+- **A2**, with Liked Songs and Your Library: a long list is never sent whole. With `route` the answer may be paged (`tracks` with a
   `cursor`): the host queues the first page and asks for the next when about 25 tracks are
   left. With `shuffle`, the host keeps only the list's size and draws positions lazily (a
   partial Fisher-Yates over the indexes, about 100 ahead, refilled 50 at a time), so
@@ -473,7 +477,7 @@ fixtures in `contracts/ui/fixtures/`, both renderers, every `ui.json` it affects
 **Change 10 - keeping tracks on the device.** A client capability `media.audio-offline`, on
 Android only (a browser keeps nothing).
 
-- The action `{"offline": {"tracks": "$.tracks"}}` (or `route`, or `["$."]`, as in change 6)
+- The action `{"offline": {"tracks": "$.tracks"}}` (or `route`, or `["$"]`, as in change 6)
   keeps those tracks of the document's own `audio.library` provider on the device, at the
   listener's download quality, network rule and storage limit (the session's preferences).
   The control's label and state are the client's: Download, Downloading 3 of 12, Downloaded
@@ -523,7 +527,15 @@ owner.
 | A9 | End to end on the local demo, then the default (`preview` goes) | all | none | Opus 5.5 high |
 | A10 | Remove Music's own interface | – | none | Sonnet 5.5 medium |
 
-**A1 - `play` with tracks, and the first pages.**
+**A1 - `play` with tracks, and the first pages.** **Done.** `play` takes `tracks` or `route`
+with `start`, `shuffle`, `queue` and `context` (change 6, without the paging, which moves to A2
+with the long lists). Each host has a `playTracks(satellite, tracks, options)` that refuses
+another library's page (`mission_control/media/handover.js`, `mobile/src/media/handover.ts`).
+Music's `ui.json` is a preview with temporary entry tabs (Recent, Discover, Genres, until A2's
+Home, Library and Search) and the album, artist, mix, radio, mood, genre and track pages.
+Music's answers carry `context`, and `mosaic_key` for `artwork/mosaic/<id>.<id>.<id>.<id>`,
+four covers in a 2x2 square kept in the artwork cache (the first cover alone with fewer, or
+without Pillow); `genres?name=` is the genre page. As planned:
 - Contract: change 6 in `ui_contract.py`, `vocabulary.json`, `contracts/ui/fixtures/`
   (valid and refused `play` actions), `mission_control/ui/renderer.js` and
   `mobile/src/satellites/ui/UiBlocks.tsx`, which hand the tracks to the hosts

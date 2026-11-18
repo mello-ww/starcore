@@ -7,6 +7,19 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **A page can play its own Satellite's tracks (UI contract 1.2, contract change 6).** The
+  `play` action takes `tracks` (a list in the page's data, or a row's own track) or `route` (one
+  of the Satellite's routes answering `tracks`), with `start`, `shuffle`, `queue` (`next` or
+  `end`) and `context`. Only a Satellite that provides `audio.library` may use them, and only
+  its own tracks play, while it is the player's library; streams still come from the track ids
+  through the provider. Both clients' audio hosts take them.
+- **Music's first shared pages (a preview, milestone A1).** Music has a `ui.json`, offered in
+  Developer Mode beside its own interface: album, artist, mix, radio, mood, genre and track
+  pages with Play, Shuffle, Radio and rows that play their list, plus temporary Recent,
+  Discover and Genres tabs. Music's answers carry what they play from (`context`), a genre has
+  its own page (`genres?name=`), and `artwork/mosaic/...` draws four album covers as one
+  square picture.
+
 - **Satellites ship their own icons (UI contract 1.2, contract change 5).** A Satellite lists
   them in its `satellite.toml` (`[icons]`, each with a shared icon as fallback) and puts them
   in `icons/`. The Engine alone reads the SVG: it accepts a strict single-colour subset (no

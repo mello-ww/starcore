@@ -7,6 +7,7 @@ import secrets
 from starcore.api.response import error_response, file_response
 
 from .history import year_now
+from .routes_catalog import mosaic_key
 from .routing import identifier, ok, route
 
 COVER_LIMIT = 4 * 1024 * 1024
@@ -193,9 +194,17 @@ def home(call):
 def mixes(call):
     music = call.music
     if not call.path:
-        return ok({"mixes": music.discovery.mixes(call.user)})
+        listed = music.discovery.mixes(call.user)
+        for mix in listed:
+            mix["mosaic_key"] = mosaic_key(mix.get("mosaic") or [])
+        return ok({"mixes": listed})
     mix = music.discovery.mix(call.user, str(call.segment(0))[:80])
-    return ok(mix) if mix is not None else error_response("unknown mix")
+    if mix is None:
+        return error_response("unknown mix")
+    # what the player says it plays from, and the mix's picture, as Music's own page names them
+    mix["context"] = f"mix:{mix['id']}"
+    mix["mosaic_key"] = mosaic_key(mix.get("mosaic") or [])
+    return ok(mix)
 
 
 @route("GET")
@@ -207,7 +216,10 @@ def radio(call):
     if not item:
         return error_response("radio needs a seed")
     station = call.music.discovery.radio(call.user, kind, item[:120], call.integer("size", 50, 5, 200))
-    return ok(station) if station is not None else error_response("nothing to build a radio station from")
+    if station is None:
+        return error_response("nothing to build a radio station from")
+    station["context"] = f"radio:{kind}-{item[:120]}"[:80]
+    return ok(station)
 
 
 @route("GET")
@@ -216,7 +228,14 @@ def moods(call):
     if not call.path:
         return ok({"moods": music.discovery.moods(music.discovery._signals(call.user))})
     mood = music.discovery.mood(call.user, str(call.segment(0))[:40])
-    return ok(mood) if mood is not None else error_response("unknown mood")
+    if mood is None:
+        return error_response("unknown mood")
+    mood["context"] = f"mix:mood-{mood['id']}"
+    covers = list(dict.fromkeys(track["album_id"] for track in mood["tracks"]
+                                if track.get("album_id") and track.get("has_artwork")))
+    mood["mosaic"] = covers[:4]
+    mood["mosaic_key"] = mosaic_key(covers)
+    return ok(mood)
 
 
 @route("GET")

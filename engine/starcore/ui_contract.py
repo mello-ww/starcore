@@ -94,6 +94,10 @@ PICKABLE = {"media.gallery"}
 SECURE_OPERATIONS = {name: set(operations) for name, operations in VOCABULARY["secure_operations"].items()
                      if not name.startswith("_")}
 SECURE_ITEMS = "media.gallery"
+# the play action (1.2): where its tracks come from, and how they join the queue
+PLAY_SOURCES = ("search", "tracks", "route")
+PLAY_QUEUE = {"next", "end"}
+AUDIO_LIBRARY = "audio.library"
 # what the sync action may open (1.2): {Satellite capability: the client capability whose screen
 # it opens} - the document's own Satellite must provide it
 SYNC_CAPABILITIES = {name: client for name, client in VOCABULARY["sync_capabilities"].items()
@@ -1386,20 +1390,69 @@ class _Validator:
             self.error(f"{where}.upload", "is a page's own action: not in a selection or a tile's quick actions")
 
     def check_play(self, where: str, action: dict):
-        """{play: {search}} (1.2): the client searches the audio.library provider for `search`
-        (text or a binding) and plays what it finds through its media.audio host. It reaches no
-        route of its own, so it can't reach anything the provider doesn't already offer."""
+        """{play: {search} | {tracks | route, start?, shuffle?, queue?, context?}} (1.2): the
+        client plays through its media.audio host. With `search` it plays what the audio.library
+        provider finds. With `tracks` (a binding to a list of the page's tracks, or a list of
+        bindings to single ones) or `route` (a GET of the Satellite's own route answering
+        {tracks}) it plays those tracks of the document's own Satellite, which must provide
+        audio.library: the host resolves each id through that provider, never a stream URL from
+        the document. `start` binds the id of the track to begin with, `shuffle` shuffles, `queue`
+        ("next" or "end") adds to the queue instead of replacing it, and `context` (text or a
+        binding, at most 80 characters) is what the host reports with each play."""
         self.since(f"{where}.play", "the play action", 2)
         self.unknown_keys(where, action, {"play"})
         play = action["play"]
-        if not isinstance(play, dict) or "search" not in play:
-            self.error(f"{where}.play", "must be {search: text or binding}")
+        sources = [key for key in PLAY_SOURCES if isinstance(play, dict) and key in play]
+        if len(sources) != 1:
+            self.error(f"{where}.play", "must be {search}, {tracks} or {route}, exactly one of them")
             return
-        self.unknown_keys(f"{where}.play", play, {"search"})
-        if not isinstance(play["search"], str) or not play["search"].strip():
-            self.error(f"{where}.play.search", "must be a non-empty text or binding")
+        source = sources[0]
+        if source == "search":
+            self.unknown_keys(f"{where}.play", play, {"search"})
+            if not isinstance(play["search"], str) or not play["search"].strip():
+                self.error(f"{where}.play.search", "must be a non-empty text or binding")
+                return
+            self.check_values(f"{where}.play.search", play["search"])
             return
-        self.check_values(f"{where}.play.search", play["search"])
+        self.unknown_keys(f"{where}.play", play, {source, "start", "shuffle", "queue", "context"})
+        if source == "tracks":
+            tracks = play["tracks"]
+            if isinstance(tracks, list):
+                if not tracks or len(tracks) > LIMITS["play_tracks"] or not all(is_binding(item) for item in tracks):
+                    self.error(f"{where}.play.tracks", f"must be a binding, or a list of 1 to {LIMITS['play_tracks']} bindings")
+                else:
+                    for index, item in enumerate(tracks):
+                        self.check_binding(f"{where}.play.tracks[{index}]", item)
+            elif is_binding(tracks):
+                self.check_binding(f"{where}.play.tracks", tracks)
+            else:
+                self.error(f"{where}.play.tracks", "must be a binding, or a list of bindings")
+        else:
+            self.check_route(f"{where}.play.route", play["route"])
+        if "start" in play:
+            if not is_binding(play["start"]):
+                self.error(f"{where}.play.start", "must bind a track id")
+            else:
+                self.check_binding(f"{where}.play.start", play["start"])
+        if "shuffle" in play and not isinstance(play["shuffle"], bool):
+            self.error(f"{where}.play.shuffle", "must be true or false")
+        if "queue" in play and play["queue"] not in PLAY_QUEUE:
+            self.error(f"{where}.play.queue", f"must be one of {sorted(PLAY_QUEUE)}")
+        if "queue" in play and ("start" in play or play.get("shuffle")):
+            self.error(f"{where}.play.queue", "adds to the queue: not with start or shuffle")
+        if "start" in play and play.get("shuffle"):
+            self.error(f"{where}.play.start", "starts at a track: not with shuffle")
+        if "context" in play:
+            context = play["context"]
+            if not isinstance(context, str) or not context or (
+                    not is_binding(context) and len(context) > LIMITS["play_context"]):
+                self.error(f"{where}.play.context", f"must be a text of at most {LIMITS['play_context']} characters, or a binding")
+            else:
+                self.check_text(f"{where}.play.context", context)
+        if self.in_bulk:
+            self.error(f"{where}.play", "plays one list: not in a selection or a tile's quick actions")
+        if self.provides is not None and AUDIO_LIBRARY not in self.provides:
+            self.error(f"{where}.play", f"plays the Satellite's own tracks, and it provides no {AUDIO_LIBRARY}")
 
     def check_own(self, where: str, action: dict):
         """{own: section} (1.2): the client opens the Satellite's own interface - its page.js on

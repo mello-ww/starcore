@@ -1,0 +1,964 @@
+{
+ "_about": "Music's shared interface (UI contract 1.2), a preview beside Music's own page and screens (docs/media-audio.md, milestone A1): an album, an artist, a mix, a radio station, a mood, a genre and a track's credits, each played through the client's audio host with the play action's tracks or route. Its entry pages (recently added albums, mixes and moods, genres) are temporary: A2 replaces them with Home, Library and Search. It binds to Music's existing routes; the pictures of mixes, moods and genres come from artwork/mosaic.",
+ "contract": "starcore.ui/1.2",
+ "title": "Music",
+ "preview": true,
+ "requires": {
+  "client": [
+   "media.audio"
+  ],
+  "capabilities": [
+   "audio.library"
+  ]
+ },
+ "entry": "recent",
+ "navigation": [
+  {
+   "page": "recent",
+   "label": "Recent",
+   "icon": "music"
+  },
+  {
+   "page": "discover",
+   "label": "Discover",
+   "icon": "star"
+  },
+  {
+   "page": "genres",
+   "label": "Genres",
+   "icon": "list"
+  }
+ ],
+ "pages": {
+  "recent": {
+   "title": "Recently added",
+   "source": {
+    "route": "albums?sort=added&order=desc&limit=60"
+   },
+   "blocks": [
+    {
+     "type": "media-grid",
+     "items": "$.albums",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.id}?size=300",
+      "key": "$.id",
+      "title": "$.album",
+      "subtitle": "$.artist",
+      "icon": "music"
+     },
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "empty": "No albums yet. Scan a folder in Music's settings."
+    }
+   ]
+  },
+  "discover": {
+   "title": "Discover",
+   "source": {
+    "route": "mixes"
+   },
+   "sources": {
+    "moods": {
+     "route": "moods"
+    }
+   },
+   "blocks": [
+    {
+     "type": "heading",
+     "text": "Made for you"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.mixes",
+     "size": "medium",
+     "empty": "Play some music to get mixes.",
+     "item": {
+      "image": "artwork/mosaic/{$.mosaic_key}?size=300",
+      "key": "$.id",
+      "title": "$.name",
+      "subtitle": "$.description",
+      "icon": "music"
+     },
+     "action": {
+      "navigate": "mix",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Moods"
+    },
+    {
+     "type": "list",
+     "items": "$sources.moods.moods",
+     "empty": "No moods in this library yet.",
+     "item": {
+      "title": "$.name",
+      "value": "$.tracks",
+      "format": {
+       "value": "integer"
+      }
+     },
+     "action": {
+      "navigate": "mood",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    }
+   ]
+  },
+  "genres": {
+   "title": "Genres",
+   "source": {
+    "route": "genres"
+   },
+   "blocks": [
+    {
+     "type": "list",
+     "items": "$.genres",
+     "empty": "No genres in this library yet.",
+     "item": {
+      "title": "$.name",
+      "value": "$.tracks",
+      "format": {
+       "value": "integer"
+      }
+     },
+     "action": {
+      "navigate": "genre",
+      "params": {
+       "name": "$.name"
+      }
+     }
+    }
+   ]
+  },
+  "album": {
+   "title": "$.album",
+   "params": [
+    "id"
+   ],
+   "source": {
+    "route": "albums/{$params.id}"
+   },
+   "blocks": [
+    {
+     "type": "image",
+     "src": "artwork/{$.id}?size=600",
+     "alt": "$.album",
+     "size": "large"
+    },
+    {
+     "type": "heading",
+     "text": "$.album"
+    },
+    {
+     "type": "list",
+     "items": "$.artists",
+     "item": {
+      "title": "$.name"
+     },
+     "action": {
+      "navigate": "artist",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Play",
+     "style": "primary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Shuffle",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "shuffle": true,
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Radio",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "route": "radio/album/{$.id}"
+      }
+     }
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "No tracks.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.artist",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      }
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     }
+    },
+    {
+     "type": "card",
+     "title": "About",
+     "blocks": [
+      {
+       "type": "field",
+       "label": "Year",
+       "value": "$.year"
+      },
+      {
+       "type": "field",
+       "label": "Length",
+       "value": "$.duration",
+       "format": "duration"
+      },
+      {
+       "type": "field",
+       "label": "Quality",
+       "value": "$.quality.label"
+      },
+      {
+       "type": "field",
+       "label": "Label",
+       "value": "$.label"
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "Genres",
+     "visible": "$.genres"
+    },
+    {
+     "type": "list",
+     "items": "$.genres",
+     "visible": "$.genres",
+     "item": {
+      "title": "$"
+     },
+     "action": {
+      "navigate": "genre",
+      "params": {
+       "name": "$"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Credits"
+    },
+    {
+     "type": "list",
+     "items": "$.tracks",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.credits.composer"
+     },
+     "action": {
+      "navigate": "track",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "More by this artist",
+     "visible": "$.more_by_artist"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.more_by_artist",
+     "visible": "$.more_by_artist",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.id}?size=300",
+      "key": "$.id",
+      "title": "$.album",
+      "subtitle": "$.artist",
+      "icon": "music"
+     },
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    }
+   ]
+  },
+  "artist": {
+   "title": "$.name",
+   "params": [
+    "id"
+   ],
+   "source": {
+    "route": "artists/{$params.id}"
+   },
+   "blocks": [
+    {
+     "type": "image",
+     "src": "artwork/{$.artwork}?size=600",
+     "alt": "$.name",
+     "size": "large",
+     "shape": "round",
+     "visible": "$.artwork"
+    },
+    {
+     "type": "heading",
+     "text": "$.name"
+    },
+    {
+     "type": "button",
+     "label": "Play",
+     "style": "primary",
+     "action": {
+      "play": {
+       "tracks": "$.top_tracks",
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Shuffle",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "tracks": "$.top_tracks",
+       "shuffle": true,
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Radio",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "route": "radio/artist/{$.id}"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Popular"
+    },
+    {
+     "type": "media-list",
+     "items": "$.top_tracks",
+     "empty": "No tracks.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.album",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      }
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.top_tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Albums",
+     "visible": "$.albums"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.albums",
+     "visible": "$.albums",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.id}?size=300",
+      "key": "$.id",
+      "title": "$.album",
+      "subtitle": "$.artist",
+      "icon": "music"
+     },
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Singles and EPs",
+     "visible": "$.singles"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.singles",
+     "visible": "$.singles",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.id}?size=300",
+      "key": "$.id",
+      "title": "$.album",
+      "subtitle": "$.artist",
+      "icon": "music"
+     },
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Appears on",
+     "visible": "$.appears_on"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.appears_on",
+     "visible": "$.appears_on",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.id}?size=300",
+      "key": "$.id",
+      "title": "$.album",
+      "subtitle": "$.artist",
+      "icon": "music"
+     },
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Similar artists",
+     "visible": "$.similar"
+    },
+    {
+     "type": "list",
+     "items": "$.similar",
+     "visible": "$.similar",
+     "item": {
+      "title": "$.name",
+      "subtitle": "$.reason"
+     },
+     "action": {
+      "navigate": "artist",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    }
+   ]
+  },
+  "mix": {
+   "title": "$.name",
+   "params": [
+    "id"
+   ],
+   "source": {
+    "route": "mixes/{$params.id}"
+   },
+   "blocks": [
+    {
+     "type": "image",
+     "src": "artwork/mosaic/{$.mosaic_key}?size=600",
+     "alt": "$.name",
+     "size": "large"
+    },
+    {
+     "type": "heading",
+     "text": "$.name"
+    },
+    {
+     "type": "text",
+     "text": "$.description",
+     "style": "caption"
+    },
+    {
+     "type": "button",
+     "label": "Play",
+     "style": "primary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Shuffle",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "shuffle": true,
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "No tracks.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.reason",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      }
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     }
+    }
+   ]
+  },
+  "mood": {
+   "title": "$.name",
+   "params": [
+    "id"
+   ],
+   "source": {
+    "route": "moods/{$params.id}"
+   },
+   "blocks": [
+    {
+     "type": "image",
+     "src": "artwork/mosaic/{$.mosaic_key}?size=600",
+     "alt": "$.name",
+     "size": "large"
+    },
+    {
+     "type": "heading",
+     "text": "$.name"
+    },
+    {
+     "type": "button",
+     "label": "Play",
+     "style": "primary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Shuffle",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "shuffle": true,
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "No tracks.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.artist",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      }
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     }
+    }
+   ]
+  },
+  "radio": {
+   "title": "$.name",
+   "params": [
+    "kind",
+    "seed"
+   ],
+   "source": {
+    "route": "radio/{$params.kind}/{$params.seed}"
+   },
+   "blocks": [
+    {
+     "type": "heading",
+     "text": "$.name"
+    },
+    {
+     "type": "text",
+     "text": "A station built from your library, different each time you open it.",
+     "style": "caption"
+    },
+    {
+     "type": "button",
+     "label": "Play",
+     "style": "primary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Shuffle",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "shuffle": true,
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "No tracks.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.artist",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      }
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     }
+    }
+   ]
+  },
+  "genre": {
+   "title": "$.name",
+   "params": [
+    "name"
+   ],
+   "source": {
+    "route": "genres?name={$params.name}"
+   },
+   "blocks": [
+    {
+     "type": "image",
+     "src": "artwork/mosaic/{$.mosaic_key}?size=600",
+     "alt": "$.name",
+     "size": "large"
+    },
+    {
+     "type": "heading",
+     "text": "$.name"
+    },
+    {
+     "type": "button",
+     "label": "Play",
+     "style": "primary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Shuffle",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "shuffle": true,
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Radio",
+     "style": "secondary",
+     "action": {
+      "navigate": "radio",
+      "params": {
+       "kind": "genre",
+       "seed": "$.name"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Albums",
+     "visible": "$.albums"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.albums",
+     "visible": "$.albums",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.id}?size=300",
+      "key": "$.id",
+      "title": "$.album",
+      "subtitle": "$.artist",
+      "icon": "music"
+     },
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Tracks"
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "No tracks.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.artist",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      }
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     }
+    }
+   ]
+  },
+  "track": {
+   "title": "$.title",
+   "params": [
+    "id"
+   ],
+   "source": {
+    "route": "tracks/{$params.id}"
+   },
+   "blocks": [
+    {
+     "type": "image",
+     "src": "artwork/{$.album_id}?size=600",
+     "alt": "$.album",
+     "size": "medium",
+     "visible": "$.has_artwork"
+    },
+    {
+     "type": "heading",
+     "text": "$.title"
+    },
+    {
+     "type": "text",
+     "text": "$.artist"
+    },
+    {
+     "type": "button",
+     "label": "Play",
+     "style": "primary",
+     "action": {
+      "play": {
+       "tracks": [
+        "$"
+       ]
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Play next",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "tracks": [
+        "$"
+       ],
+       "queue": "next"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Add to queue",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "tracks": [
+        "$"
+       ],
+       "queue": "end"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Track radio",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "route": "radio/track/{$.id}"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Go to album",
+     "style": "secondary",
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.album_id"
+      }
+     }
+    },
+    {
+     "type": "card",
+     "title": "Credits",
+     "blocks": [
+      {
+       "type": "field",
+       "label": "Album",
+       "value": "$.album"
+      },
+      {
+       "type": "field",
+       "label": "Album artist",
+       "value": "$.album_artist"
+      },
+      {
+       "type": "field",
+       "label": "Composer",
+       "value": "$.credits.composer"
+      },
+      {
+       "type": "field",
+       "label": "Producer",
+       "value": "$.credits.producer"
+      },
+      {
+       "type": "field",
+       "label": "Label",
+       "value": "$.credits.label"
+      },
+      {
+       "type": "field",
+       "label": "Copyright",
+       "value": "$.credits.copyright"
+      },
+      {
+       "type": "field",
+       "label": "ISRC",
+       "value": "$.credits.isrc"
+      },
+      {
+       "type": "field",
+       "label": "Genre",
+       "value": "$.genre"
+      },
+      {
+       "type": "field",
+       "label": "Year",
+       "value": "$.year"
+      }
+     ]
+    },
+    {
+     "type": "card",
+     "title": "File",
+     "blocks": [
+      {
+       "type": "field",
+       "label": "Quality",
+       "value": "$.quality.label"
+      },
+      {
+       "type": "field",
+       "label": "Length",
+       "value": "$.duration",
+       "format": "duration"
+      },
+      {
+       "type": "field",
+       "label": "Bitrate",
+       "value": "$.bitrate",
+       "format": "bitrate"
+      },
+      {
+       "type": "field",
+       "label": "Size",
+       "value": "$.size",
+       "format": "bytes"
+      },
+      {
+       "type": "field",
+       "label": "Plays",
+       "value": "$.plays",
+       "format": "integer"
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

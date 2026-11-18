@@ -746,9 +746,37 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           if (!audio) {
             throw new Error('Audio playback is not available here.');
           }
-          const found = await audio.playSearch(String(resolve(action.play.search, scoped) ?? ''));
-          showToast(found ? null : 'Nothing to play was found.', !found);
-          return found > 0;
+          const play = action.play;
+          if (play.search !== undefined) {
+            const found = await audio.playSearch(String(resolve(play.search, scoped) ?? ''));
+            showToast(found ? null : 'Nothing to play was found.', !found);
+            return found > 0;
+          }
+          // the Satellite's own tracks: listed in the page, or what one of its routes answers
+          let tracks: unknown;
+          // a route's answer may name what it plays from (a radio station's context)
+          let context: unknown = play.context === undefined ? undefined : resolve(play.context, scoped);
+          if (play.route) {
+            const route = resolveTemplate(play.route, scoped);
+            if (!isSafeRoute(route)) {
+              throw new Error('That cannot be played.');
+            }
+            const answer = await api.read(name, route);
+            tracks = answer?.tracks;
+            if (play.context === undefined && typeof answer?.context === 'string') {
+              context = answer.context;
+            }
+          } else {
+            tracks = resolve(play.tracks, scoped);
+          }
+          const taken = await audio.playTracks(name, tracks, {
+            start: play.start === undefined ? undefined : resolve(play.start, scoped),
+            shuffle: play.shuffle === true,
+            queue: play.queue,
+            context,
+          });
+          showToast(taken ? null : 'There is nothing to play here.', !taken);
+          return taken > 0;
         } catch (err: any) {
           showToast(err?.message || 'Could not play that.', true);
           return false;

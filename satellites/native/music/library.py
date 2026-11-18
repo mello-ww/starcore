@@ -188,6 +188,42 @@ class MusicLibrary:
             return original
         return self._resized(original, album["id"], size) or original
 
+    def mosaic_path(self, albums: list, size: int = None):
+        """Four album covers in a 2x2 square (a mix's or a genre's picture), composed once and
+        kept; fewer than four covers, or no Pillow, give the first cover by itself."""
+        covers = [(album, path) for album in albums if (path := self._artwork_original(album)) is not None]
+        if not covers:
+            return None
+        if len(covers) < 4:
+            return self.artwork_path(covers[0][0], size)
+        try:
+            from PIL import Image
+        except ImportError:
+            return self.artwork_path(covers[0][0], size)
+        size = min(ARTWORK_SIZES, key=lambda candidate: abs(candidate - int(size or 600)))
+        name = "-".join(album["id"][:16] for album, _ in covers[:4])
+        target = self.artwork_dir / "mosaic" / f"{name}-{size}.jpg"
+        newest = max(path.stat().st_mtime for _, path in covers[:4])
+        if target.is_file() and target.stat().st_mtime >= newest:
+            return target
+        try:
+            half = size // 2
+            canvas = Image.new("RGB", (half * 2, half * 2))
+            for index, (_, path) in enumerate(covers[:4]):
+                with Image.open(path) as image:
+                    tile = image.convert("RGB")
+                    side = min(tile.size)
+                    left, top = (tile.width - side) // 2, (tile.height - side) // 2
+                    tile = tile.crop((left, top, left + side, top + side)).resize((half, half))
+                    canvas.paste(tile, ((index % 2) * half, (index // 2) * half))
+            target.parent.mkdir(parents=True, exist_ok=True)
+            partial = target.with_name(f".{target.name}.{os.getpid()}.part")
+            canvas.save(partial, "JPEG", quality=85)
+            os.replace(partial, target)
+            return target
+        except Exception:
+            return self.artwork_path(covers[0][0], size)
+
     def _artwork_original(self, album: dict):
         if not album.get("artwork"):
             return None

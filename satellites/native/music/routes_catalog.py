@@ -1,11 +1,15 @@
 """Browsing the library: tracks, albums, artists, genres, folders, search, artwork, lyrics, scans."""
 
+import re
 from pathlib import Path
 
 from starcore.api.response import error_response, file_response
 
 from . import lyrics as lyric_files
 from .routing import identifier, ok, route
+
+# a mosaic's album ids in one path segment ("artwork/mosaic/<id>.<id>.<id>.<id>"), as answers give them
+MOSAIC_ALBUMS = 4
 
 # a track is addressed by a digest of its content, so what comes back can be cached
 IMMUTABLE = "private, max-age=604800"
@@ -64,6 +68,8 @@ def albums(call):
         track["liked"] = track["id"] in liked
     album["more_by_artist"] = [other for other in music.catalog.albums(artist_id=album["artist_id"])
                                if other["id"] != album["id"]][:12]
+    # what the player says it plays from, as Music's own page names it
+    album["context"] = f"album:{album['id']}"
     return ok(album)
 
 
@@ -78,12 +84,37 @@ def artists(call):
     if artist is None:
         return error_response(f"unknown artist '{call.segment(0)}'")
     artist["followed"] = music.collection.is_favorite(call.user, "artist", artist["id"])
+    artist["context"] = f"artist:{artist['id']}"
     return ok(artist)
 
 
 @route("GET")
 def genres(call):
-    return ok({"genres": call.music.catalog.genres()})
+    """Every genre, or one by name (?name=): its tracks, its albums and a mosaic of their covers."""
+    music = call.music
+    name = call.query.get("name")
+    if not name:
+        listed = music.catalog.genres()
+        for genre in listed:
+            genre["context"] = genre_context(genre["name"])
+        return ok({"genres": listed})
+    name = str(name)[:120]
+    tracks = music.catalog.tracks(genre=name, limit=500, user=call.user)
+    albums = music.catalog.albums(genre=name)
+    if not tracks.get("tracks") and not albums:
+        return error_response(f"unknown genre '{name}'", status=404)
+    covers = [album["id"] for album in albums if album.get("artwork")][:MOSAIC_ALBUMS]
+    return ok({"name": name, "tracks": tracks.get("tracks", []), "total": tracks.get("total"), "albums": albums,
+               "mosaic": covers, "mosaic_key": mosaic_key(covers), "context": genre_context(name)})
+
+
+def genre_context(name: str) -> str:
+    return "genre:" + re.sub(r"[^\w]+", "-", name.lower(), flags=re.ASCII)
+
+
+def mosaic_key(album_ids: list) -> str:
+    """Album ids as the one path segment artwork/mosaic/<key> takes."""
+    return ".".join(album_ids[:MOSAIC_ALBUMS])
 
 
 @route("GET")
@@ -141,12 +172,19 @@ def artwork(call):
         return error_response("no album was requested")
 
     music = call.music
+    size = call.integer("size", 0, 0, 2000) or None
+    if call.segment(0) == "mosaic":
+        ids = [identifier(value, "album") for value in str(call.segment(1, "")).split(".")[:MOSAIC_ALBUMS]]
+        found = {album["id"]: album for album in music.catalog.albums_by_id(ids)}
+        path = music.mosaic_path([found[album_id] for album_id in ids if album_id in found], size)
+        if path is None:
+            return error_response("these albums have no cover art")
+        return file_response(path, _image_type(path), ARTWORK_CACHE)
     album_id = identifier(call.segment(0), "album")
     album = next(iter(music.catalog.albums_by_id([album_id])), None)
     if album is None:
         return error_response(f"unknown album '{album_id}'")
 
-    size = call.integer("size", 0, 0, 2000) or None
     path = music.artwork_path(album, size)
     if path is None:
         return error_response("this album has no cover art")

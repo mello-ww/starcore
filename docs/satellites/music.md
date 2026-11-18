@@ -254,10 +254,10 @@ GET  tracks                       ?sort=title|artist|album|added|released|durati
 GET  tracks/<id>                  one track with credits, technical details, liked flag and play count
 POST tracks/hide                  {"ids": [...], "hidden": true}  hide or show tracks library-wide
 GET  albums                       ?sort=&order=&type=album|single|ep|compilation&genre=&limit=&offset=
-GET  albums/<id>                  the album, its tracks, credits, genres and more by the artist
+GET  albums/<id>                  the album, its tracks, credits, genres, more by the artist, context
 GET  artists                      album artists, ?featured=1 for everyone credited
 GET  artists/<id>                 albums, singles and EPs, appears on, top tracks, genres, similar artists
-GET  genres
+GET  genres                       ?name= for one: its tracks (up to 500), albums, mosaic and context
 GET  folders                      configured and indexed sources
 GET  folders/<n>/<path>           one folder level from the index (never the disk)
 GET  duplicates                   identical copies and likely duplicates
@@ -265,6 +265,8 @@ GET  search?q=&type=&genre=&quality=&limit=   tracks, albums, artists, playlists
 GET  search/suggest?q=
 GET  search/recent                POST {"query": ...} remembers one, {"clear": true} forgets all
 GET  artwork/<album>?size=        cover art (resized when Pillow is installed)
+GET  artwork/mosaic/<id>.<id>.<id>.<id>?size=   four album covers in a 2x2 square, kept in the
+                                  artwork cache; the first cover alone with fewer, or without Pillow
 GET  lyrics/<track>?language=     synced lines (with words and translations) or plain text
 POST lyrics/<track>               {"offset": ms}
 GET  scan                         progress and last result;  POST scan {"source", "background", "cancel"}
@@ -287,7 +289,7 @@ GET  history?limit=               POST {"track_id", "seconds", "device", "contex
 GET  stats?days=                  GET wrapped?year=
 GET  preferences                  POST {key: value, ...}
 GET  home?hour=                   GET recommendations
-GET  mixes                        GET mixes/<id>
+GET  mixes                        GET mixes/<id>   (each with mosaic_key; a mix with context)
 GET  radio/<track|artist|album|genre>/<id>
 GET  moods                        GET moods/<id>
 
@@ -310,6 +312,18 @@ lyrics, queue, devices and track details. The audio engine and the bottom bar li
 page's container, so playback continues while browsing other Mission Control pages. Large
 album, artist and song lists are drawn in chunks as they scroll. See
 `satellites/native/music/mission_control/`.
+
+### Shared interface (preview)
+
+`ui.json` (UI contract 1.2, `preview: true`) is Music's interface drawn by both clients'
+shared renderers, offered in Developer Mode while Music's own page and screens stay its
+default ([docs/media-audio.md](../media-audio.md), "Music on the shared interface", A1 to
+A10). From A1 it has temporary Recent, Discover and Genres tabs and the album, artist, mix,
+radio, mood, genre and track (credits) pages. They play through the client's audio host with
+the `play` action's `tracks` and `route`: Play, Shuffle, Radio, a row that plays its list from
+itself, and Play next or Add to queue on a track's page. The answers they bind to carry
+`context`, what the player reports it plays from, and `mosaic_key`, the picture of a mix, a
+mood or a genre (`artwork/mosaic/<key>`).
 
 ## Mobile
 

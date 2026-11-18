@@ -55,3 +55,31 @@ test("an operation the provider lacks is a rejected promise and sends nothing", 
     assert.equal(session.offersLikes(), false);
     assert.equal(requests.length, before);
 });
+
+test("a page's tracks replace the queue from the one asked for, shuffle, or join the queue", async () => {
+    const { handOver, playable } = await import("../media/handover.js");
+    const calls = [];
+    const fake = {
+        play: async (list, start, context) => calls.push(["play", list.map((track) => track.id), start, context]),
+        shufflePlay: async (list, context) => calls.push(["shuffle", list.length, context]),
+        playNext: async (list) => calls.push(["next", list.map((track) => track.id)]),
+        addToQueue: async (list) => calls.push(["end", list.map((track) => track.id)]),
+    };
+    const tracks = [{ id: "a" }, { id: "b", missing: true }, { title: "no id" }, null, "c", { id: "d" }];
+    assert.deepEqual(playable(tracks).map((track) => track.id), ["a", "d"]);
+    assert.deepEqual(playable({ id: "a" }), []);
+    assert.equal(await handOver(fake, tracks, { start: "d", context: "album:1" }), 2);
+    assert.equal(await handOver(fake, tracks, { start: "gone" }), 2);
+    assert.equal(await handOver(fake, tracks, { shuffle: true, context: "x".repeat(90) }), 2);
+    assert.equal(await handOver(fake, [{ id: "a" }], { queue: "next" }), 1);
+    assert.equal(await handOver(fake, [{ id: "a" }], { queue: "end" }), 1);
+    assert.equal(await handOver(fake, [], {}), 0);
+    assert.equal(await handOver(fake, null, {}), 0);
+    assert.deepEqual(calls, [
+        ["play", ["a", "d"], 1, "album:1"],
+        ["play", ["a", "d"], 0, null],
+        ["shuffle", 2, "x".repeat(80)],
+        ["next", ["a"]],
+        ["end", ["a"]],
+    ]);
+});

@@ -138,6 +138,19 @@ class DocumentFixturesTest(unittest.TestCase):
         self.assertTrue(any("media.sync" in error for error in errors), errors)
         self.assertTrue(ui_contract.validate(document, {}))
 
+    def test_playing_tracks_plays_only_the_satellites_own_library(self):
+        # known only at load, from the Satellite's manifest: the host resolves the ids a page
+        # hands it through the document's own Satellite, so it must provide audio.library
+        document = next(case["document"] for case in fixture("documents.json")["valid"] if case["name"] == "play-tracks")
+        audio = {"audio.library": {"version": 1, "operations": {"search": "search", "track": "tracks",
+                                                                "resolve": "playback", "artwork": "artwork"}}}
+        self.assertEqual(ui_contract.validate(document, audio), [])
+        errors = ui_contract.validate(document, {"media.gallery": {"version": 1, "operations": {"list": "media"}}})
+        self.assertTrue(any("audio.library" in error for error in errors), errors)
+        # a search plays from whichever Satellite provides it, so it needs nothing of its own
+        search = next(case["document"] for case in fixture("documents.json")["valid"] if case["name"] == "play-action")
+        self.assertEqual(ui_contract.validate(search, {}), [])
+
     def test_every_sync_capability_opens_a_reserved_client_capability(self):
         self.assertEqual(ui_contract.SYNC_CAPABILITIES, {"media.sync": "device.media-sync"})
         for name, client in ui_contract.SYNC_CAPABILITIES.items():
@@ -313,10 +326,18 @@ class UiApiTest(unittest.TestCase):
     def setUpClass(cls):
         cls.engine = start_engine(mission_control=True)
         cls.showcase = add_satellite(cls.engine, SHOWCASE)
+        # every shipped Satellite has a ui.json now, so one without a document is made here
+        cls.directory = Path(tempfile.mkdtemp(prefix="starcore-bare-"))
+        folder = cls.directory / "bare"
+        folder.mkdir()
+        (folder / "satellite.toml").write_text(
+            'name = "Bare"\nversion = "1.0.0"\nauthor = "tests"\ndescription = "No interface."\n', encoding="utf-8")
+        add_satellite(cls.engine, folder)
 
     @classmethod
     def tearDownClass(cls):
         stop_engine(cls.engine)
+        shutil.rmtree(cls.directory, ignore_errors=True)
 
     def test_the_satellite_entry_carries_its_definition(self):
         status, payload, _ = request(self.engine, "/api/satellites")
@@ -339,9 +360,12 @@ class UiApiTest(unittest.TestCase):
         # L8: its only interface, so no longer a preview
         locked = next(item for item in payload["satellites"] if item["name"] == "LockedFolder")
         self.assertNotIn("preview", locked["ui"])
-        # a Satellite without a ui.json still has an entry, with no definition
+        # A1: Music's shared pages, a preview beside its own page and screens
         music = next(item for item in payload["satellites"] if item["name"] == "Music")
-        self.assertIsNone(music["ui"])
+        self.assertEqual((music["ui"]["contract"], music["ui"]["preview"]), ("starcore.ui/1.2", True))
+        # a Satellite without a ui.json still has an entry, with no definition
+        bare = next(item for item in payload["satellites"] if item["name"] == "Bare")
+        self.assertIsNone(bare["ui"])
 
     def test_the_document_is_served_with_its_revision_as_etag(self):
         status, payload, headers = request(self.engine, "/api/satellites/Showcase/ui")
@@ -359,7 +383,7 @@ class UiApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
 
     def test_a_satellite_without_a_document_answers_404(self):
-        status, payload, _ = request(self.engine, "/api/satellites/Music/ui")
+        status, payload, _ = request(self.engine, "/api/satellites/Bare/ui")
         self.assertEqual(status, 404)
         self.assertIn("no UI document", payload["error"])
 

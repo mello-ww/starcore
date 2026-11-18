@@ -615,6 +615,39 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
   `"requires": {"client": ["media.audio"], "capabilities": ["audio.library"]}`: a client without
   an audio host, or a server without an audio library, then says so instead of opening it. When
   nothing is found, the client says so as a notice. See [Audio playback](media-audio.md).
+
+  A document can also play its **own Satellite's tracks**, with exactly one of:
+
+  - `tracks`: a binding to a list of tracks in the data (`"$.tracks"`, `"$page.tracks"` from a
+    row), or a list of up to 50 bindings to single tracks (`["$"]` for a row's own track);
+  - `route`: a GET of one of the Satellite's own routes (a template, as an action's `route`)
+    whose answer has `tracks`, for a list the page doesn't hold (a radio station).
+
+  and optionally:
+
+  - `start`: a binding to the id of the track to begin with (a row's `"$.id"`); the first
+    track when absent or not in the list;
+  - `shuffle: true`: shuffled, from any track, turning shuffle on (not with `start`);
+  - `queue`: `next` (after the current track) or `end` (at the end of the queue) adds them
+    instead of replacing the queue (not with `start` or `shuffle`);
+  - `context`: text or a binding, at most 80 characters, what the player says it plays from
+    (`"album:<id>"`); the Satellite's answers carry it, as there is no string building. With
+    `route` and no `context`, the answer's own `context` is used (a radio station's
+    `"radio:album-<id>"`).
+
+  ```json
+  {"type": "button", "label": "Shuffle", "action": {"play": {"tracks": "$.tracks", "shuffle": true, "context": "$.context"}}}
+  {"type": "media-list", "items": "$.tracks", "item": {"title": "$.title"},
+   "action": {"play": {"tracks": "$page.tracks", "start": "$.id", "context": "$page.context"}}}
+  {"type": "button", "label": "Radio", "action": {"play": {"route": "radio/album/{$.id}"}}}
+  ```
+
+  Only the tracks of the document's own Satellite play, and only while it is the catalog's
+  `audio.library` provider: the Engine refuses a document using `tracks` or `route` from a
+  Satellite that doesn't provide `audio.library`, and a client whose audio host plays from
+  another provider says so instead of playing. The host takes each track's `id` (dropping
+  missing ones) and resolves its stream through the provider, never from a URL in the data. It
+  plays one list, so it isn't allowed in a selection or a tile's quick actions.
 - **`pick`** (1.2), with a `route`: the person chooses media through the client's own media
   picker, then the route runs with what was chosen as `$value`.
 
@@ -1135,7 +1168,9 @@ Retiring all of them is planned in [Remaining work](remaining-work.md).
       has only its shared interface (see [docs/satellites/locked_folder.md](satellites/locked_folder.md));
    3. `audio.library` and `media.audio` from Music's player, queue and downloads, specified in
       [Audio playback](media-audio.md). **Done (1.2):** the shared audio host on both clients
-      and the `play` action. Music's own library screens are still native.
+      and the `play` action, which also plays a Satellite's own tracks (`tracks`, `route`).
+      Music's own library screens are still its default; its shared document is a preview
+      moving to parity milestone by milestone ([Audio playback](media-audio.md), A1 to A10).
 
    Each becomes a shared block or module that any Satellite can use, and removes one name check
    from the clients.

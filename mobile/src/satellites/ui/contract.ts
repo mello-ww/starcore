@@ -70,8 +70,18 @@ export interface UiAction {
   secrets?: Record<string, {kind: string; new?: boolean}>;
   /** 1.2, protected documents only: a field of the answer shown once, then dropped. */
   reveal?: string;
-  /** 1.2: play what the audio.library provider finds, through the app's audio host. */
-  play?: {search: Json};
+  /** 1.2: play through the app's audio host what the audio.library provider finds (`search`),
+   * or the Satellite's own tracks: a list bound in the document (`tracks`) or what a route
+   * answers (its `tracks`), from `start`, shuffled, or added to the queue (`queue`). */
+  play?: {
+    search?: Json;
+    tracks?: Json;
+    route?: string;
+    start?: Json;
+    shuffle?: boolean;
+    queue?: 'next' | 'end';
+    context?: Json;
+  };
   /** 1.2: choose media through the app's picker; the route then gets the references as $value. */
   pick?: {capability: string; kinds?: string[]; multiple?: boolean; title?: Json};
   /** 1.2: open the Satellite's own native screens at a section they name ("settings"). */

@@ -5,6 +5,7 @@ import {useAuth} from '../auth/AuthContext';
 import {useServers} from '../servers/ServersContext';
 import {ConnectClient} from './connect';
 import {DownloadManager} from './downloads';
+import {handOver, type HandOverOptions} from './handover';
 import {AudioLibraryClient, type AudioProvider, type Catalog, resolveAudioProvider} from './library';
 import {audioEffects, nativeDownloads} from './native';
 import {PlayerController, type PlayerState} from './player';
@@ -40,6 +41,9 @@ export interface AudioHostValue {
   /** Plays what the provider finds for a search (the UI contract's play action); resolves
    * with how many tracks it found. */
   playSearch: (text: string) => Promise<number>;
+  /** Plays tracks a Satellite's own page hands over (the play action with tracks or route):
+   * only that Satellite's, and only when it is the provider; resolves with how many it took. */
+  playTracks: (satellite: string, tracks: unknown, options?: HandOverOptions) => Promise<number>;
   extensions: AudioHostExtensions;
 }
 
@@ -279,6 +283,21 @@ export function AudioHost({
     [library, player],
   );
 
+  const playTracks = useCallback(
+    async (satellite: string, tracks: unknown, options: HandOverOptions = {}) => {
+      await library.ready;
+      if (!library.provider) {
+        throw new Error('There is no audio library to play from.');
+      }
+      // streams are resolved through the provider from track ids, so a page plays only its own
+      if (library.provider.satellite !== satellite) {
+        throw new Error('The player plays from another audio library.');
+      }
+      return handOver(player, tracks, options);
+    },
+    [library, player],
+  );
+
   const value: AudioHostValue = {
     library,
     provider,
@@ -297,6 +316,7 @@ export function AudioHost({
     setFullPlayer,
     resolveTracks,
     playSearch,
+    playTracks,
     extensions,
   };
 

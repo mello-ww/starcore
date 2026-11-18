@@ -39,7 +39,7 @@ Clients implement the UI contract and capability protocols, never a Satellite.
 | Status | ✅ its only interface on both clients (1.1) | none |
 | Photos | ✅ its only interface on both clients (1.2) | none: `page.js` and `src/photo/` removed (P3) |
 | File Explorer | ✅ its shared interface alone on both clients (F1-F7): browsing, a file's page (open, download, share), management (new folder, rename, delete) and upload | none: its `page.js` and `page.css` are removed |
-| Music | ◐ only the player: the shared audio host on both clients, and `play` for any Satellite. No `ui.json` | web `page.js` with its views (home, library, album, artist, playlist, search, settings, stats); Android `src/music/` (11 screen and tab files), wired by `builtins.tsx` |
+| Music | ◐ the player (the shared audio host on both clients, and `play` for any Satellite) and a preview `ui.json` from A1: album, artist, mix, radio, mood, genre and track pages | web `page.js` with its views (home, library, album, artist, playlist, search, settings, stats); Android `src/music/` (11 screen and tab files), wired by `builtins.tsx` |
 | Locked Folder | ✅ its only interface on both clients (1.2, L0-L8): browsing, moves, setup, settings, a forgotten PIN; biometric unlock from the Android app's unlock card | none: its `page.js` and `mobile/src/lockedFolder/` are removed |
 | Docker | – a placeholder with no interface | none |
 
@@ -202,9 +202,12 @@ and the Android screens against what the contract can draw.
 - [x] **The audit and plan,** in [`media-audio.md`](media-audio.md), "Music on the shared
   interface": a 42-row parity matrix, contract changes 6 to 10 and milestones A1 to A10.
   Written and approved by the owner on 2026-11-18.
-- [ ] **Library pages** (A1, A2): album, artist, mix, radio, mood, genre and track pages, then
-  home (Daily Mixes, recents), Your Library, search and folders, as media lists and grids that
-  play through the audio host (changes 6 and 7).
+- [x] **Library pages, A1:** `play` with `tracks` or `route` (change 6), and Music's first
+  `ui.json` (a preview): album, artist, mix, radio, mood, genre and track pages, the cover
+  mosaic and the genre page.
+- [ ] **Library pages, A2:** home (Daily Mixes, recents), Your Library, search and folders, as
+  media lists and grids that play through the audio host (change 7), with change 6's paged
+  queue and lazy shuffle for the long lists.
 - [ ] **Playlists** (A3): create, rename, cover, reorder, add and remove tracks, smart rules,
   M3U import and export (change 8).
 - [ ] **The player's additions declared by the document** (A4): its track menu, Add to

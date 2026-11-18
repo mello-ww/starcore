@@ -223,6 +223,80 @@ class StreamingTest(MusicApiCase):
         self.assertEqual(self.call(f"lyrics/{tracks['Two']['id']}")[0], 404)
 
 
+class SharedPagesTest(MusicApiCase):
+    """What Music's shared pages (ui.json) bind to: a genre's page, what each answer says it
+    plays from, and the cover mosaic."""
+
+    def test_a_genre_page_and_the_context_each_answer_plays_from(self):
+        tracks = self.fill()
+        album_id = tracks["One"]["album_id"]
+        album = self.call(f"albums/{album_id}")[1]
+        self.assertEqual(album["context"], f"album:{album_id}")
+        artist = self.call(f"artists/{tracks['One']['artist_id']}")[1]
+        self.assertEqual(artist["context"], f"artist:{tracks['One']['artist_id']}")
+
+        genre = self.call("genres?name=ambient")[1]
+        self.assertEqual(genre["context"], "genre:ambient")
+        self.assertEqual({track["title"] for track in genre["tracks"]}, {"One", "Two", "Three"})
+        self.assertEqual(genre["mosaic"], [album_id])
+        self.assertEqual(genre["mosaic_key"], album_id)
+        self.assertEqual(self.call("genres?name=Polka")[0], 404)
+        listed = self.call("genres")[1]["genres"]
+        self.assertEqual([entry["context"] for entry in listed], ["genre:ambient"])
+
+        station = self.call(f"radio/album/{album_id}")[1]
+        self.assertEqual(station["context"], f"radio:album-{album_id}")
+        self.call("history", {"track_id": tracks["One"]["id"], "seconds": 200})
+        mixes = self.call("mixes")[1]["mixes"]
+        self.assertTrue(mixes)
+        self.assertTrue(all(mix["mosaic_key"] == ".".join(mix["mosaic"]) for mix in mixes))
+        mix = self.call(f"mixes/{mixes[0]['id']}")[1]
+        self.assertEqual(mix["context"], f"mix:{mixes[0]['id']}")
+
+    def test_the_mosaic_takes_album_ids_only_and_falls_back_to_one_cover(self):
+        tracks = self.fill()
+        album_id = tracks["One"]["album_id"]
+        # fewer than four covers: the first one by itself
+        status, _, body = self.request(f"artwork/mosaic/{album_id}")
+        self.assertEqual((status, body), (200, COVER))
+        status, _, body = self.request(f"artwork/mosaic/{tracks['Three']['album_id']}.{album_id}")
+        self.assertEqual((status, body), (200, COVER))
+        for path in ("artwork/mosaic/", "artwork/mosaic/notanid", f"artwork/mosaic/{album_id}.x",
+                     "artwork/mosaic/..%2f..%2fconfig.toml", f"artwork/mosaic/{tracks['Three']['album_id']}"):
+            self.assertIn(self.request(path)[0], (400, 404), path)
+
+    def test_four_covers_make_one_square_picture(self):
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("Pillow is not installed")
+        import io
+
+        def cover(colour):
+            out = io.BytesIO()
+            Image.new("RGB", (64, 40), colour).save(out, "PNG")
+            return out.getvalue()
+
+        colours = ["red", "lime", "blue", "yellow"]
+        for index, colour in enumerate(colours):
+            (self.source / f"{index}.flac").write_bytes(media.flac(
+                {"TITLE": f"T{index}", "ARTIST": "A", "ALBUM": f"Album {index}", "TRACKNUMBER": "1"}, cover=cover(colour)))
+        self.assertEqual(self.call("scan", {})[0], 200)
+        albums = {album["album"]: album["id"] for album in self.call("albums")[1]["albums"]}
+        key = ".".join(albums[f"Album {index}"] for index in range(4))
+        status, headers, body = self.request(f"artwork/mosaic/{key}?size=300")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "image/jpeg")
+        with Image.open(io.BytesIO(body)) as image:
+            self.assertEqual(image.size, (300, 300))
+            corners = [image.getpixel(point) for point in ((75, 75), (225, 75), (75, 225), (225, 225))]
+        expected = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
+        for got, want in zip(corners, expected):
+            self.assertTrue(all(abs(a - b) < 40 for a, b in zip(got, want)), (got, want))
+        # composed once, then served from the cache
+        self.assertEqual(self.request(f"artwork/mosaic/{key}?size=300")[2], body)
+
+
 class PlaylistApiTest(MusicApiCase):
     def test_a_playlist_lifecycle(self):
         tracks = self.fill()

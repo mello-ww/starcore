@@ -13,6 +13,12 @@ jest.mock('../src/satellites/ui/api', () => {
   const mocks = {document: jest.fn(), providers: jest.fn(), read: jest.fn(), act: jest.fn()};
   return {UiApi: jest.fn().mockImplementation(() => mocks), __mocks: mocks};
 });
+// no audio host unless a test gives the screen one
+const audioHost: {current: any} = {current: null};
+jest.mock('../src/media/AudioHost', () => ({
+  ...jest.requireActual('../src/media/AudioHost'),
+  useOptionalAudioHost: () => audioHost.current,
+}));
 
 import {useDeveloperMode} from '../src/developer/DeveloperModeContext';
 const {__mocks} = jest.requireMock('../src/satellites/ui/api') as {
@@ -95,6 +101,7 @@ describe('SatelliteUiScreen', () => {
     });
     __mocks.act.mockResolvedValue({message: 'Done'});
     (useDeveloperMode as jest.Mock).mockReturnValue({enabled: false});
+    audioHost.current = null;
   });
 
   it('draws the entry page from live data, with the document navigation as tabs', async () => {
@@ -241,6 +248,49 @@ describe('SatelliteUiScreen', () => {
     await press(tree, 'Open settings');
     expect(navigation.push).not.toHaveBeenCalled();
     expect(texts(tree)).toContain("That isn't available in this app.");
+  });
+
+  it("plays the Satellite's own tracks from the page or from a route, through the audio host", async () => {
+    const tracks = [{id: 't1', title: 'One'}, {id: 't2', title: 'Two'}];
+    __mocks.document.mockResolvedValue({
+      document: {
+        contract: 'starcore.ui/1.2',
+        title: 'Tunes',
+        entry: 'album',
+        pages: {
+          album: {
+            title: 'Album',
+            source: {route: 'albums/9'},
+            blocks: [
+              {type: 'button', label: 'Play', action: {play: {tracks: '$.tracks', context: '$.context'}}},
+              {type: 'button', label: 'Shuffle', action: {play: {tracks: '$.tracks', shuffle: true}}},
+              {type: 'button', label: 'Radio', action: {play: {route: 'radio/album/{$.id}'}}},
+            ],
+          },
+        },
+      },
+      revision: 'rev1',
+      offline: false,
+    });
+    __mocks.read.mockImplementation(async (_satellite: string, route: string) => {
+      if (route === 'albums/9') return {id: '9', context: 'album:9', tracks};
+      if (route === 'radio/album/9') return {tracks: [{id: 'r1'}], context: 'radio:album-9'};
+      throw new Error(`unexpected route ${route}`);
+    });
+    const playTracks = jest.fn(async (_satellite: string, list: any[]) => list.length);
+    audioHost.current = {playTracks, playSearch: jest.fn()};
+    const {tree} = await mount({params: {name: 'Tunes'}});
+    await press(tree, 'Play');
+    expect(playTracks).toHaveBeenLastCalledWith('Tunes', tracks, {start: undefined, shuffle: false, queue: undefined, context: 'album:9'});
+    await press(tree, 'Shuffle');
+    expect(playTracks).toHaveBeenLastCalledWith('Tunes', tracks, expect.objectContaining({shuffle: true}));
+    await press(tree, 'Radio');
+    expect(__mocks.read).toHaveBeenCalledWith('Tunes', 'radio/album/9');
+    expect(playTracks).toHaveBeenLastCalledWith('Tunes', [{id: 'r1'}], expect.objectContaining({context: 'radio:album-9'}));
+    // the host refuses another library's page, and the screen says so
+    playTracks.mockRejectedValueOnce(new Error('The player plays from another audio library.'));
+    await press(tree, 'Play');
+    expect(texts(tree)).toContain('The player plays from another audio library.');
   });
 
   it('skips a block it does not know, unless the page requires it', async () => {

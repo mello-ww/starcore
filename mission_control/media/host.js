@@ -8,6 +8,7 @@ import { mountBar, toggleQueue } from "./bar.js";
 import { connect } from "./connect.js";
 import { extension } from "./extensions.js";
 import { installKeys } from "./keys.js";
+import { handOver } from "./handover.js";
 import { player } from "./player.js";
 import "./overlay.js";
 
@@ -36,6 +37,24 @@ export async function playSearch(text) {
         await player().play(tracks, 0, `search:${text}`);
     }
     return tracks.length;
+}
+
+/** Plays tracks a Satellite's own page hands over (the UI contract's play action with
+ * `tracks` or `route`, 1.2). Only from the Satellite the host plays from: the ids are resolved
+ * through that provider, so a page can't make the player fetch anything its provider doesn't
+ * offer. `options`: `start` (the id to begin with), `shuffle`, `queue` ("next" or "end": add
+ * instead of replacing) and `context` (reported with each play). Resolves with how many tracks
+ * it took. */
+export async function playTracks(satellite, tracks, options = {}) {
+    await start();
+    const provider = library.currentProvider();
+    if (!provider) {
+        throw new Error("There is no audio library to play from.");
+    }
+    if (provider.satellite !== satellite) {
+        throw new Error("The player plays from another audio library.");
+    }
+    return handOver(player(), tracks, options);
 }
 
 /** Starts the host once; later calls return the same promise. Settles with the provider,
