@@ -1528,7 +1528,11 @@ function renderSessions(sessions) {
         }
         row.appendChild(info);
 
-        row.appendChild(element("span", "session-meta", `Signed in ${formatSessionTime(session.created)}`));
+        // a device credential never expires: when it last reached the server tells a stale one apart
+        const meta = session.kind === "device"
+            ? `Created ${formatSessionTime(session.created)} · last used ${session.last_used ? formatSessionTime(session.last_used) : "never"}`
+            : `Signed in ${formatSessionTime(session.created)}`;
+        row.appendChild(element("span", "session-meta", meta));
 
         const revoke = element("button", "button button-stop", session.current ? "Sign out" : "Revoke");
         revoke.type = "button";

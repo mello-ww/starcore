@@ -310,7 +310,8 @@ deployment:
   session, enforced entirely server-side (`ApiServer._authorized()`) - Mission Control hiding
   a button never was, and still isn't, the actual protection.
 - Sessions last 7 days and are stored in `auth.json`, under StarCore's application-data
-  directory (see "Runtime data location" below) - created on first use, and never inside the
+  directory, each only as the SHA-256 of its token (as device credentials are), so reading the
+  file gives no working session; a store from an older version is converted on start (see "Runtime data location" below) - created on first use, and never inside the
   Git checkout by default. Deleting that file forgets every session and the administrator
   account itself, which is the supported way to reset a lost password: stop StarCore, delete
   `auth.json` from the application-data directory, start it again, and the setup screen

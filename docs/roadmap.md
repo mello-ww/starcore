@@ -102,8 +102,6 @@ Non-destructive review. The two confirmed weaknesses it found have since been fi
 
 Potential risks:
 
-- Session tokens are stored unhashed in the auth store on disk; anyone who can read that
-  file can use live sessions.
 - Before the first administrator is created the API is open by design; this is only safe
   while the server stays on `127.0.0.1`.
 - The Android app allows cleartext HTTP for any host (deliberate, for LAN servers), so
@@ -256,8 +254,8 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 ## Security
 
 - [x] Request body size limit and sign-in throttling (see the review above)
-- [ ] Hashed session tokens at rest
-- [ ] The auth store locked against concurrent writes (requests run on threads), and a "last
+- [x] Hashed session tokens at rest
+- [x] The auth store locked against concurrent writes (requests run on threads), and a "last
   used" kept for device credentials, so a stale one can be told apart
   (`photos-parity-audit.md`, "Security review of S1 to S4")
 - [ ] Periodic security audits, including dependency audits

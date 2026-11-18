@@ -22,7 +22,8 @@ own notion of "is this really the user".
 A device credential is the one other kind of token: issued to a signed-in caller for one
 Satellite capability whose vocabulary entry allows it (media.sync, a phone's backup), it reaches
 only that capability provider's routes (the server checks, see api/server.py), never expires,
-and is stored only as its SHA-256. It is listed and revoked with the sessions. It never
+and is stored only as its SHA-256, like a session token. It is listed and revoked with the
+sessions, with when it was last used. It never
 validates as a session: validate_session() and everything built on it answer no for it.
 """
 
@@ -42,6 +43,7 @@ SESSION_TTL_SECONDS = 7 * 24 * 60 * 60  # a week - long enough that a browser
                                           # a stale token doesn't live forever
 SESSION_COOKIE = "starcore_session"
 DEVICE_LIMIT = 32  # device credentials at once; another needs one revoked first
+LAST_USED_RESOLUTION = 60 * 60  # a device credential's "last used", to the hour
 
 
 class AuthError(Exception):
@@ -138,11 +140,15 @@ class AuthStore:
 
     def __init__(self, path: Path):
         self.path = Path(path)
+        # requests run on threads: every read-modify-write of the store holds this
+        self._lock = threading.RLock()
         self._data = self._load()
+        if self._data.pop("_migrated", False):
+            self._save()
 
     def _load(self) -> dict:
         if not self.path.exists():
-            return {"user": None, "sessions": {}, "devices": {}}
+            return {"user": None, "sessions": {}, "devices": {}, "session_keys": "sha256"}
 
         try:
             with open(self.path, "r", encoding="utf-8") as file:
@@ -150,23 +156,48 @@ class AuthStore:
         except (json.JSONDecodeError, OSError) as error:
             print(f"[WARNING]: auth store {self.path} is unreadable ({error}). "
                   f"Starting with no user and no sessions - a fresh setup will be required.")
-            return {"user": None, "sessions": {}, "devices": {}}
+            return {"user": None, "sessions": {}, "devices": {}, "session_keys": "sha256"}
 
         if not isinstance(data, dict):
-            return {"user": None, "sessions": {}, "devices": {}}
+            return {"user": None, "sessions": {}, "devices": {}, "session_keys": "sha256"}
         data.setdefault("user", None)
         data.setdefault("sessions", {})
         # device credentials, by the SHA-256 of their token (never the token itself)
         if not isinstance(data.get("devices"), dict):
             data["devices"] = {}
+        if not isinstance(data.get("sessions"), dict):
+            data["sessions"] = {}
+        if data.get("session_keys") != "sha256":
+            # a store from before sessions were hashed: the same sessions, by the SHA-256 of
+            # their token, so nobody is signed out and the file no longer holds a usable token
+            data["sessions"] = {_token_key(token): session for token, session in data["sessions"].items()}
+            data["session_keys"] = "sha256"
+            data["_migrated"] = True
         return data
 
     def _save(self):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = self.path.with_suffix(self.path.suffix + ".tmp")
-        with open(tmp_path, "w", encoding="utf-8") as file:
-            json.dump(self._data, file)
-        os.replace(tmp_path, self.path)
+        with self._lock:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp_path = self.path.with_suffix(self.path.suffix + ".tmp")
+            with open(tmp_path, "w", encoding="utf-8") as file:
+                json.dump(self._data, file)
+            os.replace(tmp_path, self.path)
+
+    def _session(self, token: str):
+        """The live session a token is, or None. An expired one is dropped now rather than
+        waiting for a sweep, so a stolen-then-expired token can never be revived."""
+        if not token:
+            return None
+        with self._lock:
+            key = _token_key(token)
+            session = self._data["sessions"].get(key)
+            if session is None:
+                return None
+            if session["expires"] < time.time():
+                del self._data["sessions"][key]
+                self._save()
+                return None
+            return session
 
     @property
     def is_bootstrapped(self) -> bool:
@@ -193,12 +224,15 @@ class AuthStore:
             raise AuthError("password must be at least 8 characters")
 
         salt = secrets.token_bytes(16)
-        self._data["user"] = {
-            "username": username.strip(),
-            "salt": salt.hex(),
-            "password_hash": hash_secret(password, salt),
-        }
-        self._save()
+        with self._lock:
+            if self.is_bootstrapped:
+                raise AuthError("StarCore already has an administrator account")
+            self._data["user"] = {
+                "username": username.strip(),
+                "salt": salt.hex(),
+                "password_hash": hash_secret(password, salt),
+            }
+            self._save()
         return self.create_session(username.strip())
 
     def verify(self, username: str, password: str) -> bool:
@@ -229,7 +263,7 @@ class AuthStore:
         authentication is identical to a browser login either way.
         """
         token = secrets.token_urlsafe(32)
-        self._data["sessions"][token] = {
+        session = {
             "username": username,
             "expires": time.time() + SESSION_TTL_SECONDS,
             "kind": kind if kind in ("web", "mobile") else "web",
@@ -237,22 +271,14 @@ class AuthStore:
             "session_id": secrets.token_hex(8),
             "created": time.time(),
         }
-        self._save()
+        with self._lock:
+            # kept only as its SHA-256: whoever reads the file gets no working token
+            self._data["sessions"][_token_key(token)] = session
+            self._save()
         return token
 
     def validate_session(self, token: str) -> bool:
-        if not token:
-            return False
-        session = self._data["sessions"].get(token)
-        if session is None:
-            return False
-        if session["expires"] < time.time():
-            # expired - drop it now rather than waiting for a sweep, so a
-            # stolen-then-expired token can never be revived by re-adding it
-            del self._data["sessions"][token]
-            self._save()
-            return False
-        return True
+        return self._session(token) is not None
 
     def session_kind(self, token: str) -> str:
         """"web", "mobile", or "" for a token that doesn't (or no longer)
@@ -260,26 +286,26 @@ class AuthStore:
         session validation itself. Never raises - an invalid token is simply
         reported as no kind at all, the same as validate_session() reports
         it as simply not valid."""
-        if not self.validate_session(token):
-            return ""
-        return self._data["sessions"][token].get("kind", "web")
+        session = self._session(token)
+        return session.get("kind", "web") if session else ""
 
     def session_username(self, token: str) -> str:
         """The account a valid token belongs to, or "" - so a Satellite can keep each
         account's own data apart without ever touching the session store itself."""
-        if not self.validate_session(token):
-            return ""
-        return self._data["sessions"][token].get("username", "")
+        session = self._session(token)
+        return session.get("username", "") if session else ""
 
     def session_id(self, token: str) -> str:
         """The opaque id list_sessions() reports for this token, or "" when it doesn't validate."""
-        if not self.validate_session(token):
-            return ""
-        return self._data["sessions"][token].get("session_id", "")
+        session = self._session(token)
+        return session.get("session_id", "") if session else ""
 
     def logout(self, token: str):
-        if token and self._data["sessions"].pop(token, None) is not None:
-            self._save()
+        if not token:
+            return
+        with self._lock:
+            if self._data["sessions"].pop(_token_key(token), None) is not None:
+                self._save()
 
     def list_sessions(self, current_token: str = None) -> list:
         """Every live (non-expired) session, for a "your devices" view in
@@ -295,28 +321,31 @@ class AuthStore:
         """
         now = time.time()
         sessions = []
-        for token, session in self._data["sessions"].items():
-            if session["expires"] < now:
-                continue
-            sessions.append({
-                "session_id": session.get("session_id", ""),
-                "kind": session.get("kind", "web"),
-                "device_name": session.get("device_name"),
-                "created": session.get("created"),
-                "expires": session["expires"],
-                "current": token == current_token,
-            })
-        current_key = _device_key(current_token) if current_token else None
-        for key, device in self._data["devices"].items():
-            sessions.append({
-                "session_id": device.get("session_id", ""),
-                "kind": "device",
-                "device_name": device.get("device_name"),
-                "capability": device.get("capability"),
-                "created": device.get("created"),
-                "expires": None,
-                "current": key == current_key,
-            })
+        current_key = _token_key(current_token) if current_token else None
+        with self._lock:
+            for key, session in self._data["sessions"].items():
+                if session["expires"] < now:
+                    continue
+                sessions.append({
+                    "session_id": session.get("session_id", ""),
+                    "kind": session.get("kind", "web"),
+                    "device_name": session.get("device_name"),
+                    "created": session.get("created"),
+                    "expires": session["expires"],
+                    "current": key == current_key,
+                })
+            for key, device in self._data["devices"].items():
+                sessions.append({
+                    "session_id": device.get("session_id", ""),
+                    "kind": "device",
+                    "device_name": device.get("device_name"),
+                    "capability": device.get("capability"),
+                    "created": device.get("created"),
+                    "expires": None,
+                    # when it last reached the server (to the hour), so a stale one stands out
+                    "last_used": device.get("last_used"),
+                    "current": key == current_key,
+                })
         sessions.sort(key=lambda entry: entry["created"] or 0, reverse=True)
         return sessions
 
@@ -325,16 +354,17 @@ class AuthStore:
         not by its token - the API never receives a token to revoke by, since
         the caller only ever gets the session_id back. Returns True if a
         session was actually found and removed."""
-        for token, session in list(self._data["sessions"].items()):
-            if session.get("session_id") == session_id:
-                del self._data["sessions"][token]
-                self._save()
-                return True
-        for key, device in list(self._data["devices"].items()):
-            if device.get("session_id") == session_id:
-                del self._data["devices"][key]
-                self._save()
-                return True
+        with self._lock:
+            for key, session in list(self._data["sessions"].items()):
+                if session.get("session_id") == session_id:
+                    del self._data["sessions"][key]
+                    self._save()
+                    return True
+            for key, device in list(self._data["devices"].items()):
+                if device.get("session_id") == session_id:
+                    del self._data["devices"][key]
+                    self._save()
+                    return True
         return False
 
     # ---------- device credentials ----------
@@ -348,8 +378,6 @@ class AuthStore:
             raise AuthError("StarCore has no administrator account yet")
         if not isinstance(capability, str) or not capability:
             raise AuthError("a device credential needs a capability")
-        if len(self._data["devices"]) >= DEVICE_LIMIT:
-            raise AuthError(f"at most {DEVICE_LIMIT} device credentials at once - revoke one first")
         token = secrets.token_urlsafe(32)
         name = (str(device_name).strip()[:80] or None) if device_name else None
         device = {
@@ -359,19 +387,29 @@ class AuthStore:
             "session_id": secrets.token_hex(8),
             "created": time.time(),
         }
-        self._data["devices"][_device_key(token)] = device
-        self._save()
+        with self._lock:
+            if len(self._data["devices"]) >= DEVICE_LIMIT:
+                raise AuthError(f"at most {DEVICE_LIMIT} device credentials at once - revoke one first")
+            self._data["devices"][_token_key(token)] = device
+            self._save()
         return token, {"session_id": device["session_id"], "kind": "device", "device_name": name,
-                       "capability": capability, "created": device["created"], "expires": None}
+                       "capability": capability, "created": device["created"], "expires": None,
+                       "last_used": None}
 
     def device_credential(self, token: str):
         """{session_id, capability, device_name, username} of a device credential, or None for
         any other token (a session included)."""
         if not token:
             return None
-        device = self._data["devices"].get(_device_key(token))
-        if device is None:
-            return None
+        with self._lock:
+            device = self._data["devices"].get(_token_key(token))
+            if device is None:
+                return None
+            # its use, to the hour: a phone backs up in many requests, one write an hour is enough
+            now = time.time()
+            if now - (device.get("last_used") or 0) >= LAST_USED_RESOLUTION:
+                device["last_used"] = now
+                self._save()
         return {"session_id": device.get("session_id", ""), "capability": device.get("capability"),
                 "device_name": device.get("device_name"), "username": device.get("username", "")}
 
@@ -379,8 +417,8 @@ class AuthStore:
         """Who a token is, for a Satellite that keeps something per caller (what one device
         sent): {id, kind: web|mobile|device, name} for a valid session or a device credential,
         None otherwise. id is the opaque session_id list_sessions() shows."""
-        if self.validate_session(token):
-            session = self._data["sessions"][token]
+        session = self._session(token)
+        if session is not None:
             return {"id": session.get("session_id", ""), "kind": session.get("kind", "web"),
                     "name": session.get("device_name")}
         device = self.device_credential(token)
@@ -390,11 +428,12 @@ class AuthStore:
 
     def purge_expired_sessions(self):
         now = time.time()
-        expired = [token for token, session in self._data["sessions"].items() if session["expires"] < now]
-        for token in expired:
-            del self._data["sessions"][token]
-        if expired:
-            self._save()
+        with self._lock:
+            expired = [key for key, session in self._data["sessions"].items() if session["expires"] < now]
+            for key in expired:
+                del self._data["sessions"][key]
+            if expired:
+                self._save()
 
     @staticmethod
     def token_from_request(cookie_header: str, authorization_header: str) -> str:
@@ -416,7 +455,7 @@ class AuthStore:
         return ""
 
 
-def _device_key(token: str) -> str:
-    """What a device credential is stored under: the SHA-256 of its token. The token is 256
-    random bits, so a plain digest is enough; nothing slow is needed against guessing."""
+def _token_key(token: str) -> str:
+    """What a session or a device credential is stored under: the SHA-256 of its token. The
+    token is 256 random bits, so a plain digest is enough; nothing slow is needed against guessing."""
     return hashlib.sha256(str(token).encode("utf-8")).hexdigest()

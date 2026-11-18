@@ -8,11 +8,12 @@ from pathlib import Path
 import json
 import socket
 import tempfile
+import threading
 import time
 import unittest
 
 from starcore.api.server import MAX_OPEN_JSON_BODY
-from starcore.auth import AuthError, AuthStore, LoginThrottle
+from starcore.auth import AuthError, AuthStore, LoginThrottle, _token_key
 from tests.support import start_engine, stop_engine
 
 
@@ -89,7 +90,7 @@ class AuthStoreTest(unittest.TestCase):
     def test_an_expired_session_no_longer_validates(self):
         auth = self.store()
         token = auth.bootstrap("admin", "a very good password")
-        auth._data["sessions"][token]["expires"] = time.time() - 1  # simulate the passage of time
+        auth._data["sessions"][_token_key(token)]["expires"] = time.time() - 1  # simulate the passage of time
 
         self.assertFalse(auth.validate_session(token))
 
@@ -184,7 +185,7 @@ class AuthStoreTest(unittest.TestCase):
     def test_list_sessions_excludes_expired_sessions(self):
         auth = self.store()
         token = auth.bootstrap("admin", "a very good password")
-        auth._data["sessions"][token]["expires"] = time.time() - 1
+        auth._data["sessions"][_token_key(token)]["expires"] = time.time() - 1
 
         self.assertEqual(auth.list_sessions(), [])
 
@@ -216,6 +217,85 @@ class AuthStoreTest(unittest.TestCase):
         auth.bootstrap("admin", "a very good password")
 
         self.assertFalse(auth.revoke_session("not-a-real-session-id"))
+
+
+    # ---------- at rest ----------
+
+    def test_the_store_on_disk_holds_no_working_token(self):
+        auth = self.store()
+        session = auth.bootstrap("admin", "a very good password")
+        device, _ = auth.create_device("admin", "media.sync", "Phone")
+
+        text = auth.path.read_text("utf-8")
+        self.assertNotIn(session, text)
+        self.assertNotIn(device, text)
+        reopened = AuthStore(auth.path)
+        self.assertTrue(reopened.validate_session(session))
+        self.assertIsNotNone(reopened.device_credential(device))
+
+    def test_a_store_from_before_hashing_keeps_its_sessions_and_loses_the_tokens(self):
+        directory = Path(tempfile.mkdtemp(prefix="starcore-auth-tests-"))
+        path = directory / "auth.json"
+        token = "an-old-plain-token"
+        path.write_text(json.dumps({
+            "user": {"username": "admin", "salt": "00", "password_hash": "x"},
+            "sessions": {token: {"username": "admin", "expires": time.time() + 60, "kind": "mobile",
+                                 "device_name": "Phone", "session_id": "abcd", "created": time.time()}},
+        }), "utf-8")
+
+        auth = AuthStore(path)
+
+        self.assertTrue(auth.validate_session(token))
+        self.assertEqual(auth.session_kind(token), "mobile")
+        self.assertNotIn(token, path.read_text("utf-8"))  # written back hashed at once
+        self.assertTrue(AuthStore(path).validate_session(token))  # and never hashed twice
+
+    # ---------- concurrent requests ----------
+
+    def test_concurrent_sign_ins_all_survive_a_reload(self):
+        auth = self.store()
+        auth.bootstrap("admin", "a very good password")
+        tokens = []
+
+        def sign_in():
+            tokens.append(auth.create_session("admin", kind="mobile"))
+
+        threads = [threading.Thread(target=sign_in) for _ in range(16)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        reopened = AuthStore(auth.path)
+        self.assertEqual(len(tokens), 16)
+        self.assertTrue(all(reopened.validate_session(token) for token in tokens))
+
+    # ---------- a device credential's last use ----------
+
+    def test_a_device_credential_reports_when_it_was_last_used(self):
+        auth = self.store()
+        auth.bootstrap("admin", "a very good password")
+        token, entry = auth.create_device("admin", "media.sync", "Phone")
+        self.assertIsNone(entry["last_used"])
+
+        before = time.time()
+        auth.device_credential(token)
+        listed = next(item for item in auth.list_sessions() if item["kind"] == "device")
+        self.assertGreaterEqual(listed["last_used"], before)
+        self.assertGreaterEqual(AuthStore(auth.path).list_sessions()[0]["last_used"] or 0, before)
+
+    def test_a_device_credential_writes_its_use_at_most_once_an_hour(self):
+        auth = self.store()
+        auth.bootstrap("admin", "a very good password")
+        token, _ = auth.create_device("admin", "media.sync", "Phone")
+        auth.device_credential(token)
+        first = auth.path.stat().st_mtime_ns
+        written = auth.path.read_text("utf-8")
+
+        auth.device_credential(token)
+
+        self.assertEqual(auth.path.read_text("utf-8"), written)
+        self.assertEqual(auth.path.stat().st_mtime_ns, first)
 
 
 class AuthApiTest(unittest.TestCase):
