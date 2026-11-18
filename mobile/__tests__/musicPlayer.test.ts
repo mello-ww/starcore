@@ -147,6 +147,51 @@ describe('PlayerController', () => {
     expect(saveLocal).toHaveBeenCalled();
   });
 
+  it('follows a pause and a resume made on the lock screen or a headset', async () => {
+    const {player, saveLocal} = setup();
+    await player.playTracks(tracks, 0);
+    player.onLoad(200);
+    player.onBuffer(false);
+    player.onProgress(42);
+    saveLocal.mockClear();
+
+    player.onNativePlaying(false, false);
+    expect(player.state.playing).toBe(false);
+    expect(player.state.position).toBe(42);
+    expect(saveLocal).toHaveBeenCalled();
+
+    player.onNativePlaying(true, false);
+    expect(player.state.playing).toBe(true);
+  });
+
+  it('does not take loading, seeking or the end of a track for a pause', async () => {
+    const {player} = setup();
+    await player.playTracks(tracks, 1);
+    player.onNativePlaying(false, false); // still loading
+    expect(player.state.playing).toBe(true);
+
+    player.onLoad(200);
+    player.onBuffer(false);
+    player.onNativePlaying(false, true); // seeking
+    expect(player.state.playing).toBe(true);
+
+    player.cycleRepeat();
+    player.cycleRepeat();
+    await player.onEnd();
+    player.onNativePlaying(false, false); // the track ended, repeat one starts it again
+    expect(player.state.playing).toBe(true);
+  });
+
+  it('leaves the state alone while it controls another device', async () => {
+    const {player} = setup();
+    await player.playTracks(tracks, 0);
+    player.onLoad(200);
+    player.onBuffer(false);
+    (player as any).state = {...player.state, remote: {deviceId: 'web-1'}};
+    player.onNativePlaying(false, false);
+    expect(player.state.playing).toBe(true);
+  });
+
   it('stops after the current song with the end-of-track sleep timer', async () => {
     const {player} = setup();
     await player.playTracks(tracks, 0);

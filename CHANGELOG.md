@@ -446,6 +446,14 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Fixed
 
+- **The Android player follows a pause or a resume made outside the app.** The lock screen,
+  the media notification and a headset button drive the native player directly, and the app
+  kept showing it as playing (and saved it so) after such a pause. The AudioHost now listens
+  to the native player's own playing state and takes a stop during steady playback as a
+  pause, never one while a track loads, seeks or ends. The lock-screen position reading 0:00
+  after a pause did not reproduce: it was the end of the queue, where the player rightly goes
+  back to the start.
+
 - **A web page or drawing opened from a Satellite can no longer act as you.** An HTML, SVG or
   XML file opened in a browser tab (File Explorer's Open) ran on Mission Control's own origin,
   with the session. The Engine now sends such files sandboxed, and never lets a browser guess a

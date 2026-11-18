@@ -364,6 +364,7 @@ function AudioOutput({
         onProgress={event => player.onProgress(event.currentTime)}
         onBuffer={event => player.onBuffer(event.isBuffering)}
         onEnd={() => player.onEnd()}
+        onPlaybackStateChanged={event => player.onNativePlaying(event.isPlaying, event.isSeeking)}
         onError={event => player.onError(event.error?.errorString)}
         onAudioBecomingNoisy={() => player.onInterrupted()}
         onAudioFocusChanged={event => !event.hasAudioFocus && player.onInterrupted()}

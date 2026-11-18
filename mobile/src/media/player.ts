@@ -81,6 +81,7 @@ export class PlayerController {
   private listened = 0;
   private lastProgress: number | null = null;
   private retries = 0;
+  private endingTrack = false;
   private pendingSeek: number | null = null;
   private sleepTimer: any = null;
   private retryTimer: any = null;
@@ -468,6 +469,7 @@ export class PlayerController {
   // ---------- events from the native player ----------
 
   onLoad(duration: number) {
+    this.endingTrack = false;
     this.retries = 0;
     this.set({duration: duration || this.state.track?.duration || 0, buffering: false, error: null});
     if (this.pendingSeek !== null) {
@@ -506,6 +508,8 @@ export class PlayerController {
   }
 
   async onEnd() {
+    // the native player reports it stopped right after the end: that is not a pause
+    this.endingTrack = true;
     this.flushListen();
     if (this.state.sleepAtEnd) {
       this.set({sleepAtEnd: false});
@@ -542,6 +546,29 @@ export class PlayerController {
         this.set({source, sourceKey: this.state.sourceKey + 1});
       }
     }, delay);
+  }
+
+  /** The native player started or stopped on its own: the lock screen, the notification or a
+   * headset button drive it directly, without going through this controller. A stop while it
+   * loads, seeks or finishes a track is not a pause, so only a stop during steady playback is
+   * taken as one. */
+  onNativePlaying(isPlaying: boolean, isSeeking = false) {
+    if (this.state.remote || !this.state.track) {
+      return;
+    }
+    if (isPlaying) {
+      this.endingTrack = false;
+      if (!this.state.playing) {
+        this.set({playing: true});
+        this.persist();
+      }
+      return;
+    }
+    if (!this.state.playing || isSeeking || this.endingTrack || this.state.buffering || this.state.error) {
+      return;
+    }
+    this.set({playing: false});
+    this.persist(true);
   }
 
   /** Another app took audio focus (a call, a navigation prompt) or headphones came out. */

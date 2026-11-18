@@ -183,7 +183,7 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] Audio contract groundwork: `audio.library` v1 in the vocabulary, provided by Music; `media.audio` reserved
 - [x] Audio: the Android AudioHost (`mobile/src/media/`), playing from the catalog's `audio.library` provider
 - [x] Audio: `audio.session` v1 in the shared vocabulary (`queue` required, the rest optional)
-- [ ] Audio: the lock-screen position reads 0:00 after pausing on Android (investigate)
+- [x] Audio: the lock-screen pause on Android (the 0:00 was the end of the queue; the app now follows a pause or resume made outside it)
 - [x] Audio: the web AudioHost (`mission_control/media/`), started by the shell, playing from the catalog's `audio.library` provider
 - [x] Audio: any Satellite can play through both clients with the UI contract's `play` action (1.2)
 - [ ] Remove `mobile/src/satellites/builtins.tsx` once Music's declarative interface replaces its native screens

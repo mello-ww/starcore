@@ -280,6 +280,5 @@ replacement on the web and on the phone. Tick the boxes here as items are done.
 ## Outside this migration
 
 Tracked in [`roadmap.md`](roadmap.md), not here: what has not been verified (the Python tests
-skipped on Windows, a physical phone, the production HTTPS proxy), the Android lock-screen
-position after a pause, and the features still to build. The light theme on Android is not
+skipped on Windows, a physical phone, the production HTTPS proxy), and the features still to build. The light theme on Android is not
 part of the stable release.

@@ -201,10 +201,13 @@ What it is now:
 
 Follow-ups found while building it:
 - **Formalize `audio.session`** - done: v1 is in the shared vocabulary (see above).
-- **Lock-screen position after a pause:** after pausing from the lock screen, Android's
-  media controls showed the position as 0:00 (seen on the emulator). The output component
-  (react-native-video's `<Video>` and its props) was moved unchanged, so this looks like
-  existing behaviour rather than a regression of this milestone. To investigate.
+- **Lock-screen position after a pause** - done. The 0:00 seen on the emulator was the end
+  of the queue (its demo tracks last seconds), where the player goes back to the start; a
+  pause from the lock screen keeps its position. What it did show: the lock screen, the
+  notification and a headset drive the native player directly, and the app kept believing
+  it played. The AudioHost now passes the native playing state on (`onNativePlaying`), which
+  takes a stop during steady playback as a pause, never one while loading, seeking or at a
+  track's end.
 - **Naming left from Music** in both hosts (a type, test IDs, labels, the web's keyboard
   shortcuts tied to Music's page): listed under "Leftovers the guard can't see" in
   [Remaining work](remaining-work.md).
