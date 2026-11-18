@@ -75,8 +75,9 @@ From [`file-explorer-migration.md`](file-explorer-migration.md). F1 is done.
   one virtualized list (`VirtualListPage`), its lists' rows one by one, each list loading its
   next page as its end nears; 10,000 files flung through on the emulator with no page failing
   and the JavaScript thread idle afterwards (2026-11-14).
-- [ ] **Unify the web's paging:** the media-grid and the list each keep their own paging code
-  on the web (`ui/gallery.js`, `ui/listpaging.js`); one shared helper, once both are stable.
+- [x] **Unify the web's paging:** the media-grid now pages through `ui/listpaging.js`, the
+  same helper as the list (cursor, stale-page token, refresh depth, duplicate guard); the grid
+  keeps only its tiles, selection and viewer.
 - [x] **F3 - File page:** details, picture preview, Download, Share, and Open (`download` with
   `open: true`: a new tab on the web, the system viewer on Android through
   `StarCoreFilesModule.kt`); an HTML, SVG or XML file opened in a tab is sandboxed.

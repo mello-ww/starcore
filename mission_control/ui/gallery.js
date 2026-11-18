@@ -7,6 +7,7 @@
 
 import { formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate } from "./contract.js";
 import { icon } from "./icons.js";
+import { createListPaging } from "./listpaging.js";
 
 // tiles revealed at a time: enough for a first screen, little enough to paint at once
 export const GRID_PAGE = 60;
@@ -138,6 +139,8 @@ export function createGallery(host) {
     // every icon here may be one of the document's own (host.icons(), UI contract 1.2)
     const glyph = (name, size) => drawGlyph(name, size, typeof host.icons === "function" ? host.icons() : null);
     let grids = new WeakMap();
+    // paging (`more`) is the list's own: its pages, cursor, stale-page token and refresh depth
+    const paging = createListPaging(host);
     // the one viewer a page can have open: {block, key, index, overlay, stageKey}
     let viewer = null;
     let returnFocus = null;
@@ -148,9 +151,9 @@ export function createGallery(host) {
             entry = {
                 shown: GRID_PAGE, selected: new Set(), chosen: new Map(), selecting: Boolean(picking), items: [], keys: [],
                 scope: null, tiles: new Map(), bar: null,
-                // paging (`more`): the page data's own items, the pages loaded after them, the
-                // provider's cursor for the next, and a token that retires stale requests
-                base: null, collection: null, extra: [], cursor: null, loading: null, error: null, token: 0, depth: 0,
+                // the page data the grid last adopted, and its collection (`more`'s route); the
+                // pages themselves are the shared list paging's
+                base: null, collection: null,
                 dom: null,
             };
             grids.set(block, entry);
@@ -192,20 +195,14 @@ export function createGallery(host) {
 
     // ---------- the grid ----------
 
-    /** The page data changed (first load, a refresh, another filter): what the grid holds
-     * starts again from it. A refresh of the same collection reloads as many pages as were
-     * loaded, so the grid, its scroll position and its selection stay where they were. */
+    /** The page data changed (first load, a refresh, another filter): the grid starts again from
+     * it. A refresh of the same collection keeps its size, scroll position and selection while
+     * the paging loads back the pages it had. */
     function adopt(block, grid, base, scope) {
         const collection = block.more ? resolveTemplate(block.more.route, { ...scope, value: "" }) : null;
         const same = collection === grid.collection && grid.base !== null;
-        grid.depth = same ? grid.extra.length : 0;
         grid.base = base;
         grid.collection = collection;
-        grid.extra = [];
-        grid.token += 1;  // any page still on its way belongs to the old data
-        grid.loading = null;
-        grid.error = null;
-        grid.cursor = block.more ? resolve(block.more.cursor, scope) : null;
         if (!same) {
             grid.shown = GRID_PAGE;
             grid.selected.clear();
@@ -217,8 +214,8 @@ export function createGallery(host) {
     }
 
     /** A selection keeps what is still there once everything that was loaded is loaded again. */
-    function pruneSelection(grid) {
-        if (grid.depth > grid.extra.length && grid.cursor) {
+    function pruneSelection(block, grid) {
+        if (paging.status(block).restoring) {
             return;
         }
         const present = new Set(grid.keys);
@@ -231,7 +228,7 @@ export function createGallery(host) {
     }
 
     function collect(block, grid) {
-        grid.items = grid.base.concat(grid.extra);
+        grid.items = paging.rows(block, grid.scope);
         grid.keys = grid.items.map((item, index) => itemKey(block, item, index, grid.scope));
         grid.items.forEach((item, index) => {
             if (grid.chosen.has(grid.keys[index])) {
@@ -240,58 +237,32 @@ export function createGallery(host) {
         });
     }
 
-    /** Loads the next page through the block's `more`, once at a time; a page that arrives
-     * after the data changed is dropped. Resolves when it is in (or failed). */
-    function loadMore(block, grid) {
-        if (!block.more || !grid.cursor || !host.load) {
-            return Promise.resolve(false);
+    /** Loads the next page through the block's `more` (the shared paging: once at a time, a page
+     * that arrives after the data changed is dropped). Resolves when it is in (or failed). */
+    async function loadMore(block, grid) {
+        const before = paging.status(block);
+        if (!block.more || !before.more || !host.load) {
+            return false;
         }
-        if (grid.loading) {
-            return grid.loading;
+        const from = grid.items.length;
+        const pending = paging.loadMore(block);
+        drawFooter(block, grid);
+        const added = await pending;
+        if (before.loading) {
+            return added.length > 0;  // the call that started it does the drawing
         }
-        const token = grid.token;
-        const route = resolveTemplate(block.more.route, { ...grid.scope, value: grid.cursor });
-        grid.error = null;
+        collect(block, grid);
+        pruneSelection(block, grid);
+        reveal(block, grid, from, grid.items.length);
+        const status = paging.status(block);
+        if (added.length && status.restoring) {
+            return loadMore(block, grid);  // back to where a refresh found the grid
+        }
         drawFooter(block, grid);
-        grid.loading = (isSafeRoute(route) ? host.load(route) : Promise.reject(new Error("That page points outside its Satellite.")))
-            .then((data) => {
-                if (token !== grid.token) {
-                    return false;
-                }
-                const pageScope = { ...grid.scope, data: data || {}, page: data || {} };
-                const resolved = resolve(block.items, pageScope);
-                const known = new Set(grid.keys);
-                // a provider's cursor never repeats an item; this keeps a broken one from doing so
-                const fresh = (Array.isArray(resolved) ? resolved : []).filter((item, index) => {
-                    const key = itemKey(block, item, grid.items.length + index, grid.scope);
-                    return key.startsWith("#") || !known.has(key);
-                });
-                const next = resolve(block.more.cursor, pageScope);
-                grid.cursor = next === null || next === undefined || next === "" || next === grid.cursor ? null : next;
-                const from = grid.items.length;
-                grid.extra = grid.extra.concat(fresh);
-                collect(block, grid);
-                grid.loading = null;
-                pruneSelection(grid);
-                reveal(block, grid, from, grid.items.length);
-                if (grid.depth > grid.extra.length && grid.cursor) {
-                    return loadMore(block, grid);  // back to where a refresh found the grid
-                }
-                if (viewer && viewer.block === block) {
-                    drawViewer();
-                }
-                return true;
-            })
-            .catch((error) => {
-                if (token === grid.token) {
-                    grid.loading = null;
-                    grid.error = error.message || "The next items could not be loaded.";
-                    drawFooter(block, grid);
-                }
-                return false;
-            });
-        drawFooter(block, grid);
-        return grid.loading;
+        if (added.length && viewer && viewer.block === block) {
+            drawViewer();
+        }
+        return added.length > 0;
     }
 
     /** Appends tiles [from, to) to the grid on screen, and moves its "more" sentinel. */
@@ -306,14 +277,14 @@ export function createGallery(host) {
         }
         grid.shown = Math.max(grid.shown, end);
         drawFooter(block, grid);
-        rearm(grid);
+        rearm(block, grid);
     }
 
     /** An observer reports only changes: when the end is still near after new tiles came in,
      * observing it again reports that, and the next tiles (or page) follow. */
-    function rearm(grid) {
+    function rearm(block, grid) {
         const dom = grid.dom;
-        if (dom && dom.observer && (grid.shown < grid.items.length || grid.cursor)) {
+        if (dom && dom.observer && (grid.shown < grid.items.length || paging.status(block).more)) {
             dom.observer.unobserve(dom.sentinel);
             dom.observer.observe(dom.sentinel);
         }
@@ -327,15 +298,16 @@ export function createGallery(host) {
             return;
         }
         dom.footer.replaceChildren();
-        const pending = grid.shown < grid.items.length || Boolean(grid.cursor);
-        dom.footer.hidden = !pending && !grid.error;
-        if (grid.error) {
-            dom.footer.appendChild(el("p", "ui-text ui-text-caption", grid.error));
+        const state = paging.status(block);
+        const pending = grid.shown < grid.items.length || state.more;
+        dom.footer.hidden = !pending && !state.error;
+        if (state.error) {
+            dom.footer.appendChild(el("p", "ui-text ui-text-caption", state.error));
             const retry = el("button", "ui-pill", "Try again");
             retry.type = "button";
             retry.addEventListener("click", () => loadMore(block, grid));
             dom.footer.appendChild(retry);
-        } else if (grid.loading) {
+        } else if (state.loading) {
             const note = el("p", "ui-text ui-text-caption ui-media-grid-loading", "Loading…");
             note.setAttribute("role", "status");
             dom.footer.appendChild(note);
@@ -345,7 +317,7 @@ export function createGallery(host) {
     function more(block, grid) {
         if (grid.shown < grid.items.length) {
             reveal(block, grid, grid.shown, grid.shown + GRID_PAGE);
-        } else if (grid.cursor && !grid.error) {
+        } else if (paging.status(block).more && !paging.status(block).error) {
             loadMore(block, grid);
         }
     }
@@ -360,7 +332,7 @@ export function createGallery(host) {
         }
         collect(block, grid);
         grid.tiles = new Map();
-        pruneSelection(grid);
+        pruneSelection(block, grid);
         const items = grid.items;
 
         // the person's own choice of size, remembered per Satellite and grid (not in the picker,
@@ -414,7 +386,7 @@ export function createGallery(host) {
             button.addEventListener("click", () => more(block, grid));
             sentinel.appendChild(button);
         }
-        if (grid.depth > grid.extra.length && grid.cursor && !grid.loading) {
+        if (paging.status(block).restoring && !paging.status(block).loading) {
             loadMore(block, grid);  // a refresh: back to as many pages as were loaded
         }
         return wrapper;
@@ -802,7 +774,7 @@ export function createGallery(host) {
         }
         const grid = gridState(viewer.block);
         const index = viewer.index + delta;
-        if (index >= grid.items.length && grid.cursor) {
+        if (index >= grid.items.length && paging.status(viewer.block).more) {
             // past the last item loaded: the next page first, then on
             const block = viewer.block;
             await loadMore(block, grid);
@@ -918,7 +890,7 @@ export function createGallery(host) {
         if (title !== null && title !== undefined && title !== "") {
             heading.appendChild(el("p", "ui-viewer-title", String(title)));
         }
-        const position = `${viewer.index + 1} of ${grid.items.length}${grid.cursor ? "+" : ""}`;
+        const position = `${viewer.index + 1} of ${grid.items.length}${paging.status(viewer.block).more ? "+" : ""}`;
         heading.appendChild(el("p", "ui-viewer-subtitle",
             subtitle !== null && subtitle !== undefined && subtitle !== ""
                 ? `${subtitle} · ${position}` : position));
@@ -936,7 +908,7 @@ export function createGallery(host) {
         const previous = iconButton("chevron-left", "Previous", "ui-viewer-previous", () => step(-1));
         previous.disabled = viewer.index === 0;
         const next = iconButton("chevron-right", "Next", "ui-viewer-next", () => step(1));
-        next.disabled = viewer.index >= grid.items.length - 1 && !grid.cursor;
+        next.disabled = viewer.index >= grid.items.length - 1 && !paging.status(viewer.block).more;
         chrome.append(previous, next);
 
         if (viewer.info) {
