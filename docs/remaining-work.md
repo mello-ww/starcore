@@ -199,20 +199,27 @@ Its audit and plan go in [`satellites/locked_folder.md`](satellites/locked_folde
 The largest piece. Its own audit comes first, as for Photos: a parity matrix of the web views
 and the Android screens against what the contract can draw.
 
-- [ ] **The audit and plan,** in [`media-audio.md`](media-audio.md).
-- [ ] **Library pages:** home (Daily Mixes, recents), library, albums, artists, playlists,
-  tracks, search, as media lists and grids that play through the audio host.
-- [ ] **Playlists:** create, rename, reorder, add and remove tracks, M3U import and export.
-- [ ] **Settings and equalizer** as forms; **stats and Wrapped** as dashboard pages.
+- [x] **The audit and plan,** in [`media-audio.md`](media-audio.md), "Music on the shared
+  interface": a 42-row parity matrix, contract changes 6 to 10 and milestones A1 to A10.
+  Written on 2026-11-18, awaiting the owner's approval.
+- [ ] **Library pages** (A1, A2): album, artist, mix, radio, mood, genre and track pages, then
+  home (Daily Mixes, recents), Your Library, search and folders, as media lists and grids that
+  play through the audio host (changes 6 and 7).
+- [ ] **Playlists** (A3): create, rename, cover, reorder, add and remove tracks, smart rules,
+  M3U import and export (change 8).
+- [ ] **The player's additions declared by the document** (A4): its track menu, Add to
+  playlist and the links to an album or artist, instead of `MUSIC_AUDIO_EXTENSIONS` and
+  `setExtensions` (change 9).
+- [ ] **Settings and equalizer** as forms (A5); **stats and Wrapped** as dashboard pages (A6).
 - [ ] **Offline downloads** as a generic client capability (keep a provider's tracks on the
-  device), with its Downloads page.
-- [ ] **The player's additions declared by the document:** its track menu, Add to playlist and
-  the links to an album or artist, instead of `MUSIC_AUDIO_EXTENSIONS` and `setExtensions`.
+  device), with its Downloads page (A7, change 10).
 - [ ] **The web player's keyboard shortcuts** active wherever the host plays, not only on
-  Music's page (`mission_control/media/keys.js` looks for `.pl-root`).
+  Music's page (A8; `mission_control/media/keys.js` looks for `.pl-root`).
+- [ ] **End to end, then the default** (A9): the isolated demo on both clients, a short
+  review, `preview` removed, the owner's validation.
 - [ ] Then remove Music's `page.js`, `page.css`, `views/`, `ui/`, `mobile/src/music/`,
-  `builtins.tsx`'s Music entries and its `DEDICATED_SCREENS` entry; `builtins.tsx` goes when
-  empty.
+  `builtins.tsx` and its `DEDICATED_SCREENS` entry, and empty the guard's last exception lists
+  (A10).
 
 ## 6. Leftovers the guard can't see
 

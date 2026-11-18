@@ -1,10 +1,11 @@
 # Audio playback: `media.audio` and `audio.library`
 
-Status: **specification**, with its contract groundwork in place: `audio.library` v1 is in
-`contracts/ui/vocabulary.json` and Music provides it. No client plays through it yet. Music's current web player (`satellites/native/music/mission_control/
-player/`, `audio/`) and Android player (`mobile/src/music/`, `android/.../media/`) are the
-behavioural reference: each section says which file it describes. See
-[UI contract](ui-contract.md), "Two kinds of capability", for the general model.
+Status: **implemented** on both clients (milestones 1 to 5 below): `audio.library` and
+`audio.session` v1 are in `contracts/ui/vocabulary.json`, Music provides them, and each
+client's AudioHost (`mission_control/media/`, `mobile/src/media/`) plays through them. Music's
+library screens are still its own; their move to `ui.json` is planned in the last section,
+"Music on the shared interface". See [UI contract](ui-contract.md), "Two kinds of capability",
+for the general model.
 
 Playback is split in two, along the line the UI contract already draws:
 
@@ -275,3 +276,347 @@ block (the counterpart of `file-browser`) is still not designed: nothing needs o
 - Background behaviour differs by Android version and vendor: test on real hardware.
 - Browsers block audio without a gesture: keep the `blocked` state.
 - Connect transfers carry the queue format: keep the format unchanged across the move.
+
+## Music on the shared interface: audit and plan (2026-11-18, at 24bb300)
+
+Stage 5 (R4) of [Remaining work](remaining-work.md). Music is the last Satellite with an
+interface of its own. Its player is already the shared audio host (milestones 3 to 5 above);
+what is left is its library: every view and screen below, then their removal. Compared from
+the code, not the docs:
+
+- **Own web (OW):** `satellites/native/music/mission_control/page.js`, its `views/` (home,
+  search, library, album, artist, playlist, collections, settings, stats), `ui/` (track lists,
+  cards, menus, Add to playlist), `store.js` and `router.js`, and what it registers with
+  `setExtensions` (`mission_control/media/extensions.js`).
+- **Own Android (OA):** `mobile/src/music/` (`MusicHomeScreen` with the Home, Search and Library
+  tabs, Album, Artist, Playlist, TrackList, Settings, Equalizer, Downloads, the `TrackActions`
+  sheet and its playlist picker), wired by `mobile/src/satellites/builtins.tsx` (8 screens and
+  `MUSIC_AUDIO_EXTENSIONS`) and by `DEDICATED_SCREENS` in `mobile/src/screens/HomeScreen.tsx`.
+- **Contract (UI 1.2):** what the shared renderers (`mission_control/ui/`,
+  `mobile/src/satellites/ui/`) can draw today, as specified in [UI contract](ui-contract.md).
+- **Server:** Music's routes (`routes_catalog.py`, `routes_listener.py`, `routes_playback.py`,
+  `discovery.py`), which already answer most pages' data.
+
+Legend, as in [the Photos audit](photos-parity-audit.md):
+- **Marks:** ✅ = yes, ◐ = partly or different, ✗ = no; n/a = not on that platform.
+- **Fix types:** C*n* = contract change *n* (below); S = a Music server change; J = Music's
+  `ui.json` only; H = a host or renderer change with no contract change; N = accepted as a
+  difference.
+- **Priority:** P0 = needed before the shared interface becomes Music's default; P1 = should
+  be there before the own interface is removed; P2 = optional.
+
+### Parity matrix
+
+| # | Feature | OW | OA | 1.2 today | Gap | Fix | Pri |
+|---|---|---|---|---|---|---|---|
+| 1 | Navigation: Home, Search, Your Library, Stats, Settings | ✅ sidebar | ◐ Home, Search, Library pills and a Settings button | ✅ `navigation` tabs | None: five tabs on both clients. | J | P0 |
+| 2 | Home: greeting, empty-library state with "Open settings", the "built only from your library" hint | ✅ | ◐ no empty state | ✅ `heading`, `text`, `button`, `visible` | The greeting's hour becomes the server's (the own pages send the device's). | J+S; N for the hour | P0 |
+| 3 | Home shelves: Continue listening (albums, playlists, artists and mixes mixed), Made for you (Daily Mixes), Your listening, top albums and artists, Recently added, Genre mixes, Moods, Start listening | ✅ horizontal shelves | ✅ `Shelf` | ◐ a `media-grid` wraps onto rows | A shelf is one row that scrolls sideways. The sections are a fixed set the server orders (`discovery.py`), so the document lists them, each `visible` when present; a mixed shelf opens each tile by kind through `open`. | C7, J+S | P0 |
+| 4 | Home track sections: Recently played, Recommended (each song's reason), Liked songs with "Show all" | ✅ | ✅ | ◐ `media-list` rows | No like, menu or playing mark on a row; a row can't play its list from itself. | C6, C7 | P0 |
+| 5 | Playing a list: a row plays its list from that row; Play and Shuffle on an album, playlist, mix or artist; the play's context reported to history | ✅ | ✅ | ✗ `play` takes only a search | The core gap: the document can't hand the host the tracks it shows. | C6 | P0 |
+| 6 | Album page: cover, title, artist link, year and type, totals, Play, Shuffle, Save, Radio, tracks by disc and number, credits, More by the artist | ✅ | ◐ no credits | ◐ `image`, `heading`, `field`, `button`, `media-list` | Play, Shuffle and Radio need C6; More by the artist is a shelf (C7). | C6, C7, J | P0 |
+| 7 | Artist page: picture, Play, Shuffle, Follow, Radio, top songs, Albums, Singles and EPs | ✅ | ✅ | ◐ | As #6. | C6, C7, J | P0 |
+| 8 | Mix, radio, mood and genre pages (generated lists, each song's reason) | ✅ one view | ✅ `TrackListScreen` | ◐ | A mix's or playlist's cover is a mosaic the clients draw. | S: one cover route composing the mosaic; C6, J | P0 |
+| 9 | Your Library: Playlists (by folder, pinned first), Liked Songs, Albums, Artists, Recently played, Folders, Genres | ✅ seven tabs | ◐ Playlists, Albums, Artists, plus Liked, Recent and Downloads rows | ◐ no tab strip inside a page | One `choice` for the tab; the server answers only the selected tab's key, so each block shows by `visible`. | J+S: `library?tab=&q=&sort=` | P0 |
+| 10 | Library filter field and sorting (albums by added, released, quality, name, and release type; artists all, featured, followed) | ✅ client-side | ◐ filter and A-Z | ✅ `search`, `choice` (8 options at most) | Filtering moves to the server. The playlists' folder filter becomes groups. | S, J | P0 |
+| 11 | Long lists: thousands of albums or liked songs | ◐ progressive DOM | ◐ FlatList | ◐ a `media-grid` and a `list` page; a `media-list` doesn't | A `media-list` needs `more`, and on Android the virtualized page (F2b). | C7 | P0 |
+| 12 | Folders tab: a library root, then its folders and tracks | ✅ | ✗ | ✅ `breadcrumb`, `list`, `media-list` | – | J+S | P1 |
+| 13 | Search as you type: Top result, Songs, Albums, Artists, Playlists, Genres, All songs; a quality filter | ✅ | ◐ no genres | ✅ `search`, `choice`, sections with `visible` | – | J+S | P0 |
+| 14 | Search: recent searches (with Clear) and Browse genres while the field is empty | ✅ | ◐ recent only | ✅ blocks `visible` on an empty query | Recording a search: the own pages record on Enter or on a pick, which the shared field has neither of. | S: record the query with the result the person opens; or drop it | P2 |
+| 15 | Search: suggestions while typing; a genre filter | ✅ | ◐ suggestions | ✗ no completion; a `choice` can't list dynamic genres | Results already follow the text after 300 ms. | N | P2 |
+| 16 | Track row: like heart, quality badge (Lossless, Hi-Res), album link, duration, an unavailable file dimmed, the playing mark | ✅ | ◐ no album link | ◐ `title`, `subtitle`, `meta` only | The heart and the playing mark need C7; the badge and "Unavailable" go in the row's text. | C7, S (`liked` per row) | P0 |
+| 17 | Track menu on a row: Play next, Add to queue, Add to playlist, Like, Start radio, Go to album, Go to artist, Credits and file info, Remove from this playlist, Download | ✅ menu, right-click, Shift+F10 | ✅ sheet, long press | ✗ a row has one action | A row needs a menu of actions; Play next and Add to queue need C6's `queue`. | C6, C7 | P0 |
+| 18 | Card menu on an album: Play, Play next, Add to queue, Add to playlist, Save, Pin, Radio, Go to artist; a Play button on hover | ✅ | ✗ | ◐ `quick` (2 icons), no menu | A tile menu is the row menu on a `media-grid`. | C7 | P1 |
+| 19 | Add to playlist: choose a playlist (or New playlist), then "already in this playlist" with Skip or Add anyway | ✅ dialog | ✅ sheet | ✗ `pick` chooses media from a capability only | A generic "choose one of the Satellite's items, then run a route", with a conflict step like `upload`'s. | C8 | P0 |
+| 20 | Playlists: create, rename, description, folder, delete, a cover image or the automatic mosaic | ✅ | ◐ create, rename, delete | ✅ forms, `confirm`, `upload` | – | J+S (a cover from the raw body) | P0 |
+| 21 | Playlist: reorder (drag on the web, arrows on Android), remove a song | ✅ | ✅ | ✗ no reorder | A list whose rows the person moves, each move one request. | C8 | P0 |
+| 22 | Smart playlists: rules (field, operator, value), match all or any, order, limit, Preview | ✅ | ✗ | ◐ form `rows`; a form shows no preview | Preview becomes the playlist page itself, after saving. | J+S | P1 |
+| 23 | M3U import (listing the unmatched entries) and M3U8 export | ✅ | ✗ | ✅ `upload`, `download` | Import takes JSON today. | S (`playlists/import` from the raw body), J | P1 |
+| 24 | Pins: pin an album or a playlist; pinned first | ✅ | ◐ shows pins | ✅ a menu entry (C7), the server's order | – | C7, J | P2 |
+| 25 | Web sidebar: Liked Songs and every playlist, always visible | ✅ | n/a | ✗ | Your Library's Playlists tab replaces it. | N | P2 |
+| 26 | Settings, playback: streaming quality (Wi-Fi, cellular), transcode format, ReplayGain, normalise, crossfade, gapless, speed, pitch, keep pitch, when the queue ends | ✅ | ◐ | ✅ `form`, `toggle`, `slider` (on release) | The host keeps the session's preferences; a change from a page must reach it at once. | C9 (`reloads`), J | P0 |
+| 27 | Equalizer: on, preset, ten bands, preamp, bass boost | ✅ vertical sliders, live | ✅ steps | ◐ ten `slider`s | A slider applies on release, not while dragging; no vertical layout. | N, J | P1 |
+| 28 | Appearance: theme, accent (StarCore's, from the artwork, a custom colour), density, visualizer, lyrics offset | ✅ | ✗ | ◐ no colour field | The custom colour is a `#rrggbb` text field the server checks. | J+S | P2 |
+| 29 | Privacy: history, recommendations, scrobbling (disabled), Clear history | ✅ | ✅ | ✅ | – | J | P0 |
+| 30 | Devices: the listener's devices, Forget one | ✅ | ✗ (the player's Devices tab) | ◐ the forget route takes the asking device's id | The session is enough to forget a device of one's own. | S, J | P2 |
+| 31 | The library on the server: summary tiles, its settings (library folders as a list, patterns, transcoding), the Developer Mode ones | ✅ | ✗ | ✅ `metric`, form `rows`, `developer` | – | J+S | P1 |
+| 32 | Scan: Scan now, progress while running, Cancel; Find duplicates | ✅ | ✗ | ✅ a page refreshing every 2 s, `button`, `visible` | – | J | P1 |
+| 33 | Stats: a range (7, 30, 90, 365 days, all), minutes, plays, songs, library tiles; top songs, artists, albums, genres; plays by hour | ✅ | ✗ | ✅ `dashboard`, `metric`, `media-list`, `chart` (`bars`) | – | J+S | P1 |
+| 34 | Wrapped: a year, its personality, tiles, top songs, artists, genres, artists discovered, Play your top songs, the previous and next years | ✅ | ✗ | ◐ | Play needs C6; the years come as the answer's `previous` and `next`. | C6, J+S | P1 |
+| 35 | Credits and file info (tags, file, format) | ✅ dialog | ✗ | ✅ a `track` detail page of `field`s | The resolved stream's plan stays in the full player's Info tab. | J | P1 |
+| 36 | Offline downloads: an album or a playlist, a song from its menu, Remove download, a downloaded mark | n/a | ✅ | ✗ | Keeping a provider's tracks on the device is the client's: the document names tracks, the client owns the storage and the control's state. | C10 | P0 (Android) |
+| 37 | Downloads page: jobs and progress, kept songs with size and quality, removal; download quality, network, storage limit | n/a | ✅ | ✗ | A screen of the client's own, like the phone sync's. | C10 | P0 (Android) |
+| 38 | The player's track menu (More in the full player) | ✅ registered | ✅ `TrackMenu` | ✗ only from a page's own code | The provider's document declares it. | C9 | P0 |
+| 39 | The player's title and artist links, Add to playlist, Open library | ✅ registered | ◐ album and artist | ✗ | As #38. | C9 | P0 |
+| 40 | A like in the player shows on the page, and the reverse | ✅ shared store | ✅ shared context | ✗ page data is a snapshot | A page follows the session's likes and preferences. | C9 (`follows`) | P1 |
+| 41 | Web keyboard shortcuts: Space, Shift+arrows, arrows, M, L, Q, `/` | ◐ only on Music's page (`.pl-root`) | n/a | – | Active wherever the host plays; `/` focuses the page's `search` block. | H | P1 |
+| 42 | Offline browsing (Android) | n/a | ✗ | ✅ `offline` pages | Shared is ahead: Home, Your Library and album pages can be kept. | J | P2 |
+
+The shared interface is ahead in places: Android gains stats, Wrapped, smart playlists, M3U,
+the Folders and Genres tabs, the library's settings, scan and duplicates; both clients gain the
+server-side filter, which no longer loads a whole library into a page; Android gains offline
+pages.
+
+### Contract changes
+
+Five changes, numbered after the five of Photos and the Locked Folder. Each is generic (any
+Satellite with audio, or with a list, can use it) and lands in one milestone, together in the
+Engine's validation (`engine/starcore/ui_contract.py`), `contracts/ui/vocabulary.json`, the
+fixtures in `contracts/ui/fixtures/`, both renderers, every `ui.json` it affects,
+[UI contract](ui-contract.md) and this file.
+
+**Change 6 - `play` with tracks.** Today `play` takes `{"search": ...}` only. Added:
+
+```json
+{"play": {"tracks": "$page.tracks", "start": "$.id", "context": "album:{$params.id}"}}
+{"play": {"route": "radio/track/{$.id}", "context": "radio:track-{$.id}"}}
+{"play": {"tracks": "$.tracks", "shuffle": true}}
+{"play": {"tracks": ["$."], "queue": "next"}}
+```
+
+- `tracks` binds a list of `Track` objects in the page data (a row's own, `["$."]`, for one);
+  `route` instead GETs one of the Satellite's own routes whose answer has `tracks`. Exactly one
+  of `search`, `tracks` and `route`.
+- `start` is the id of the first track to play (the first by default); `shuffle` shuffles;
+  `queue` is `next` or `end` (Play next, Add to queue) instead of replacing the queue.
+- `context` (text or a template, at most 80 characters) is what the host reports with each
+  play (`audio.session`'s `history`), as the own pages do (`album:<id>`, `mix:<id>`).
+- With `tracks` or `route`, the provider is **the document's own Satellite**, which must provide
+  `audio.library` (checked at load, as for `sync`). The host plays those ids through that
+  provider's `resolve`, never a stream URL from the document.
+- Allowed in a row's or a tile's `menu` and `quick` (change 7); not in a selection.
+
+**Change 7 - shelves and track rows.**
+
+- `media-grid` gets `layout: "row"`: one row that scrolls sideways (a shelf), at the grid's
+  `size`, with no paging, density control or selection. Android draws a horizontal list, the
+  web a scroll-snapping row with Previous and Next buttons.
+- `media-list` gets what a `media-grid` already has, so a list of tracks needs no client code:
+  `key`; `more` (paging, the list's rule, and on Android the virtualized page); `group`
+  (headings, as the grid's); `quick` (up to 2 icon actions at the row's end, a pair being a
+  toggle: the heart).
+- `menu` on a `media-list` row and on a `media-grid` tile: up to 10 `{label, icon, action,
+  visible, style}`, with the row as `$.`. The web opens it from a More button, a right-click,
+  the context-menu key or Shift+F10; Android from a More button or a long press, as a sheet.
+  An entry the client can't run is left out, and an empty menu hides its button.
+- `item.audio` (a binding to a track id) marks a row as one of the document's own
+  `audio.library` provider's tracks: the client marks the one playing (the equaliser bars),
+  and with change 10 a kept one.
+
+**Change 8 - choosing and reordering.**
+
+- `choose`, with a `route`: the person picks one of the Satellite's own items in a client
+  dialog (the web) or sheet (Android), then the route runs with it as `$value`.
+
+  ```json
+  {"choose": {"source": "playlists?editable=1", "items": "$.playlists",
+              "item": {"title": "$.name", "subtitle": "$.summary", "image": "covers/playlist/{$.id}"},
+              "title": "Add to playlist",
+              "create": {"label": "New playlist", "field": "Name", "route": "playlists",
+                         "body": {"name": "$value", "tracks": ["$.id"]}}},
+   "route": "playlists/{$value.id}/add", "body": {"tracks": ["$.id"]},
+   "conflict": {"confirm": "$answer.message", "route": "playlists/{$value.id}/add",
+                "body": {"tracks": ["$.id"], "allow_duplicates": true}},
+   "then": "refresh"}
+  ```
+
+  `source` is one of the Satellite's routes, its rows drawn as a `media-list`'s; `create`
+  offers one text field and runs its own route instead. A `409` asks `conflict.confirm` (text,
+  or the answer's `message`), then runs `conflict.route`; declining stops there. Cancelling
+  runs nothing. It is the counterpart of `pick`, which chooses media from a capability's
+  provider.
+- `reorder` on a `media-list` with a `key`: `{"route": "playlists/{$params.id}/move",
+  "body": {"entry": "$.entry_id", "to": "$value.to"}}`. The web drags a row by its handle (and
+  moves the focused row with Alt+Up and Alt+Down); Android drags after a long press on the
+  handle. Each drop is one request: the list moves at once, and is put back with the route's
+  error if it fails. Not with `more` (the whole list must be loaded) or `group`.
+
+**Change 9 - the document and the audio host.**
+
+- A document key `audio`, read by a client's audio host **from the document of the Satellite it
+  plays from**:
+
+  ```json
+  "audio": {
+    "menu": [
+      {"label": "Add to playlist", "icon": "list", "action": {"choose": "..."}},
+      {"label": "Start radio", "icon": "radio", "action": {"play": {"route": "radio/track/{$.id}"}}},
+      {"label": "Go to album", "icon": "disc", "visible": "$.album_id", "action": {"navigate": "album", "params": {"id": "$.album_id"}}},
+      {"label": "Credits and file info", "icon": "info", "action": {"navigate": "track", "params": {"id": "$.id"}}}
+    ],
+    "album": {"navigate": "album", "params": {"id": "$.album_id"}},
+    "artist": {"navigate": "artist", "params": {"id": "$.artist_id"}},
+    "library": {"label": "Open Music", "action": {"navigate": "home"}}
+  }
+  ```
+
+  `$.` is the playing track as the provider's `track` operation answers it. The full player's
+  More shows `menu` after the host's own entries; the title and the artist open `album` and
+  `artist`; `library` is the host's way to the provider's pages. A `navigate` opens that
+  Satellite's shared page from wherever the player is. Without `audio`, the host offers what it
+  offers today on a page that registered nothing. This replaces `setExtensions` on the web and
+  `AudioHostExtensions` on Android.
+- `reloads` on a route action: `"reloads": "audio.session"`. Once it succeeded, the client
+  reloads what it keeps from that capability of the document's own Satellite (the host's
+  preferences and likes), so a setting or a heart changed on a page reaches the player at once.
+  The vocabulary lists which capabilities can be named.
+- `follows` on a page: `"follows": ["audio.session"]`. The page's sources load again when the
+  client changes that state itself (a like in the player, a preference from the full player).
+
+**Change 10 - keeping tracks on the device.** A client capability `media.audio-offline`, on
+Android only (a browser keeps nothing).
+
+- The action `{"offline": {"tracks": "$.tracks"}}` (or `route`, or `["$."]`, as in change 6)
+  keeps those tracks of the document's own `audio.library` provider on the device, at the
+  listener's download quality, network rule and storage limit (the session's preferences).
+  The control's label and state are the client's: Download, Downloading 3 of 12, Downloaded
+  with Remove download. The document supplies no path, URL or storage setting.
+- `sync_capabilities` gains `audio.library` → `media.audio-offline`, so
+  `{"sync": {"capability": "audio.library"}}` opens the client's own Downloads screen (jobs,
+  progress, kept songs, sizes, removal) for the document's own provider.
+- A kept track is marked on a row with `item.audio` (change 7). The host already plays a kept
+  file before the stream.
+- A client without it (Mission Control) hides the control and the link.
+
+### Server changes (S)
+
+Music's routes already answer most pages. What changes, all inside Music's folder:
+
+- `home` keyed by section id (`continue`, `recent`, `mixes`, ...), so the document places each
+  section; each item says how it opens (`kind`).
+- `library?tab=&q=&sort=&type=&cursor=&limit=`: only the selected tab's list, filtered and
+  sorted on the server, paged where long; playlists with their `folder` as a group.
+- `liked` on every track, album and artist row the listener sees; a row's summary line
+  (`"12 songs · 48 min"`) and its quality badge (Lossless, Hi-Res) as text.
+- One cover route for a playlist, a mix or a mood (its mosaic composed on the server, cached).
+- `playlists/import` and `playlists/<id>/cover` from a raw body (the `upload` action);
+  `playlists/<id>/add` answering `409` with a `message` and the duplicates.
+- `wrapped?year=` with `previous` and `next`; `connect/forget` with the session alone; the
+  accent's custom colour checked as `#rrggbb`.
+- Each change keeps the own pages working until A10 (they read the same routes), or is made
+  beside the route they use.
+
+### Milestones
+
+Music's `ui.json` starts with `"preview": true`: its own page and screens stay the default, and
+Developer Mode opens the document, until A9 makes it the default. One commit per milestone,
+each tested on both clients (automated tests, the web and the emulator) and summarised to the
+owner.
+
+| # | Milestone | Matrix | Contract | Model and effort |
+|---|---|---|---|---|
+| A1 | `play` with tracks; Music's first `ui.json`: album, artist, mix, radio, mood, genre and track pages | 5-8, 35 | change 6 | Opus 5.5 high |
+| A2 | Shelves and track rows; Home, Your Library, Search, Folders | 1-4, 9-18, 24 | change 7 | Opus 5.5 high |
+| A3 | Playlists: Add to playlist, create, edit, cover, delete, reorder, remove, smart rules, M3U | 19-23 | change 8 | Opus 5.5 high |
+| A4 | The player's additions from the document; `reloads` and `follows` | 38-40 | change 9 | Opus 5.5 high |
+| A5 | Settings: playback, equalizer, appearance, privacy, devices, the library, scan, duplicates | 26-32 | none | Sonnet 5.5 high |
+| A6 | Stats and Wrapped | 33-34 | none | Sonnet 5.5 high |
+| A7 | Offline downloads and the Downloads screen | 36-37 | change 10 | Opus 5.5 xhigh |
+| A8 | The web player's keyboard shortcuts on every page | 41 | none | Sonnet 5.5 medium |
+| A9 | End to end on the local demo, then the default (`preview` goes) | all | none | Opus 5.5 high |
+| A10 | Remove Music's own interface | – | none | Sonnet 5.5 medium |
+
+**A1 - `play` with tracks, and the first pages.**
+- Contract: change 6 in `ui_contract.py`, `vocabulary.json`, `contracts/ui/fixtures/`
+  (valid and refused `play` actions), `mission_control/ui/renderer.js` and
+  `mobile/src/satellites/ui/UiBlocks.tsx`, which hand the tracks to the hosts
+  (`mission_control/media/player.js`, `mobile/src/media/player.ts`: a `playTracks` beside
+  `playSearch`, for the document's own provider).
+- Music: `satellites/native/music/ui.json` (`preview: true`) with the album, artist, mix,
+  radio, mood, genre and track (credits) pages, each with Play, Shuffle and a track list that
+  plays from its row; the cover route (S).
+- Tests: the Engine's (`test_ui_contract.py`: `play` with `tracks` in a Satellite without
+  `audio.library` is refused; a `route` stays the Satellite's own), `contracts/ui/tests/web.test.mjs`,
+  Jest for the renderer and the host's `playTracks`, Music's routes in the engine tests; the
+  pages on the web and the emulator.
+
+**A2 - shelves and track rows; Home, Your Library, Search, Folders.**
+- Contract: change 7 (`layout: "row"`; a `media-list`'s `key`, `more`, `group`, `quick`, `menu`
+  and `item.audio`) in the Engine, the fixtures, `mission_control/ui/` (a row menu beside
+  `gallery.js`, `listpaging.js` for the rows) and `mobile/src/satellites/ui/`
+  (`VirtualListPage.tsx`, a row sheet).
+- Music: the Home, Search and Your Library tabs (one `choice` for the seven tabs), the folder
+  pages with a `breadcrumb`; `home`, `library` and the row fields (S).
+- Tests: fixtures for each new key; renderer tests on both clients (a menu leaves out what the
+  client can't run, a heart pair toggles, paging keeps a row's key); Music's engine tests for
+  `library` (each tab, the filter, a cursor); 10,000 liked songs flung through on the emulator.
+
+**A3 - playlists.**
+- Contract: change 8 (`choose` with `create` and `conflict`; `reorder`) in the Engine, the
+  fixtures and both renderers.
+- Music: Add to playlist in every row's menu; the playlist page (edit, cover, delete, export,
+  reorder, remove); smart playlists' rules as form `rows`; M3U import through `upload`; the
+  raw-body routes and the `409` (S).
+- Tests: fixtures; renderer tests (a declined conflict runs nothing, a failed move is put
+  back); Music's engine tests for import, cover and duplicates; both clients.
+
+**A4 - the player's additions from the document.**
+- Contract: change 9 (`audio`, `reloads`, `follows`) in the Engine, the fixtures and both
+  hosts: `mission_control/media/` reads the provider's document instead of `extensions.js`, and
+  `mobile/src/media/AudioHost.tsx` instead of `AudioHostExtensions`. The own interface keeps
+  registering its extensions until A10, and they win while it is shown.
+- Music: its `audio` section.
+- Tests: `node --test mission_control/tests/media.test.mjs` (the menu and links from a
+  document, none without one, a `reloads` re-reads the preferences), Jest for the Android host;
+  both clients, from Music's pages and from another Satellite's.
+
+**A5 - settings.** Music's Settings page as forms, toggles and sliders with `reloads`; the
+equalizer page; the library's settings with `rows`; the scan page refreshing every 2 s with
+Cancel; duplicates; devices (S: `connect/forget`). Tests: Music's engine tests for the
+preference keys and the configuration; a setting changed on the page heard at once, on both
+clients.
+
+**A6 - stats and Wrapped.** Two `dashboard` pages: the range as a `choice`, metrics, rankings
+as `media-list`s, plays by hour as a `bars` chart; Wrapped by year, with Play your top songs
+(change 6). Tests: Music's engine tests for `wrapped`'s `previous` and `next`; both clients.
+
+**A7 - offline downloads.**
+- Contract: change 10 (`media.audio-offline`, the `offline` action, the `sync_capabilities`
+  entry) in the Engine, the fixtures and the app: the Downloads screen and the control move
+  from `mobile/src/music/screens/DownloadsScreen.tsx` and `ui/TrackActions.tsx` to generic code
+  beside `mobile/src/media/downloads.ts`, which keeps `starcore_music_downloads` and
+  `files/music/`, so the copies already on a phone survive. Mission Control hides both.
+- Music: Download on album, playlist and mix pages and in the row menu, and a Downloads link
+  in Your Library.
+- Tests: Jest for the action (queued, held by the network rule, removed) with the existing
+  `downloads.ts` tests unchanged; airplane mode on the emulator, playing kept songs.
+
+**A8 - keyboard shortcuts.** `mission_control/media/keys.js` is active wherever the host has a
+track, except while typing, with a menu or a dialog open, or while the shared media viewer is
+(it owns the arrows); `/` focuses the page's `search` block, if it has one. The `.pl-root`
+check and the `focusSearch` extension go. Tests: a unit test for the rule
+(`mission_control/tests/media.test.mjs`) and a check in the browser.
+
+**A9 - end to end, then the default.** The whole interface on the isolated demo engine with a
+test library, on the web and the emulator, every row of the matrix done or accepted; a short
+review of what a document can make the host do (only its own provider, only its own routes).
+Then `preview` goes: the document is the default, and the own interface moves to Developer
+Mode on both clients. The owner validates it on the web and the phone.
+
+**A10 - remove Music's own interface** (after the owner's validation):
+- `satellites/native/music/mission_control/` (`page.js`, `page.css`, `views/`, `ui/`,
+  `styles/`, `api.js`, `store.js`, `router.js`): the Satellite publishes no page.
+- `mobile/src/music/` with its tests; `builtins.tsx` (empty by then) and its uses in the
+  Satellites stack and `MainTabs.tsx`; `DEDICATED_SCREENS` and the own-screen helpers in
+  `HomeScreen.tsx`, `SatellitesListScreen.tsx` and `SatelliteUiScreen.tsx` where nothing else
+  needs them; `mission_control/media/extensions.js` and `AudioHostExtensions`.
+- `engine/tests/test_client_modularity.py`: `SATELLITE_SPECIFIC` lists no folder,
+  `KNOWN_COUPLINGS` loses `HomeScreen.tsx` and `KNOWN_IMPORTS` `builtins.tsx`;
+  `KNOWN_CROSS_SATELLITE`'s last entry goes by renaming the type in
+  `satellites/native/music/library.py` that the pattern matches. All three are then empty,
+  stage 5's "Done".
+- Docs: this file's references to the own interface, `docs/satellites/music.md`,
+  [Remaining work](remaining-work.md), `CHANGELOG.md`, `mobile/README.md`.
+
+### Risks and open points
+
+- **A2's rows are the biggest piece.** A `media-list` with menus, paging and Android's
+  virtualized page is used by nearly every page; it is built and measured first on Liked Songs.
+- **Library size:** pages ask the server for one tab and one page at a time, never the whole
+  library, as the own pages did.
+- **The greeting's hour** is the server's; the mixes don't depend on it. Accepted.
+- **Accepted losses (N):** search suggestions and the genre filter (#15), the web sidebar
+  (#25), the equalizer applying while dragging (#27). Each can come back later as a generic
+  block.
+- **No backward compatibility:** the five changes may break older documents; every `ui.json`,
+  both clients and the fixtures change together, as the rules say.
