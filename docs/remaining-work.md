@@ -201,7 +201,7 @@ and the Android screens against what the contract can draw.
 
 - [x] **The audit and plan,** in [`media-audio.md`](media-audio.md), "Music on the shared
   interface": a 42-row parity matrix, contract changes 6 to 10 and milestones A1 to A10.
-  Written on 2026-11-18, awaiting the owner's approval.
+  Written and approved by the owner on 2026-11-18.
 - [ ] **Library pages** (A1, A2): album, artist, mix, radio, mood, genre and track pages, then
   home (Daily Mixes, recents), Your Library, search and folders, as media lists and grids that
   play through the audio host (changes 6 and 7).

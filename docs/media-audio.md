@@ -385,6 +385,12 @@ fixtures in `contracts/ui/fixtures/`, both renderers, every `ui.json` it affects
   `audio.library` (checked at load, as for `sync`). The host plays those ids through that
   provider's `resolve`, never a stream URL from the document.
 - Allowed in a row's or a tile's `menu` and `quick` (change 7); not in a selection.
+- A long list is never sent whole. With `route` the answer may be paged (`tracks` with a
+  `cursor`): the host queues the first page and asks for the next when about 25 tracks are
+  left. With `shuffle`, the host keeps only the list's size and draws positions lazily (a
+  partial Fisher-Yates over the indexes, about 100 ahead, refilled 50 at a time), so
+  Shuffle on 10,000 liked songs costs one page, not the whole list. The `route` answers a
+  `count` and pages by position for that.
 
 **Change 7 - shelves and track rows.**
 
@@ -398,7 +404,8 @@ fixtures in `contracts/ui/fixtures/`, both renderers, every `ui.json` it affects
 - `menu` on a `media-list` row and on a `media-grid` tile: up to 10 `{label, icon, action,
   visible, style}`, with the row as `$.`. The web opens it from a More button, a right-click,
   the context-menu key or Shift+F10; Android from a More button or a long press, as a sheet.
-  An entry the client can't run is left out, and an empty menu hides its button.
+  An entry the client can't run is left out (including one that needs the server while the
+  client is offline, such as Start radio, a like or Add to playlist), and an empty menu hides its button.
 - `item.audio` (a binding to a track id) marks a row as one of the document's own
   `audio.library` provider's tracks: the client marks the one playing (the equaliser bars),
   and with change 10 a kept one.
@@ -537,8 +544,12 @@ owner.
   (`VirtualListPage.tsx`, a row sheet).
 - Music: the Home, Search and Your Library tabs (one `choice` for the seven tabs), the folder
   pages with a `breadcrumb`; `home`, `library` and the row fields (S).
+- Both renderers (no contract change): going back to a page restores its scroll position and
+  the pages of a paged list already loaded, so returning from an album lands on the same row of
+  Your Library. Mission Control keeps them per history entry; Android per screen in the stack.
 - Tests: fixtures for each new key; renderer tests on both clients (a menu leaves out what the
-  client can't run, a heart pair toggles, paging keeps a row's key); Music's engine tests for
+  client can't run, a heart pair toggles, paging keeps a row's key, going back restores the
+  position); Music's engine tests for
   `library` (each tab, the filter, a cursor); 10,000 liked songs flung through on the emulator.
 
 **A3 - playlists.**
@@ -556,6 +567,8 @@ owner.
   `mobile/src/media/AudioHost.tsx` instead of `AudioHostExtensions`. The own interface keeps
   registering its extensions until A10, and they win while it is shown.
 - Music: its `audio` section.
+- The hosts: while the context is a radio (an endless queue the host refills), the repeat
+  button cycles between off and repeat one only; repeat all has no end to loop back from.
 - Tests: `node --test mission_control/tests/media.test.mjs` (the menu and links from a
   document, none without one, a `reloads` re-reads the preferences), Jest for the Android host;
   both clients, from Music's pages and from another Satellite's.
