@@ -174,7 +174,7 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 
 - [x] Multiple servers, sign-in and per-server biometric app lock
 - [x] StarCore design language with live accent
-- [x] Native Music and Photos, declarative screens for other satellites
+- [x] Native Music, declarative screens for every other satellite
 - [x] Shared renderer for UI contract documents; icons from `icon_name`
 - [ ] Rediscover and cache controls in the app
 - [x] Move Status onto shared blocks, at parity - UI contract 1.1 (`docs/satellites/status.md`, "Status's migration")
@@ -190,12 +190,13 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [ ] Move Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/ui-contract.md`, "Migration")
     - [x] Photos opens in its shared interface by default on both clients (M1-M6 of `docs/photos-parity-audit.md`)
     - [x] Photos' shared interface after the owner's review: whole photo in the viewer, full width, Favorites and the Locked Folder among the folders, tile hearts, download and share, web swipe, Library grouping (M7-M14)
-    - [ ] Retire Photo's own page and screens once the shared interface is validated
-    - [ ] Move File Explorer onto its `ui.json`, giving Android a file browser (`docs/file-explorer-migration.md`)
+    - [x] Retire Photo's own page and screens once the shared interface is validated
+    - [x] Move File Explorer onto its `ui.json`, giving Android a file browser (`docs/file-explorer-migration.md`)
         - [x] F1: read-only browsing, as a preview (Android opens it; the web keeps its own page)
         - [x] F2-F5: list paging, the file page (download, share, open), management, upload
         - [x] F6-F7: shared by default, then retire its own page
-    - [ ] The Locked Folder through `media.vault`, and Music on `ui.json` (R3 and R4 of `docs/remaining-work.md`)
+    - [x] The Locked Folder through `media.vault`, its only interface on both clients (R3 of `docs/remaining-work.md`)
+    - [ ] Music on `ui.json` (R4 of `docs/remaining-work.md`)
 - [ ] Light theme (after the stable release)
 - [ ] Icons instead of text glyphs for the remaining Music controls
 - [ ] Audio playback validated on a real device

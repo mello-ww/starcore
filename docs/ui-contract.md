@@ -1128,11 +1128,11 @@ Retiring all of them is planned in [Remaining work](remaining-work.md).
    1. `media.gallery` from Photos' grid and viewer. **Done (1.2):** the shared
       `media-grid` block and viewer, and Photo's `ui.json`, now its default interface on both
       clients (see "Shared interface" in [docs/satellites/photo.md](satellites/photo.md)).
-      Photo's own page and screens stay in Developer Mode until they are retired;
-   2. `media.vault` from the Locked Folder. **Partly done (1.2):** the `secure` action moves
+      Photo's own page and screens are removed;
+   2. `media.vault` from the Locked Folder. **Done (1.2):** the `secure` action moves
       photos in from Photos' shared viewer and selection, behind each client's own PIN and
-      biometric prompt, and a document can be protected by the store. Next: the Locked Folder
-      itself in the shared interface;
+      biometric prompt, a document can be protected by the store, and the Locked Folder itself
+      has only its shared interface (see [docs/satellites/locked_folder.md](satellites/locked_folder.md));
    3. `audio.library` and `media.audio` from Music's player, queue and downloads, specified in
       [Audio playback](media-audio.md). **Done (1.2):** the shared audio host on both clients
       and the `play` action. Music's own library screens are still native.

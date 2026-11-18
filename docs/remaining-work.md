@@ -115,7 +115,7 @@ the owner 2026-11-15).
 - [x] **P1 - Settings (#29):** the `source_paths` mappings as repeatable form rows (the `rows`
   field kind arrives with contract change 2, in the Locked Folder's L4); the `own: "settings"`
   entry goes. Phone sync was reached from Settings with `{"own": "sync"}` until S0 removed it.
-- [ ] **The Locked Folder (#37):** stage 4.
+- [x] **The Locked Folder (#37):** stage 4.
 - [x] **P2 - Icons shipped by the Satellite (#38):** a declared `icons/` folder, validated by
   the Engine (single colour, no script) and served as path data, drawn by both clients with a
   shared icon as fallback (contract change 5). Every Satellite's `mission_control/icon.svg`
