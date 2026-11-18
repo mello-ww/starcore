@@ -85,6 +85,8 @@ export class PlayerController {
   private pendingSeek: number | null = null;
   private sleepTimer: any = null;
   private retryTimer: any = null;
+  /** The native player stopped on its own; onNativeReady decides whether that was a pause. */
+  private nativeStop = false;
   private localTimer: any = null;
   private serverTimer: any = null;
   private notifiedPermission = false;
@@ -142,6 +144,7 @@ export class PlayerController {
   }
 
   private async loadCurrent(play: boolean) {
+    this.nativeStop = false;
     const track = Q.current(this.state.queue);
     this.retries = 0;
     this.listened = 0;
@@ -470,6 +473,7 @@ export class PlayerController {
 
   onLoad(duration: number) {
     this.endingTrack = false;
+    this.nativeStop = false;
     this.retries = 0;
     this.set({duration: duration || this.state.track?.duration || 0, buffering: false, error: null});
     if (this.pendingSeek !== null) {
@@ -504,12 +508,21 @@ export class PlayerController {
   }
 
   onBuffer(buffering: boolean) {
+    if (buffering) {
+      this.nativeStop = false;
+    }
     this.set({buffering});
   }
 
   async onEnd() {
-    // the native player reports it stopped right after the end: that is not a pause
+    // react-native-video reports the end again whenever play-when-ready changes on an ended
+    // player: only the first end of a loaded track moves the queue on
+    if (this.endingTrack) {
+      return;
+    }
+    // the native player reported it stopped just before the end: that was not a pause
     this.endingTrack = true;
+    this.nativeStop = false;
     this.flushListen();
     if (this.state.sleepAtEnd) {
       this.set({sleepAtEnd: false});
@@ -526,6 +539,7 @@ export class PlayerController {
   }
 
   onError(message?: string) {
+    this.nativeStop = false;
     const track = this.state.track;
     if (!track) {
       return;
@@ -550,13 +564,16 @@ export class PlayerController {
 
   /** The native player started or stopped on its own: the lock screen, the notification or a
    * headset button drive it directly, without going through this controller. A stop while it
-   * loads, seeks or finishes a track is not a pause, so only a stop during steady playback is
-   * taken as one. */
+   * loads, seeks, buffers or finishes a track is not a pause. Media3 reports the stop before the
+   * end, buffering or load event that explains it, so a stop is only noted here and taken for a
+   * pause by onNativeReady. Taking it at once would toggle play-when-ready on an ended player
+   * (which then reports the end again and skips a track) or leave a new track paused at 0:00. */
   onNativePlaying(isPlaying: boolean, isSeeking = false) {
     if (this.state.remote || !this.state.track) {
       return;
     }
     if (isPlaying) {
+      this.nativeStop = false;
       this.endingTrack = false;
       if (!this.state.playing) {
         this.set({playing: true});
@@ -564,11 +581,26 @@ export class PlayerController {
       }
       return;
     }
-    if (!this.state.playing || isSeeking || this.endingTrack || this.state.buffering || this.state.error) {
+    this.nativeStop = this.pausedNatively(isSeeking);
+  }
+
+  /** The native player reports it is ready, with a track loaded, after each change of its state:
+   * right after a stop, that means it was paused rather than ended, buffering or loading. This is
+   * an event and not a delay because JavaScript timers do not run while the screen is locked. */
+  onNativeReady() {
+    if (!this.nativeStop) {
       return;
     }
-    this.set({playing: false});
-    this.persist(true);
+    this.nativeStop = false;
+    if (this.pausedNatively(false)) {
+      this.set({playing: false});
+      this.persist(true);
+    }
+  }
+
+  private pausedNatively(isSeeking: boolean) {
+    const {playing, buffering, error, remote} = this.state;
+    return playing && !isSeeking && !this.endingTrack && !buffering && !error && !remote;
   }
 
   /** Another app took audio focus (a call, a navigation prompt) or headphones came out. */

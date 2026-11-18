@@ -459,6 +459,15 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Fixed
 
+- **The Android player plays on into the next track, and a new list plays.** Since it began
+  following pauses made outside the app, it stopped at 0:00 when the queue moved on, or when a
+  list was played while it sat paused. The native player reports that it stopped before the
+  end or the loading that explains it, so the app took the end of a track (or the switch to a
+  new one) for a pause; pausing an ended native player then made it report the end twice
+  more, which skipped a track. A stop now counts as a pause only when the native player then
+  reports it is still ready, which works with the screen locked too, and a repeated end is
+  ignored.
+
 - **The Android player follows a pause or a resume made outside the app.** The lock screen,
   the media notification and a headset button drive the native player directly, and the app
   kept showing it as playing (and saved it so) after such a pause. The AudioHost now listens

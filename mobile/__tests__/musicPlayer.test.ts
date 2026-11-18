@@ -120,6 +120,7 @@ describe('PlayerController', () => {
 
     setPrefs({queue_end: 'autoplay'});
     await player.playTracks(tracks, 2);
+    player.onLoad(200);
     await player.onEnd();
     expect(api.radio).toHaveBeenCalledWith('track', tracks[2].id);
     expect(player.state.track?.title).toBe('Song r0');
@@ -156,6 +157,10 @@ describe('PlayerController', () => {
     saveLocal.mockClear();
 
     player.onNativePlaying(false, false);
+    // Media3 reports the stop before the end or buffering that may explain it: only the native
+    // player's report that it is still ready makes it a pause
+    expect(player.state.playing).toBe(true);
+    player.onNativeReady();
     expect(player.state.playing).toBe(false);
     expect(player.state.position).toBe(42);
     expect(saveLocal).toHaveBeenCalled();
@@ -180,6 +185,76 @@ describe('PlayerController', () => {
     await player.onEnd();
     player.onNativePlaying(false, false); // the track ended, repeat one starts it again
     expect(player.state.playing).toBe(true);
+  });
+
+  // The order below is what react-native-video delivers on a real device: Media3's
+  // onIsPlayingChanged(false) comes before the onEvents that carry the end, the buffering or the
+  // ready state which explain it.
+  it('plays into the next track when the native player reports the stop before the end', async () => {
+    const {player} = setup();
+    await player.playTracks(tracks, 0);
+    player.onNativePlaying(true, false);
+    player.onNativeReady();
+    player.onBuffer(false);
+    player.onLoad(25);
+    player.onProgress(24);
+    const asked: boolean[] = [];
+    player.subscribe(state => asked.push(state.playing));
+
+    player.onNativePlaying(false, false);
+    await player.onEnd();
+    expect(player.state.track?.id).toBe(tracks[1].id);
+    expect(player.state.playing).toBe(true);
+
+    player.onBuffer(true);
+    player.onNativePlaying(true, false);
+    player.onNativeReady();
+    player.onBuffer(false);
+    player.onLoad(25);
+    expect(player.state.track?.id).toBe(tracks[1].id);
+    // a pause in between would toggle play-when-ready on the ended native player, which reports
+    // the end again and skips a track
+    expect(asked).not.toContain(false);
+  });
+
+  it('ignores the end the native player repeats while it sits at the end of a track', async () => {
+    const {player} = setup();
+    await player.playTracks(tracks, 0);
+    player.onLoad(25);
+    await player.onEnd();
+    // react-native-video reports the end again whenever play-when-ready changes on an ended player
+    await player.onEnd();
+    expect(player.state.track?.id).toBe(tracks[1].id);
+
+    player.onLoad(25);
+    await player.onEnd();
+    expect(player.state.track?.id).toBe(tracks[2].id);
+  });
+
+  it('does not take the stop of a source change for a pause', async () => {
+    const {player} = setup();
+    await player.playTracks(tracks, 2);
+    player.onLoad(25);
+    await player.onEnd(); // the queue ends: paused at the start of its last track
+    expect(player.state.playing).toBe(false);
+
+    await player.playTracks(tracks, 0);
+    const asked: boolean[] = [];
+    player.subscribe(state => asked.push(state.playing));
+    // the old track resumes for a moment, and its progress clears the buffering flag
+    player.onNativePlaying(true, false);
+    player.onNativeReady();
+    player.onProgress(1);
+    // then the native player switches to the new source
+    player.onNativePlaying(false, false);
+    player.onBuffer(true);
+    player.onNativePlaying(true, false);
+    player.onNativeReady();
+    player.onBuffer(false);
+    player.onLoad(25);
+    expect(player.state.track?.id).toBe(tracks[0].id);
+    // a pause in between would leave the new track loaded but paused at 0:00
+    expect(asked).not.toContain(false);
   });
 
   it('leaves the state alone while it controls another device', async () => {

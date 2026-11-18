@@ -207,8 +207,9 @@ Follow-ups found while building it:
   pause from the lock screen keeps its position. What it did show: the lock screen, the
   notification and a headset drive the native player directly, and the app kept believing
   it played. The AudioHost now passes the native playing state on (`onNativePlaying`), which
-  takes a stop during steady playback as a pause, never one while loading, seeking or at a
-  track's end.
+  takes a stop as a pause only when the native player then reports it is still ready
+  (`onNativeReady`: Media3 reports a stop before the end or the loading that explains it),
+  never one while loading, seeking or at a track's end.
 - **Naming left from Music** in both hosts (a type, test IDs, labels, the web's keyboard
   shortcuts tied to Music's page): listed under "Leftovers the guard can't see" in
   [Remaining work](remaining-work.md).
