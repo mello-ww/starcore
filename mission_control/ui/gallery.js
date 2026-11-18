@@ -685,7 +685,11 @@ export function createGallery(host) {
         if (action.secure) {
             // one request and one prompt for the whole selection (it confirms and refreshes itself)
             button.disabled = true;
-            const done = await host.runSecure(action, chosen, grid.scope);
+            const viewer = block.viewer || {};
+            const imagesOf = (item) => [block.item.image, viewer.image, viewer.video]
+                .map((template) => source(template, { ...grid.scope, data: item }))
+                .filter(Boolean);
+            const done = await host.runSecure(action, chosen, grid.scope, imagesOf);
             button.disabled = false;
             if (done) {
                 clearSelection(block, grid);

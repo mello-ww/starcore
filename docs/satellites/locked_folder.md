@@ -546,9 +546,10 @@ Windows password reset (DPAPI's documented behaviour).
   still on a phone, would be taken back into Photos by the next sync, and the next move in
   writes a new list over the damaged one. Refusing everything instead would have Photo answer
   every new photo as a duplicate, which a phone takes for "synced" (L7's R4).
-- **A browser's cache after a move in:** Photo's thumbnails and originals are served to be
-  cached for a week, so a browser that showed a photo may keep it that long after it was moved
-  into the vault. The Android app evicts its own image cache (L7's R5).
+- **A browser's cache after a move in** (handled): thumbnails and originals are served to be
+  cached for a week, so Mission Control asks the browser to fetch each moved item's images again
+  (`cache: "reload"`), which replaces the cached copies. The Android app evicts its own image
+  cache (L7's R5).
 
 ## Biometric unlock
 

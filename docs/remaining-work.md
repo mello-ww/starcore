@@ -166,9 +166,9 @@ closed it.
 - [x] **L7 follow-up - the phone check** (with L5's): a screenshot of the vault's viewer, of a
   PIN prompt and of the recovery-key dialog comes out black. The owner validated the phone side
   on the emulator with this build (2026-11-16).
-- [ ] **L7 follow-up - a browser's cache after a move in:** Mission Control asks the browser to
-  fetch a moved item's thumbnail and original again, which replaces the copies it cached (the
-  Android app already evicts its image cache).
+- [x] **L7 follow-up - a browser's cache after a move in:** Mission Control asks the browser to
+  fetch a moved item's thumbnail and original again (`cache: "reload"`), which replaces the copies
+  it cached (the Android app already evicts its image cache).
 - [x] **L8** - removed the Locked Folder's `page.js` and `mobile/src/lockedFolder/`, Photo's
   Locked Folder tab and its own Lock move on both clients (2026-11-16). Turning biometric unlock
   on and off, which only the old Android screens did, moved to the app's unlock card.

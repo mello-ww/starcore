@@ -228,7 +228,7 @@ export function mount(context) {
         load: (route) => call(`${satelliteBase}/${route}`),
         runAction: (...args) => runAction(...args),
         // the secure action (1.2): once for a whole selection, and hidden where it can't run
-        runSecure: (action, items, scope) => runSecureAction(action, items, scope),
+        runSecure: (action, items, scope, imagesOf) => runSecureAction(action, items, scope, imagesOf),
         canRun: (action) => canRun(action),
         setNotice: (...args) => setNotice(...args),
         afterSelection: (then) => {
@@ -850,9 +850,17 @@ export function mount(context) {
         return result.uploaded.length > 0;
     }
 
+    /** What left the page is no longer served, so ask the browser to fetch each image again: that
+     * replaces the copy it cached (a week, as served) with the answer for an item that's gone. */
+    function refreshImages(urls) {
+        for (const url of new Set(urls)) {
+            fetch(url, { cache: "reload", credentials: "same-origin" }).catch(() => {});
+        }
+    }
+
     /** The secure action (1.2) on `items` - one request and one prompt for all of them. True once
      * something was done. A partial result is reported as partial, never as done. */
-    async function runSecureAction(action, items, scope) {
+    async function runSecureAction(action, items, scope, imagesOf) {
         const provider = secureProvider(action, state.catalog && state.catalog.capabilities, satelliteName);
         if (!provider) {
             setNotice("That isn't available on this server.", "error");
@@ -877,6 +885,10 @@ export function mount(context) {
         }
         setNotice(result.text, result.outcome === "done" ? "info" : "error");
         if (result.moved.length) {
+            if (imagesOf) {
+                const movedIds = new Set(result.moved.map((item) => String(item && item.id)));
+                refreshImages(items.filter((item, at) => movedIds.has(String(ids[at]))).flatMap((item) => imagesOf(item)));
+            }
             if (action.then === "back") {
                 goBack();
             } else {
