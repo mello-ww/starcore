@@ -265,36 +265,6 @@ h3 {
     color: var(--alert);
 }
 
-/* asteroid belt dividing the Core from its satellites */
-.belt {
-    display: block;
-    width: 100%;
-    height: 24px;
-    margin: 0.8rem 0 0.7rem;
-    color: var(--azure);
-    opacity: 0.7;
-}
-
-.belt-rocks {
-    animation: drift 90s ease-in-out infinite alternate;
-}
-
-@keyframes drift {
-    from { transform: translateX(0); }
-    to { transform: translateX(-42px); }
-}
-
-/* a few of the rocks catch the light now and then - only a handful (not the
-   whole belt), each on its own delay so they never sparkle in unison */
-.belt-twinkle {
-    animation: belt-twinkle 6s ease-in-out infinite;
-}
-
-@keyframes belt-twinkle {
-    0%, 100% { opacity: 0.35; }
-    50% { opacity: 1; }
-}
-
 .satellite-nav {
     flex: 1;
     min-height: 0;
