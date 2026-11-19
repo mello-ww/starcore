@@ -23,6 +23,7 @@ import {RevealSecret, SecretPrompt} from '../satellites/ui/SecretPrompt';
 import {askSecrets, bodyWithSecrets, revealFrom, type SecretAsk} from '../satellites/ui/secrets';
 import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
 import {hasPagedList, VirtualListPage} from '../satellites/ui/VirtualListPage';
+import {mergeItem} from '../satellites/ui/rows';
 import {DEDICATED_SCREENS, opensSharedInterface, ownScreen} from './HomeScreen';
 import {uiPreferences} from '../satellites/ui/preferences';
 import {
@@ -56,6 +57,7 @@ import {TOUCH_TARGET, tokens, useAccent} from '../theme';
 import type {SatellitesStackParamList} from '../navigation/MainTabs';
 import {FloatingPlayerSpacer, useFloatingPlayerInset} from '../components/FloatingPlayerInset';
 import {useOptionalAudioHost} from '../media/AudioHost';
+import type {PagedPlay} from '../media/handover';
 
 const {palette, radii, space, type} = tokens;
 
@@ -619,7 +621,12 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   );
 
   const runAction = useCallback(
-    async (action: UiAction | undefined, scope: Scope, value?: unknown, options?: {quiet?: boolean}): Promise<boolean> => {
+    async (
+      action: UiAction | undefined,
+      scope: Scope,
+      value?: unknown,
+      options?: {quiet?: boolean; update?: () => void},
+    ): Promise<boolean> => {
       const quiet = Boolean(options?.quiet);
       if (!action) {
         return false;
@@ -754,6 +761,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           }
           // the Satellite's own tracks: listed in the page, or what one of its routes answers
           let tracks: unknown;
+          let page: PagedPlay | null = null;
           // a route's answer may name what it plays from (a radio station's context)
           let context: unknown = play.context === undefined ? undefined : resolve(play.context, scoped);
           if (play.route) {
@@ -766,6 +774,19 @@ export function SatelliteUiScreen({route, navigation}: Props) {
             if (play.context === undefined && typeof answer?.context === 'string') {
               context = answer.context;
             }
+            // a long list answers page by page: the host asks the same route for more (cursor=,
+            // or positions= to shuffle) as the queue runs low
+            const joiner = route.includes('?') ? '&' : '?';
+            page = {
+              answer,
+              load: params =>
+                api.read(
+                  name,
+                  `${route}${joiner}${Object.entries(params)
+                    .map(([key, value]) => `${key}=${encodeURIComponent(String(value))}`)
+                    .join('&')}`,
+                ),
+            };
           } else {
             tracks = resolve(play.tracks, scoped);
           }
@@ -774,6 +795,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
             shuffle: play.shuffle === true,
             queue: play.queue,
             context,
+            page,
           });
           showToast(taken ? null : 'There is nothing to play here.', !taken);
           return taken > 0;
@@ -889,6 +911,14 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         go(then.navigate, resolve(then.params ?? {}, {...scoped, data: result ?? {}}));
       } else if (then === 'refresh') {
         loadData();
+      } else if (then === 'update' && mergeItem(scope.data, result)) {
+        // 1.2: the answer's item merged into its own row, which redraws in place - the list keeps
+        // its pages and its scroll position
+        if (options?.update) {
+          options.update();
+        } else {
+          setData((current: any) => (current && typeof current === 'object' ? {...current} : current));
+        }
       }
       return true;
     },
@@ -1014,6 +1044,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     setOverlay,
     confirm: confirmAction,
     afterSelection,
+    satellite: name,
     hasOwnScreens: Boolean(DEDICATED_SCREENS[name]),
     canRun,
     runSecure: runSecureAction,
@@ -1106,6 +1137,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       ? blocks.findIndex(
           block =>
             block?.type === 'media-grid' &&
+            block.layout !== 'row' &&
             !(block.developer && !developer) &&
             (!('visible' in block) || isVisible(resolve(block.visible, scope))),
         )

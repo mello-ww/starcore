@@ -217,7 +217,7 @@ class Player {
         session.toast(list.length === 1 ? `"${list[0].title}" plays next` : `${list.length} tracks play next`);
     }
 
-    addToQueue(tracks) {
+    addToQueue(tracks, { quiet = false } = {}) {
         const list = (Array.isArray(tracks) ? tracks : [tracks]).filter((track) => track && !track.missing);
         if (this.remote) {
             return this.remoteCommand("add_queue", { tracks: list.map((track) => track.id) });
@@ -230,6 +230,9 @@ class Player {
             this.original.push(...list);
         }
         this.changed();
+        if (quiet) {
+            return;  // a long list's next page, fed as it plays
+        }
         session.toast(list.length === 1 ? `Added "${list[0].title}" to the queue` : `Added ${list.length} tracks to the queue`);
     }
 

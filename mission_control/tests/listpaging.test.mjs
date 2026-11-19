@@ -113,3 +113,43 @@ test("a page route outside the Satellite is never asked for", async () => {
     assert.equal(server.asked.length, 0);
     assert.match(paging.status(outside).error, /outside/);
 });
+
+const tracks = {
+    type: "media-list", items: "$.tracks", item: { title: "$.title", key: "$.id" },
+    more: { route: "library?tab=liked&cursor={$value}", cursor: "$.cursor" },
+};
+
+test("a row with a key is the same row however it changed: a page that repeats it adds nothing", async () => {
+    const server = pages([{ tracks: [{ id: "t2", title: "Two", liked: true }, { id: "t3", title: "Three" }], cursor: null }]);
+    const paging = createListPaging(server);
+    const first = scope({ tracks: [{ id: "t1", title: "One" }, { id: "t2", title: "Two", liked: false }], cursor: "2" });
+    paging.rows(tracks, first);
+    const added = await paging.loadMore(tracks);
+    assert.deepEqual(added.map((row) => row.id), ["t3"]);
+    assert.deepEqual(paging.rows(tracks, first).map((row) => row.id), ["t1", "t2", "t3"]);
+});
+
+test("back to a page: its loaded pages are there at once, and fresh data keeps them", async () => {
+    const server = pages([
+        { tracks: [{ id: "t3" }, { id: "t4" }], cursor: "4" },
+        { tracks: [{ id: "t5" }], cursor: null },
+    ]);
+    const paging = createListPaging(server);
+    const data = { tracks: [{ id: "t1" }, { id: "t2" }], cursor: "2" };
+    paging.rows(tracks, scope(data));
+    await paging.loadMore(tracks);
+    const kept = paging.snapshot();
+
+    paging.reset();  // another page was opened meanwhile
+    paging.restore(kept);
+    assert.deepEqual(paging.rows(tracks, scope(data)).map((row) => row.id), ["t1", "t2", "t3", "t4"]);
+    assert.equal(paging.status(tracks).restoring, false, "nothing to load back");
+
+    // the page data arrives again: its first page is the fresh one (t2 went), the rest stays
+    const fresh = { tracks: [{ id: "t1" }, { id: "t3" }], cursor: "2" };
+    assert.deepEqual(paging.rows(tracks, scope(fresh)).map((row) => row.id), ["t1", "t3", "t4"]);
+    assert.equal(server.asked.length, 1);
+    // and the next page follows on from where the person was
+    assert.deepEqual((await paging.loadMore(tracks)).map((row) => row.id), ["t5"]);
+    assert.equal(server.asked[1], "library?tab=liked&cursor=4");
+});

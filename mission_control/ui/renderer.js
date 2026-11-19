@@ -19,11 +19,13 @@ import { createGallery, holdsCollection } from "./gallery.js";
 import { createListPaging } from "./listpaging.js";
 import { icon } from "./icons.js";
 import { createMaps } from "./map.js";
+import { closeMenu, openMenu } from "./menu.js";
 import { pickMedia } from "./picker.js";
 import { askSecrets, bodyWithSecrets, promptSecret, revealFrom, showRevealed } from "./secrets.js";
 import { promptPin, runSecure, secureProvider } from "./secure.js";
 import { chooseFiles, runUploads, sendFile, uploadReport } from "./upload.js";
 import { createVaultGate, protectedProvider } from "./vault.js";
+import { createEntries, groupOf as rowGroup, isPlayingRow, mergeItem, rowMenu, rowQuick } from "./rows.js";
 
 const STYLESHEET = "/ui/ui.css";
 const TONE_LEVEL = { warn: "warning", danger: "critical" };
@@ -227,6 +229,8 @@ export function mount(context) {
         // a grid's next page (`more`), from the Satellite's own route, with this session
         load: (route) => call(`${satelliteBase}/${route}`),
         runAction: (...args) => runAction(...args),
+        // a tile's menu (1.2 `menu`), beside the tile or where it was right-clicked
+        openMenu: (block, item, scope, at) => showRowMenu(block, item, scope, null, at),
         // the secure action (1.2): once for a whole selection, and hidden where it can't run
         runSecure: (action, items, scope, imagesOf) => runSecureAction(action, items, scope, imagesOf),
         canRun: (action) => canRun(action),
@@ -247,6 +251,78 @@ export function mount(context) {
     const listPaging = createListPaging({ load: (route) => call(`${satelliteBase}/${route}`) });
     let listViews = new WeakMap();
     const listObservers = new Set();
+
+    // what each history entry of this interface left behind (its data, its lists' pages, its
+    // scroll position), so Back draws it again as it was - never for a protected document
+    const entries = createEntries();
+    const ENTRY = "starcore.uiEntry";
+    let entryId = null;
+
+    function historyEntry() {
+        const held = history.state && history.state[ENTRY];
+        if (typeof held === "string" && held) {
+            return held;
+        }
+        const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        try {
+            history.replaceState({ ...(history.state || {}), [ENTRY]: id }, "", location.href);
+        } catch {
+            // without history state this entry starts afresh when it is come back to
+        }
+        return id;
+    }
+
+    function scroller() {
+        for (let parent = root.parentElement; parent; parent = parent.parentElement) {
+            const overflow = getComputedStyle(parent).overflowY;
+            if (overflow === "auto" || overflow === "scroll") {
+                return parent;
+            }
+        }
+        return document.scrollingElement || document.documentElement;
+    }
+
+    function leaveEntry() {
+        if (!entryId || !state.page || !state.data || state.dataError || isProtected()) {
+            return;
+        }
+        entries.save(entryId, {
+            page: state.page,
+            params: state.params,
+            pageState: state.pageState,
+            data: state.data,
+            sources: state.sources,
+            lists: listPaging.snapshot(),
+            scroll: scroller().scrollTop,
+        });
+    }
+
+    // the track playing now, when it is one of this Satellite's (`item.audio`, 1.2): its rows
+    // are marked as the host moves on
+    const playing = { id: null, off: null };
+
+    function watchPlaying() {
+        if (playing.off) {
+            return;
+        }
+        playing.off = () => {};
+        import("/media/host.js").then((host) => {
+            if (state.disposed || typeof host.nowPlaying !== "function") {
+                return;
+            }
+            playing.off = host.nowPlaying(satelliteName, (id) => {
+                playing.id = id;
+                for (const row of root.querySelectorAll(".ui-media-row[data-audio]")) {
+                    const now = row.dataset.audio === id;
+                    row.classList.toggle("is-playing", now);
+                    const title = row.querySelector(".ui-list-title");
+                    if (title) {
+                        title.toggleAttribute("aria-current", now);
+                    }
+                }
+            });
+        }).catch(() => {});
+    }
 
     function resetLists() {
         listPaging.reset();
@@ -306,13 +382,13 @@ export function mount(context) {
 
     /** A list with `more` (1.2): its rows, then a footer that loads the next page - by itself as
      * it comes near the screen, or with "Show more" - says "Loading…", or offers "Try again". */
-    function pagedList(block, scope, list) {
+    function pagedList(block, scope, list, append) {
         const wrapper = el("div", "ui-list-paged");
         const sentinel = el("div", "ui-list-more");
         sentinel.setAttribute("aria-hidden", "true");
         const footer = el("div", "ui-list-footer");
         wrapper.append(list, sentinel, footer);
-        const view = { list, wrapper, footer, sentinel, scope };
+        const view = { list, wrapper, footer, sentinel, scope, append };
         listViews.set(block, view);
 
         const near = () => typeof window !== "undefined" && view.wrapper.isConnected
@@ -347,7 +423,7 @@ export function mount(context) {
                     return;
                 }
                 for (const item of added) {
-                    current.list.appendChild(listRow(block, item, current.scope));
+                    current.append(current.list, item, current.scope);
                 }
                 current.draw();
                 const status = listPaging.status(block);
@@ -452,6 +528,8 @@ export function mount(context) {
             return;
         }
         if (target !== state.page || JSON.stringify(params) !== JSON.stringify(state.params)) {
+            leaveEntry();
+            closeMenu();
             state.page = target;
             state.params = params;
             state.pageState = { ...(pageDefinition().state || {}) };
@@ -472,6 +550,24 @@ export function mount(context) {
             }
             state.charts.forEach((chart) => chart.destroy());
             state.charts.clear();
+            entryId = historyEntry();
+            const kept = isProtected() ? null : entries.get(entryId);
+            if (kept && kept.page === target && JSON.stringify(kept.params) === JSON.stringify(params)) {
+                // Back (or Forward) to an entry left earlier: drawn at once as it was, where it
+                // was, then refreshed in place
+                state.pageState = kept.pageState;
+                state.data = kept.data;
+                state.sources = kept.sources;
+                state.lastGood = Date.now();
+                listPaging.restore(kept.lists);
+                render();
+                scroller().scrollTop = kept.scroll;
+                loadData({ background: true });
+                for (const name of Object.keys(pageDefinition().sources || {})) {
+                    loadNamed(name);
+                }
+                return;
+            }
             loadPage();
         }
     }
@@ -652,7 +748,7 @@ export function mount(context) {
 
     /** Runs one action; true once its request (if any) succeeded. `quiet` (one item of a
      * selection) leaves notices and refreshing to the caller. */
-    async function runAction(action, scope, value, { quiet = false } = {}) {
+    async function runAction(action, scope, value, { quiet = false, update = null } = {}) {
         if (!action) {
             return false;
         }
@@ -730,6 +826,7 @@ export function mount(context) {
                     return found > 0;
                 }
                 let tracks;
+                let page = null;
                 // a route's answer may name what it plays from (a radio station's context)
                 let context = play.context !== undefined ? resolve(play.context, bindings) : null;
                 if (play.route !== undefined) {
@@ -743,6 +840,13 @@ export function mount(context) {
                     if (play.context === undefined && answer && typeof answer.context === "string") {
                         context = answer.context;
                     }
+                    // a long list answers page by page: the host asks the same route for more
+                    // (cursor=, or positions= to shuffle) as the queue runs low
+                    const joiner = route.includes("?") ? "&" : "?";
+                    page = {
+                        answer,
+                        load: (params) => requestJson(`${satelliteBase}/${route}${joiner}${new URLSearchParams(params)}`),
+                    };
                 } else {
                     tracks = resolve(play.tracks, bindings);
                 }
@@ -751,6 +855,7 @@ export function mount(context) {
                     shuffle: play.shuffle === true,
                     queue: play.queue,
                     context,
+                    page,
                 });
                 setNotice(played ? null : "There is nothing to play here.", played ? "info" : "error");
                 return played > 0;
@@ -840,6 +945,9 @@ export function mount(context) {
             navigate(then.navigate, resolve(then.params || {}, { ...bindings, data: result || {} }));
         } else if (then === "refresh") {
             loadData({ background: false });
+        } else if (then === "update" && mergeItem(scope.data, result)) {
+            // 1.2: the answer's item is merged into the row it ran from, which is drawn again
+            (update || render)();
         }
         return true;
     }
@@ -1022,6 +1130,121 @@ export function mount(context) {
         return frame;
     }
 
+    /** One media-list row (1.2): what it opens, then its quick buttons and its More button. A
+     * row's own actions are buttons beside the row's, never inside it. */
+    function mediaRow(block, item, scope) {
+        const itemScope = { ...scope, data: item };
+        const formats = block.item.format || {};
+        const quick = rowQuick(block, itemScope, canRun);
+        const menu = rowMenu(block, itemScope, canRun);
+        const row = el("div", `ui-list-row ui-media-row${block.action ? " is-action" : ""}`);
+        const open = el(block.action ? "button" : "div", "ui-media-row-open");
+        if (block.action) {
+            open.type = "button";
+            open.addEventListener("click", () => runAction(block.action, itemScope));
+        }
+        if (block.item.image !== undefined) {
+            open.appendChild(mediaFrame(block.item.image, itemScope, "ui-media-thumb", ""));
+        }
+        const main = el("span", "ui-list-main");
+        const title = text(block.item.title, itemScope);
+        main.appendChild(el("span", "ui-list-title", title));
+        if (block.item.subtitle !== undefined) {
+            const subtitle = resolve(block.item.subtitle, itemScope);
+            if (subtitle !== null && subtitle !== undefined && subtitle !== "") {
+                main.appendChild(el("span", "ui-list-subtitle", formatValue(subtitle, formats.subtitle)));
+            }
+        }
+        open.appendChild(main);
+        if (block.item.meta !== undefined) {
+            const meta = resolve(block.item.meta, itemScope);
+            if (meta !== null && meta !== undefined && meta !== "") {
+                open.appendChild(el("span", "ui-list-value", formatValue(meta, formats.meta)));
+            }
+        }
+        if (block.action && !quick.length && !block.menu) {
+            open.appendChild(el("span", "ui-list-chevron", "›"));
+        }
+        row.appendChild(open);
+        if (block.item.audio !== undefined) {
+            const id = resolve(block.item.audio, itemScope);
+            if (id !== null && id !== undefined && id !== "") {
+                row.dataset.audio = String(id);
+                if (isPlayingRow(block, itemScope, playing.id)) {
+                    row.classList.add("is-playing");
+                    main.firstChild.setAttribute("aria-current", "true");
+                }
+            }
+        }
+        quick.forEach((entry, index) => {
+            const label = text(entry.label, itemScope);
+            const button = el("button", `sc-icon-button sc-icon-button-quiet ui-row-quick${entry.style === "primary" ? " is-active" : ""}`);
+            button.type = "button";
+            button.dataset.index = String(index);
+            button.setAttribute("aria-label", label);
+            button.title = label;
+            const glyph = icon(entry.icon, 18, ownIcons());
+            if (glyph) {
+                button.appendChild(glyph);
+            }
+            button.addEventListener("click", () => runRowAction(entry, block, item, scope, row, `.ui-row-quick[data-index="${index}"]`));
+            row.appendChild(button);
+        });
+        if (menu.length) {
+            const more = el("button", "sc-icon-button sc-icon-button-quiet ui-row-more", "⋯");
+            more.type = "button";
+            more.setAttribute("aria-haspopup", "menu");
+            more.setAttribute("aria-label", `More for ${title}`);
+            more.title = "More";
+            more.addEventListener("click", () => showRowMenu(block, item, scope, row, more));
+            row.appendChild(more);
+            row.addEventListener("contextmenu", (event) => {
+                event.preventDefault();
+                showRowMenu(block, item, scope, row, { x: event.clientX, y: event.clientY });
+            });
+            row.addEventListener("keydown", (event) => {
+                if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+                    event.preventDefault();
+                    showRowMenu(block, item, scope, row, more);
+                }
+            });
+        }
+        return row;
+    }
+
+    /** Runs one of a row's own actions; `then: "update"` draws that row again in place (and
+     * keeps the focus on the control that ran it), or the whole page for a tile. */
+    function runRowAction(entry, block, item, scope, row, control = null) {
+        const itemScope = { ...scope, data: item };
+        const update = row && block.type === "media-list" ? () => {
+            if (!row.isConnected) {
+                render();
+                return;
+            }
+            const focused = control && row.contains(document.activeElement);
+            const fresh = mediaRow(block, item, scope);
+            row.replaceWith(fresh);
+            const again = focused ? fresh.querySelector(control) : null;
+            if (again) {
+                again.focus({ preventScroll: true });
+            }
+        } : null;
+        return runAction(entry.action, itemScope, undefined, { update });
+    }
+
+    /** A row's or a tile's menu: what this client can run, beside `at` (an element, or where it
+     * was right-clicked). Nothing opens when every entry is left out. */
+    function showRowMenu(block, item, scope, row, at) {
+        const itemScope = { ...scope, data: item };
+        const entries = rowMenu(block, itemScope, canRun).map((entry) => ({
+            label: text(entry.label, itemScope),
+            glyph: entry.icon !== undefined ? icon(entry.icon, 16, ownIcons()) : null,
+            danger: entry.style === "danger",
+            run: () => runRowAction(entry, block, item, scope, row),
+        }));
+        openMenu(entries, at, { back: document.activeElement, label: block.item.title !== undefined ? text(block.item.title, itemScope) : "Actions" });
+    }
+
     function renderBlock(block, scope) {
         if (!block || typeof block !== "object") {
             return null;
@@ -1085,7 +1308,7 @@ export function mount(context) {
             for (const item of items) {
                 list.appendChild(listRow(block, item, scope));
             }
-            return block.more ? pagedList(block, scope, list) : list;
+            return block.more ? pagedList(block, scope, list, (target, item, at) => target.appendChild(listRow(block, item, at))) : list;
         },
 
         // The way down to the current place on one row: every entry but the last runs the
@@ -1179,44 +1402,35 @@ export function mount(context) {
         },
 
         "media-list": (block, scope) => {
-            const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
+            const items = listPaging.rows(block, scope);
             const list = el("div", `ui-list ui-media-list ui-media-${block.size || "small"} ui-shape-${block.shape || "square"}`);
-            if (!Array.isArray(items) || items.length === 0) {
+            const paging = block.more ? listPaging.status(block) : null;
+            if (items.length === 0 && !(paging && (paging.more || paging.error))) {
                 list.appendChild(el("p", "ui-text ui-text-caption", block.empty ? text(block.empty, scope) : "Nothing here."));
                 return list;
             }
-            const formats = (block.item && block.item.format) || {};
-            for (const item of items) {
-                const itemScope = { ...scope, data: item };
-                const row = el(block.action ? "button" : "div", "ui-list-row ui-media-row");
-                if (block.action) {
-                    row.type = "button";
-                    row.addEventListener("click", () => runAction(block.action, itemScope));
-                }
-                if (block.item.image !== undefined) {
-                    row.appendChild(mediaFrame(block.item.image, itemScope, "ui-media-thumb", ""));
-                }
-                const main = el("span", "ui-list-main");
-                main.appendChild(el("span", "ui-list-title", text(block.item.title, itemScope)));
-                if (block.item.subtitle !== undefined) {
-                    const subtitle = resolve(block.item.subtitle, itemScope);
-                    if (subtitle !== null && subtitle !== undefined && subtitle !== "") {
-                        main.appendChild(el("span", "ui-list-subtitle", formatValue(subtitle, formats.subtitle)));
-                    }
-                }
-                row.appendChild(main);
-                if (block.item.meta !== undefined) {
-                    const meta = resolve(block.item.meta, itemScope);
-                    if (meta !== null && meta !== undefined && meta !== "") {
-                        row.appendChild(el("span", "ui-list-value", formatValue(meta, formats.meta)));
-                    }
-                }
-                if (block.action) {
-                    row.appendChild(el("span", "ui-list-chevron", "›"));
-                }
-                list.appendChild(row);
+            if (block.item.audio !== undefined) {
+                watchPlaying();
             }
-            return list;
+            // a group's heading goes before its first row, also when that row came with a page
+            const groups = { label: undefined };
+            const append = (target, item, at) => {
+                if (block.item.group !== undefined) {
+                    const formats = block.item.format || {};
+                    const label = rowGroup(block, { ...at, data: item }, (value) => formatValue(value, formats.group));
+                    if (label !== groups.label) {
+                        groups.label = label;
+                        if (label) {
+                            target.appendChild(el("h3", "ui-media-group ui-list-group", label));
+                        }
+                    }
+                }
+                target.appendChild(mediaRow(block, item, at));
+            };
+            for (const item of items) {
+                append(list, item, scope);
+            }
+            return block.more ? pagedList(block, scope, list, append) : list;
         },
 
         button: (block, scope) => {
@@ -1952,6 +2166,7 @@ export function mount(context) {
         state.params = {};
         state.pageState = {};
         state.data = null;
+        entries.clear();
         state.dataError = null;
         state.lastGood = 0;
         state.sources = {};
@@ -2120,6 +2335,10 @@ export function mount(context) {
         noticeSlot.remove();
         gallery.dispose();
         maps.reset();
+        closeMenu();
+        if (playing.off) {
+            playing.off();
+        }
     };
     cleanup.showSection = showSection;
     cleanup.revision = () => state.revision;

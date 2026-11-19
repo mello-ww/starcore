@@ -128,7 +128,8 @@ export function clock(seconds) {
 }
 
 /**
- * host: {satelliteBase, runAction(action, scope), afterSelection(then), setNotice(text, kind),
+ * host: {satelliteBase, runAction(action, scope), openMenu(block, item, scope, at) (a tile's
+ * `menu`), afterSelection(then), setNotice(text, kind),
  * load(route) -> Promise<data> (a page of a grid's `more`, from the Satellite's own route)},
  * and for the media picker `picking: {multiple, onChange(selectedItems)}`: every tile then
  * selects (one at a time unless `multiple`), and the picker draws its own bar.
@@ -337,7 +338,7 @@ export function createGallery(host) {
 
         // the person's own choice of size, remembered per Satellite and grid (not in the picker,
         // nor for a `full` grid of one column)
-        const resizable = !picking && block.size !== "full";
+        const resizable = !picking && block.size !== "full" && block.layout !== "row";
         if (resizable && grid.size === undefined) {
             grid.size = host.preferences ? host.preferences.get(gridSizeKey(block)) : null;
         }
@@ -351,6 +352,9 @@ export function createGallery(host) {
         }
         grid.resizable = resizable;
         grid.wrapper = wrapper;
+        if (block.layout === "row") {
+            return shelf(block, grid, wrapper, items);
+        }
         if (block.selection && !picking) {
             grid.bar = el("div", "ui-media-selection");
             wrapper.appendChild(grid.bar);
@@ -392,11 +396,48 @@ export function createGallery(host) {
         return wrapper;
     }
 
+    /** A shelf (`layout: "row"`, 1.2): one row of tiles that scrolls sideways, snapping to a
+     * tile, with Previous and Next beside it for a pointer; nothing to page or select. */
+    function shelf(block, grid, wrapper, items) {
+        wrapper.classList.add("ui-media-shelf");
+        grid.dom?.observer?.disconnect();
+        grid.dom = null;
+        const track = el("div", "ui-media-shelf-track");
+        // one run of tiles: no groups, no chunks
+        const groups = { label: undefined, cells: track, count: Number.NEGATIVE_INFINITY };
+        items.forEach((item, index) => appendTile(block, grid, index, track, groups));
+        grid.shown = items.length;
+        const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const step = (direction, name, label) => {
+            const button = el("button", `sc-icon-button ui-media-shelf-step ui-media-shelf-${name}`);
+            button.type = "button";
+            button.setAttribute("aria-label", label);
+            button.title = label;
+            button.appendChild(glyph(direction < 0 ? "chevron-left" : "chevron-right", 18));
+            button.addEventListener("click", () => {
+                track.scrollBy({ left: direction * Math.max(1, track.clientWidth * 0.85), behavior: reduced ? "auto" : "smooth" });
+            });
+            return button;
+        };
+        const previous = step(-1, "previous", "Previous");
+        const next = step(1, "next", "Next");
+        const ends = () => {
+            previous.disabled = track.scrollLeft <= 1;
+            next.disabled = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
+        };
+        track.addEventListener("scroll", ends, { passive: true });
+        if (typeof requestAnimationFrame === "function") {
+            requestAnimationFrame(ends);
+        }
+        wrapper.append(track, previous, next);
+        return wrapper;
+    }
+
     function appendTile(block, grid, index, body, groups) {
         const item = grid.items[index];
         const itemScope = { ...grid.scope, data: item };
         const formats = (block.item && block.item.format) || {};
-        if (block.item.group !== undefined) {
+        if (block.item.group !== undefined && block.layout !== "row") {
             const raw = resolve(block.item.group, itemScope);
             const label = raw === null || raw === undefined || raw === "" ? "" : formatValue(raw, formats.group);
             if (label !== groups.label || !groups.cells) {
@@ -471,6 +512,39 @@ export function createGallery(host) {
                 }
             });
             thumb.appendChild(button);
+        }
+        const menu = picking || !block.menu || !host.openMenu ? null : (at) => host.openMenu(block, item, grid.scope, at);
+        if (menu) {
+            // a tile's menu (1.2): a More button in its corner, a right-click, or the keyboard's
+            // context-menu key - again a focusable span inside the tile's own button
+            const more = el("span", "ui-media-quick ui-media-tile-more", "⋯");
+            more.setAttribute("role", "button");
+            more.setAttribute("tabindex", "0");
+            more.setAttribute("aria-haspopup", "menu");
+            more.setAttribute("aria-label", label ? `More for ${label}` : "More");
+            more.title = "More";
+            const show = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                menu(more);
+            };
+            more.addEventListener("click", show);
+            more.addEventListener("keydown", (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    show(event);
+                }
+            });
+            thumb.appendChild(more);
+            tile.addEventListener("contextmenu", (event) => {
+                event.preventDefault();
+                menu({ x: event.clientX, y: event.clientY });
+            });
+            tile.addEventListener("keydown", (event) => {
+                if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+                    event.preventDefault();
+                    menu(more);
+                }
+            });
         }
         tile.appendChild(thumb);
         if (label || (subtitle !== null && subtitle !== undefined && subtitle !== "")) {

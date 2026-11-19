@@ -11,8 +11,14 @@ function nextCursor(value, previous) {
     return value === null || value === undefined || value === "" || value === previous ? null : value;
 }
 
-/** A row's identity, to never show one twice when a provider's pages overlap. */
-function rowKey(item) {
+/** A row's identity, to never show one twice when a provider's pages overlap: its `item.key`
+ * binding (1.2) when the block has one, so a row updated in place (`then: "update"`) is still the
+ * same row, else the whole row. */
+export function rowKey(block, item, scope) {
+    if (block && block.item && block.item.key !== undefined) {
+        const key = resolve(block.item.key, { ...scope, data: item });
+        return key === null || key === undefined || key === "" ? null : String(key);
+    }
     try {
         return JSON.stringify(item);
     } catch {
@@ -22,17 +28,17 @@ function rowKey(item) {
 
 /**
  * host: {load(route) -> Promise<data>} (a page from the Satellite's own route, with the session).
- * Returns {rows(block, scope), status(block), loadMore(block), reset()}.
+ * Returns {rows(block, scope), status(block), loadMore(block), reset(), snapshot(), restore()}.
  */
 export function createListPaging(host) {
-    let lists = new WeakMap();
+    let lists = new Map();
 
     function stateOf(block) {
         let list = lists.get(block);
         if (!list) {
             list = {
                 base: null, collection: null, extra: [], keys: new Set(), cursor: null,
-                scope: null, loading: null, error: null, token: 0, pages: 0, depth: 0,
+                scope: null, loading: null, error: null, token: 0, pages: 0, depth: 0, kept: false,
             };
             lists.set(block, list);
         }
@@ -44,11 +50,35 @@ export function createListPaging(host) {
     function adopt(block, list, base, scope) {
         const collection = resolveTemplate(block.more.route, { ...scope, value: "" });
         const same = collection === list.collection && list.base !== null;
+        const keyOf = (item) => rowKey(block, item, scope);
+        if (same && list.kept) {
+            // back on a page whose rows were kept (restore): its first page is the fresh one, the
+            // pages loaded after it stay where they are, so the place the person left is still there
+            list.kept = false;
+            list.base = base;
+            list.keys = new Set(base.map(keyOf).filter((key) => key !== null));
+            list.extra = list.extra.filter((item) => {
+                const key = keyOf(item);
+                if (key === null) {
+                    return true;
+                }
+                if (list.keys.has(key)) {
+                    return false;
+                }
+                list.keys.add(key);
+                return true;
+            });
+            list.token += 1;
+            list.loading = null;
+            list.error = null;
+            return;
+        }
+        list.kept = false;
         list.depth = same ? list.pages : 0;
         list.base = base;
         list.collection = collection;
         list.extra = [];
-        list.keys = new Set(base.map(rowKey).filter((key) => key !== null));
+        list.keys = new Set(base.map(keyOf).filter((key) => key !== null));
         list.pages = 0;
         list.token += 1;  // any page still on its way belongs to the old data
         list.loading = null;
@@ -106,7 +136,7 @@ export function createListPaging(host) {
                 const resolved = resolve(block.items, pageScope);
                 const added = [];
                 for (const item of Array.isArray(resolved) ? resolved : []) {
-                    const key = rowKey(item);
+                    const key = rowKey(block, item, list.scope);
                     if (key === null || !list.keys.has(key)) {
                         if (key !== null) {
                             list.keys.add(key);
@@ -131,8 +161,32 @@ export function createListPaging(host) {
     }
 
     function reset() {
-        lists = new WeakMap();
+        lists = new Map();
     }
 
-    return { rows, status, loadMore, reset };
+    /** What every list has loaded, to come back to (a history entry left): its rows, keys and
+     * cursor, without what is on its way. */
+    function snapshot() {
+        const kept = new Map();
+        for (const [block, list] of lists) {
+            if (list.base !== null) {
+                kept.set(block, {
+                    ...list, extra: list.extra.slice(), keys: new Set(list.keys),
+                    loading: null, error: null, depth: 0, kept: true,
+                });
+            }
+        }
+        return kept;
+    }
+
+    /** Back to a snapshot: the lists show what they had, and the page data that arrives next
+     * refreshes their first page without dropping the pages loaded after it. */
+    function restore(kept) {
+        lists = new Map();
+        for (const [block, list] of kept || []) {
+            lists.set(block, { ...list, extra: list.extra.slice(), keys: new Set(list.keys), token: list.token + 1 });
+        }
+    }
+
+    return { rows, status, loadMore, reset, snapshot, restore };
 }

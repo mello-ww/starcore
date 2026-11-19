@@ -219,6 +219,49 @@
                    ]}}}
     },
     {
+      "name": "track-rows",
+      "_why": "1.2: a long list of the Satellite's own tracks: rows page by page (more) kept by their key, in groups, a heart pair at each row's end (a toggle: each entry drawn while its visible holds, and the answer's item updates the row), a menu that plays, queues, opens and downloads, and the playing row marked (item.audio).",
+      "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.audio"], "capabilities": ["audio.library"]},
+                   "entry": "liked", "pages": {
+        "liked": {"source": {"route": "library?tab=liked"}, "blocks": [
+          {"type": "media-list", "items": "$.tracks", "size": "small", "empty": "No liked songs yet.",
+           "item": {"title": "$.title", "subtitle": "$.artist", "meta": "$.duration", "image": "artwork/{$.album_id}",
+                    "key": "$.id", "group": "$.disc", "audio": "$.id", "format": {"meta": "duration"}},
+           "more": {"route": "library?tab=liked&cursor={$value}", "cursor": "$.cursor"},
+           "action": {"play": {"route": "library/play?tab=liked&from={$.position}", "context": "liked"}},
+           "quick": [{"label": "Like", "icon": "heart", "visible": "$.not_liked",
+                      "action": {"route": "favorites", "body": {"kind": "track", "ids": ["$.id"], "liked": true}, "then": "update"}},
+                     {"label": "Unlike", "icon": "heart", "style": "primary", "visible": "$.liked",
+                      "action": {"route": "favorites", "body": {"kind": "track", "ids": ["$.id"], "liked": false}, "then": "update"}}],
+           "menu": [{"label": "Play next", "icon": "play", "action": {"play": {"tracks": ["$"], "queue": "next"}}},
+                    {"label": "Add to queue", "icon": "list", "action": {"play": {"tracks": ["$"], "queue": "end"}}},
+                    {"label": "Start radio", "action": {"play": {"route": "radio/track/{$.id}"}}},
+                    {"label": "Go to album", "visible": "$.album_id", "action": {"navigate": "album", "params": {"id": "$.album_id"}}},
+                    {"label": "Download", "icon": "download", "action": {"download": "tracks/{$.id}/file", "name": "$.title"}},
+                    {"label": "Remove", "icon": "trash-2", "style": "danger", "action": {"route": "remove", "body": {"id": "$.id"}, "confirm": "Remove it?", "then": "refresh"}}]}
+        ]},
+        "album": {"params": ["id"], "blocks": []}
+      }}
+    },
+    {
+      "name": "shelves",
+      "_why": "1.2: a media-grid with layout row is a shelf, one row that scrolls sideways; its tiles may play from their quick button and carry a menu.",
+      "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.audio"], "capabilities": ["audio.library"]},
+                   "entry": "home", "pages": {
+        "home": {"source": {"route": "home"}, "blocks": [
+          {"type": "heading", "text": "Recently added", "visible": "$.recent"},
+          {"type": "media-grid", "layout": "row", "size": "medium", "items": "$.recent", "visible": "$.recent",
+           "item": {"image": "artwork/{$.id}", "key": "$.id", "title": "$.album", "subtitle": "$.artist", "icon": "music"},
+           "action": {"navigate": "album", "params": {"id": "$.id"}},
+           "quick": [{"label": "Play", "icon": "play", "action": {"play": {"route": "albums/{$.id}"}}}],
+           "menu": [{"label": "Play next", "action": {"play": {"route": "albums/{$.id}", "queue": "next"}}},
+                    {"label": "Save", "icon": "heart", "visible": "$.not_liked", "action": {"route": "favorites", "body": {"kind": "album", "ids": ["$.id"], "liked": true}, "then": "update"}}]},
+          {"type": "media-grid", "layout": "grid", "items": "$.more", "item": {"image": "artwork/{$.id}"}}
+        ]},
+        "album": {"params": ["id"], "blocks": []}
+      }}
+    },
+    {
       "name": "smallest",
       "document": {"contract": "starcore.ui/1.0", "entry": "home", "pages": {"home": {"blocks": []}}}
     },
@@ -817,11 +860,96 @@
       "error": "unknown key"
     },
     {
-      "name": "play-in-quick",
+      "name": "play-in-selection",
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "media-grid", "items": "$.albums", "item": {"image": "artwork/{$.id}"},
-         "quick": [{"label": "Play", "icon": "play", "action": {"play": {"route": "albums/{$.id}"}}}]}]}}},
+         "selection": {"actions": [{"label": "Play", "action": {"play": {"route": "albums/{$.id}"}}}]}}]}}},
       "error": "not in a selection"
+    },
+    {
+      "name": "shelf-with-more",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "layout": "row", "items": "$.albums", "item": {"image": "artwork/{$.id}"},
+         "more": {"route": "albums?cursor={$value}", "cursor": "$.cursor"}}]}}},
+      "error": "no paging or selection"
+    },
+    {
+      "name": "shelf-with-selection",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "layout": "row", "items": "$.albums", "item": {"image": "artwork/{$.id}"},
+         "selection": {"actions": [{"label": "Delete", "action": {"route": "delete", "body": {"id": "$.id"}}}]}}]}}},
+      "error": "no paging or selection"
+    },
+    {
+      "name": "media-grid-unknown-layout",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "layout": "carousel", "items": [], "item": {"image": "t"}}]}}},
+      "error": "layout"
+    },
+    {
+      "name": "menu-too-long",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-list", "items": [], "item": {"title": "$.title"},
+         "menu": [{"label": "One", "action": {"route": "a"}}, {"label": "Two", "action": {"route": "a"}}, {"label": "Three", "action": {"route": "a"}},
+                  {"label": "Four", "action": {"route": "a"}}, {"label": "Five", "action": {"route": "a"}}, {"label": "Six", "action": {"route": "a"}},
+                  {"label": "Seven", "action": {"route": "a"}}, {"label": "Eight", "action": {"route": "a"}}, {"label": "Nine", "action": {"route": "a"}},
+                  {"label": "Ten", "action": {"route": "a"}}, {"label": "Eleven", "action": {"route": "a"}}]}]}}},
+      "error": "at most 10"
+    },
+    {
+      "name": "menu-empty",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-list", "items": [], "item": {"title": "$.title"}, "menu": []}]}}},
+      "error": "must be a list of {label, action}"
+    },
+    {
+      "name": "menu-entry-without-label",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-list", "items": [], "item": {"title": "$.title"}, "menu": [{"icon": "play", "action": {"route": "a"}}]}]}}},
+      "error": "needs a 'label'"
+    },
+    {
+      "name": "menu-secure",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-list", "items": [], "item": {"title": "$.title"},
+         "menu": [{"label": "Lock", "action": {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id"}}]}]}}},
+      "error": "secure"
+    },
+    {
+      "name": "media-list-quick-without-icon",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-list", "items": [], "item": {"title": "$.title"}, "quick": [{"label": "Like", "action": {"route": "like"}}]}]}}},
+      "error": "needs an 'icon'"
+    },
+    {
+      "name": "media-list-quick-download",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-list", "items": [], "item": {"title": "$.title"}, "quick": [{"label": "Download", "icon": "download", "action": {"download": "files/{$.id}"}}]}]}}},
+      "error": "one file at a time"
+    },
+    {
+      "name": "media-list-more-on-literal-items",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-list", "items": [{"title": "One"}], "item": {"title": "$.title"}, "more": {"route": "next?cursor={$value}", "cursor": "$.cursor"}}]}}},
+      "error": "needs `items` bound"
+    },
+    {
+      "name": "media-list-literal-audio",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-list", "items": "$.tracks", "item": {"title": "$.title", "audio": "track-1"}}]}}},
+      "error": "must bind a track id"
+    },
+    {
+      "name": "media-list-unknown-item-key",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-list", "items": "$.tracks", "item": {"title": "$.title", "badge": "$.quality"}}]}}},
+      "error": "unknown key"
+    },
+    {
+      "name": "update-outside-a-row",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "button", "label": "Like", "action": {"route": "favorites", "then": "update"}}]}}},
+      "error": "only in a media-list's or media-grid's quick and menu"
     },
     {"name": "not-an-object", "document": [], "error": "must be an object", "client": true},
     {"name": "no-contract", "document": {"entry": "home", "pages": {"home": {"blocks": []}}}, "error": "contract", "client": true},

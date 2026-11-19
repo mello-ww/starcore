@@ -6,6 +6,7 @@ import secrets
 
 from starcore.api.response import error_response, file_response
 
+from . import views
 from .history import year_now
 from .routes_catalog import mosaic_key
 from .routing import identifier, ok, route
@@ -22,15 +23,21 @@ def favorites(call):
         return ok(music.collection.favorites(call.user))
     kind = call.body.get("kind", "track")
     items = call.body.get("ids", call.body.get("id"))
-    return ok({"ids": music.collection.set_favorite(call.user, kind, items, bool(call.body.get("liked", True)))})
+    liked = bool(call.body.get("liked", True))
+    answer = {"ids": music.collection.set_favorite(call.user, kind, items, liked)}
+    if isinstance(items, str):
+        # one row's heart, which the shared interface turns over in place (`then: "update"`)
+        answer["item"] = {"liked": liked, "not_liked": not liked}
+    return ok(answer)
 
 
 @route("GET", "POST")
 def pins(call):
     music = call.music
     if call.method == "POST":
-        music.collection.set_pin(call.user, call.body.get("kind", ""), str(call.body.get("id", "")),
-                                 bool(call.body.get("pinned", True)))
+        pinned = bool(call.body.get("pinned", True))
+        music.collection.set_pin(call.user, call.body.get("kind", ""), str(call.body.get("id", "")), pinned)
+        return ok({"pins": music.collection.pins(call.user), "item": {"pinned": pinned, "not_pinned": not pinned}})
     return ok({"pins": music.collection.pins(call.user)})
 
 
@@ -67,6 +74,17 @@ def playlists(call):
         playlist = store.get(call.user, playlist_id)
         if playlist is None:
             return error_response(f"unknown playlist '{playlist_id}'")
+        liked = views.liked_tracks(music, call.user)
+        for position, entry in enumerate(playlist["tracks"]):
+            views.decorate(entry, liked, position)
+        playlist["pinned"] = ("playlist", playlist_id) in views.pinned_set(music, call.user)
+        playlist["not_pinned"] = not playlist["pinned"]
+        playlist["mosaic_key"] = mosaic_key(playlist.get("mosaic") or [])
+        playlist["line"] = " · ".join(part for part in (
+            views.songs(playlist["track_count"] - playlist["unavailable"]), views.length(playlist["duration"]),
+            f"{playlist['unavailable']} unavailable" if playlist["unavailable"] else "") if part)
+        # what the player says it plays from, as Music's own page names it
+        playlist["context"] = f"playlist:{playlist_id}"
         return ok(playlist)
 
     body = call.body
@@ -187,7 +205,11 @@ def home(call):
     music = call.music
     hour = call.query.get("hour")
     enabled = bool(music.preferences.get(call.user, "discovery_enabled"))
-    return ok(music.discovery.home(call.user, int(hour) if str(hour or "").isdigit() else None, enabled))
+    answer = music.discovery.home(call.user, int(hour) if str(hour or "").isdigit() else None, enabled)
+    if call.query.get("view") == "shelves":
+        # each section under its own key, for the shared interface
+        return ok(views.home(music, call.user, answer))
+    return ok(answer)
 
 
 @route("GET")
@@ -198,12 +220,24 @@ def mixes(call):
         for mix in listed:
             mix["mosaic_key"] = mosaic_key(mix.get("mosaic") or [])
         return ok({"mixes": listed})
-    mix = music.discovery.mix(call.user, str(call.segment(0))[:80])
+    mix_id = str(call.segment(0))[:80]
+    if mix_id.startswith("mood-"):
+        # a mood opens as a mix too, so a shelf of both opens each the same way
+        mood = _mood(call, mix_id[5:45])
+        if mood is None:
+            return error_response("unknown mix")
+        mood["id"] = mix_id
+        mood["description"] = ", ".join(mood.get("genres", [])[:3])
+        return ok(mood)
+    mix = music.discovery.mix(call.user, mix_id)
     if mix is None:
         return error_response("unknown mix")
     # what the player says it plays from, and the mix's picture, as Music's own page names them
     mix["context"] = f"mix:{mix['id']}"
     mix["mosaic_key"] = mosaic_key(mix.get("mosaic") or [])
+    liked = views.liked_tracks(music, call.user)
+    for position, track in enumerate(mix["tracks"]):
+        views.decorate(track, liked, position)
     return ok(mix)
 
 
@@ -219,6 +253,9 @@ def radio(call):
     if station is None:
         return error_response("nothing to build a radio station from")
     station["context"] = f"radio:{kind}-{item[:120]}"[:80]
+    liked = views.liked_tracks(call.music, call.user)
+    for position, track in enumerate(station["tracks"]):
+        views.decorate(track, liked, position)
     return ok(station)
 
 
@@ -227,15 +264,24 @@ def moods(call):
     music = call.music
     if not call.path:
         return ok({"moods": music.discovery.moods(music.discovery._signals(call.user))})
-    mood = music.discovery.mood(call.user, str(call.segment(0))[:40])
+    mood = _mood(call, str(call.segment(0))[:40])
+    return ok(mood) if mood is not None else error_response("unknown mood")
+
+
+def _mood(call, mood_id: str):
+    """A mood's tracks as rows, its picture and what the player says it plays from."""
+    mood = call.music.discovery.mood(call.user, mood_id)
     if mood is None:
-        return error_response("unknown mood")
+        return None
     mood["context"] = f"mix:mood-{mood['id']}"
     covers = list(dict.fromkeys(track["album_id"] for track in mood["tracks"]
                                 if track.get("album_id") and track.get("has_artwork")))
     mood["mosaic"] = covers[:4]
     mood["mosaic_key"] = mosaic_key(covers)
-    return ok(mood)
+    liked = views.liked_tracks(call.music, call.user)
+    for position, track in enumerate(mood["tracks"]):
+        views.decorate(track, liked, position)
+    return mood
 
 
 @route("GET")

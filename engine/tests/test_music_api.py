@@ -253,6 +253,163 @@ class SharedPagesTest(MusicApiCase):
         mix = self.call(f"mixes/{mixes[0]['id']}")[1]
         self.assertEqual(mix["context"], f"mix:{mixes[0]['id']}")
 
+    def test_your_library_answers_only_the_selected_tab_filtered_on_the_server(self):
+        tracks = self.fill()
+        one, three = tracks["One"], tracks["Three"]
+        self.call("favorites", {"kind": "track", "ids": [one["id"], three["id"]], "liked": True})
+
+        liked = self.call("library?tab=liked")[1]
+        self.assertEqual(liked["tab"], "liked")
+        self.assertTrue(liked["showing"]["liked"])
+        self.assertFalse(liked["showing"]["albums"])
+        self.assertNotIn("albums", liked)
+        self.assertEqual(liked["count"], 2)
+        self.assertEqual(liked["context"], "liked:all")
+        self.assertEqual(liked["summary"], "2 songs")
+        rows = {row["title"]: row for row in liked["tracks"]}
+        self.assertEqual(set(rows), {"One", "Three"})
+        self.assertTrue(rows["One"]["liked"])
+        self.assertFalse(rows["One"]["not_liked"])
+        self.assertEqual(rows["One"]["badge"], "Lossless")
+        self.assertEqual(rows["One"]["line"], "Lossless · Lumen")
+        self.assertEqual(rows["Three"]["badge"], "")
+        self.assertEqual(rows["Three"]["line"], "Tidal")
+        self.assertEqual(sorted(row["position"] for row in liked["tracks"]), [0, 1])
+        self.assertNotIn("replaygain", rows["One"])
+        by_title = self.call("library?tab=liked&sort=title")[1]["tracks"]
+        self.assertEqual([row["title"] for row in by_title], ["One", "Three"])
+        self.assertEqual([row["title"] for row in self.call("library?tab=liked&q=tid")[1]["tracks"]], ["Three"])
+
+        albums = self.call("library?tab=albums&sort=name")[1]
+        self.assertEqual(albums["count"], 2)
+        self.assertNotIn("tracks", albums)
+        first = next(album for album in albums["albums"] if album["album"] == "First")
+        self.assertTrue(first["not_liked"])
+        self.assertTrue(first["not_pinned"])
+        self.assertEqual(self.call("library?tab=albums&q=first")[1]["count"], 1)
+        self.assertEqual(self.call("library?tab=albums&type=compilation")[1]["count"], 0)
+        self.call("pins", {"kind": "album", "id": first["id"], "pinned": True})
+        pinned = self.call("library?tab=albums&sort=name")[1]["albums"]
+        self.assertEqual(pinned[0]["id"], first["id"])
+        self.assertTrue(pinned[0]["pinned"])
+
+        self.assertEqual(self.call("library?tab=artists&filter=followed")[1]["count"], 0)
+        self.call("favorites", {"kind": "artist", "id": one["artist_id"], "liked": True})
+        followed = self.call("library?tab=artists&filter=followed")[1]["artists"]
+        self.assertEqual([artist["name"] for artist in followed], ["Lumen"])
+        self.assertTrue(followed[0]["liked"])
+        self.assertEqual(self.call("library?tab=artists")[1]["count"], 2)
+
+        self.call("playlists", {"name": "Loose"})
+        filed = self.call("playlists", {"name": "Filed", "folder": "Evening", "tracks": [one["id"]]})[1]
+        top = self.call("playlists", {"name": "Top"})[1]
+        self.call("pins", {"kind": "playlist", "id": top["id"], "pinned": True})
+        playlists = self.call("library?tab=playlists")[1]["playlists"]
+        self.assertEqual([(row["name"], row["group"]) for row in playlists],
+                         [("Top", "Pinned"), ("Loose", "Playlists"), ("Filed", "Evening")])
+        self.assertEqual(next(row for row in playlists if row["id"] == filed["id"])["line"], "1 song · 3 min")
+
+        self.call("history", {"track_id": three["id"], "seconds": 200})
+        recent = self.call("library?tab=recent")[1]
+        self.assertEqual([row["title"] for row in recent["tracks"]], ["Three"])
+        self.assertEqual(recent["context"], "library:recent")
+        self.assertEqual([source["index"] for source in self.call("library?tab=folders")[1]["sources"]], [0])
+        self.assertEqual([genre["name"] for genre in self.call("library?tab=genres")[1]["genres"]], ["Ambient"])
+        self.assertEqual(self.call("library?tab=nothing")[1]["tab"], "playlists")
+        self.assertIn("tracks", self.call("library")[1])  # without a tab: the totals, as before
+
+    def test_a_long_list_comes_page_by_page_and_by_position(self):
+        tracks = self.fill()
+        ids = [tracks[title]["id"] for title in ("One", "Two", "Three")]
+        self.call("favorites", {"kind": "track", "ids": ids, "liked": True})
+        route = "library?tab=liked&sort=title&limit=2"
+
+        first = self.call(route)[1]
+        self.assertEqual([row["title"] for row in first["tracks"]], ["One", "Three"])
+        self.assertEqual((first["count"], first["cursor"]), (3, "2"))
+        second = self.call(f"{route}&cursor={first['cursor']}")[1]
+        self.assertEqual([row["title"] for row in second["tracks"]], ["Two"])
+        self.assertEqual([row["position"] for row in second["tracks"]], [2])
+        self.assertIsNone(second["cursor"])
+
+        picked = self.call(f"{route}&positions=2,0")[1]
+        self.assertEqual([row["title"] for row in picked["tracks"]], ["Two", "One"])
+        self.assertEqual(picked["count"], 3)
+        self.assertIsNone(picked["cursor"])
+
+        # a row's play: the list from that row on, positions counted from it
+        played = self.call(f"{route}&from=1")[1]
+        self.assertEqual([row["title"] for row in played["tracks"]], ["Three", "Two"])
+        self.assertEqual([row["position"] for row in played["tracks"]], [1, 2])
+        self.assertEqual(played["count"], 2)
+        self.assertEqual([row["title"] for row in self.call(f"{route}&from=1&positions=1")[1]["tracks"]], ["Two"])
+
+        for bad in ("cursor=x", "positions=3", "positions=-1", "from=9", "positions=" + ",".join(["0"] * 51)):
+            self.assertEqual(self.call(f"{route}&{bad}")[0], 400, bad)
+
+    def test_a_heart_and_a_pin_answer_the_row_they_turn_over(self):
+        tracks = self.fill()
+        track_id = tracks["One"]["id"]
+        status, answer = self.call("favorites", {"kind": "track", "id": track_id, "liked": True})
+        self.assertEqual(status, 200)
+        self.assertEqual(answer["item"], {"liked": True, "not_liked": False})
+        self.assertEqual(self.call("favorites", {"kind": "track", "id": track_id, "liked": False})[1]["item"],
+                         {"liked": False, "not_liked": True})
+        self.assertNotIn("item", self.call("favorites", {"kind": "track", "ids": [track_id], "liked": True})[1])
+        album = self.call(f"albums/{tracks['One']['album_id']}")[1]
+        self.assertTrue(album["tracks"][0]["liked"])
+        self.assertEqual(album["tracks"][0]["disc_label"], "")
+        self.assertEqual(album["line"], "Single · 2 songs · 5 min · Lossless")
+        pin = self.call("pins", {"kind": "album", "id": album["id"], "pinned": True})[1]
+        self.assertEqual(pin["item"], {"pinned": True, "not_pinned": False})
+        self.assertEqual(self.call("pins", {"kind": "album", "id": album["id"], "pinned": False})[1]["item"],
+                         {"pinned": False, "not_pinned": True})
+
+    def test_home_by_section_and_search_as_the_shared_pages_read_them(self):
+        tracks = self.fill()
+        home = self.call("home?view=shelves&hour=9")[1]
+        self.assertEqual(home["greeting"], "Good morning")
+        self.assertFalse(home["empty"])
+        self.assertNotIn("sections", home)
+        self.assertIn("added", home["shelves"])
+        self.assertIn("start", home["shelves"])
+        self.assertTrue(all("not_pinned" in album for album in home["shelves"]["added"]["items"]))
+
+        self.call("favorites", {"kind": "track", "id": tracks["Two"]["id"], "liked": True})
+        album_id = tracks["One"]["album_id"]
+        self.call("history", {"track_id": tracks["One"]["id"], "seconds": 200, "context": f"album:{album_id}"})
+        home = self.call("home?view=shelves")[1]["shelves"]
+        self.assertEqual([row["title"] for row in home["recent"]["items"]], ["One"])
+        self.assertEqual([row["title"] for row in home["liked"]["items"]], ["Two"])
+        self.assertTrue(home["liked"]["items"][0]["liked"])
+        tile = home["continue"]["items"][0]
+        self.assertEqual((tile["id"], tile["is_album"], tile["is_mix"]), (album_id, True, False))
+        self.assertEqual(tile["mosaic_key"], album_id)
+        self.assertIn("sections", self.call("home")[1])  # Music's own page reads it as before
+
+        idle = self.call("search?q=")[1]
+        self.assertTrue(idle["idle"])
+        self.assertEqual([genre["name"] for genre in idle["browse"]], ["Ambient"])
+        for query in ("lu", "lume", "lumen"):
+            self.call(f"search?q={query}&remember=1")
+        self.assertEqual(self.call("search/recent")[1]["recent"], ["lumen"])
+        found = self.call("search?q=one")[1]
+        self.assertTrue(found["found"])
+        self.assertFalse(found["nothing"])
+        self.assertEqual(found["songs"][0]["title"], "One")
+        self.assertIn("not_liked", found["songs"][0])
+        self.assertEqual(found["top_tiles"][0]["is_track"], True)
+        self.assertEqual(found["context"], "search:one")
+        self.assertTrue(self.call("search?q=zzzzqqq")[1]["nothing"])
+
+        folder = self.call("folders/0?path=Lumen")[1]
+        self.assertEqual([crumb["path"] for crumb in folder["crumbs"]], ["", "Lumen"])
+        self.assertEqual({track["title"] for track in folder["tracks"]}, {"One", "Two"})
+        self.assertEqual(folder["context"], "folder:0")
+        root = self.call("folders/0")[1]
+        self.assertEqual([(child["name"], child["source"]) for child in root["folders"]], [("Lumen", 0)])
+        self.assertEqual(self.call("folders/0?path=../etc")[0], 404)
+
     def test_the_mosaic_takes_album_ids_only_and_falls_back_to_one_cover(self):
         tracks = self.fill()
         album_id = tracks["One"]["album_id"]

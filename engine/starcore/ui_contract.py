@@ -85,6 +85,8 @@ IMAGE_SHAPES = set(VOCABULARY["image_shapes"])
 IMAGE_FITS = set(VOCABULARY["image_fits"])
 MEDIA_KINDS = set(VOCABULARY["media_kinds"])
 MEDIA_GRID_ITEM_KEYS = set(VOCABULARY["media_grid_item_keys"])
+MEDIA_GRID_LAYOUTS = set(VOCABULARY["media_grid_layouts"])
+MEDIA_LIST_ITEM_KEYS = set(VOCABULARY["media_list_item_keys"])
 MEDIA_VIEWER_KEYS = set(VOCABULARY["media_viewer_keys"])
 MAP_ITEM_KEYS = set(VOCABULARY["map_item_keys"])
 # capabilities the client's media picker can choose from (the pick action)
@@ -144,11 +146,12 @@ BINDING_WORDS = {"$", "$value", "$page", "$params", "$form", "$state", "$sources
 
 
 def paged_lists(blocks) -> list:
-    """The `list` blocks of a page that load further pages (`more`), also inside a card."""
+    """The `list` and `media-list` blocks of a page that load further pages (`more`), also
+    inside a card."""
     found = []
     for block in blocks or []:
         if isinstance(block, dict):
-            if block.get("type") == "list" and "more" in block:
+            if block.get("type") in ("list", "media-list") and "more" in block:
                 found.append(block)
             found += paged_lists(block.get("blocks"))
     return found
@@ -264,6 +267,8 @@ class _Validator:
         self.protected = False
         self.in_media_actions = False
         self.in_bulk = False  # a selection's or a tile's quick actions: no download or share there
+        self.in_selection = False  # a selection's actions: no play there
+        self.in_row = False  # a row's or a tile's quick and menu entries: `then: update` there
         self.errors = []
         self.lenient = False  # a newer minor: unknown blocks and keys are skipped by clients
         self.minor = MINOR
@@ -875,28 +880,54 @@ class _Validator:
     def check_media_list(self, where: str, block: dict):
         """{type: media-list, items, item} (1.2): rows with a thumbnail from the Satellite's
         own routes, a title, a subtitle and a short piece of metadata; the row action is any
-        action (navigate, a route, play)."""
+        action (navigate, a route, play). Like a media-grid's tiles, rows may come page by page
+        (`more`, with `item.key` keeping a row across pages), in groups (`item.group`), with up to
+        two icon actions at their end (`quick`, each drawn while its `visible` holds: a pair is a
+        toggle) and a menu of actions (`menu`). `item.audio` binds a track id of the document's
+        own audio.library provider, so the client marks the row playing."""
         self.check_items(f"{where}.items", block.get("items"))
         item = block.get("item")
         if not isinstance(item, dict):
             self.error(f"{where}.item", "must be an object")
             return
-        self.unknown_keys(f"{where}.item", item, {"title", "subtitle", "meta", "image", "format"})
+        self.unknown_keys(f"{where}.item", item, MEDIA_LIST_ITEM_KEYS)
         if "title" not in item:
             self.error(f"{where}.item", "needs 'title'")
-        for key in ("title", "subtitle", "meta"):
+        for key in ("title", "subtitle", "meta", "key", "group"):
             if key in item:
                 self.check_text(f"{where}.item.{key}", item[key])
         if "image" in item:
             self.check_route(f"{where}.item.image", item["image"])
+        if "audio" in item:
+            if not is_binding(item["audio"]):
+                self.error(f"{where}.item.audio", "must bind a track id")
+            else:
+                self.check_binding(f"{where}.item.audio", item["audio"])
+            if self.provides is not None and AUDIO_LIBRARY not in self.provides:
+                self.error(f"{where}.item.audio", f"marks the Satellite's own tracks, and it provides no {AUDIO_LIBRARY}")
         formats = item.get("format", {})
-        if not isinstance(formats, dict) or not set(formats) <= {"subtitle", "meta"} or any(
+        if not isinstance(formats, dict) or not set(formats) <= {"subtitle", "meta", "group"} or any(
                 value not in FORMATS for value in formats.values()):
-            self.error(f"{where}.item.format", "must map 'subtitle'/'meta' to a known format")
+            self.error(f"{where}.item.format", "must map 'subtitle'/'meta'/'group' to a known format")
         else:
             for key, value in formats.items():
                 self.check_format(f"{where}.item.format.{key}", value)
         self.check_media_options(where, block)
+        self.check_row_actions(where, block)
+        if "more" in block:
+            if not is_binding(block.get("items")):
+                self.error(f"{where}.more", "needs `items` bound to the page's data")
+            self.check_more(f"{where}.more", block["more"])
+
+    def check_row_actions(self, where: str, block: dict):
+        """`quick` and `menu` (1.2), on a media-list's rows and a media-grid's tiles: the row is
+        `$.`, and an entry may play it (not a selection), download it or update it in place."""
+        if "quick" in block:
+            self.check_media_actions(f"{where}.quick", block["quick"], LIMITS["quick_actions"],
+                                     required=True, secure=False, icon=True, files=False, row=True)
+        if "menu" in block:
+            self.check_media_actions(f"{where}.menu", block["menu"], LIMITS["menu_entries"],
+                                     required=True, secure=False, row=True)
 
     def check_media_grid(self, where: str, block: dict):
         """{type: media-grid, items, item} (1.2): a grid of images and videos from the
@@ -910,10 +941,16 @@ class _Validator:
             self.error(where, "a media-grid's tiles open the viewer or run an action, not both")
         if "open" in block:
             self.check_tile_actions(f"{where}.open", block)
-        if "quick" in block:
-            # a small button in each tile's corner: the first entry whose `visible` holds
-            self.check_media_actions(f"{where}.quick", block["quick"], LIMITS["quick_actions"],
-                                     required=True, secure=False, icon=True, files=False)
+        # quick: a small button in each tile's corner, the first entry whose `visible` holds
+        self.check_row_actions(where, block)
+        layout = block.get("layout", "grid")
+        if layout not in MEDIA_GRID_LAYOUTS:
+            self.error(f"{where}.layout", f"must be one of {sorted(MEDIA_GRID_LAYOUTS)}")
+        elif layout == "row":
+            # a shelf: one row that scrolls sideways, at its size, nothing to page or select
+            for key in ("more", "selection"):
+                if key in block:
+                    self.error(f"{where}.{key}", "a shelf (layout row) has no paging or selection")
         item = block.get("item")
         if not isinstance(item, dict):
             self.error(f"{where}.item", "must be an object")
@@ -948,7 +985,8 @@ class _Validator:
             else:
                 self.unknown_keys(f"{where}.selection", selection, {"actions"})
                 self.check_media_actions(f"{where}.selection.actions", selection.get("actions"),
-                                         LIMITS["selection_actions"], required=True, files=False)
+                                         LIMITS["selection_actions"], required=True, files=False,
+                                         selection=True)
         if "size" in block and block["size"] not in IMAGE_SIZES:
             self.error(f"{where}.size", f"must be one of {sorted(IMAGE_SIZES)}")
         if "shape" in block and block["shape"] not in IMAGE_SHAPES:
@@ -1087,10 +1125,11 @@ class _Validator:
             self.check_media_actions(f"{where}.actions", viewer["actions"], LIMITS["viewer_actions"])
 
     def check_media_actions(self, where: str, actions, limit: int, required: bool = False,
-                            secure: bool = True, icon: bool = False, files: bool = True):
+                            secure: bool = True, icon: bool = False, files: bool = True,
+                            selection: bool = False, row: bool = False):
         """[{label, action, icon, style, visible}]: the viewer's actions on the item shown, a
-        selection's on each selected item, or a tile's quick actions (no secure action there,
-        and an icon each: the button has no room for its label)."""
+        selection's on each selected item, or a row's or a tile's quick actions (no secure action
+        there, and an icon each: the button has no room for its label) and menu entries."""
         if not isinstance(actions, list) or (required and not actions):
             self.error(where, "must be a list of {label, action}")
             return
@@ -1111,11 +1150,15 @@ class _Validator:
             else:
                 self.in_media_actions = secure  # where a secure action may be
                 self.in_bulk = not files
+                self.in_selection = selection
+                self.in_row = row
                 try:
                     self.check_action(f"{at}.action", entry["action"])
                 finally:
                     self.in_media_actions = False
                     self.in_bulk = False
+                    self.in_selection = False
+                    self.in_row = False
             if icon and "icon" not in entry:
                 self.error(at, "needs an 'icon'")
             if "icon" in entry and entry["icon"] not in self.icons:
@@ -1251,7 +1294,10 @@ class _Validator:
             self.unknown_keys(f"{where}.then", then, {"navigate", "params"})
             self.check_navigate(f"{where}.then", then)
         elif then not in ACTION_THEN:
-            self.error(f"{where}.then", "must be 'refresh', 'back' or {navigate, params}")
+            self.error(f"{where}.then", "must be 'refresh', 'back', 'update' or {navigate, params}")
+        elif then == "update" and not self.in_row:
+            # the answer's `item` is merged into the row the action ran from
+            self.error(f"{where}.then", "update redraws a row: only in a media-list's or media-grid's quick and menu")
 
     def check_secrets(self, where: str, action: dict):
         """secrets: {key: {kind, new?}} (1.2), only in a protected document: before the request
@@ -1398,7 +1444,9 @@ class _Validator:
         audio.library: the host resolves each id through that provider, never a stream URL from
         the document. `start` binds the id of the track to begin with, `shuffle` shuffles, `queue`
         ("next" or "end") adds to the queue instead of replacing it, and `context` (text or a
-        binding, at most 80 characters) is what the host reports with each play."""
+        binding, at most 80 characters) is what the host reports with each play. A `route` answer may
+        be paged ({tracks, count, cursor}): the host asks for more as the queue runs low, and draws a
+        shuffle's positions lazily (docs/media-audio.md)."""
         self.since(f"{where}.play", "the play action", 2)
         self.unknown_keys(where, action, {"play"})
         play = action["play"]
@@ -1449,8 +1497,8 @@ class _Validator:
                 self.error(f"{where}.play.context", f"must be a text of at most {LIMITS['play_context']} characters, or a binding")
             else:
                 self.check_text(f"{where}.play.context", context)
-        if self.in_bulk:
-            self.error(f"{where}.play", "plays one list: not in a selection or a tile's quick actions")
+        if self.in_selection:
+            self.error(f"{where}.play", "plays one list: not in a selection")
         if self.provides is not None and AUDIO_LIBRARY not in self.provides:
             self.error(f"{where}.play", f"plays the Satellite's own tracks, and it provides no {AUDIO_LIBRARY}")
 

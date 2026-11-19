@@ -205,9 +205,10 @@ and the Android screens against what the contract can draw.
 - [x] **Library pages, A1:** `play` with `tracks` or `route` (change 6), and Music's first
   `ui.json` (a preview): album, artist, mix, radio, mood, genre and track pages, the cover
   mosaic and the genre page.
-- [ ] **Library pages, A2:** home (Daily Mixes, recents), Your Library, search and folders, as
+- [x] **Library pages, A2:** home (Daily Mixes, recents), Your Library, search and folders, as
   media lists and grids that play through the audio host (change 7), with change 6's paged
-  queue and lazy shuffle for the long lists.
+  queue and lazy shuffle for the long lists. Rows and tiles have menus and hearts, shelves
+  scroll sideways, and going back restores the scroll position and loaded pages.
 - [ ] **Playlists** (A3): create, rename, cover, reorder, add and remove tracks, smart rules,
   M3U import and export (change 8).
 - [ ] **The player's additions declared by the document** (A4): its track menu, Add to

@@ -83,3 +83,94 @@ test("a page's tracks replace the queue from the one asked for, shuffle, or join
         ["end", ["a"]],
     ]);
 });
+
+test("a shuffle over a long list draws every position once, a few at a time", async () => {
+    const { lazyPositions } = await import("../media/handover.js");
+    let seed = 7;
+    const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    const positions = lazyPositions(10000, random);
+    const drawn = [...positions.draw(100), ...positions.draw(50)];
+    assert.equal(drawn.length, 150);
+    assert.equal(positions.left, 9850);
+    while (positions.left) {
+        drawn.push(...positions.draw(1000));
+    }
+    assert.equal(new Set(drawn).size, 10000);
+    assert.ok(drawn.every((position) => position >= 0 && position < 10000));
+    assert.notDeepEqual(drawn.slice(0, 10), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    assert.deepEqual(lazyPositions(0).draw(5), []);
+});
+
+/** A player as the handover sees it: a queue, a context, events. */
+function fakePlayer() {
+    const handlers = new Map();
+    const player = {
+        queue: [], index: 0, context: null, remote: null, added: [],
+        on(name, handler) {
+            handlers.set(name, [...(handlers.get(name) || []), handler]);
+            return () => handlers.set(name, handlers.get(name).filter((other) => other !== handler));
+        },
+        emit(name) { (handlers.get(name) || []).forEach((handler) => handler()); },
+        async play(list, start, context) { this.queue = list.slice(); this.index = start; this.context = context; },
+        async shufflePlay(list, context) { return this.play(list, 0, context); },
+        async addToQueue(list, options) { this.added.push([list.length, options]); this.queue.push(...list); this.emit("queue"); },
+        listeners: () => [...handlers.values()].flat().length,
+    };
+    return player;
+}
+
+const pageOf = (from, size, count) => Array.from({ length: Math.max(0, Math.min(size, count - from)) }, (_, at) => ({ id: `t${from + at}` }));
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+test("a paged route's list is queued page by page as it plays, then stops when replaced", async () => {
+    const { handOver } = await import("../media/handover.js");
+    const asked = [];
+    const load = async (params) => {
+        asked.push(params);
+        const from = Number(params.cursor);
+        return { tracks: pageOf(from, 50, 120), count: 120, cursor: from + 50 < 120 ? String(from + 50) : null };
+    };
+    const player = fakePlayer();
+    const answer = { tracks: pageOf(0, 50, 120), count: 120, cursor: "50" };
+    assert.equal(await handOver(player, answer.tracks, { context: "liked", page: { answer, load } }), 50);
+    await settle();
+    assert.equal(player.queue.length, 50);  // 49 left: nothing asked yet
+    assert.deepEqual(asked, []);
+    player.index = 30;  // 19 left
+    player.emit("track");
+    await settle();
+    assert.deepEqual(asked, [{ cursor: "50" }]);
+    assert.equal(player.queue.length, 100);
+    assert.deepEqual(player.added, [[50, { quiet: true }]]);
+    assert.equal(player.queue[99].id, "t99");
+    // another list replaces the queue: nothing more is asked for, and the listeners are gone
+    await player.play([{ id: "x" }], 0, "album:1");
+    player.emit("track");
+    await settle();
+    assert.equal(asked.length, 1);
+    assert.equal(player.listeners(), 0);
+});
+
+test("shuffling a paged list asks only for the positions it draws, and its first page is never asked again", async () => {
+    const { handOver } = await import("../media/handover.js");
+    const asked = [];
+    const load = async (params) => {
+        asked.push(params);
+        const positions = params.positions.split(",").map(Number);
+        assert.ok(positions.length <= 50);
+        return { tracks: positions.map((position) => ({ id: `t${position}` })), count: 10000 };
+    };
+    const player = fakePlayer();
+    const answer = { tracks: pageOf(0, 100, 10000), count: 10000, cursor: "100" };
+    assert.equal(await handOver(player, answer.tracks, { shuffle: true, context: "liked", page: { answer, load } }), 100);
+    assert.equal(player.queue.length, 100);
+    assert.ok(asked.length >= 2 && asked.length <= 3);
+    const fromFirstPage = asked.flatMap((params) => params.positions.split(",").map(Number)).filter((position) => position < 100);
+    assert.deepEqual(fromFirstPage, []);
+    assert.equal(new Set(player.queue.map((track) => track.id)).size, 100);
+    player.index = 80;
+    player.emit("track");
+    await settle();
+    assert.equal(player.queue.length, 150);
+    assert.equal(new Set(player.queue.map((track) => track.id)).size, 150);
+});

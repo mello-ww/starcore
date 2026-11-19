@@ -1,5 +1,7 @@
 """What a listener keeps: liked tracks, albums, followed artists, pinned items, recent searches."""
 
+from datetime import datetime, timedelta, timezone
+
 from .db import now
 
 KINDS = ("track", "album", "artist", "playlist")
@@ -75,10 +77,17 @@ class Collection:
         return [{"kind": row["kind"], "id": row["item_id"]} for row in self.db.all(
             "SELECT kind, item_id FROM pins WHERE user = ? ORDER BY created_at", (user,))]
 
-    def remember_search(self, user: str, query: str):
+    def remember_search(self, user: str, query: str, replace_prefixes: bool = False):
+        """With `replace_prefixes`, a query typed on from one remembered a moment ago replaces it,
+        so a field that searches as the person types keeps "radiohead", not "rad" and "radio"."""
         query = " ".join(str(query or "").split())[:100]
         if len(query) < 2:
             return
+        if replace_prefixes:
+            recent = (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat(timespec="seconds")
+            for row in self.db.all("SELECT query FROM searches WHERE user = ? AND searched_at >= ?", (user, recent)):
+                if row[0] != query and query.lower().startswith(row[0].lower()):
+                    self.db.execute("DELETE FROM searches WHERE user = ? AND query = ?", (user, row[0]))
         self.db.execute("INSERT INTO searches (user, query, searched_at) VALUES (?, ?, ?) ON CONFLICT (user, query) "
                         "DO UPDATE SET searched_at = excluded.searched_at", (user, query, now()))
         self.db.execute("DELETE FROM searches WHERE user = ? AND query NOT IN (SELECT query FROM searches WHERE "

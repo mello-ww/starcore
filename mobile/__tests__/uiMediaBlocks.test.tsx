@@ -71,7 +71,7 @@ describe('the media-list block', () => {
     const rows = tree.root.findAllByType(Pressable);
     expect(rows).toHaveLength(2);
     act(() => rows[0].props.onPress());
-    expect(runAction).toHaveBeenCalledWith(block.action, expect.objectContaining({data: expect.objectContaining({id: 'one'})}));
+    expect(runAction).toHaveBeenCalledWith(block.action, expect.objectContaining({data: expect.objectContaining({id: 'one'})}), undefined, expect.anything());
   });
 
   it('says what its empty text says when there is nothing', () => {

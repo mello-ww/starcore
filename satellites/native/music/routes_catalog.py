@@ -6,10 +6,11 @@ from pathlib import Path
 from starcore.api.response import error_response, file_response
 
 from . import lyrics as lyric_files
+from . import views
 from .routing import identifier, ok, route
 
-# a mosaic's album ids in one path segment ("artwork/mosaic/<id>.<id>.<id>.<id>"), as answers give them
-MOSAIC_ALBUMS = 4
+MOSAIC_ALBUMS = views.MOSAIC_ALBUMS
+mosaic_key = views.mosaic_key
 
 # a track is addressed by a digest of its content, so what comes back can be cached
 IMMUTABLE = "private, max-age=604800"
@@ -18,6 +19,9 @@ ARTWORK_CACHE = "private, max-age=86400"
 
 @route("GET")
 def summary(call):
+    """The library's totals; with `tab`, one tab of Your Library as the shared interface reads it."""
+    if call.query.get("tab"):
+        return ok(views.library(call))
     payload = call.music.summary()
     payload["transcoding"] = call.music.transcoder.available
     return ok(payload)
@@ -63,11 +67,20 @@ def albums(call):
     if album is None:
         return error_response(f"unknown album '{call.segment(0)}'")
     album["liked"] = music.collection.is_favorite(call.user, "album", album["id"])
-    liked = set(music.collection.favorite_ids(call.user)["track"])
-    for track in album["tracks"]:
-        track["liked"] = track["id"] in liked
-    album["more_by_artist"] = [other for other in music.catalog.albums(artist_id=album["artist_id"])
+    album["not_liked"] = not album["liked"]
+    liked = views.liked_tracks(music, call.user)
+    for position, track in enumerate(album["tracks"]):
+        views.decorate(track, liked, position)
+        # a heading per disc, on an album that has more than one
+        track["disc_label"] = f"Disc {track['disc'] or 1}" if album["discs"] > 1 else ""
+    pinned = views.pinned_set(music, call.user)
+    saved = set(music.collection.favorite_ids(call.user)["album"])
+    album["more_by_artist"] = [views.flags(other, saved, pinned, "album")
+                               for other in music.catalog.albums(artist_id=album["artist_id"])
                                if other["id"] != album["id"]][:12]
+    album["line"] = " · ".join(part for part in (
+        str(album["year"]) if album.get("year") else "", album["type"].title(), views.songs(len(album["tracks"])),
+        views.length(album.get("duration")), views.badge(album.get("quality"))) if part)
     # what the player says it plays from, as Music's own page names it
     album["context"] = f"album:{album['id']}"
     return ok(album)
@@ -84,6 +97,14 @@ def artists(call):
     if artist is None:
         return error_response(f"unknown artist '{call.segment(0)}'")
     artist["followed"] = music.collection.is_favorite(call.user, "artist", artist["id"])
+    artist["not_followed"] = not artist["followed"]
+    liked = views.liked_tracks(music, call.user)
+    for position, track in enumerate(artist["top_tracks"]):
+        views.decorate(track, liked, position)
+    pinned = views.pinned_set(music, call.user)
+    saved = set(music.collection.favorite_ids(call.user)["album"])
+    for key in ("albums", "singles", "appears_on"):
+        artist[key] = [views.flags(album, saved, pinned, "album") for album in artist[key]]
     artist["context"] = f"artist:{artist['id']}"
     return ok(artist)
 
@@ -104,17 +125,15 @@ def genres(call):
     if not tracks.get("tracks") and not albums:
         return error_response(f"unknown genre '{name}'", status=404)
     covers = [album["id"] for album in albums if album.get("artwork")][:MOSAIC_ALBUMS]
+    liked = views.liked_tracks(music, call.user)
+    for position, track in enumerate(tracks.get("tracks", [])):
+        views.decorate(track, liked, position)
     return ok({"name": name, "tracks": tracks.get("tracks", []), "total": tracks.get("total"), "albums": albums,
                "mosaic": covers, "mosaic_key": mosaic_key(covers), "context": genre_context(name)})
 
 
 def genre_context(name: str) -> str:
     return "genre:" + re.sub(r"[^\w]+", "-", name.lower(), flags=re.ASCII)
-
-
-def mosaic_key(album_ids: list) -> str:
-    """Album ids as the one path segment artwork/mosaic/<key> takes."""
-    return ".".join(album_ids[:MOSAIC_ALBUMS])
 
 
 @route("GET")
@@ -131,14 +150,17 @@ def folders(call):
         index = int(call.segment(0))
     except ValueError:
         return error_response("unknown folder")
-    folder = "/".join(call.path[1:])
-    if ".." in call.path[1:] or "\\" in folder:
+    # a path in the URL's own segments, or as `path=` (the shared interface's folder pages)
+    parts = call.path[1:] if call.query.get("path") is None else str(call.query["path"]).split("/")
+    folder = "/".join(part for part in parts if part)
+    if ".." in parts or "\\" in folder:
         return error_response("unknown folder")
     listing = music.catalog.folder(index, folder, roots)
     if listing is None:
         return error_response("unknown folder")
     listing["name"] = Path(folder).name if folder else (Path(roots[index]).name or roots[index])
-    return ok(listing)
+    listing["source_name"] = Path(roots[index]).name or roots[index]
+    return ok(views.folder_view(listing, index, views.liked_tracks(music, call.user)))
 
 
 @route("GET")
@@ -155,7 +177,8 @@ def search(call):
                 music.collection.clear_searches(call.user)
             elif isinstance(call.body.get("query"), str):
                 music.collection.remember_search(call.user, call.body["query"])
-        return ok({"recent": music.collection.recent_searches(call.user)})
+        recent = music.collection.recent_searches(call.user)
+        return ok({"recent": recent, "has_recent": bool(recent)})
     if call.segment(0) == "suggest":
         return ok({"suggestions": music.finder.suggest(call.user, call.query.get("q", ""))})
     if call.method != "GET":
@@ -163,7 +186,10 @@ def search(call):
     kinds = [kind for kind in call.query.get("type", "").split(",") if kind] or None
     result = music.finder.search(call.user, call.query.get("q", ""), kinds=kinds, genre=call.query.get("genre"),
                                  quality=call.query.get("quality"), limit=call.integer("limit", 20, 1, 100))
-    return ok(result)
+    if call.query.get("remember") == "1" and any(result[key] for key in ("tracks", "albums", "artists")):
+        # a search field that searches as the person types remembers the query it settled on
+        music.collection.remember_search(call.user, result["query"], replace_prefixes=True)
+    return ok(views.search(music, call.user, result, views.liked_tracks(music, call.user)))
 
 
 @route("GET")

@@ -1,4 +1,4 @@
-import React, {memo, useCallback, useEffect, useRef, useState} from 'react';
+import React, {memo, useCallback, useEffect, useReducer, useRef, useState} from 'react';
 import {ActivityIndicator, Alert, Animated, Clipboard, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {Glyph, useOwnIcons} from '../../components/Glyph';
@@ -11,7 +11,9 @@ import {TOUCH_TARGET, tokens, useAccent} from '../../theme';
 import {MapBlock} from './MapBlock';
 import {ActionPill, MediaGridBlock} from './MediaGrid';
 import {emptyRow, formBody, formProblem, formValues} from './forms';
-import {createListPaging, type ListPagingStatus} from './listPaging';
+import {createListPaging, rowKey, type ListPagingStatus} from './listPaging';
+import {RowMenuSheet, usePlayingId} from './RowMenu';
+import {groupOf, isPlayingRow, rowMenu, rowQuick, runsHere, type RowEntry} from './rows';
 import {useImageSource} from './memoryImages';
 import {
   BLOCK_TYPES, findProvider, formatValue, isIconName, isSafeRoute, isVisible, resolve, resolveTemplate, toneOf,
@@ -33,9 +35,18 @@ const {palette, space, type, radii} = tokens;
 export interface BlockContext {
   developer: boolean;
   providers: Providers;
+  /** The Satellite whose interface this is: a list marks the row the audio host plays when it
+   * plays from this Satellite (`item.audio`, 1.2). */
+  satellite?: string;
   /** Runs an action; resolves true once its request (if any) succeeded. `quiet` (one item of
-   * a selection) leaves notices and refreshing to the caller. */
-  runAction: (action: UiAction | undefined, scope: Scope, value?: unknown, options?: {quiet?: boolean}) => Promise<boolean>;
+   * a selection) leaves notices and refreshing to the caller; `update` redraws the row an
+   * answer's item was merged into (`then: "update"`, 1.2). */
+  runAction: (
+    action: UiAction | undefined,
+    scope: Scope,
+    value?: unknown,
+    options?: {quiet?: boolean; update?: () => void},
+  ) => Promise<boolean>;
   /** Reads one operation of a capability provider - another Satellite's route. */
   readCapability: (satellite: string, route: string) => Promise<any>;
   /** An image from one of the Satellite's own routes, with this session (1.2's image and
@@ -482,7 +493,9 @@ function ListBlock({block, scope, context}: {block: UiBlock; scope: Scope; conte
  * its rows, then the next page - loaded as the screen scrolls near its end, or with "Show
  * more". A paged list among a page's own blocks makes the page a virtualized list instead
  * (VirtualListPage; docs/ui-contract.md, "Paging a list"). */
-function PagedListBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+function PagedListBlock({
+  block, scope, context, draw,
+}: {block: UiBlock; scope: Scope; context: BlockContext; draw?: (rows: any[]) => React.ReactNode}) {
   const paging = useRef(createListPaging({load: context.load})).current;
   const [, setVersion] = useState(0);
   // the screen reached its end while a page was on its way: it sends no more scroll events once
@@ -531,7 +544,7 @@ function PagedListBlock({block, scope, context}: {block: UiBlock; scope: Scope; 
   }
   return (
     <View style={styles.list}>
-      {rows.map((item: any, index: number) => listRow(block, item, index, scope, context))}
+      {draw ? draw(rows) : rows.map((item: any, index: number) => listRow(block, item, index, scope, context))}
       <ListFooter status={status} scope={scope} onMore={next} />
     </View>
   );
@@ -610,60 +623,210 @@ function ImageBlock({block, scope, context}: {block: UiBlock; scope: Scope; cont
 }
 
 function MediaListBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  if (block.more) {
+    return (
+      <PagedListBlock
+        block={block}
+        scope={scope}
+        context={context}
+        draw={rows => <MediaRows block={block} rows={rows} scope={scope} context={context} />}
+      />
+    );
+  }
   const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
   if (!Array.isArray(items) || items.length === 0) {
     return <Text style={type.caption}>{block.empty !== undefined ? asText(resolve(block.empty, scope)) : 'Nothing here.'}</Text>;
   }
-  const size = typeof block.size === 'string' ? block.size : 'small';
-  const shape = typeof block.shape === 'string' ? block.shape : 'square';
-  const thumb = THUMB_SIZES[size] ?? 40;
-  const formats = block.item?.format ?? {};
   return (
     <View style={styles.list}>
-      {items.map((item: any, index: number) => {
-        const itemScope = {...scope, data: item};
-        const title = asText(resolve(block.item?.title, itemScope));
-        const subtitle = block.item?.subtitle !== undefined ? resolve(block.item.subtitle, itemScope) : undefined;
-        const meta = block.item?.meta !== undefined ? resolve(block.item.meta, itemScope) : undefined;
-        const content = (
-          <>
-            {block.item?.image !== undefined && (
-              <MediaFrame
-                template={block.item.image}
-                scope={itemScope}
-                context={context}
-                width={shape === 'wide' ? Math.round(thumb * 16 / 9) : thumb}
-                aspect={shape === 'wide' ? 16 / 9 : 1}
-                round={shape === 'round'}
-                fit="cover"
-              />
-            )}
-            <View style={styles.rowMain}>
-              <Text style={styles.rowTitle} numberOfLines={1}>{title}</Text>
-              {subtitle !== undefined && subtitle !== null && subtitle !== '' && (
-                <Text style={type.caption} numberOfLines={1}>{formatValue(subtitle, formats.subtitle)}</Text>
-              )}
-            </View>
-            {meta !== undefined && meta !== null && meta !== '' && <Text style={type.caption}>{formatValue(meta, formats.meta)}</Text>}
-            {block.action && <Icon name="chevron-right" size={18} color={palette.text3} />}
-          </>
-        );
-        return block.action ? (
+      <MediaRows block={block} rows={items} scope={scope} context={context} />
+    </View>
+  );
+}
+
+/** A media-list's rows, each group's heading above its first row (`item.group`, 1.2), the row
+ * the audio host plays marked (`item.audio`). */
+function MediaRows({block, rows, scope, context}: {block: UiBlock; rows: any[]; scope: Scope; context: BlockContext}) {
+  const playing = usePlayingId(context.satellite, block.item?.audio !== undefined);
+  const keys = mediaRowKeys(block, rows, scope);
+  const out: React.ReactNode[] = [];
+  let label = '';
+  rows.forEach((item, index) => {
+    const itemScope = {...scope, data: item};
+    const group = mediaGroup(block, itemScope);
+    if (group !== '' && group !== label) {
+      out.push(<MediaGroupHeading key={`group:${index}`} label={group} />);
+      label = group;
+    }
+    out.push(
+      <MediaRow
+        key={keys[index]}
+        block={block}
+        item={item}
+        scope={scope}
+        context={context}
+        playing={isPlayingRow(block, itemScope, playing)}
+      />,
+    );
+  });
+  return <>{out}</>;
+}
+
+/** Each row's React key: its `item.key` (1.2), so a row keeps its place and state as further
+ * pages arrive; its position for a row without one, or a key seen already. */
+export function mediaRowKeys(block: UiBlock, rows: any[], scope: Scope): string[] {
+  const seen = new Set<string>();
+  return rows.map((item, index) => {
+    const known = block.item?.key !== undefined ? rowKey(block, item, scope) : null;
+    const key = known !== null && !seen.has(`k:${known}`) ? `k:${known}` : `#${index}`;
+    seen.add(key);
+    return key;
+  });
+}
+
+/** The group a media-list row starts, formatted as the block says; '' for none. */
+export function mediaGroup(block: UiBlock, itemScope: Scope): string {
+  const format = block.item?.format?.group;
+  return groupOf(block, itemScope, value => formatValue(value, format));
+}
+
+export function MediaGroupHeading({label}: {label: string}) {
+  return (
+    <Text style={styles.mediaGroup} accessibilityRole="header" numberOfLines={1}>
+      {label}
+    </Text>
+  );
+}
+
+/**
+ * One row of a media-list (1.2): its image, title and lines; its quick buttons (every visible
+ * one, so a heart pair is one toggle) and its menu - a More button, or a long press - with only
+ * what this app can run. An answer merged into the row (`then: "update"`) redraws just it.
+ */
+export const MediaRow = memo(
+  function MediaRow({
+    block, item, scope, context, playing,
+  }: {block: UiBlock; item: any; scope: Scope; context: BlockContext; playing: boolean}) {
+    const [, redraw] = useReducer((value: number) => value + 1, 0);
+    const [menuOpen, setMenuOpen] = useState(false);
+    const {color: accent} = useAccent();
+    const size = typeof block.size === 'string' ? block.size : 'small';
+    const shape = typeof block.shape === 'string' ? block.shape : 'square';
+    const thumb = THUMB_SIZES[size] ?? 40;
+    const formats = block.item?.format ?? {};
+    const itemScope = {...scope, data: item};
+    const runs = (action: UiAction) => runsHere(action, context);
+    const quick = rowQuick(block, itemScope, runs);
+    const menu = rowMenu(block, itemScope, runs);
+    const run = (action: UiAction | undefined) => context.runAction(action, itemScope, undefined, {update: redraw});
+    const title = asText(resolve(block.item?.title, itemScope));
+    const subtitle = block.item?.subtitle !== undefined ? resolve(block.item.subtitle, itemScope) : undefined;
+    const meta = block.item?.meta !== undefined ? resolve(block.item.meta, itemScope) : undefined;
+    const opens = block.action !== undefined && runsHere(block.action, context);
+    const content = (
+      <>
+        {block.item?.image !== undefined && (
+          <MediaFrame
+            template={block.item.image}
+            scope={itemScope}
+            context={context}
+            width={shape === 'wide' ? Math.round(thumb * 16 / 9) : thumb}
+            aspect={shape === 'wide' ? 16 / 9 : 1}
+            round={shape === 'round'}
+            fit="cover"
+          />
+        )}
+        <View style={styles.rowMain}>
+          <Text style={[styles.rowTitle, playing && {color: accent}]} numberOfLines={1}>
+            {title}
+          </Text>
+          {subtitle !== undefined && subtitle !== null && subtitle !== '' && (
+            <Text style={type.caption} numberOfLines={1}>{formatValue(subtitle, formats.subtitle)}</Text>
+          )}
+        </View>
+        {meta !== undefined && meta !== null && meta !== '' && <Text style={type.caption}>{formatValue(meta, formats.meta)}</Text>}
+        {opens && !quick.length && !menu.length && <Icon name="chevron-right" size={18} color={palette.text3} />}
+      </>
+    );
+    const showMenu = menu.length ? () => setMenuOpen(true) : undefined;
+    return (
+      <View style={[styles.row, styles.mediaRow, (quick.length > 0 || menu.length > 0) && styles.mediaRowActions]}>
+        {opens || showMenu ? (
           <Pressable
-            key={item?.id ?? index}
-            accessibilityRole="button"
+            accessibilityRole={opens ? 'button' : undefined}
             accessibilityLabel={title}
-            onPress={() => context.runAction(block.action, itemScope)}
-            style={({pressed}) => [styles.row, styles.mediaRow, pressed && styles.pressed]}>
+            accessibilityState={playing ? {selected: true} : undefined}
+            accessibilityActions={showMenu ? [{name: 'longpress', label: 'More'}] : undefined}
+            onAccessibilityAction={event => {
+              if (event.nativeEvent.actionName === 'longpress') {
+                showMenu?.();
+              }
+            }}
+            onPress={opens ? () => run(block.action) : undefined}
+            onLongPress={showMenu}
+            delayLongPress={300}
+            testID="media-row"
+            style={({pressed}) => [styles.mediaRowOpen, pressed && opens && styles.pressed]}>
             {content}
           </Pressable>
         ) : (
-          <View key={item?.id ?? index} style={[styles.row, styles.mediaRow]}>
+          <View style={styles.mediaRowOpen} accessible accessibilityLabel={title} testID="media-row">
             {content}
           </View>
-        );
-      })}
-    </View>
+        )}
+        {quick.map((entry, index) => (
+          <QuickButton key={`quick:${index}`} entry={entry} scope={itemScope} accent={accent} onPress={() => run(entry.action)} />
+        ))}
+        {showMenu && (
+          <Pressable
+            onPress={showMenu}
+            hitSlop={4}
+            accessibilityRole="button"
+            accessibilityLabel={title ? `More for ${title}` : 'More'}
+            testID="media-row-more"
+            style={({pressed}) => [styles.rowControl, pressed && styles.pressed]}>
+            <Icon name="more-vertical" size={18} color={palette.text2} />
+          </Pressable>
+        )}
+        {menuOpen && (
+          <RowMenuSheet
+            title={title}
+            entries={menu}
+            scope={itemScope}
+            onRun={entry => run(entry.action)}
+            onClose={() => setMenuOpen(false)}
+          />
+        )}
+      </View>
+    );
+  },
+  (before, after) =>
+    before.block === after.block &&
+    before.item === after.item &&
+    before.playing === after.playing &&
+    before.context.runAction === after.context.runAction &&
+    before.context.canRun === after.context.canRun &&
+    before.scope.page === after.scope.page &&
+    before.scope.params === after.scope.params &&
+    before.scope.state === after.scope.state &&
+    before.scope.sources === after.scope.sources,
+);
+
+/** A row's quick button: its icon, the accent when its style is primary (a heart that is on). */
+function QuickButton({entry, scope, accent, onPress}: {entry: RowEntry; scope: Scope; accent: string; onPress: () => void}) {
+  const label = asText(resolve(entry.label, scope));
+  const active = entry.style === 'primary';
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={4}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{selected: active}}
+      testID={active ? 'media-row-quick-on' : 'media-row-quick'}
+      style={({pressed}) => [styles.rowControl, pressed && styles.pressed]}>
+      <Glyph name={typeof entry.icon === 'string' ? entry.icon : 'star'} size={18} color={active ? accent : palette.text2} />
+    </Pressable>
   );
 }
 
@@ -1324,6 +1487,10 @@ const styles = StyleSheet.create({
   },
   rowMain: {flex: 1, minWidth: 0, gap: 2},
   mediaRow: {minHeight: 64},
+  mediaRowActions: {paddingRight: space.xs, gap: 0},
+  mediaRowOpen: {flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: space.md, alignSelf: 'stretch'},
+  rowControl: {width: 40, minHeight: TOUCH_TARGET, alignItems: 'center', justifyContent: 'center', borderRadius: 9999},
+  mediaGroup: {...type.label, fontWeight: '600', paddingTop: space.md, paddingBottom: space.xs, paddingHorizontal: space.xs},
   search: {
     flexDirection: 'row',
     alignItems: 'center',

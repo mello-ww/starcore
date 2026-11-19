@@ -37,8 +37,13 @@ function nextCursor(value: unknown, previous: unknown): unknown {
   return value === null || value === undefined || value === '' || value === previous ? null : value;
 }
 
-/** A row's identity, to never show one twice when a provider's pages overlap. */
-function rowKey(item: unknown): string | null {
+/** A row's identity, to never show one twice when a provider's pages overlap: its `item.key`
+ * binding when the block declares one (1.2), else the whole row. */
+export function rowKey(block: UiBlock | null, item: unknown, scope?: Scope): string | null {
+  if (block?.item?.key !== undefined) {
+    const key = resolve(block.item.key, {...scope, data: item});
+    return key === null || key === undefined || key === '' ? null : String(key);
+  }
   try {
     return JSON.stringify(item) ?? null;
   } catch {
@@ -70,7 +75,7 @@ export function createListPaging(host: {load?: (route: string) => Promise<any>})
     list.base = base;
     list.collection = collection;
     list.extra = [];
-    list.keys = new Set(base.map(rowKey).filter((key): key is string => key !== null));
+    list.keys = new Set(base.map(item => rowKey(block, item, scope)).filter((key): key is string => key !== null));
     list.pages = 0;
     list.token += 1; // any page still on its way belongs to the old data
     list.loading = null;
@@ -126,7 +131,7 @@ export function createListPaging(host: {load?: (route: string) => Promise<any>})
         const resolved = resolve(block.items, pageScope);
         const added: any[] = [];
         for (const item of Array.isArray(resolved) ? resolved : []) {
-          const key = rowKey(item);
+          const key = rowKey(block, item, pageScope);
           if (key === null || !list.keys.has(key)) {
             if (key !== null) {
               list.keys.add(key);

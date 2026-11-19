@@ -249,6 +249,12 @@ they serve a file.
 
 ```
 GET  library                      summary, totals, formats, schema version, transcoding availability
+GET  library?tab=playlists|liked|albums|artists|recent|folders|genres&q=
+                                  one Your Library tab for the shared interface (`showing` says which):
+                                  liked_sort=added|title|artist|album, album_sort=added|released|quality|name,
+                                  type=album|single|ep|compilation, filter=all|featured|followed; Liked Songs
+                                  pages ({tracks, count, cursor}, cursor=, limit= up to 500, positions=
+                                  up to 50 for a shuffle, from= to count from a row)
 GET  tracks                       ?sort=title|artist|album|added|released|duration|quality|plays|random
                                   &order=asc|desc&limit=&offset=&genre=&quality=hires|lossless|lossy&album=&artist=
 GET  tracks/<id>                  one track with credits, technical details, liked flag and play count
@@ -259,9 +265,12 @@ GET  artists                      album artists, ?featured=1 for everyone credit
 GET  artists/<id>                 albums, singles and EPs, appears on, top tracks, genres, similar artists
 GET  genres                       ?name= for one: its tracks (up to 500), albums, mosaic and context
 GET  folders                      configured and indexed sources
-GET  folders/<n>/<path>           one folder level from the index (never the disk)
+GET  folders/<n>/<path>           one folder level from the index (never the disk); also
+                                  folders/<n>?path=, with `crumbs` for a breadcrumb
 GET  duplicates                   identical copies and likely duplicates
-GET  search?q=&type=&genre=&quality=&limit=   tracks, albums, artists, playlists, genres, top result
+GET  search?q=&type=&genre=&quality=&limit=   tracks, albums, artists, playlists, genres, top result;
+                                  remember=1 remembers a query with results, and the answer says
+                                  `idle`/`searching`, `nothing` and `corrected_text`
 GET  search/suggest?q=
 GET  search/recent                POST {"query": ...} remembers one, {"clear": true} forgets all
 GET  artwork/<album>?size=        cover art (resized when Pillow is installed)
@@ -271,8 +280,9 @@ GET  lyrics/<track>?language=     synced lines (with words and translations) or 
 POST lyrics/<track>               {"offset": ms}
 GET  scan                         progress and last result;  POST scan {"source", "background", "cancel"}
 
-GET  favorites                    POST {"kind": "track|album|artist|playlist", "ids": [...], "liked": bool}
-GET  pins                         POST {"kind", "id", "pinned"}
+GET  favorites                    POST {"kind": "track|album|artist|playlist", "ids": [...], "liked": bool};
+                                  with one "id", the answer's `item` is {liked, not_liked}
+GET  pins                         POST {"kind", "id", "pinned"}, answering `item` {pinned, not_pinned}
 GET  playlists                    POST {"name", "description", "folder", "visibility", "rules", "tracks"}
 GET  playlists/<id>               POST {"name"|"description"|"folder"|"visibility"|"rules"|"cover"}
 POST playlists/<id>/add           {"tracks": [...], "allow_duplicates", "position"}
@@ -288,7 +298,7 @@ GET  covers/<id>                  an uploaded playlist cover
 GET  history?limit=               POST {"track_id", "seconds", "device", "context"};  POST history/clear
 GET  stats?days=                  GET wrapped?year=
 GET  preferences                  POST {key: value, ...}
-GET  home?hour=                   GET recommendations
+GET  home?hour=                   GET recommendations;  home?view=shelves for the shared interface
 GET  mixes                        GET mixes/<id>   (each with mosaic_key; a mix with context)
 GET  radio/<track|artist|album|genre>/<id>
 GET  moods                        GET moods/<id>
@@ -318,12 +328,15 @@ album, artist and song lists are drawn in chunks as they scroll. See
 `ui.json` (UI contract 1.2, `preview: true`) is Music's interface drawn by both clients'
 shared renderers, offered in Developer Mode while Music's own page and screens stay its
 default ([docs/media-audio.md](../media-audio.md), "Music on the shared interface", A1 to
-A10). From A1 it has temporary Recent, Discover and Genres tabs and the album, artist, mix,
-radio, mood, genre and track (credits) pages. They play through the client's audio host with
-the `play` action's `tracks` and `route`: Play, Shuffle, Radio, a row that plays its list from
-itself, and Play next or Add to queue on a track's page. The answers they bind to carry
-`context`, what the player reports it plays from, and `mosaic_key`, the picture of a mix, a
-mood or a genre (`artwork/mosaic/<key>`).
+A10). It has Home, Search and Your Library (A2) and the album, artist, playlist (read-only
+until A3), folder, mix, radio, mood, genre, search results, Liked Songs and track (credits)
+pages. They play through the client's audio host with the `play` action's `tracks` and `route`
+(Liked Songs paged, so shuffling 10,000 songs costs one page). Every track row has a heart and
+an 8-entry menu (Play next, Add to queue, like, radio, album, artist, credits); album, artist,
+mix and playlist tiles have their own. The answers they bind to come from `views.py` and carry
+`context`, what the player reports it plays from, `mosaic_key`, the picture of a mix, a mood
+or a genre (`artwork/mosaic/<key>`), and the rows' own fields: `liked`/`not_liked`, `line`,
+`album_line`, `badge` (a quality), `position` in a paged list and `disc_label`.
 
 ## Mobile
 

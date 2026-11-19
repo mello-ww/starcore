@@ -65,7 +65,7 @@ export interface UiAction {
   method?: 'GET' | 'POST';
   body?: Record<string, Json>;
   confirm?: string;
-  then?: 'refresh' | 'back' | {navigate: string; params?: Record<string, Json>};
+  then?: 'refresh' | 'back' | 'update' | {navigate: string; params?: Record<string, Json>};
   /** 1.2, protected documents only: asked in this app's own prompt, put in the body. */
   secrets?: Record<string, {kind: string; new?: boolean}>;
   /** 1.2, protected documents only: a field of the answer shown once, then dropped. */

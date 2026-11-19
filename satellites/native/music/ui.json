@@ -1,5 +1,5 @@
 {
- "_about": "Music's shared interface (UI contract 1.2), a preview beside Music's own page and screens (docs/media-audio.md, milestone A1): an album, an artist, a mix, a radio station, a mood, a genre and a track's credits, each played through the client's audio host with the play action's tracks or route. Its entry pages (recently added albums, mixes and moods, genres) are temporary: A2 replaces them with Home, Library and Search. It binds to Music's existing routes; the pictures of mixes, moods and genres come from artwork/mosaic.",
+ "_about": "Music's shared interface (UI contract 1.2), a preview beside Music's own page and screens (docs/media-audio.md). A1: an album, an artist, a mix, a radio station, a mood, a genre and a track's credits, each played through the client's audio host with the play action's tracks or route. A2: Home (its sections as shelves and track rows), Search (recent searches and genres while empty, then the results, with a quality filter) and Your Library (one choice for its seven tabs, each filtered and sorted on the server, Liked Songs paged), a folder's page with its breadcrumb, and a playlist read-only; every track row has its heart, marks the track playing and has its menu, every album, artist, mix and playlist tile its own. It binds to Music's routes (views.py shapes the rows); pictures of mixes, moods, genres and playlists come from artwork/mosaic.",
  "contract": "starcore.ui/1.2",
  "title": "Music",
  "preview": true,
@@ -11,31 +11,1782 @@
    "audio.library"
   ]
  },
- "entry": "recent",
+ "entry": "home",
  "navigation": [
   {
-   "page": "recent",
-   "label": "Recent",
-   "icon": "music"
+   "page": "home",
+   "label": "Home",
+   "icon": "home"
   },
   {
-   "page": "discover",
-   "label": "Discover",
-   "icon": "star"
+   "page": "search",
+   "label": "Search",
+   "icon": "search"
   },
   {
-   "page": "genres",
-   "label": "Genres",
-   "icon": "list"
+   "page": "library",
+   "label": "Your Library",
+   "icon": "layers"
   }
  ],
  "pages": {
-  "recent": {
-   "title": "Recently added",
+  "home": {
    "source": {
-    "route": "albums?sort=added&order=desc&limit=60"
+    "route": "home?view=shelves"
    },
    "blocks": [
+    {
+     "type": "heading",
+     "text": "$.greeting"
+    },
+    {
+     "type": "text",
+     "visible": "$.empty",
+     "text": "Your library is empty. Add a music folder in Music's settings and scan it."
+    },
+    {
+     "type": "heading",
+     "text": "$.shelves.continue.title",
+     "visible": "$.shelves.continue.items"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.shelves.continue.subtitle",
+     "visible": "$.shelves.continue.subtitle"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.shelves.continue.items",
+     "size": "medium",
+     "item": {
+      "image": "artwork/mosaic/{$.mosaic_key}?size=300",
+      "key": "$.id",
+      "title": "$.title",
+      "subtitle": "$.subtitle",
+      "icon": "music"
+     },
+     "id": "home-continue",
+     "layout": "row",
+     "visible": "$.shelves.continue.items",
+     "open": [
+      {
+       "visible": "$.is_album",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      },
+      {
+       "visible": "$.is_playlist",
+       "action": {
+        "navigate": "playlist",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      },
+      {
+       "visible": "$.is_artist",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      },
+      {
+       "visible": "$.is_mix",
+       "action": {
+        "navigate": "mix",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "$.shelves.recent.title",
+     "visible": "$.shelves.recent.items"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.shelves.recent.subtitle",
+     "visible": "$.shelves.recent.subtitle"
+    },
+    {
+     "type": "media-list",
+     "items": "$.shelves.recent.items",
+     "empty": "No songs.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.shelves.recent.items",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small",
+     "visible": "$.shelves.recent.items"
+    },
+    {
+     "type": "heading",
+     "text": "$.shelves.mixes.title",
+     "visible": "$.shelves.mixes.items"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.shelves.mixes.subtitle",
+     "visible": "$.shelves.mixes.subtitle"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.shelves.mixes.items",
+     "size": "medium",
+     "item": {
+      "image": "artwork/mosaic/{$.mosaic_key}?size=300",
+      "key": "$.id",
+      "title": "$.name",
+      "subtitle": "$.description",
+      "icon": "music"
+     },
+     "id": "home-mixes",
+     "layout": "row",
+     "visible": "$.shelves.mixes.items",
+     "action": {
+      "navigate": "mix",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}",
+         "queue": "end"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "$.shelves.listening.title",
+     "visible": "$.shelves.listening.items"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.shelves.listening.subtitle",
+     "visible": "$.shelves.listening.subtitle"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.shelves.listening.items",
+     "size": "medium",
+     "item": {
+      "image": "artwork/mosaic/{$.mosaic_key}?size=300",
+      "key": "$.id",
+      "title": "$.name",
+      "subtitle": "$.description",
+      "icon": "music"
+     },
+     "id": "home-listening",
+     "layout": "row",
+     "visible": "$.shelves.listening.items",
+     "action": {
+      "navigate": "mix",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}",
+         "queue": "end"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "$.shelves.albums.title",
+     "visible": "$.shelves.albums.items"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.shelves.albums.subtitle",
+     "visible": "$.shelves.albums.subtitle"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.shelves.albums.items",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.id}?size=300",
+      "key": "$.id",
+      "title": "$.album",
+      "subtitle": "$.artist",
+      "icon": "music"
+     },
+     "id": "home-albums",
+     "layout": "row",
+     "visible": "$.shelves.albums.items",
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/album/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Save to your library",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from your library",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "$.shelves.artists.title",
+     "visible": "$.shelves.artists.items"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.shelves.artists.subtitle",
+     "visible": "$.shelves.artists.subtitle"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.shelves.artists.items",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.artwork}?size=300",
+      "key": "$.id",
+      "title": "$.name",
+      "icon": "music"
+     },
+     "id": "home-artists",
+     "layout": "row",
+     "shape": "round",
+     "visible": "$.shelves.artists.items",
+     "action": {
+      "navigate": "artist",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/artist/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Follow",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unfollow",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "$.shelves.added.title",
+     "visible": "$.shelves.added.items"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.shelves.added.subtitle",
+     "visible": "$.shelves.added.subtitle"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.shelves.added.items",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.id}?size=300",
+      "key": "$.id",
+      "title": "$.album",
+      "subtitle": "$.artist",
+      "icon": "music"
+     },
+     "id": "home-added",
+     "layout": "row",
+     "visible": "$.shelves.added.items",
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/album/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Save to your library",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from your library",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "$.shelves.recommended.title",
+     "visible": "$.shelves.recommended.items"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.shelves.recommended.subtitle",
+     "visible": "$.shelves.recommended.subtitle"
+    },
+    {
+     "type": "media-list",
+     "items": "$.shelves.recommended.items",
+     "empty": "No songs.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.reason",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.shelves.recommended.items",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small",
+     "visible": "$.shelves.recommended.items"
+    },
+    {
+     "type": "heading",
+     "text": "$.shelves.liked.title",
+     "visible": "$.shelves.liked.items"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.shelves.liked.subtitle",
+     "visible": "$.shelves.liked.subtitle"
+    },
+    {
+     "type": "media-list",
+     "items": "$.shelves.liked.items",
+     "empty": "No songs.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.shelves.liked.items",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small",
+     "visible": "$.shelves.liked.items"
+    },
+    {
+     "type": "button",
+     "label": "Show all",
+     "style": "secondary",
+     "visible": "$.shelves.liked.items",
+     "action": {
+      "navigate": "liked"
+     }
+    },
+    {
+     "type": "heading",
+     "text": "$.shelves.genres.title",
+     "visible": "$.shelves.genres.items"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.shelves.genres.subtitle",
+     "visible": "$.shelves.genres.subtitle"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.shelves.genres.items",
+     "size": "medium",
+     "item": {
+      "image": "artwork/mosaic/{$.mosaic_key}?size=300",
+      "key": "$.id",
+      "title": "$.name",
+      "subtitle": "$.description",
+      "icon": "music"
+     },
+     "id": "home-genres",
+     "layout": "row",
+     "visible": "$.shelves.genres.items",
+     "action": {
+      "navigate": "mix",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}",
+         "queue": "end"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "$.shelves.moods.title",
+     "visible": "$.shelves.moods.items"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.shelves.moods.subtitle",
+     "visible": "$.shelves.moods.subtitle"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.shelves.moods.items",
+     "size": "medium",
+     "item": {
+      "image": "artwork/mosaic/{$.mosaic_key}?size=300",
+      "key": "$.id",
+      "title": "$.name",
+      "subtitle": "$.description",
+      "icon": "music"
+     },
+     "id": "home-moods",
+     "layout": "row",
+     "visible": "$.shelves.moods.items",
+     "action": {
+      "navigate": "mix",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "mixes/{$.id}",
+         "queue": "end"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "$.shelves.start.title",
+     "visible": "$.shelves.start.items"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.shelves.start.subtitle",
+     "visible": "$.shelves.start.subtitle"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.shelves.start.items",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.id}?size=300",
+      "key": "$.id",
+      "title": "$.album",
+      "subtitle": "$.artist",
+      "icon": "music"
+     },
+     "id": "home-start",
+     "layout": "row",
+     "visible": "$.shelves.start.items",
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/album/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Save to your library",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from your library",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "search": {
+   "state": {
+    "q": "",
+    "quality": "all"
+   },
+   "source": {
+    "route": "search?q={$state.q}&quality={$state.quality}&remember=1&limit=50"
+   },
+   "blocks": [
+    {
+     "type": "search",
+     "key": "q",
+     "placeholder": "What do you want to listen to?"
+    },
+    {
+     "type": "choice",
+     "key": "quality",
+     "label": "Quality",
+     "options": [
+      {
+       "value": "all",
+       "label": "All"
+      },
+      {
+       "value": "lossless",
+       "label": "Lossless"
+      },
+      {
+       "value": "hires",
+       "label": "Hi-Res"
+      }
+     ],
+     "visible": "$.searching"
+    },
+    {
+     "type": "heading",
+     "text": "Recent searches",
+     "visible": "$.has_recent"
+    },
+    {
+     "type": "list",
+     "items": "$.recent",
+     "visible": "$.has_recent",
+     "item": {
+      "title": "$.query"
+     },
+     "action": {
+      "navigate": "results",
+      "params": {
+       "q": "$.query"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Clear recent searches",
+     "style": "secondary",
+     "visible": "$.has_recent",
+     "action": {
+      "route": "search/recent",
+      "method": "POST",
+      "body": {
+       "clear": true
+      },
+      "then": "refresh"
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Browse all",
+     "visible": "$.browse"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.browse",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.artwork}?size=300",
+      "key": "$.name",
+      "title": "$.name",
+      "icon": "music"
+     },
+     "id": "browse",
+     "visible": "$.browse",
+     "action": {
+      "navigate": "genre",
+      "params": {
+       "name": "$.name"
+      }
+     }
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.corrected_text",
+     "visible": "$.corrected_text"
+    },
+    {
+     "type": "text",
+     "text": "Nothing in your library matches this search.",
+     "visible": "$.nothing"
+    },
+    {
+     "type": "heading",
+     "text": "Top result",
+     "visible": "$.top_tiles"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.top_tiles",
+     "size": "large",
+     "item": {
+      "image": "artwork/mosaic/{$.mosaic_key}?size=300",
+      "key": "$.id",
+      "title": "$.title",
+      "subtitle": "$.subtitle",
+      "icon": "music"
+     },
+     "layout": "row",
+     "visible": "$.top_tiles",
+     "open": [
+      {
+       "visible": "$.is_artist",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      },
+      {
+       "visible": "$.is_album",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      },
+      {
+       "visible": "$.is_track",
+       "action": {
+        "play": {
+         "tracks": "$page.tracks",
+         "start": "$.id",
+         "context": "$page.context"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "Songs",
+     "visible": "$.songs"
+    },
+    {
+     "type": "media-list",
+     "items": "$.songs",
+     "empty": "No songs.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small",
+     "visible": "$.songs"
+    },
+    {
+     "type": "heading",
+     "text": "Albums",
+     "visible": "$.albums"
+    },
     {
      "type": "media-grid",
      "items": "$.albums",
@@ -47,84 +1798,2137 @@
       "subtitle": "$.artist",
       "icon": "music"
      },
+     "layout": "row",
+     "visible": "$.albums",
      "action": {
       "navigate": "album",
       "params": {
        "id": "$.id"
       }
      },
-     "empty": "No albums yet. Scan a folder in Music's settings."
-    }
-   ]
-  },
-  "discover": {
-   "title": "Discover",
-   "source": {
-    "route": "mixes"
-   },
-   "sources": {
-    "moods": {
-     "route": "moods"
-    }
-   },
-   "blocks": [
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/album/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Save to your library",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from your library",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      }
+     ]
+    },
     {
      "type": "heading",
-     "text": "Made for you"
+     "text": "Artists",
+     "visible": "$.artists"
     },
     {
      "type": "media-grid",
-     "items": "$.mixes",
+     "items": "$.artists",
      "size": "medium",
-     "empty": "Play some music to get mixes.",
+     "item": {
+      "image": "artwork/{$.artwork}?size=300",
+      "key": "$.id",
+      "title": "$.name",
+      "icon": "music"
+     },
+     "layout": "row",
+     "shape": "round",
+     "visible": "$.artists",
+     "action": {
+      "navigate": "artist",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/artist/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Follow",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unfollow",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "Playlists",
+     "visible": "$.playlists"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.playlists",
+     "size": "medium",
      "item": {
       "image": "artwork/mosaic/{$.mosaic_key}?size=300",
       "key": "$.id",
       "title": "$.name",
-      "subtitle": "$.description",
+      "subtitle": "$.line",
       "icon": "music"
      },
+     "layout": "row",
+     "visible": "$.playlists",
      "action": {
-      "navigate": "mix",
+      "navigate": "playlist",
       "params": {
        "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "playlists/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "playlists/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "playlists/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "playlists/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "playlist",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "playlist",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "Genres",
+     "visible": "$.genres"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.genres",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.artwork}?size=300",
+      "key": "$.name",
+      "title": "$.name",
+      "icon": "music"
+     },
+     "layout": "row",
+     "visible": "$.genres",
+     "action": {
+      "navigate": "genre",
+      "params": {
+       "name": "$.name"
       }
      }
     },
     {
      "type": "heading",
-     "text": "Moods"
+     "text": "All songs",
+     "visible": "$.found"
     },
     {
-     "type": "list",
-     "items": "$sources.moods.moods",
-     "empty": "No moods in this library yet.",
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "No songs.",
      "item": {
-      "title": "$.name",
-      "value": "$.tracks",
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.duration",
       "format": {
-       "value": "integer"
-      }
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
      },
      "action": {
-      "navigate": "mood",
-      "params": {
-       "id": "$.id"
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
       }
-     }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small",
+     "id": "search-songs",
+     "visible": "$.found"
     }
    ]
   },
-  "genres": {
-   "title": "Genres",
+  "results": {
+   "title": "$params.q",
+   "params": [
+    "q"
+   ],
+   "state": {
+    "quality": "all"
+   },
    "source": {
-    "route": "genres"
+    "route": "search?q={$params.q}&quality={$state.quality}&limit=50"
    },
    "blocks": [
     {
-     "type": "list",
+     "type": "choice",
+     "key": "quality",
+     "label": "Quality",
+     "options": [
+      {
+       "value": "all",
+       "label": "All"
+      },
+      {
+       "value": "lossless",
+       "label": "Lossless"
+      },
+      {
+       "value": "hires",
+       "label": "Hi-Res"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.corrected_text",
+     "visible": "$.corrected_text"
+    },
+    {
+     "type": "text",
+     "text": "Nothing in your library matches this search.",
+     "visible": "$.nothing"
+    },
+    {
+     "type": "heading",
+     "text": "Top result",
+     "visible": "$.top_tiles"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.top_tiles",
+     "size": "large",
+     "item": {
+      "image": "artwork/mosaic/{$.mosaic_key}?size=300",
+      "key": "$.id",
+      "title": "$.title",
+      "subtitle": "$.subtitle",
+      "icon": "music"
+     },
+     "layout": "row",
+     "visible": "$.top_tiles",
+     "open": [
+      {
+       "visible": "$.is_artist",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      },
+      {
+       "visible": "$.is_album",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      },
+      {
+       "visible": "$.is_track",
+       "action": {
+        "play": {
+         "tracks": "$page.tracks",
+         "start": "$.id",
+         "context": "$page.context"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "Songs",
+     "visible": "$.songs"
+    },
+    {
+     "type": "media-list",
+     "items": "$.songs",
+     "empty": "No songs.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small",
+     "visible": "$.songs"
+    },
+    {
+     "type": "heading",
+     "text": "Albums",
+     "visible": "$.albums"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.albums",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.id}?size=300",
+      "key": "$.id",
+      "title": "$.album",
+      "subtitle": "$.artist",
+      "icon": "music"
+     },
+     "layout": "row",
+     "visible": "$.albums",
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/album/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Save to your library",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from your library",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "Artists",
+     "visible": "$.artists"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.artists",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.artwork}?size=300",
+      "key": "$.id",
+      "title": "$.name",
+      "icon": "music"
+     },
+     "layout": "row",
+     "shape": "round",
+     "visible": "$.artists",
+     "action": {
+      "navigate": "artist",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/artist/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Follow",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unfollow",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "Playlists",
+     "visible": "$.playlists"
+    },
+    {
+     "type": "media-grid",
+     "items": "$.playlists",
+     "size": "medium",
+     "item": {
+      "image": "artwork/mosaic/{$.mosaic_key}?size=300",
+      "key": "$.id",
+      "title": "$.name",
+      "subtitle": "$.line",
+      "icon": "music"
+     },
+     "layout": "row",
+     "visible": "$.playlists",
+     "action": {
+      "navigate": "playlist",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "playlists/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "playlists/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "playlists/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "playlists/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "playlist",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "playlist",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      }
+     ]
+    },
+    {
+     "type": "heading",
+     "text": "Genres",
+     "visible": "$.genres"
+    },
+    {
+     "type": "media-grid",
      "items": "$.genres",
-     "empty": "No genres in this library yet.",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.artwork}?size=300",
+      "key": "$.name",
+      "title": "$.name",
+      "icon": "music"
+     },
+     "layout": "row",
+     "visible": "$.genres",
+     "action": {
+      "navigate": "genre",
+      "params": {
+       "name": "$.name"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "All songs",
+     "visible": "$.found"
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "No songs.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small",
+     "id": "search-songs",
+     "visible": "$.found"
+    }
+   ]
+  },
+  "library": {
+   "state": {
+    "tab": "playlists",
+    "q": "",
+    "liked_sort": "added",
+    "album_sort": "added",
+    "type": "all",
+    "filter": "all"
+   },
+   "source": {
+    "route": "library?tab={$state.tab}&q={$state.q}&liked_sort={$state.liked_sort}&album_sort={$state.album_sort}&type={$state.type}&filter={$state.filter}"
+   },
+   "blocks": [
+    {
+     "type": "choice",
+     "key": "tab",
+     "options": [
+      {
+       "value": "playlists",
+       "label": "Playlists"
+      },
+      {
+       "value": "liked",
+       "label": "Liked Songs"
+      },
+      {
+       "value": "albums",
+       "label": "Albums"
+      },
+      {
+       "value": "artists",
+       "label": "Artists"
+      },
+      {
+       "value": "recent",
+       "label": "Recently played"
+      },
+      {
+       "value": "folders",
+       "label": "Folders"
+      },
+      {
+       "value": "genres",
+       "label": "Genres"
+      }
+     ]
+    },
+    {
+     "type": "search",
+     "key": "q",
+     "placeholder": "Search in Your Library"
+    },
+    {
+     "type": "media-list",
+     "id": "playlists",
+     "visible": "$.showing.playlists",
+     "items": "$.playlists",
+     "empty": "No playlists yet.",
+     "size": "small",
+     "item": {
+      "title": "$.name",
+      "subtitle": "$.line",
+      "image": "artwork/mosaic/{$.mosaic_key}?size=120",
+      "key": "$.id",
+      "group": "$.group"
+     },
+     "action": {
+      "navigate": "playlist",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "playlists/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "playlists/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "playlists/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "playlists/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "playlist",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "playlist",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      }
+     ]
+    },
+    {
+     "type": "choice",
+     "key": "liked_sort",
+     "label": "Sort by",
+     "options": [
+      {
+       "value": "added",
+       "label": "Recently added"
+      },
+      {
+       "value": "title",
+       "label": "Title"
+      },
+      {
+       "value": "artist",
+       "label": "Artist"
+      },
+      {
+       "value": "album",
+       "label": "Album"
+      }
+     ],
+     "visible": "$.showing.liked"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.summary",
+     "visible": "$.showing.liked"
+    },
+    {
+     "type": "button",
+     "label": "Play",
+     "style": "primary",
+     "action": {
+      "play": {
+       "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}"
+      }
+     },
+     "visible": "$.showing.liked"
+    },
+    {
+     "type": "button",
+     "label": "Shuffle",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}",
+       "shuffle": true
+      }
+     },
+     "visible": "$.showing.liked"
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "Songs you like appear here.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}&from={$.position}"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small",
+     "more": {
+      "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}&cursor={$value}",
+      "cursor": "$.cursor"
+     },
+     "id": "liked",
+     "visible": "$.showing.liked"
+    },
+    {
+     "type": "choice",
+     "key": "album_sort",
+     "label": "Sort by",
+     "visible": "$.showing.albums",
+     "options": [
+      {
+       "value": "added",
+       "label": "Recently added"
+      },
+      {
+       "value": "released",
+       "label": "Release date"
+      },
+      {
+       "value": "name",
+       "label": "Name"
+      },
+      {
+       "value": "quality",
+       "label": "Quality"
+      }
+     ]
+    },
+    {
+     "type": "choice",
+     "key": "type",
+     "label": "Type",
+     "visible": "$.showing.albums",
+     "options": [
+      {
+       "value": "all",
+       "label": "All"
+      },
+      {
+       "value": "album",
+       "label": "Albums"
+      },
+      {
+       "value": "ep",
+       "label": "EPs"
+      },
+      {
+       "value": "single",
+       "label": "Singles"
+      },
+      {
+       "value": "compilation",
+       "label": "Compilations"
+      }
+     ]
+    },
+    {
+     "type": "media-grid",
+     "items": "$.albums",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.id}?size=300",
+      "key": "$.id",
+      "title": "$.album",
+      "subtitle": "$.artist",
+      "icon": "music"
+     },
+     "id": "albums",
+     "visible": "$.showing.albums",
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/album/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Save to your library",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from your library",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      }
+     ],
+     "more": {
+      "route": "library?tab={$state.tab}&q={$state.q}&liked_sort={$state.liked_sort}&album_sort={$state.album_sort}&type={$state.type}&filter={$state.filter}&cursor={$value}",
+      "cursor": "$.cursor"
+     },
+     "empty": "No albums match."
+    },
+    {
+     "type": "choice",
+     "key": "filter",
+     "label": "Show",
+     "visible": "$.showing.artists",
+     "options": [
+      {
+       "value": "all",
+       "label": "All"
+      },
+      {
+       "value": "featured",
+       "label": "Featured"
+      },
+      {
+       "value": "followed",
+       "label": "Followed"
+      }
+     ]
+    },
+    {
+     "type": "media-grid",
+     "items": "$.artists",
+     "size": "medium",
+     "item": {
+      "image": "artwork/{$.artwork}?size=300",
+      "key": "$.id",
+      "title": "$.name",
+      "icon": "music"
+     },
+     "id": "artists",
+     "shape": "round",
+     "visible": "$.showing.artists",
+     "action": {
+      "navigate": "artist",
+      "params": {
+       "id": "$.id"
+      }
+     },
+     "menu": [
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/artist/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Follow",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unfollow",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "artist",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "more": {
+      "route": "library?tab={$state.tab}&q={$state.q}&liked_sort={$state.liked_sort}&album_sort={$state.album_sort}&type={$state.type}&filter={$state.filter}&cursor={$value}",
+      "cursor": "$.cursor"
+     },
+     "empty": "No artists match."
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "Songs you play appear here.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small",
+     "id": "recent",
+     "visible": "$.showing.recent"
+    },
+    {
+     "type": "media-list",
+     "visible": "$.showing.folders",
+     "items": "$.sources",
+     "empty": "No music folders.",
+     "item": {
+      "title": "$.name",
+      "key": "$.index"
+     },
+     "action": {
+      "navigate": "folder",
+      "params": {
+       "source": "$.index",
+       "path": "$.path"
+      }
+     }
+    },
+    {
+     "type": "list",
+     "visible": "$.showing.genres",
+     "items": "$.genres",
+     "empty": "No genres in this library.",
      "item": {
       "title": "$.name",
       "value": "$.tracks",
@@ -138,6 +3942,687 @@
        "name": "$.name"
       }
      }
+    }
+   ]
+  },
+  "liked": {
+   "title": "Liked Songs",
+   "state": {
+    "liked_sort": "added",
+    "q": ""
+   },
+   "source": {
+    "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}"
+   },
+   "blocks": [
+    {
+     "type": "search",
+     "key": "q",
+     "placeholder": "Search in Liked Songs"
+    },
+    {
+     "type": "choice",
+     "key": "liked_sort",
+     "label": "Sort by",
+     "options": [
+      {
+       "value": "added",
+       "label": "Recently added"
+      },
+      {
+       "value": "title",
+       "label": "Title"
+      },
+      {
+       "value": "artist",
+       "label": "Artist"
+      },
+      {
+       "value": "album",
+       "label": "Album"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.summary"
+    },
+    {
+     "type": "button",
+     "label": "Play",
+     "style": "primary",
+     "action": {
+      "play": {
+       "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Shuffle",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}",
+       "shuffle": true
+      }
+     }
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "Songs you like appear here.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}&from={$.position}"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small",
+     "more": {
+      "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}&cursor={$value}",
+      "cursor": "$.cursor"
+     },
+     "id": "liked"
+    }
+   ]
+  },
+  "playlist": {
+   "title": "$.name",
+   "params": [
+    "id"
+   ],
+   "source": {
+    "route": "playlists/{$params.id}"
+   },
+   "blocks": [
+    {
+     "type": "image",
+     "src": "artwork/mosaic/{$.mosaic_key}?size=600",
+     "alt": "$.name",
+     "size": "large"
+    },
+    {
+     "type": "heading",
+     "text": "$.name"
+    },
+    {
+     "type": "text",
+     "text": "$.description",
+     "visible": "$.description"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.line"
+    },
+    {
+     "type": "button",
+     "label": "Play",
+     "style": "primary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Shuffle",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "context": "$.context",
+       "shuffle": true
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Pin",
+     "style": "secondary",
+     "visible": "$.not_pinned",
+     "action": {
+      "route": "pins",
+      "method": "POST",
+      "body": {
+       "kind": "playlist",
+       "id": "$.id",
+       "pinned": true
+      },
+      "then": "refresh"
+     }
+    },
+    {
+     "type": "button",
+     "label": "Unpin",
+     "style": "secondary",
+     "visible": "$.pinned",
+     "action": {
+      "route": "pins",
+      "method": "POST",
+      "body": {
+       "kind": "playlist",
+       "id": "$.id",
+       "pinned": false
+      },
+      "then": "refresh"
+     }
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "This playlist is empty.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small"
+    }
+   ]
+  },
+  "folder": {
+   "title": "$.name",
+   "params": [
+    "source",
+    "path"
+   ],
+   "source": {
+    "route": "folders/{$params.source}?path={$params.path}"
+   },
+   "blocks": [
+    {
+     "type": "breadcrumb",
+     "items": "$.crumbs",
+     "item": {
+      "title": "$.name"
+     },
+     "action": {
+      "navigate": "folder",
+      "params": {
+       "source": "$.source",
+       "path": "$.path"
+      }
+     }
+    },
+    {
+     "type": "media-list",
+     "items": "$.folders",
+     "item": {
+      "title": "$.name",
+      "subtitle": "$.line",
+      "key": "$.path"
+     },
+     "action": {
+      "navigate": "folder",
+      "params": {
+       "source": "$.source",
+       "path": "$.path"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Play",
+     "style": "primary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "context": "$.context"
+      }
+     },
+     "visible": "$.tracks"
+    },
+    {
+     "type": "button",
+     "label": "Shuffle",
+     "style": "secondary",
+     "action": {
+      "play": {
+       "tracks": "$.tracks",
+       "context": "$.context",
+       "shuffle": true
+      }
+     },
+     "visible": "$.tracks"
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "No songs in this folder itself.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "key": "$.id"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ]
     }
    ]
   },
@@ -174,6 +4659,11 @@
      }
     },
     {
+     "type": "text",
+     "style": "caption",
+     "text": "$.line"
+    },
+    {
      "type": "button",
      "label": "Play",
      "style": "primary",
@@ -191,8 +4681,8 @@
      "action": {
       "play": {
        "tracks": "$.tracks",
-       "shuffle": true,
-       "context": "$.context"
+       "context": "$.context",
+       "shuffle": true
       }
      }
     },
@@ -207,16 +4697,83 @@
      }
     },
     {
+     "type": "button",
+     "label": "Save to your library",
+     "style": "secondary",
+     "visible": "$.not_liked",
+     "action": {
+      "route": "favorites",
+      "method": "POST",
+      "body": {
+       "kind": "album",
+       "id": "$.id",
+       "liked": true
+      },
+      "then": "refresh"
+     }
+    },
+    {
+     "type": "button",
+     "label": "Remove from your library",
+     "style": "secondary",
+     "visible": "$.liked",
+     "action": {
+      "route": "favorites",
+      "method": "POST",
+      "body": {
+       "kind": "album",
+       "id": "$.id",
+       "liked": false
+      },
+      "then": "refresh"
+     }
+    },
+    {
+     "type": "button",
+     "label": "Pin",
+     "style": "secondary",
+     "visible": "$.not_pinned",
+     "action": {
+      "route": "pins",
+      "method": "POST",
+      "body": {
+       "kind": "album",
+       "id": "$.id",
+       "pinned": true
+      },
+      "then": "refresh"
+     }
+    },
+    {
+     "type": "button",
+     "label": "Unpin",
+     "style": "secondary",
+     "visible": "$.pinned",
+     "action": {
+      "route": "pins",
+      "method": "POST",
+      "body": {
+       "kind": "album",
+       "id": "$.id",
+       "pinned": false
+      },
+      "then": "refresh"
+     }
+    },
+    {
      "type": "media-list",
      "items": "$.tracks",
-     "empty": "No tracks.",
+     "empty": "No songs.",
      "item": {
       "title": "$.title",
-      "subtitle": "$.artist",
+      "subtitle": "$.line",
       "meta": "$.duration",
       "format": {
        "meta": "duration"
-      }
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "group": "$.disc_label"
      },
      "action": {
       "play": {
@@ -224,7 +4781,137 @@
        "start": "$.id",
        "context": "$page.context"
       }
-     }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ]
     },
     {
      "type": "card",
@@ -274,31 +4961,12 @@
     },
     {
      "type": "heading",
-     "text": "Credits"
-    },
-    {
-     "type": "list",
-     "items": "$.tracks",
-     "item": {
-      "title": "$.title",
-      "subtitle": "$.credits.composer"
-     },
-     "action": {
-      "navigate": "track",
-      "params": {
-       "id": "$.id"
-      }
-     }
-    },
-    {
-     "type": "heading",
      "text": "More by this artist",
      "visible": "$.more_by_artist"
     },
     {
      "type": "media-grid",
      "items": "$.more_by_artist",
-     "visible": "$.more_by_artist",
      "size": "medium",
      "item": {
       "image": "artwork/{$.id}?size=300",
@@ -307,12 +4975,135 @@
       "subtitle": "$.artist",
       "icon": "music"
      },
+     "layout": "row",
+     "visible": "$.more_by_artist",
      "action": {
       "navigate": "album",
       "params": {
        "id": "$.id"
       }
-     }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/album/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Save to your library",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from your library",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      }
+     ]
     }
    ]
   },
@@ -355,8 +5146,8 @@
      "action": {
       "play": {
        "tracks": "$.top_tracks",
-       "shuffle": true,
-       "context": "$.context"
+       "context": "$.context",
+       "shuffle": true
       }
      }
     },
@@ -371,20 +5162,55 @@
      }
     },
     {
+     "type": "button",
+     "label": "Follow",
+     "style": "secondary",
+     "visible": "$.not_followed",
+     "action": {
+      "route": "favorites",
+      "method": "POST",
+      "body": {
+       "kind": "artist",
+       "id": "$.id",
+       "liked": true
+      },
+      "then": "refresh"
+     }
+    },
+    {
+     "type": "button",
+     "label": "Unfollow",
+     "style": "secondary",
+     "visible": "$.followed",
+     "action": {
+      "route": "favorites",
+      "method": "POST",
+      "body": {
+       "kind": "artist",
+       "id": "$.id",
+       "liked": false
+      },
+      "then": "refresh"
+     }
+    },
+    {
      "type": "heading",
      "text": "Popular"
     },
     {
      "type": "media-list",
      "items": "$.top_tracks",
-     "empty": "No tracks.",
+     "empty": "No songs.",
      "item": {
       "title": "$.title",
-      "subtitle": "$.album",
+      "subtitle": "$.album_line",
       "meta": "$.duration",
       "format": {
        "meta": "duration"
-      }
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
      },
      "action": {
       "play": {
@@ -392,7 +5218,138 @@
        "start": "$.id",
        "context": "$page.context"
       }
-     }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small"
     },
     {
      "type": "heading",
@@ -402,7 +5359,6 @@
     {
      "type": "media-grid",
      "items": "$.albums",
-     "visible": "$.albums",
      "size": "medium",
      "item": {
       "image": "artwork/{$.id}?size=300",
@@ -411,12 +5367,134 @@
       "subtitle": "$.artist",
       "icon": "music"
      },
+     "visible": "$.albums",
      "action": {
       "navigate": "album",
       "params": {
        "id": "$.id"
       }
-     }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/album/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Save to your library",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from your library",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      }
+     ]
     },
     {
      "type": "heading",
@@ -426,7 +5504,6 @@
     {
      "type": "media-grid",
      "items": "$.singles",
-     "visible": "$.singles",
      "size": "medium",
      "item": {
       "image": "artwork/{$.id}?size=300",
@@ -435,12 +5512,135 @@
       "subtitle": "$.artist",
       "icon": "music"
      },
+     "layout": "row",
+     "visible": "$.singles",
      "action": {
       "navigate": "album",
       "params": {
        "id": "$.id"
       }
-     }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/album/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Save to your library",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from your library",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      }
+     ]
     },
     {
      "type": "heading",
@@ -450,7 +5650,6 @@
     {
      "type": "media-grid",
      "items": "$.appears_on",
-     "visible": "$.appears_on",
      "size": "medium",
      "item": {
       "image": "artwork/{$.id}?size=300",
@@ -459,12 +5658,135 @@
       "subtitle": "$.artist",
       "icon": "music"
      },
+     "layout": "row",
+     "visible": "$.appears_on",
      "action": {
       "navigate": "album",
       "params": {
        "id": "$.id"
       }
-     }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/album/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Save to your library",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from your library",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      }
+     ]
     },
     {
      "type": "heading",
@@ -530,22 +5852,25 @@
      "action": {
       "play": {
        "tracks": "$.tracks",
-       "shuffle": true,
-       "context": "$.context"
+       "context": "$.context",
+       "shuffle": true
       }
      }
     },
     {
      "type": "media-list",
      "items": "$.tracks",
-     "empty": "No tracks.",
+     "empty": "No songs.",
      "item": {
       "title": "$.title",
       "subtitle": "$.reason",
       "meta": "$.duration",
       "format": {
        "meta": "duration"
-      }
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
      },
      "action": {
       "play": {
@@ -553,7 +5878,138 @@
        "start": "$.id",
        "context": "$page.context"
       }
-     }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small"
     }
    ]
   },
@@ -594,22 +6050,25 @@
      "action": {
       "play": {
        "tracks": "$.tracks",
-       "shuffle": true,
-       "context": "$.context"
+       "context": "$.context",
+       "shuffle": true
       }
      }
     },
     {
      "type": "media-list",
      "items": "$.tracks",
-     "empty": "No tracks.",
+     "empty": "No songs.",
      "item": {
       "title": "$.title",
-      "subtitle": "$.artist",
+      "subtitle": "$.line",
       "meta": "$.duration",
       "format": {
        "meta": "duration"
-      }
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
      },
      "action": {
       "play": {
@@ -617,7 +6076,138 @@
        "start": "$.id",
        "context": "$page.context"
       }
-     }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small"
     }
    ]
   },
@@ -658,22 +6248,25 @@
      "action": {
       "play": {
        "tracks": "$.tracks",
-       "shuffle": true,
-       "context": "$.context"
+       "context": "$.context",
+       "shuffle": true
       }
      }
     },
     {
      "type": "media-list",
      "items": "$.tracks",
-     "empty": "No tracks.",
+     "empty": "No songs.",
      "item": {
       "title": "$.title",
-      "subtitle": "$.artist",
+      "subtitle": "$.line",
       "meta": "$.duration",
       "format": {
        "meta": "duration"
-      }
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
      },
      "action": {
       "play": {
@@ -681,7 +6274,138 @@
        "start": "$.id",
        "context": "$page.context"
       }
-     }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small"
     }
    ]
   },
@@ -722,8 +6446,8 @@
      "action": {
       "play": {
        "tracks": "$.tracks",
-       "shuffle": true,
-       "context": "$.context"
+       "context": "$.context",
+       "shuffle": true
       }
      }
     },
@@ -747,7 +6471,6 @@
     {
      "type": "media-grid",
      "items": "$.albums",
-     "visible": "$.albums",
      "size": "medium",
      "item": {
       "image": "artwork/{$.id}?size=300",
@@ -756,28 +6479,154 @@
       "subtitle": "$.artist",
       "icon": "music"
      },
+     "layout": "row",
+     "visible": "$.albums",
      "action": {
       "navigate": "album",
       "params": {
        "id": "$.id"
       }
-     }
+     },
+     "menu": [
+      {
+       "label": "Play",
+       "icon": "play",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Shuffle",
+       "icon": "rotate-ccw",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "shuffle": true
+        }
+       }
+      },
+      {
+       "label": "Play next",
+       "icon": "chevron-right",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "route": "albums/{$.id}",
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/album/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Save to your library",
+       "icon": "plus",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from your library",
+       "icon": "x",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Pin",
+       "icon": "map-pin",
+       "visible": "$.not_pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Unpin",
+       "icon": "map-pin",
+       "visible": "$.pinned",
+       "action": {
+        "route": "pins",
+        "method": "POST",
+        "body": {
+         "kind": "album",
+         "id": "$.id",
+         "pinned": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      }
+     ]
     },
     {
      "type": "heading",
-     "text": "Tracks"
+     "text": "Songs"
     },
     {
      "type": "media-list",
      "items": "$.tracks",
-     "empty": "No tracks.",
+     "empty": "No songs.",
      "item": {
       "title": "$.title",
-      "subtitle": "$.artist",
+      "subtitle": "$.line",
       "meta": "$.duration",
       "format": {
        "meta": "duration"
-      }
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
      },
      "action": {
       "play": {
@@ -785,7 +6634,138 @@
        "start": "$.id",
        "context": "$page.context"
       }
-     }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small"
     }
    ]
   },

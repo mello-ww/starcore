@@ -57,6 +57,38 @@ export async function playTracks(satellite, tracks, options = {}) {
     return handOver(player(), tracks, options);
 }
 
+/** Tells `listener` the id of the track playing now whenever it changes, when it is one of
+ * `satellite`'s (the audio.library provider's), else null - so a page marks its playing row
+ * (the UI contract's `item.audio`, 1.2). Returns the function that stops it. */
+export function nowPlaying(satellite, listener) {
+    let off = null;
+    let stopped = false;
+    start().then((provider) => {
+        if (stopped || !provider) {
+            return;
+        }
+        const instance = player();
+        let last;
+        const tell = () => {
+            const track = instance.current;
+            const id = provider.satellite === satellite && track && track.id ? String(track.id) : null;
+            if (id !== last) {
+                last = id;
+                listener(id);
+            }
+        };
+        const offs = [instance.on("track", tell), instance.on("queue", tell)];
+        off = () => offs.forEach((stop) => stop());
+        tell();
+    }).catch(() => {});
+    return () => {
+        stopped = true;
+        if (off) {
+            off();
+        }
+    };
+}
+
 /** Starts the host once; later calls return the same promise. Settles with the provider,
  * or null when the server offers no audio library (then nothing is drawn). */
 export function start() {

@@ -163,7 +163,7 @@ describe('the media-grid block', () => {
       ['media-quick-b', 'Unfavorite'],
     ]);
     act(() => quick[1].props.onPress());
-    expect(ctx.runAction).toHaveBeenCalledWith(remove.action, expect.objectContaining({data: data.items[1]}));
+    expect(ctx.runAction).toHaveBeenCalledWith(remove.action, expect.objectContaining({data: data.items[1]}), undefined, expect.anything());
     // the viewer didn't open
     expect((ctx.setOverlay as jest.Mock).mock.calls.filter(([overlay]) => overlay)).toEqual([]);
   });

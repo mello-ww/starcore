@@ -2210,3 +2210,211 @@ button.ui-breadcrumb-item:focus-visible {
     flex: none;
     color: var(--sc-text-icon);
 }
+
+/* ---------- a row's own actions, menus and shelves (1.2) ---------- */
+
+/* a media-list row: what it opens, then its quick buttons and More beside it */
+.ui-media-row {
+    gap: var(--sc-space-1);
+    padding-right: 6px;
+}
+
+.ui-media-row.is-action:hover {
+    background: #25262c;
+}
+
+.ui-card .ui-media-row.is-action:hover {
+    background: var(--sc-control-strong);
+}
+
+.ui-media-row-open {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--sc-space-3);
+    min-width: 0;
+    min-height: inherit;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+button.ui-media-row-open {
+    cursor: pointer;
+}
+
+button.ui-media-row-open:focus-visible {
+    border-radius: var(--sc-radius-control);
+    outline: 2px solid var(--sc-accent);
+    outline-offset: 2px;
+}
+
+.ui-media-row-open .ui-list-value {
+    margin-right: var(--sc-space-2);
+}
+
+.ui-row-quick,
+.ui-row-more {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+}
+
+.ui-row-quick.is-active {
+    color: var(--sc-accent);
+}
+
+.ui-row-quick.is-active svg {
+    fill: currentColor;
+}
+
+.ui-row-more {
+    font-size: 18px;
+    line-height: 1;
+}
+
+/* the row of the track playing now */
+.ui-media-row.is-playing .ui-list-title {
+    color: var(--sc-accent);
+}
+
+.ui-list-group {
+    margin: var(--sc-space-3) 0 var(--sc-space-1);
+}
+
+.ui-media-list > .ui-list-group:first-child {
+    margin-top: 0;
+}
+
+/* a row's or a tile's menu: a small floating card */
+.ui-menu {
+    position: fixed;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    min-width: 200px;
+    max-width: min(320px, calc(100vw - 16px));
+    padding: 6px;
+    border: 1px solid var(--sc-line);
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.ui-menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sc-space-3);
+    min-height: 38px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--sc-radius-control);
+    background: none;
+    color: var(--sc-text);
+    font: 500 14px/1.2 var(--sc-font-sans);
+    text-align: left;
+    cursor: pointer;
+}
+
+.ui-menu-item:hover,
+.ui-menu-item:focus-visible {
+    background: var(--sc-control);
+    outline: none;
+}
+
+.ui-menu-item.is-danger {
+    color: var(--sc-danger);
+}
+
+.ui-menu-icon {
+    display: inline-flex;
+    flex: none;
+    width: 16px;
+    color: var(--sc-text-icon);
+}
+
+.ui-menu-item.is-danger .ui-menu-icon {
+    color: inherit;
+}
+
+.ui-menu-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* a tile's More, in the corner under its quick button */
+.ui-media-tile-more {
+    top: auto;
+    bottom: 6px;
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* a shelf (media-grid layout row): one row of tiles that scrolls sideways */
+.ui-media-shelf {
+    position: relative;
+}
+
+.ui-media-shelf-track {
+    display: grid;
+    grid-auto-columns: var(--ui-tile);
+    grid-auto-flow: column;
+    gap: 12px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 4px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+}
+
+.ui-media-shelf-track::-webkit-scrollbar {
+    display: none;
+}
+
+.ui-media-shelf-track > .ui-media-tile {
+    scroll-snap-align: start;
+}
+
+.ui-media-shelf.ui-media-grid-full .ui-media-shelf-track {
+    grid-auto-columns: min(100%, 420px);
+}
+
+.ui-media-shelf-step {
+    position: absolute;
+    top: calc(var(--ui-tile) / 2 - 18px);
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--sc-control-strong);
+    color: var(--sc-text);
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.ui-media-shelf-previous { left: 4px; }
+.ui-media-shelf-next { right: 4px; }
+
+.ui-media-shelf:hover .ui-media-shelf-step:not(:disabled),
+.ui-media-shelf-step:focus-visible {
+    opacity: 1;
+}
+
+.ui-media-shelf-step:disabled {
+    visibility: hidden;
+}
+
+@media (hover: none) {
+    .ui-media-shelf-step { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-media-shelf-step { transition: none; }
+    .ui-media-shelf-track { scroll-behavior: auto; }
+}

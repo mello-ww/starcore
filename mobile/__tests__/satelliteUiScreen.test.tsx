@@ -281,7 +281,7 @@ describe('SatelliteUiScreen', () => {
     audioHost.current = {playTracks, playSearch: jest.fn()};
     const {tree} = await mount({params: {name: 'Tunes'}});
     await press(tree, 'Play');
-    expect(playTracks).toHaveBeenLastCalledWith('Tunes', tracks, {start: undefined, shuffle: false, queue: undefined, context: 'album:9'});
+    expect(playTracks).toHaveBeenLastCalledWith('Tunes', tracks, {start: undefined, shuffle: false, queue: undefined, context: 'album:9', page: null});
     await press(tree, 'Shuffle');
     expect(playTracks).toHaveBeenLastCalledWith('Tunes', tracks, expect.objectContaining({shuffle: true}));
     await press(tree, 'Radio');

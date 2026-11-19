@@ -1,24 +1,32 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {FlatList, StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent} from 'react-native';
 import {tokens} from '../../theme';
-import {isShown, ListFooter, ListRow, UiBlocks, type BlockContext} from './UiBlocks';
+import {
+  isShown, ListFooter, ListRow, MediaGroupHeading, mediaGroup, MediaRow, mediaRowKeys, UiBlocks, type BlockContext,
+} from './UiBlocks';
 import {createListPaging, type ListPaging} from './listPaging';
 import {resolve, type Scope, type UiBlock} from './contract';
+import {usePlayingId} from './RowMenu';
+import {isPlayingRow} from './rows';
 
 const {space, type} = tokens;
 
 /** What a list page is drawn as, one entry per line: a block of the page, a row of one of its
- * lists, a list's empty text, or the footer of a list that loads further pages. `gap` is the
- * space above it. */
+ * lists, a media-list group's heading, a list's empty text, or the footer of a list that loads
+ * further pages. `gap` is the space above it. */
 export type PageEntry =
   | {kind: 'block'; key: string; block: UiBlock; gap: number}
   | {kind: 'row'; key: string; block: UiBlock; item: any; gap: number}
+  | {kind: 'group'; key: string; block: UiBlock; label: string; gap: number}
   | {kind: 'empty'; key: string; block: UiBlock; gap: number}
   | {kind: 'foot'; key: string; block: UiBlock; gap: number};
 
+/** The blocks a list page draws row by row: a list and a media-list (1.2). */
+const isRowList = (block: UiBlock | undefined) => block?.type === 'list' || block?.type === 'media-list';
+
 /** Whether a page's own blocks include a list that loads further pages (1.2 `more`). */
 export function hasPagedList(blocks: UiBlock[] | undefined, scope: Scope, context: BlockContext): boolean {
-  return (blocks ?? []).some(block => block?.type === 'list' && Boolean(block.more) && isShown(block, scope, context));
+  return (blocks ?? []).some(block => isRowList(block) && Boolean(block.more) && isShown(block, scope, context));
 }
 
 /** The page's shown blocks as one sequence: each list's rows one by one, everything else whole.
@@ -33,7 +41,7 @@ export function pageEntries(blocks: UiBlock[] | undefined, scope: Scope, context
       return;
     }
     const key = block.id ?? `${block.type}-${index}`;
-    if (block.type !== 'list') {
+    if (!isRowList(block)) {
       add({kind: 'block', key, block, gap: space.md});
       return;
     }
@@ -43,7 +51,24 @@ export function pageEntries(blocks: UiBlock[] | undefined, scope: Scope, context
       add({kind: 'empty', key, block, gap: space.md});
       return;
     }
-    rows.forEach((item, row) => add({kind: 'row', key: `${key}:${row}`, block, item, gap: row ? 2 : space.md}));
+    if (block.type === 'media-list') {
+      // a media-list's rows keep their key (`item.key`) as pages arrive; a group's heading sits
+      // above its first row
+      const keys = mediaRowKeys(block, rows, scope);
+      let label = '';
+      rows.forEach((item, row) => {
+        const group = mediaGroup(block, {...scope, data: item});
+        if (group !== '' && group !== label) {
+          add({kind: 'group', key: `${key}:group:${row}`, block, label: group, gap: row ? space.sm : space.md});
+          label = group;
+          add({kind: 'row', key: `${key}:${keys[row]}`, block, item, gap: 0});
+          return;
+        }
+        add({kind: 'row', key: `${key}:${keys[row]}`, block, item, gap: row ? 2 : space.md});
+      });
+    } else {
+      rows.forEach((item, row) => add({kind: 'row', key: `${key}:${row}`, block, item, gap: row ? 2 : space.md}));
+    }
     if (status && (status.more || status.error)) {
       add({kind: 'foot', key: `${key}:more`, block, gap: 2});
     }
@@ -100,9 +125,12 @@ export function VirtualListPage({
     [paging],
   );
   const entries = pageEntries(blocks, scope, context, paging);
+  // the row the audio host plays, when a media-list here marks it (`item.audio`, 1.2)
+  const marks = (blocks ?? []).some(block => block?.type === 'media-list' && block.item?.audio !== undefined);
+  const playing = usePlayingId(context.satellite, marks);
   // after a refresh of the same page: each list back to as many pages as it had
   const restoring = (blocks ?? []).filter(block => {
-    if (block?.type !== 'list' || !block.more) {
+    if (!isRowList(block) || !block.more) {
       return false;
     }
     const status = paging.status(block);
@@ -114,8 +142,20 @@ export function VirtualListPage({
 
   const renderItem = ({item: entry}: {item: PageEntry}) => {
     let content: React.ReactNode;
-    if (entry.kind === 'row') {
+    if (entry.kind === 'row' && entry.block.type === 'media-list') {
+      content = (
+        <MediaRow
+          block={entry.block}
+          item={entry.item}
+          scope={scope}
+          context={context}
+          playing={isPlayingRow(entry.block, {...scope, data: entry.item}, playing)}
+        />
+      );
+    } else if (entry.kind === 'row') {
       content = <ListRow block={entry.block} item={entry.item} scope={scope} context={context} />;
+    } else if (entry.kind === 'group') {
+      content = <MediaGroupHeading label={entry.label} />;
     } else if (entry.kind === 'foot') {
       content = <NearFooter block={entry.block} scope={scope} paging={paging} next={next} />;
     } else if (entry.kind === 'empty') {
@@ -130,6 +170,7 @@ export function VirtualListPage({
     <FlatList
       testID="ui-list-page"
       data={entries}
+      extraData={playing}
       keyExtractor={entry => entry.key}
       renderItem={renderItem}
       initialNumToRender={16}

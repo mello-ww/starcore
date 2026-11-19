@@ -259,8 +259,8 @@ Locked Folder). `status` never extends it.
 | `status` (1.1) | `label` | `tone`, `detail` | a state as a dot and a word, never colour alone ("Healthy", "2 warnings") |
 | `code` (1.1) | `value` | `label`, `copy` | text or JSON, folded under `label`, with a Copy button when `copy` is true |
 | `image` (1.2) | `src` | `alt`, `caption`, `size`, `shape`, `fit` | an image from one of the Satellite's own routes - see [Media](#media-image-and-media-list) |
-| `media-list` (1.2) | `items`, `item` | `empty`, `action`, `size`, `shape` | rows with a thumbnail; `item` maps `title`, `subtitle`, `meta`, `image` and `format` (`{subtitle, meta}`) - see [Media](#media-image-and-media-list) |
-| `media-grid` (1.2) | `items`, `item` | `empty`, `action` or `viewer`, `selection`, `size`, `shape` | a grid of images and videos with the shared viewer and selection - see [Media gallery](#media-gallery-media-grid) |
+| `media-list` (1.2) | `items`, `item` | `empty`, `action`, `size`, `shape`, `more`, `quick`, `menu` | rows with a thumbnail; `item` maps `title`, `subtitle`, `meta`, `image`, `format` (`{subtitle, meta, group}`), `key`, `group` and `audio` - see [Media](#media-image-and-media-list) |
+| `media-grid` (1.2) | `items`, `item` | `empty`, `action`, `open` or `viewer`, `quick`, `menu`, `selection`, `size`, `shape`, `more`, `layout` | a grid of images and videos with the shared viewer and selection, or one row of tiles (a shelf) - see [Media gallery](#media-gallery-media-grid) |
 | `search` (1.2) | `key` | `label`, `placeholder` | a search field that sets the page state `key` as the person types - see [Search and map](#search-and-map) |
 | `breadcrumb` (1.2) | `items`, `item` | `action` | the way down to the current place on one scrolling row: `item` maps `title`; every entry but the last runs `action` with itself as the scope, the last is where the person is and is not pressable. A client draws pills (web) or a horizontally scrolling row of pills (Android), kept scrolled to the end |
 | `map` (1.2) | `items`, `item` | `empty`, `action` or `viewer` | located items on an interactive map, in clusters, opening the shared viewer - see [Search and map](#search-and-map) |
@@ -371,6 +371,46 @@ use them without the client knowing what the images are.
   own, shows the image glyph in its place. Images load lazily on the web.
 - A media-list row takes the block's `action`, any action (`navigate`, a route, `play`), with
   the row as `$.`, like a `list`. `meta` is a short piece of text at the end of the row.
+- What a media-grid has, a media-list has too (change 7), so a list of tracks needs no client
+  code:
+  - `key` identifies a row across refreshes and pages; `group` puts consecutive rows with the
+    same value under one heading (an album's discs), formatted by `format.group`;
+  - `more` pages the list, by [the list's rule](#paging-a-list);
+  - `quick`: up to 2 `{label, icon, action, visible, style}` at the row's end, the first whose
+    `visible` holds drawn as a small icon button; a `primary` one is drawn active, so a pair is
+    a toggle (a heart: "Add to Liked Songs" while `$.not_liked`, "Remove" while `$.liked`);
+  - `menu`: see [Row and tile menus](#row-and-tile-menus);
+  - `item.audio`, a binding to a track id, marks the row as one of the document Satellite's own
+    `audio.library` tracks: the row of the track the client's audio host is playing from that
+    Satellite is marked (the equaliser bars).
+
+### Row and tile menus
+
+A media-list's rows and a media-grid's tiles take a `menu` (change 7): up to 10
+`{label, icon, action, visible, style}`, with the row or tile as `$.`.
+
+```json
+{"type": "media-list", "items": "$.tracks",
+ "item": {"title": "$.title", "subtitle": "$.line", "key": "$.id", "audio": "$.id"},
+ "action": {"play": {"tracks": "$page.tracks", "start": "$.id"}},
+ "quick": [{"label": "Like", "icon": "heart", "visible": "$.not_liked",
+            "action": {"route": "favorites", "body": {"id": "$.id", "liked": true}, "then": "update"}},
+           {"label": "Unlike", "icon": "heart", "style": "primary", "visible": "$.liked",
+            "action": {"route": "favorites", "body": {"id": "$.id", "liked": false}, "then": "update"}}],
+ "menu": [{"label": "Play next", "icon": "play", "action": {"play": {"tracks": ["$"], "queue": "next"}}},
+          {"label": "Go to album", "visible": "$.album_id", "action": {"navigate": "album", "params": {"id": "$.album_id"}}}]}
+```
+
+- The web opens it from a More button at the row's end, a right-click, the context-menu key or
+  Shift+F10; Android from a More button or a long press, as a bottom sheet. Choosing an entry
+  closes the menu and runs it on that row.
+- An entry whose `visible` doesn't hold is left out, and so is one the client can't run there
+  (a `share` the device can't do, an `own` action without the Satellite's own interface). A
+  menu left empty hides its button.
+- **`then: "update"`**, only in a row's or tile's `quick` and `menu`: the answer's `item`
+  object is merged into that row, which is drawn again in place - no reload, so a long list
+  keeps its pages and its scroll position. A heart answers `{"item": {"liked": true,
+  "not_liked": false}}`. An answer without an `item` object changes nothing.
 - `size`, `shape` and `fit` are fixed words, never bindings, so the layout is known before any
   data arrives.
 
@@ -436,6 +476,10 @@ collection: the document says where each picture comes from and what can be done
   the web) starts a selection; the bar shows the count and the actions. An action runs once
   per selected item with that item as `$.`; its `confirm` is asked once, its `then` applies
   once at the end, and a count of failures is shown if any.
+- **`layout`** (change 7): `grid` (the default) or `row`, one row of tiles that scrolls
+  sideways (a shelf), at the grid's `size`, with no paging, density control or selection.
+  Android draws a horizontal list that snaps to its tiles; the web a scroll-snapping row with
+  Previous and Next buttons. A shelf's tiles take `quick` and `menu` as a grid's.
 - **`size`**: `small`, `medium` (the default), `large`, or `full` (one per row): the width
   a tile aims for. Each client fits as many columns as that width allows (3 on a typical phone
   at `medium`), so the grid follows the screen. **`shape`**: `square` (default), `wide` (16:9)
@@ -474,7 +518,7 @@ collection: the document says where each picture comes from and what can be done
 
 ### Paging a list
 
-A `list` takes the same `more` as a media-grid (1.2): `{"route": "...&cursor={$value}",
+A `list` and a `media-list` take the same `more` as a media-grid (1.2): `{"route": "...&cursor={$value}",
 "cursor": "$.next"}`, and `items` must be bound to the page's data. The page's data holds the
 first page; near the end of the list (or with "Show more"), the client calls `route` with the
 cursor and appends the rows of the answer, which has the page data's shape. As for a grid, the
@@ -487,6 +531,13 @@ one - so only the lines near the screen are mounted however many rows have loade
 list loads its next page as its own end nears the screen, as on the web. A paged list inside a
 card stays in the page's own scrolling. A provider still keeps its pages small (a few hundred
 rows), as each is one request.
+
+## Going back to a page
+
+Both clients (no contract change): going back to a page restores where the person was - its
+scroll position and the pages of each paged list already loaded - so returning from an album
+lands on the same row of a long list. Mission Control keeps them per history entry; Android per
+screen in its stack.
 
 ## Search and map
 
@@ -605,6 +656,8 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
 - **`then`** says what happens after a successful request:
   - `refresh` reloads the page data;
   - `back` closes a detail page;
+  - `update` (change 7), from a row's or a tile's `quick` or `menu` only, merges the answer's
+    `item` into that row (see [Row and tile menus](#row-and-tile-menus));
   - `{navigate, params}` opens a page, where `$.` refers to the action's **response**, which is
     how "add an item, then open it" works.
 - **`navigate`** on its own is a navigation-only action.
@@ -647,7 +700,15 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
   Satellite that doesn't provide `audio.library`, and a client whose audio host plays from
   another provider says so instead of playing. The host takes each track's `id` (dropping
   missing ones) and resolves its stream through the provider, never from a URL in the data. It
-  plays one list, so it isn't allowed in a selection or a tile's quick actions.
+  plays one list, so it isn't allowed in a selection; a row's or a tile's `quick` and `menu`
+  may use it (change 7).
+  - A long list is never sent whole: a `route` may answer a page, `{tracks, count, cursor}`.
+    The host queues the first page and asks for the next (`cursor=`) when about 25 tracks are
+    left. With `shuffle`, it keeps only `count` and asks for the positions it draws
+    (`positions=` up to 50, a partial Fisher-Yates over the indexes), so shuffling 10,000
+    tracks costs a page, not the list. A row of a paged list plays the list from itself with
+    `from=` (its position): the answer counts from there. The Satellite owns these parameters'
+    meaning; the host only passes them back.
 - **`pick`** (1.2), with a `route`: the person chooses media through the client's own media
   picker, then the route runs with what was chosen as `$value`.
 

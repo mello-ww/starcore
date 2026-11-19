@@ -19,6 +19,21 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   Discover and Genres tabs. Music's answers carry what they play from (`context`), a genre has
   its own page (`genres?name=`), and `artwork/mosaic/...` draws four album covers as one
   square picture.
+- **Row and tile menus, shelves and paged track lists (UI contract 1.2, contract change 7).**
+  A media-list takes `key`, `group`, `more`, `quick` and `menu`, like a media-grid. A row's
+  or a tile's `menu` (up to 10 entries) opens from a More button, a right-click or a long press,
+  and `then: "update"` merges the answer's `item` into that row in place, so a heart turns over
+  without reloading a long list. `item.audio` marks the row the audio host is playing. A
+  media-grid with `layout: "row"` is a shelf that scrolls sideways. A `play` route may answer a
+  page (`{tracks, count, cursor}`): both hosts queue it page by page and shuffle 10,000 tracks by
+  asking only for the positions they draw. Going back to a page restores its scroll position
+  and the pages it had loaded.
+- **Music's Home, Search and Your Library on the shared interface (a preview, milestone A2).**
+  Home's sections as shelves and track rows; Search with recent searches, Browse all and
+  results filtered by quality; Your Library's seven tabs, filtered and sorted on the server,
+  with Liked Songs paged; folders with a breadcrumb; a read-only playlist page. Every track
+  row has a heart and a menu (Play next, Add to queue, radio, album, artist, credits), and
+  album, artist, mix and playlist tiles have their own. Music's own interface is unchanged.
 
 - **Satellites ship their own icons (UI contract 1.2, contract change 5).** A Satellite lists
   them in its `satellite.toml` (`[icons]`, each with a shared icon as fallback) and puts them

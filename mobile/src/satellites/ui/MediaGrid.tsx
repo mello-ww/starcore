@@ -15,6 +15,8 @@ import {keptPages} from './offline';
 import {tokens, useAccent} from '../../theme';
 import {formatValue, isIconName, isSafeRoute, isVisible, resolve, resolveTemplate, type Scope, type OwnIcons, type UiAction, type UiBlock} from './contract';
 import type {BlockContext} from './UiBlocks';
+import {RowMenuSheet} from './RowMenu';
+import {rowMenu, runsHere} from './rows';
 
 const {palette, space, type, radii} = tokens;
 
@@ -199,6 +201,10 @@ export interface MediaGridModel {
   error: string | null;
   loadMore: () => void;
   renderRow: (row: Row) => React.ReactElement;
+  /** One tile at `size` wide (a shelf's, 1.2 `layout: "row"`). */
+  renderTile: (entry: Entry, size: number) => React.ReactElement;
+  /** A shelf's tile width: a little of the next tile shows, so the row reads as one that scrolls. */
+  shelfSize: number;
   /** The select button above the grid, when the block offers a selection. */
   head: React.ReactElement | null;
   /** Loading, error and retry under the grid. */
@@ -502,7 +508,8 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
   // the person's own choice of size (a pinch), remembered per server, Satellite and grid; the
   // document's `size` until they make one
   const {preferences} = context;
-  const preferenceKey = picking || size === 'full' || !preferences ? null : gridPreferenceKey(block);
+  const shelf = block.layout === 'row';
+  const preferenceKey = picking || shelf || size === 'full' || !preferences ? null : gridPreferenceKey(block);
   const [chosen, setChosen] = useState<number | null>(() => {
     const known = preferenceKey ? preferences?.peek(preferenceKey) : null;
     return known ? Number(known) || null : null;
@@ -533,6 +540,7 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
   );
   const pinchGesture = usePinchColumnsGesture(columns, fewest, most, choose);
   const cell = Math.floor((available - GAP * (columns - 1)) / columns);
+  const shelfSize = Math.floor((available - GAP * columns) / (columns + 0.35));
   const aspect = shape === 'wide' ? 16 / 9 : 1;
   const hasText = item.title !== undefined || item.subtitle !== undefined;
 
@@ -547,7 +555,7 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
       }
     };
     for (const entry of shown < entries.length ? entries.slice(0, shown) : entries) {
-      if (item.group !== undefined) {
+      if (item.group !== undefined && !shelf) {
         const raw = resolve(item.group, entry.scope);
         const next = present(raw) ? formatValue(raw, formats.group) : '';
         if (next !== label) {
@@ -565,7 +573,7 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
     }
     flush();
     return out;
-  }, [entries, shown, columns, item.group, formats.group]);
+  }, [entries, shown, columns, item.group, formats.group, shelf]);
 
   const layout = useMemo(() => {
     const tileHeight = Math.round(cell / aspect) + GAP + (hasText ? TEXT_HEIGHT : 0);
@@ -600,6 +608,60 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
     [picking, block.selection, block.viewer, actionOf, selecting, toggle, runAction],
   );
 
+  // a tile's menu (1.2): a long press, where it doesn't select; only what this app can run
+  const [menuKey, setMenuKey] = useState<string | null>(null);
+  const canMenu = Boolean(block.menu) && !picking && !block.selection;
+  const openMenu = useCallback(
+    (key: string) => {
+      const entry = entriesRef.current.find(candidate => candidate.key === key);
+      if (entry && rowMenu(block, entry.scope, action => runsHere(action, latest.current.context)).length) {
+        setMenuKey(key);
+      }
+    },
+    [block],
+  );
+  const menuEntry = menuKey !== null ? entries.find(entry => entry.key === menuKey) ?? null : null;
+  const menuSheet = menuEntry ? (
+    <RowMenuSheet
+      title={item.title !== undefined ? asText(resolve(item.title, menuEntry.scope)) : ''}
+      entries={rowMenu(block, menuEntry.scope, action => runsHere(action, context))}
+      scope={menuEntry.scope}
+      onRun={entry => runAction(entry.action, menuEntry.scope, undefined, {update: bump})}
+      onClose={() => setMenuKey(null)}
+    />
+  ) : null;
+  // a quick action's answer merged into its item (`then: "update"`) redraws the tiles
+  const runQuick = useCallback(
+    (action: UiAction, itemScope: Scope) => runAction(action, itemScope, undefined, {update: bump}),
+    [runAction],
+  );
+
+  const renderTile = (entry: Entry, tileSize: number) => (
+    <Tile
+      key={entry.key}
+      entry={entry}
+      size={tileSize}
+      textHeight={hasText ? TEXT_HEIGHT : 0}
+      aspect={aspect}
+      round={shape === 'round'}
+      title={item.title !== undefined ? asText(resolve(item.title, entry.scope)) : ''}
+      subtitle={item.subtitle !== undefined ? resolve(item.subtitle, entry.scope) : null}
+      subtitleFormat={formats.subtitle}
+      duration={item.duration !== undefined ? resolve(item.duration, entry.scope) : null}
+      selectable={Boolean(block.selection || picking)}
+      selecting={selecting}
+      selected={selected.has(entry.key)}
+      accent={accent}
+      onAccent={onColor}
+      reduced={reduced}
+      icon={tileIcon(block, entry.scope, own)}
+      quick={picking || selecting ? null : quickAction(block, entry.scope, action => canRun(context, action))}
+      onQuick={runQuick}
+      onPress={opens(entry) ? onPress : undefined}
+      onLongPress={block.selection || picking ? toggle : canMenu ? openMenu : undefined}
+    />
+  );
+
   const renderRow = (row: Row) =>
     row.kind === 'group' ? (
       <Text key={row.id} style={styles.group} accessibilityRole="header" numberOfLines={1}>
@@ -607,31 +669,7 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
       </Text>
     ) : (
       <View key={row.id} style={styles.row}>
-        {row.entries.map(entry => (
-          <Tile
-            key={entry.key}
-            entry={entry}
-            size={cell}
-            textHeight={hasText ? TEXT_HEIGHT : 0}
-            aspect={aspect}
-            round={shape === 'round'}
-            title={item.title !== undefined ? asText(resolve(item.title, entry.scope)) : ''}
-            subtitle={item.subtitle !== undefined ? resolve(item.subtitle, entry.scope) : null}
-            subtitleFormat={formats.subtitle}
-            duration={item.duration !== undefined ? resolve(item.duration, entry.scope) : null}
-            selectable={Boolean(block.selection || picking)}
-            selecting={selecting}
-            selected={selected.has(entry.key)}
-            accent={accent}
-            onAccent={onColor}
-            reduced={reduced}
-            icon={tileIcon(block, entry.scope, own)}
-            quick={picking || selecting ? null : quickAction(block, entry.scope, action => canRun(context, action))}
-            onQuick={runAction}
-            onPress={opens(entry) ? onPress : undefined}
-            onLongPress={block.selection || picking ? toggle : undefined}
-          />
-        ))}
+        {row.entries.map(entry => renderTile(entry, cell))}
       </View>
     );
 
@@ -684,9 +722,16 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
     error: pg.error,
     loadMore,
     renderRow,
+    renderTile,
+    shelfSize,
     head,
     foot,
-    viewer,
+    viewer: viewer || menuSheet ? (
+      <>
+        {viewer}
+        {menuSheet}
+      </>
+    ) : null,
     empty: entries.length ? null : present(emptyText) ? String(emptyText) : 'Nothing here.',
   };
 }
@@ -697,14 +742,15 @@ const EMPTY: any[] = [];
  * old layout, a page with more than one grid): its tiles are revealed a page at a time as the
  * screen nears its end, and its next page loads when all are shown. */
 export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const shelf = block.layout === 'row';
   const [shown, setShown] = useState(GRID_PAGE);
-  const model = useMediaGrid(block, scope, context, shown);
+  const model = useMediaGrid(block, scope, context, shelf ? Infinity : shown);
   const {onNearEnd} = context;
   const total = model.entries.length;
   const latest = useRef(model);
   latest.current = model;
   useEffect(() => {
-    if (!onNearEnd || (shown >= total && !model.cursor)) {
+    if (shelf || !onNearEnd || (shown >= total && !model.cursor)) {
       return;
     }
     return onNearEnd(() => {
@@ -714,10 +760,13 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
         latest.current.loadMore();
       }
     });
-  }, [onNearEnd, shown, total, model.cursor]);
+  }, [shelf, onNearEnd, shown, total, model.cursor]);
 
   if (model.empty !== null) {
     return <Text style={type.caption}>{model.empty}</Text>;
+  }
+  if (shelf) {
+    return <MediaShelf model={model} />;
   }
   const grid = (
     <View style={styles.grid} testID="media-grid" collapsable={false}>
@@ -728,6 +777,38 @@ export function MediaGridBlock({block, scope, context}: {block: UiBlock; scope: 
     </View>
   );
   return model.pinch ? <GestureDetector gesture={model.pinch}>{grid}</GestureDetector> : grid;
+}
+
+/**
+ * A shelf (1.2 `layout: "row"`): one row of tiles that scrolls sideways and settles on a tile,
+ * with a little of the next one showing. Only the tiles near the screen are mounted; a shelf has
+ * no further pages and no selection.
+ */
+function MediaShelf({model}: {model: MediaGridModel}) {
+  const step = model.shelfSize + GAP;
+  return (
+    <View testID="media-shelf">
+      <FlatList
+        horizontal
+        data={model.entries}
+        keyExtractor={entry => entry.key}
+        renderItem={({item: entry}) => model.renderTile(entry, model.shelfSize)}
+        ItemSeparatorComponent={ShelfGap}
+        getItemLayout={(_, index) => ({length: step, offset: step * index, index})}
+        snapToInterval={step}
+        decelerationRate="fast"
+        showsHorizontalScrollIndicator={false}
+        initialNumToRender={6}
+        windowSize={5}
+        style={styles.shelf}
+      />
+      {model.viewer}
+    </View>
+  );
+}
+
+function ShelfGap() {
+  return <View style={styles.shelfGap} />;
 }
 
 /**
@@ -1208,6 +1289,9 @@ function ViewerButton({icon, label, onPress, active}: {icon: string; label: stri
 
 const styles = StyleSheet.create({
   grid: {},
+  // a shelf runs to the screen's edges, its first tile in line with the page
+  shelf: {marginHorizontal: -space.lg, paddingHorizontal: space.lg},
+  shelfGap: {width: GAP},
   virtualHead: {gap: space.md, marginBottom: space.md},
   virtualFoot: {gap: space.md, marginTop: space.md},
   foot: {alignItems: 'center', gap: space.sm, paddingVertical: space.md},

@@ -397,14 +397,15 @@ fixtures in `contracts/ui/fixtures/`, both renderers, every `ui.json` it affects
   provider's `resolve`, never a stream URL from the document.
 - Allowed in a row's or a tile's `menu` and `quick` (change 7); not in a selection (nor, until
   change 7, in a tile's `quick`).
-- **A2**, with Liked Songs and Your Library: a long list is never sent whole. With `route` the answer may be paged (`tracks` with a
-  `cursor`): the host queues the first page and asks for the next when about 25 tracks are
-  left. With `shuffle`, the host keeps only the list's size and draws positions lazily (a
+- **Paging, done (A2)**, with Liked Songs and Your Library: a long list is never sent whole.
+  With `route` the answer may be paged (`{tracks, count, cursor}`, `cursor=` for the next):
+  the host queues the first page and asks for the next when about 25 tracks are left. With `shuffle`, the host keeps only the list's size and draws positions lazily (a
   partial Fisher-Yates over the indexes, about 100 ahead, refilled 50 at a time), so
   Shuffle on 10,000 liked songs costs one page, not the whole list. The `route` answers a
-  `count` and pages by position for that.
+  `count` and pages by position for that (`positions=`, up to 50); a row of a paged list plays
+  from itself with `from=<its position>`.
 
-**Change 7 - shelves and track rows.**
+**Change 7 - shelves and track rows.** **Done (A2).**
 
 - `media-grid` gets `layout: "row"`: one row that scrolls sideways (a shelf), at the grid's
   `size`, with no paging, density control or selection. Android draws a horizontal list, the
@@ -557,7 +558,23 @@ without Pillow); `genres?name=` is the genre page. As planned:
   Jest for the renderer and the host's `playTracks`, Music's routes in the engine tests; the
   pages on the web and the emulator.
 
-**A2 - shelves and track rows; Home, Your Library, Search, Folders.**
+**A2 - shelves and track rows; Home, Your Library, Search, Folders.** **Done.** Change 7 and
+change 6's paging are in the Engine, the fixtures and both renderers: a row menu
+(`mission_control/ui/menu.js`, `mobile/src/satellites/ui/RowMenu.tsx`), the rows' own rules
+(`rows.js`, `rows.ts`: a heart pair, `then: "update"`, the playing mark), shelves
+(`gallery.js`, `MediaGrid.tsx`) and paged lists (`listpaging.js`, `listPaging.ts`,
+`VirtualListPage.tsx`); the hosts page a `route` and draw shuffled positions lazily
+(`handover.js`, `handover.ts`). Music's `ui.json` replaces A1's temporary tabs with Home (its
+sections as shelves and track rows), Search (recent searches and Browse all while empty, the
+results with a quality filter, a recent search's own `results` page) and Your Library (one
+`choice` for its seven tabs, each filtered and sorted on the server, Liked Songs paged, also as
+its own `liked` page), a folder page with its `breadcrumb` and a read-only playlist page. Every
+track row has its heart, the playing mark and the 8-entry menu (Add to playlist waits for A3);
+album, artist, mix and playlist tiles have their own. Music's shared answers come from
+`satellites/native/music/views.py`: `library?tab=`, `home?view=shelves`, the rows' fields
+(`liked`/`not_liked`, `badge`, `line`, `position`), `search` with `remember=1`, `folders/<n>?path=`,
+and a heart's or a pin's answer `item`. Its own page and screens read the old answers, unchanged.
+As planned:
 - Contract: change 7 (`layout: "row"`; a `media-list`'s `key`, `more`, `group`, `quick`, `menu`
   and `item.audio`) in the Engine, the fixtures, `mission_control/ui/` (a row menu beside
   `gallery.js`, `listpaging.js` for the rows) and `mobile/src/satellites/ui/`
