@@ -474,6 +474,12 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Fixed
 
+- **The Android player opens on a track from a Liked Songs page, and a long choice scrolls.**
+  Music's shared track rows left out their quality, so the full player closed the app when it
+  opened on one of them; the rows keep it, and the player and its Info panel no longer need a
+  track's quality, format or artists. A choice with more options than fit (Your Library's seven
+  tabs) scrolls sideways, like Mission Control's, instead of shrinking its labels. Needs a new
+  APK.
 - **The Android sleep timer stops playback with the screen locked.** React Native suspends
   its JS timers while the app is in the background, so a sleep timer set for some minutes
   never fired with the screen off, and a resume made from the lock screen, or the stream's

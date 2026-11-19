@@ -68,9 +68,9 @@ export function InfoPanel() {
       </View>
 
       <Text style={[typography.heading, styles.heading]}>Quality</Text>
-      <Line label="Source" value={track.quality.label} />
+      <Line label="Source" value={track.quality?.label} />
       <Line label="Delivery" value={delivery} />
-      <Line label="Format" value={`${track.format.toUpperCase()}${track.codec && track.codec !== track.format ? ` (${track.codec})` : ''}`} />
+      <Line label="Format" value={track.format ? `${track.format.toUpperCase()}${track.codec && track.codec !== track.format ? ` (${track.codec})` : ''}` : null} />
       <Line label="Sample rate" value={track.sample_rate ? `${track.sample_rate / 1000} kHz` : null} />
       <Line label="Bit depth" value={track.bit_depth ? `${track.bit_depth}-bit` : null} />
       <Line label="Bitrate" value={track.bitrate ? `${Math.round(track.bitrate / 1000)} kbps` : null} />
@@ -79,7 +79,7 @@ export function InfoPanel() {
       <Line label="ReplayGain" value={track.replaygain?.album_gain ?? track.replaygain?.track_gain ?? null} />
 
       <Text style={[typography.heading, styles.heading]}>Credits</Text>
-      <Line label="Artist" value={track.artists.map(artist => artist.name).join(', ')} />
+      <Line label="Artist" value={track.artists ? track.artists.map(artist => artist.name).join(', ') : track.artist} />
       <Line label="Album" value={track.album} />
       <Line label="Album artist" value={track.album_artist} />
       <Line label="Composer" value={track.credits?.composer} />

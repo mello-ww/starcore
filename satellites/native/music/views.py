@@ -74,15 +74,14 @@ def decorate(track: dict, liked: set, position: int = None) -> dict:
 
 
 def track_row(track: dict, liked: set, position: int = None) -> dict:
-    """The few fields a row and the audio host need, out of a full track."""
+    """The few fields a row and the audio host need, out of a full track (the host's player
+    shows the quality)."""
     row = {key: track.get(key) for key in ("id", "title", "artist", "artist_id", "album", "album_id", "duration",
                                            "has_artwork", "quality", "missing")}
     for key in ("reason", "played_at"):
         if key in track:
             row[key] = track[key]
-    decorate(row, liked, position)
-    row.pop("quality")
-    return row
+    return decorate(row, liked, position)
 
 
 def liked_tracks(music, user: str) -> set:

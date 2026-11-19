@@ -105,7 +105,7 @@ function PlayerBody() {
               <Text numberOfLines={1} style={typography.body}>{track.artist ?? track.album_artist}</Text>
             </Pressable>
             <Text style={typography.label}>
-              {track.quality.hires ? 'Hi-Res' : track.quality.lossless ? 'Lossless' : track.quality.label}
+              {track.quality?.hires ? 'Hi-Res' : track.quality?.lossless ? 'Lossless' : track.quality?.label ?? ''}
               {state.source?.local ? ' · Downloaded' : state.plan?.delivery === 'transcode' ? ` · ${state.plan.codec} ${Math.round((state.plan.bitrate ?? 0) / 1000)} kbps` : ''}
             </Text>
           </View>

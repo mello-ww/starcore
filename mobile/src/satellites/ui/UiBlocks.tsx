@@ -1357,7 +1357,15 @@ function ChoiceBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
   const current = context.pageState?.[block.key];
   const label = block.label !== undefined ? asText(resolve(block.label, scope)) : '';
   return (
-    <View style={styles.segments} accessibilityRole="radiogroup" accessibilityLabel={label || undefined}>
+    // Like the web's segmented control: the segments share the width when they fit, and the
+    // row scrolls sideways when they don't, instead of shrinking their labels.
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.segmentsFrame}
+      contentContainerStyle={styles.segments}
+      accessibilityRole="radiogroup"
+      accessibilityLabel={label || undefined}>
       {(Array.isArray(block.options) ? block.options : []).map((option: any) => {
         const selected = option.value === current;
         const text = asText(resolve(option.label, scope));
@@ -1370,13 +1378,13 @@ function ChoiceBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
             accessibilityLabel={text}
             testID={`ui-choice-${String(option.value)}`}
             style={[styles.segment, selected && {backgroundColor: accent}]}>
-            <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.segmentLabel, selected && {color: onColor, fontWeight: '700'}]}>
+            <Text numberOfLines={1} style={[styles.segmentLabel, selected && {color: onColor, fontWeight: '700'}]}>
               {text}
             </Text>
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -1558,8 +1566,9 @@ const styles = StyleSheet.create({
   cellState: {flexDirection: 'row', alignItems: 'center', gap: space.sm},
   cellUsage: {flexDirection: 'row', alignItems: 'center', gap: space.sm, minWidth: 140},
   cellMeter: {flex: 1},
-  segments: {flexDirection: 'row', backgroundColor: palette.card, borderRadius: radii.control, padding: 3, gap: 3},
-  segment: {flex: 1, minHeight: TOUCH_TARGET, paddingHorizontal: 2, borderRadius: radii.control - 3, alignItems: 'center', justifyContent: 'center'},
+  segmentsFrame: {flexGrow: 0, backgroundColor: palette.card, borderRadius: radii.control},
+  segments: {flexGrow: 1, flexDirection: 'row', padding: 3, gap: 3},
+  segment: {flexGrow: 1, minHeight: TOUCH_TARGET, paddingHorizontal: space.md, borderRadius: radii.control - 3, alignItems: 'center', justifyContent: 'center'},
   segmentLabel: {...type.caption, color: palette.text2},
   pill: {
     flexDirection: 'row',

@@ -270,6 +270,8 @@ class SharedPagesTest(MusicApiCase):
         self.assertEqual(set(rows), {"One", "Three"})
         self.assertTrue(rows["One"]["liked"])
         self.assertFalse(rows["One"]["not_liked"])
+        # the audio host plays these rows, and its player shows their quality
+        self.assertIn("lossless", rows["One"]["quality"])
         self.assertEqual(rows["One"]["badge"], "Lossless")
         self.assertEqual(rows["One"]["line"], "Lossless · Lumen")
         self.assertEqual(rows["Three"]["badge"], "")
