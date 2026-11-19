@@ -210,6 +210,13 @@ Follow-ups found while building it:
   takes a stop as a pause only when the native player then reports it is still ready
   (`onNativeReady`: Media3 reports a stop before the end or the loading that explains it),
   never one while loading, seeking or at a track's end.
+- **Timers with the screen locked** - done. React Native suspends its JS timers while the
+  activity is paused (a locked screen included), so the sleep timer, the stream's retry and
+  the deferred queue saves (which publish a resume made from the lock screen) waited for the
+  app to return. The AudioHost hands the player native one-shot timers (`backgroundTimers` in
+  `src/media/native.ts`, the `StarCoreTimer` module on the main looper); native events and
+  prop changes already reach the player in the background. Its timers use the uptime clock,
+  so they also wait while the phone is in deep sleep, which playback prevents.
 - **Naming left from Music** in both hosts (a type, test IDs, labels, the web's keyboard
   shortcuts tied to Music's page): listed under "Leftovers the guard can't see" in
   [Remaining work](remaining-work.md).

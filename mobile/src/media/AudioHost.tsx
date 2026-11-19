@@ -7,7 +7,7 @@ import {ConnectClient} from './connect';
 import {DownloadManager} from './downloads';
 import {handOver, type HandOverOptions} from './handover';
 import {AudioLibraryClient, type AudioProvider, type Catalog, resolveAudioProvider} from './library';
-import {audioEffects, nativeDownloads} from './native';
+import {audioEffects, backgroundTimers, nativeDownloads} from './native';
 import {PlayerController, type PlayerState} from './player';
 import {deviceId as loadDeviceId, playerKeys, readJson, type SavedQueue, writeJson} from './storage';
 import type {PlaybackPreferences, Track} from './types';
@@ -120,6 +120,7 @@ export function AudioHost({
         preferences: () => preferencesRef.current,
         saveLocal: saved => writeJson(playerKeys.queue(serverId), saved),
         requestNotifications,
+        ...backgroundTimers(),
       }),
     [library, baseUrl, downloads, serverId],
   );

@@ -459,6 +459,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Fixed
 
+- **The Android sleep timer stops playback with the screen locked.** React Native suspends
+  its JS timers while the app is in the background, so a sleep timer set for some minutes
+  never fired with the screen off, and a resume made from the lock screen, or the stream's
+  retry after an error, waited for the app to come back. The player's timers now run on a
+  native one-shot timer (`StarCoreTimer`) that keeps running in the background; Jest and other
+  platforms keep `setTimeout`. Needs a new APK.
+
 - **The Android player plays on into the next track, and a new list plays.** Since it began
   following pauses made outside the app, it stopped at 0:00 when the queue moved on, or when a
   list was played while it sat paused. The native player reports that it stopped before the

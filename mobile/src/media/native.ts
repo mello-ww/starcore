@@ -52,6 +52,51 @@ export function nativeDownloads(): DownloadNative | null {
   };
 }
 
+export interface Timers {
+  setTimer(callback: () => void, ms: number): number;
+  clearTimer(handle: number): void;
+}
+
+interface TimerNative {
+  start(id: number, ms: number): Promise<boolean>;
+  cancel(id: number): void;
+}
+
+/**
+ * Timers that keep running while the app is in the background: React Native suspends its own
+ * while the activity is paused, a locked screen included. Null where the native module is absent
+ * (other platforms, Jest), so callers keep setTimeout there.
+ */
+export function backgroundTimers(module: TimerNative | undefined = NativeModules.StarCoreTimer): Timers | null {
+  if (!module) {
+    return null;
+  }
+  const live = new Map<number, () => void>();
+  let next = 1;
+  return {
+    setTimer(callback, ms) {
+      const id = next++;
+      live.set(id, callback);
+      module.start(id, Math.max(0, ms)).then(
+        fired => {
+          const run = live.get(id);
+          if (fired && run) {
+            live.delete(id);
+            run();
+          }
+        },
+        () => live.delete(id),
+      );
+      return id;
+    },
+    clearTimer(handle) {
+      if (live.delete(handle)) {
+        module.cancel(handle);
+      }
+    },
+  };
+}
+
 /** Folder-safe server id: downloads and artwork never mix between servers. */
 export function serverFolder(serverId: string): string {
   return serverId.replace(/[^A-Za-z0-9_-]/g, '_') || 'server';

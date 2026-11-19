@@ -1,3 +1,4 @@
+import {backgroundTimers} from '../src/media/native';
 import {PlayerController} from '../src/media/player';
 import {fakeEffects, makeTracks, manualTimers, preferences, testLibrary} from './musicFakes';
 
@@ -370,5 +371,71 @@ describe('PlayerController', () => {
     expect(effects.setEqualizer).toHaveBeenCalledWith(true, [6, 5, 4, 2, 0, 0, 0, 0, 0, 0], -2);
     expect(effects.setBassBoost).toHaveBeenCalledWith(4);
     expect(effects.setPlaybackParameters).toHaveBeenCalledWith(1, 2);
+  });
+});
+
+describe('background timers', () => {
+  // The native module stands in for StarCoreTimer: each start resolves only when the test fires it.
+  function nativeTimer() {
+    const pending = new Map<number, {ms: number; resolve: (fired: boolean) => void}>();
+    const module = {
+      start: jest.fn((id: number, ms: number) => new Promise<boolean>(resolve => pending.set(id, {ms, resolve}))),
+      cancel: jest.fn((id: number) => {
+        pending.get(id)?.resolve(false);
+        pending.delete(id);
+      }),
+    };
+    const fire = async (ms: number) => {
+      for (const [id, entry] of [...pending]) {
+        if (entry.ms === ms) {
+          pending.delete(id);
+          entry.resolve(true);
+        }
+      }
+      await new Promise<void>(resolve => setImmediate(() => resolve()));
+    };
+    return {module, pending, fire};
+  }
+
+  it('pauses on the minutes sleep timer from the native timer, which keeps running with the screen locked', async () => {
+    const native = nativeTimer();
+    const {player} = setup({...backgroundTimers(native.module)});
+    await player.playTracks(makeTracks(3), 0);
+    player.setSleep(15);
+    expect(native.module.start).toHaveBeenCalledWith(expect.any(Number), 15 * 60_000);
+    await native.fire(15 * 60_000);
+    expect(player.state.playing).toBe(false);
+    expect(player.state.sleepAt).toBeNull();
+  });
+
+  it('publishes a resume through the native timer, not a JS one', async () => {
+    const native = nativeTimer();
+    const {player, api} = setup({...backgroundTimers(native.module)});
+    await player.playTracks(makeTracks(3), 0);
+    player.toggle();
+    api.publishState.mockClear();
+    player.toggle();
+    expect(player.state.playing).toBe(true);
+    const delays = [...native.pending.values()].map(entry => entry.ms);
+    await Promise.all(delays.map(ms => native.fire(ms)));
+    expect(api.publishState).toHaveBeenCalledWith('mobile-device-1', expect.objectContaining({playing: true}));
+  });
+
+  it('never runs a cancelled or replaced timer', async () => {
+    const native = nativeTimer();
+    const {player} = setup({...backgroundTimers(native.module)});
+    await player.playTracks(makeTracks(3), 0);
+    player.setSleep(15);
+    player.setSleep(30);
+    expect(native.module.cancel).toHaveBeenCalledTimes(1);
+    await native.fire(15 * 60_000);
+    expect(player.state.playing).toBe(true);
+    player.setSleep(null);
+    await native.fire(30 * 60_000);
+    expect(player.state.playing).toBe(true);
+  });
+
+  it('leaves setTimeout in place where the native module is absent', () => {
+    expect(backgroundTimers(undefined)).toBeNull();
   });
 });
