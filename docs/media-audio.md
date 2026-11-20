@@ -589,7 +589,18 @@ As planned:
   position); Music's engine tests for
   `library` (each tab, the filter, a cursor); 10,000 liked songs flung through on the emulator.
 
-**A3 - playlists.**
+**A3 - playlists.** **Done.** Change 8 is in the Engine, the fixtures and both renderers: the
+`choose` action (`mission_control/ui/choose.js`, `mobile/src/satellites/ui/choose.ts` and its
+`ChooseSheet.tsx`, on the row menu's bottom sheet) and a `media-list`'s `reorder`
+(`mission_control/ui/reorder.js`, `mobile/src/satellites/ui/reorder.ts` with the rows in
+`UiBlocks.tsx`). Android drags a row by its handle at once, with no long press, which stays the
+row's menu; TalkBack has Move up and Move down on the handle. Every track row's menu has Add to
+playlist (the playlists you own, a new one, and a 409 asked about before adding a song twice);
+a playlist's own rows add Remove from this playlist. The playlist page edits its details and,
+for a smart playlist, its rules (form `rows`: field, operator, value), changes or resets its
+cover, exports M3U, deletes, reorders and lists what an imported file named that the library
+doesn't have, with Dismiss. Your Library has New playlist, New smart playlist and Import a
+playlist file (`upload`, the raw M3U). As planned:
 - Contract: change 8 (`choose` with `create` and `conflict`; `reorder`) in the Engine, the
   fixtures and both renderers.
 - Music: Add to playlist in every row's menu; the playlist page (edit, cover, delete, export,

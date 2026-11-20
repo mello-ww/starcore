@@ -383,6 +383,22 @@ use them without the client knowing what the images are.
   - `item.audio`, a binding to a track id, marks the row as one of the document Satellite's own
     `audio.library` tracks: the row of the track the client's audio host is playing from that
     Satellite is marked (the equaliser bars).
+- **`reorder`** (change 8): `{route, body?}`, so the person can move the rows of the list. The
+  route gets `$value` = `{from, to}` (indexes in the list, `to` the row's final place), with
+  the moved row as `$.`; a JSON POST, `body` resolved as an action's.
+
+  ```json
+  {"type": "media-list", "items": "$.tracks", "item": {"title": "$.title", "key": "$.entry_id"},
+   "reorder": {"route": "playlists/{$page.id}/move", "body": {"entry": "$.entry_id", "to": "$value.to"}}}
+  ```
+
+  - The rows move at once; if the route fails they move back (and the page is read again).
+    There is no `then`: the list already shows what the route was asked to do.
+  - It needs `item.key`, and a whole list: not with `more` or `group`.
+  - The web draws a handle at each row's start, dragged with the pointer, and moves the focused
+    row with Alt+ArrowUp and Alt+ArrowDown. Android drags a row by its handle at once, with no
+    long press (that opens the row's menu), and gives the handle the accessibility actions
+    Move up and Move down.
 
 ### Row and tile menus
 
@@ -821,6 +837,35 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
     Mission Control picks with the browser's own file dialog; the app with the system document
     picker, and sends from its own module with the session. A client that can't pick files
     hides the control. One action for the page: not in a selection or a tile's `quick` actions.
+- **`choose`** (1.2, change 8), with a `route`: the person picks one row of a list the
+  Satellite's own `source` route answers, or names a new one, in the client's own dialog (a
+  bottom sheet on Android); the route then gets the chosen row as `$value`. "Add to playlist".
+
+  ```json
+  {"choose": {"source": "playlists?editable=1", "items": "$.playlists",
+              "item": {"title": "$.name", "subtitle": "$.line", "image": "playlists/{$.id}/picture?size=120"},
+              "title": "Add to playlist", "empty": "You have no playlists yet.",
+              "create": {"label": "New playlist", "field": "Playlist name", "route": "playlists",
+                         "body": {"name": "$value", "tracks": ["$.id"]}}},
+   "route": "playlists/{$value.id}/add", "body": {"tracks": ["$.id"], "ask": true},
+   "conflict": {"confirm": "This song is already in this playlist. Add it again?",
+                "body": {"tracks": ["$.id"], "allow_duplicates": true}}}
+  ```
+
+  - `source` is a route of the Satellite's own, read with a GET; `items` binds the list in its
+    answer. Inside `item` (`title`, and `subtitle` and `image` if given), `$.` is that list's
+    row; everywhere else in the action `$.` stays the row or page the action is on. An `image`
+    is a route of the Satellite's own, as a media frame's.
+  - `title` heads the dialog, `empty` is shown when there are no rows.
+  - `create` (optional) adds a first line, `label`, that asks for a name (`field` is its
+    placeholder) and POSTs `create.body` to `create.route` with the typed text as `$value`
+    (`{"value": ...}` without a `body`). The new one is not chosen again: the create route does
+    the whole thing (make the playlist with this song).
+  - A **`409`** from the route means it is already there. With `conflict`, the client asks its
+    `confirm`, then sends `conflict.body` (or `body`) to `conflict.route` (or `route`); declining
+    sends nothing. Without `conflict`, a `409` is the route's error, shown as such.
+  - `then` (`refresh`, `back` or `navigate`) runs after a request succeeded, and the answer's
+    `message` is shown. Cancelling the dialog runs nothing. Not in a selection (`in_bulk`).
 - **`secure`** (1.2), in a media viewer's or selection's `actions` only: runs one protected
   operation on the items shown or selected, behind the **client's own** unlock prompt.
 

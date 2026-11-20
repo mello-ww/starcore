@@ -212,6 +212,10 @@ MIGRATIONS = (
         fetched_at TEXT
     );
     """,
+    # 2: the entries an imported playlist file named that this library does not have
+    """
+    ALTER TABLE playlists ADD COLUMN unmatched TEXT;
+    """,
 )
 
 

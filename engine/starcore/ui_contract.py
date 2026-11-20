@@ -918,6 +918,8 @@ class _Validator:
             if not is_binding(block.get("items")):
                 self.error(f"{where}.more", "needs `items` bound to the page's data")
             self.check_more(f"{where}.more", block["more"])
+        if "reorder" in block:
+            self.check_reorder(f"{where}.reorder", block)
 
     def check_row_actions(self, where: str, block: dict):
         """`quick` and `menu` (1.2), on a media-list's rows and a media-grid's tiles: the row is
@@ -1266,6 +1268,9 @@ class _Validator:
         if "upload" in action:
             self.check_upload(where, action)
             return
+        if "choose" in action:
+            self.check_choose(where, action)
+            return
         known = {"route", "method", "body", "confirm", "then"}
         if "pick" in action:
             self.check_pick(where, action["pick"])
@@ -1434,6 +1439,103 @@ class _Validator:
             self.error(f"{where}.then", "must be 'refresh' or 'back'")
         if self.in_bulk:
             self.error(f"{where}.upload", "is a page's own action: not in a selection or a tile's quick actions")
+
+    def check_choose(self, where: str, action: dict):
+        """{choose: {source, items, item, title?, empty?, create?}, route, body?, conflict?, then?}
+        (1.2): the person picks one row of the Satellite's own route `source` (its `items`, drawn
+        as a media-list's rows, the source row as $. inside `item`) in the client's own dialog or
+        sheet, then `route` runs with that row as $value. `create` offers one text field instead,
+        and runs its own route with the text as $value. A 409 answer asks `conflict.confirm` (else
+        the answer's error), then runs `conflict.route`; declining or cancelling runs nothing."""
+        self.since(f"{where}.choose", "the choose action", 2)
+        self.unknown_keys(where, action, {"choose", "route", "body", "conflict", "then"})
+        choose = action["choose"]
+        if not isinstance(choose, dict):
+            self.error(f"{where}.choose", "must be {source, items, item}")
+        else:
+            self.unknown_keys(f"{where}.choose", choose, {"source", "items", "item", "title", "empty", "create"})
+            self.check_route(f"{where}.choose.source", choose.get("source"))
+            items = choose.get("items")
+            if not is_binding(items):
+                self.error(f"{where}.choose.items", "must bind the rows in the source's answer")
+            else:
+                self.check_binding(f"{where}.choose.items", items)
+            item = choose.get("item")
+            if not isinstance(item, dict):
+                self.error(f"{where}.choose.item", "must be {title, subtitle?, image?}")
+            else:
+                self.unknown_keys(f"{where}.choose.item", item, {"title", "subtitle", "image"})
+                if "title" not in item:
+                    self.error(f"{where}.choose.item", "needs 'title'")
+                for key in ("title", "subtitle"):
+                    if key in item:
+                        self.check_text(f"{where}.choose.item.{key}", item[key])
+                if "image" in item:
+                    self.check_route(f"{where}.choose.item.image", item["image"])
+            for key in ("title", "empty"):
+                if key in choose:
+                    self.check_text(f"{where}.choose.{key}", choose[key])
+            if "create" in choose:
+                create = choose["create"]
+                if not isinstance(create, dict):
+                    self.error(f"{where}.choose.create", "must be {label, field, route, body?}")
+                else:
+                    self.unknown_keys(f"{where}.choose.create", create, {"label", "field", "route", "body"})
+                    for key in ("label", "field"):
+                        if key not in create:
+                            self.error(f"{where}.choose.create", f"needs '{key}'")
+                        else:
+                            self.check_text(f"{where}.choose.create.{key}", create[key])
+                    self.check_route(f"{where}.choose.create.route", create.get("route"))
+                    self.check_body(f"{where}.choose.create.body", create)
+        self.check_route(f"{where}.route", action.get("route"))
+        self.check_body(f"{where}.body", action)
+        if "conflict" in action:
+            conflict = action["conflict"]
+            if not isinstance(conflict, dict):
+                self.error(f"{where}.conflict", "must be {confirm?, route, body?}")
+            else:
+                self.unknown_keys(f"{where}.conflict", conflict, {"confirm", "route", "body"})
+                self.check_route(f"{where}.conflict.route", conflict.get("route"))
+                self.check_body(f"{where}.conflict.body", conflict)
+                if "confirm" in conflict:
+                    self.check_text(f"{where}.conflict.confirm", conflict["confirm"])
+        then = action.get("then")
+        if isinstance(then, dict):
+            self.unknown_keys(f"{where}.then", then, {"navigate", "params"})
+            self.check_navigate(f"{where}.then", then)
+        elif then is not None and then not in ("refresh", "back"):
+            self.error(f"{where}.then", "must be 'refresh', 'back' or {navigate, params}")
+        if self.in_bulk:
+            self.error(f"{where}.choose", "asks the person: not in a selection or a tile's quick actions")
+
+    def check_body(self, where: str, holder: dict):
+        """An optional `body` of `holder`: an object of values and bindings."""
+        if "body" not in holder:
+            return
+        if not isinstance(holder["body"], dict):
+            self.error(where, "must be an object")
+        else:
+            self.check_values(where, holder["body"])
+
+    def check_reorder(self, where: str, block: dict):
+        """`reorder: {route, body?}` on a media-list (1.2): the person moves a row by its handle,
+        the list moves at once, and `route` runs once per move with $value {from, to}, the row's
+        old and new index; a failed move is put back. Every row must be loaded and stay apart:
+        a key, and neither `more` nor `item.group`."""
+        self.since(where, "media-list reorder", 2)
+        reorder = block["reorder"]
+        if not isinstance(reorder, dict):
+            self.error(where, "must be {route, body?}")
+            return
+        self.unknown_keys(where, reorder, {"route", "body"})
+        self.check_route(f"{where}.route", reorder.get("route"))
+        self.check_body(f"{where}.body", reorder)
+        item = block.get("item") if isinstance(block.get("item"), dict) else {}
+        if "key" not in item:
+            self.error(where, "needs item.key: a row is moved by its key")
+        if "more" in block or "group" in item:
+            self.error(where, "moves rows of a whole list: not with 'more' or item.group")
 
     def check_play(self, where: str, action: dict):
         """{play: {search} | {tracks | route, start?, shuffle?, queue?, context?}} (1.2): the

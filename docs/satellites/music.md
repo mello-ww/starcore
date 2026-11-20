@@ -283,16 +283,26 @@ GET  scan                         progress and last result;  POST scan {"source"
 GET  favorites                    POST {"kind": "track|album|artist|playlist", "ids": [...], "liked": bool};
                                   with one "id", the answer's `item` is {liked, not_liked}
 GET  pins                         POST {"kind", "id", "pinned"}, answering `item` {pinned, not_pinned}
-GET  playlists                    POST {"name", "description", "folder", "visibility", "rules", "tracks"}
+GET  playlists?editable=1         POST {"name", "description", "folder", "visibility", "rules", "tracks"}
+                                  (or "smart" with the form's "conditions", "match", "sort", "order",
+                                  "limit"); `editable` lists only regular playlists, each with a `line`
 GET  playlists/<id>               POST {"name"|"description"|"folder"|"visibility"|"rules"|"cover"}
-POST playlists/<id>/add           {"tracks": [...], "allow_duplicates", "position"}
+                                  (or "smart" and the form's rules); the page also answers `regular`,
+                                  `unmatched` with `has_unmatched`, `export_name` and the rules as form
+                                  `conditions`
+POST playlists/<id>/add           {"tracks": [...], "allow_duplicates", "position"}; with "ask" and no
+                                  "allow_duplicates", a 409 {"duplicates"} and nothing added
+POST playlists/<id>/dismiss       forget what an imported file named that the library doesn't have
+GET  playlists/<id>/picture?size= the uploaded cover, else the album's art, else the mosaic
 POST playlists/<id>/remove        {"entries": [...]}
 POST playlists/<id>/move          {"entry", "to"}
 POST playlists/<id>/reorder       {"entries": [...]}
 POST playlists/<id>/cover         raw PNG/JPEG body, or {"album": id}
 POST playlists/<id>/delete
 GET  playlists/<id>/export        M3U8 download
-POST playlists/import             {"name", "content"} for M3U, or {"name", "entries": [...]}
+POST playlists/import             {"name", "content"} for M3U, or {"name", "entries": [...]}, or the
+                                  raw file (up to 2 MB, `?name=` its file name); the entries not found
+                                  are kept (up to 500, the `unmatched` column) for the playlist page
 POST playlists/preview            {"rules"}
 GET  covers/<id>                  an uploaded playlist cover
 GET  history?limit=               POST {"track_id", "seconds", "device", "context"};  POST history/clear
@@ -328,12 +338,14 @@ album, artist and song lists are drawn in chunks as they scroll. See
 `ui.json` (UI contract 1.2, `preview: true`) is Music's interface drawn by both clients'
 shared renderers, offered in Developer Mode while Music's own page and screens stay its
 default ([docs/media-audio.md](../media-audio.md), "Music on the shared interface", A1 to
-A10). It has Home, Search and Your Library (A2) and the album, artist, playlist (read-only
-until A3), folder, mix, radio, mood, genre, search results, Liked Songs and track (credits)
-pages. They play through the client's audio host with the `play` action's `tracks` and `route`
+A10). It has Home, Search and Your Library (A2) and the album, artist, playlist, folder, mix,
+radio, mood, genre, search results, Liked Songs and track (credits) pages, and the playlists'
+own (A3): New playlist, New smart playlist, a playlist's details and rules, Import a playlist
+file. They play through the client's audio host with the `play` action's `tracks` and `route`
 (Liked Songs paged, so shuffling 10,000 songs costs one page). Every track row has a heart and
-an 8-entry menu (Play next, Add to queue, like, radio, album, artist, credits); album, artist,
-mix and playlist tiles have their own. The answers they bind to come from `views.py` and carry
+a 9-entry menu (Play next, Add to queue, Add to playlist, like, radio, album, artist, credits),
+and a playlist's own rows add Remove from this playlist and can be dragged into another order;
+album, artist, mix and playlist tiles have their own. The answers they bind to come from `views.py` and carry
 `context`, what the player reports it plays from, `mosaic_key`, the picture of a mix, a mood
 or a genre (`artwork/mosaic/<key>`), and the rows' own fields: `liked`/`not_liked`, `line`,
 `album_line`, `badge` (a quality), `position` in a paged list and `disc_label`.

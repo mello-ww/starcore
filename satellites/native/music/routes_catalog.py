@@ -205,7 +205,7 @@ def artwork(call):
         path = music.mosaic_path([found[album_id] for album_id in ids if album_id in found], size)
         if path is None:
             return error_response("these albums have no cover art")
-        return file_response(path, _image_type(path), ARTWORK_CACHE)
+        return file_response(path, image_type(path), ARTWORK_CACHE)
     album_id = identifier(call.segment(0), "album")
     album = next(iter(music.catalog.albums_by_id([album_id])), None)
     if album is None:
@@ -214,7 +214,7 @@ def artwork(call):
     path = music.artwork_path(album, size)
     if path is None:
         return error_response("this album has no cover art")
-    return file_response(path, _image_type(path), ARTWORK_CACHE)
+    return file_response(path, image_type(path), ARTWORK_CACHE)
 
 
 @route("GET", "POST")
@@ -254,5 +254,5 @@ def scan(call):
     return ok(music.scan(source))
 
 
-def _image_type(path: Path) -> str:
+def image_type(path: Path) -> str:
     return {".png": "image/png", ".webp": "image/webp"}.get(path.suffix.lower(), "image/jpeg")

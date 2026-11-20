@@ -101,7 +101,20 @@ export interface UiAction {
    * its {name, size}; a 409 asks `conflict.confirm`, naming the file, then retries on
    * `conflict.route`. */
   upload?: {multiple?: boolean};
-  conflict?: {confirm?: Json; route: string};
+  /** 1.2 (upload, choose): a 409 asks `confirm`, then sends again to `route` with `body`
+   * (choose falls back to the action's own route and body). */
+  conflict?: {confirm?: Json; route?: string; body?: Record<string, Json>};
+  /** 1.2 (change 8): pick one row of what `source` answers (`items`, each drawn by `item`, where
+   * `$.` is that row) or name a new one (`create`, its route getting the text as $value); the
+   * action's route then gets the chosen row as $value. */
+  choose?: {
+    source: string;
+    items: Json;
+    item: {title: Json; subtitle?: Json; image?: Json};
+    title?: Json;
+    empty?: Json;
+    create?: {label: Json; field: Json; route: string; body?: Record<string, Json>};
+  };
   /** 1.2: open the shared interface of a Satellite whose manifest says it is a section of this
    * one (section_of): its name, or a binding to it. */
   section?: Json;

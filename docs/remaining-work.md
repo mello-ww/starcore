@@ -209,8 +209,8 @@ and the Android screens against what the contract can draw.
   media lists and grids that play through the audio host (change 7), with change 6's paged
   queue and lazy shuffle for the long lists. Rows and tiles have menus and hearts, shelves
   scroll sideways, and going back restores the scroll position and loaded pages.
-- [ ] **Playlists** (A3): create, rename, cover, reorder, add and remove tracks, smart rules,
-  M3U import and export (change 8).
+- [x] **Playlists** (A3): create, rename, cover, reorder, add and remove tracks, smart rules,
+  M3U import and export (change 8): `choose` for Add to playlist, a `media-list`'s `reorder`.
 - [ ] **The player's additions declared by the document** (A4): its track menu, Add to
   playlist and the links to an album or artist, instead of `MUSIC_AUDIO_EXTENSIONS` and
   `setExtensions` (change 9).

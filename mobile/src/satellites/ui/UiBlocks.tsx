@@ -1,5 +1,5 @@
 import React, {memo, useCallback, useEffect, useReducer, useRef, useState} from 'react';
-import {ActivityIndicator, Alert, Animated, Clipboard, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, Alert, Animated, Clipboard, Image, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {Glyph, useOwnIcons} from '../../components/Glyph';
 import {Bars, ChartScale, ColumnChart, Meter, Sparkline} from '../../components/charts';
@@ -12,6 +12,7 @@ import {MapBlock} from './MapBlock';
 import {ActionPill, MediaGridBlock} from './MediaGrid';
 import {emptyRow, formBody, formProblem, formValues} from './forms';
 import {createListPaging, rowKey, type ListPagingStatus} from './listPaging';
+import {moveItem, shiftFor, targetIndex} from './reorder';
 import {RowMenuSheet, usePlayingId} from './RowMenu';
 import {groupOf, isPlayingRow, rowMenu, rowQuick, runsHere, type RowEntry} from './rows';
 import {useImageSource} from './memoryImages';
@@ -639,7 +640,163 @@ function MediaListBlock({block, scope, context}: {block: UiBlock; scope: Scope; 
   }
   return (
     <View style={styles.list}>
-      <MediaRows block={block} rows={items} scope={scope} context={context} />
+      {block.reorder ? (
+        <ReorderRows block={block} rows={items} scope={scope} context={context} />
+      ) : (
+        <MediaRows block={block} rows={items} scope={scope} context={context} />
+      )}
+    </View>
+  );
+}
+
+interface ReorderControl {
+  start: (index: number) => void;
+  update: (dy: number) => void;
+  end: (commit: boolean) => void;
+  step: (index: number, by: number) => void;
+}
+
+/**
+ * A reorderable media-list's rows (1.2, change 8): a row is dragged by its handle at once, with
+ * no long press, the rows between stepping aside; the handle's accessibility actions move it one
+ * place. The rows move at once and the list's route gets {from, to} as $value; if it fails they
+ * move back. Only a whole list (never one with `more`, or groups) reorders.
+ */
+function ReorderRows({block, rows, scope, context}: {block: UiBlock; rows: any[]; scope: Scope; context: BlockContext}) {
+  const playing = usePlayingId(context.satellite, block.item?.audio !== undefined);
+  const keys = mediaRowKeys(block, rows, scope);
+  const [, redraw] = useReducer((value: number) => value + 1, 0);
+  const [drag, setDrag] = useState<{from: number; target: number} | null>(null);
+  const offset = useRef(new Animated.Value(0)).current;
+  const tops = useRef<number[]>([]);
+  const held = useRef<{from: number; target: number; pitch: number} | null>(null);
+  const pitchAt = (index: number) => {
+    const here = tops.current[index];
+    const next = tops.current[index + 1];
+    const before = tops.current[index - 1];
+    if (typeof here === 'number' && typeof next === 'number') {
+      return Math.abs(next - here);
+    }
+    return typeof here === 'number' && typeof before === 'number' ? Math.abs(here - before) : 0;
+  };
+  const move = async (from: number, to: number) => {
+    const moved = rows[from];
+    if (!moveItem(rows, from, to)) {
+      return;
+    }
+    redraw();
+    const done = await context.runAction(block.reorder, {...scope, data: moved}, {from, to});
+    if (!done) {
+      moveItem(rows, to, from);
+      redraw();
+    }
+  };
+  const control = useRef<ReorderControl | null>(null);
+  control.current = {
+    start: index => {
+      held.current = {from: index, target: index, pitch: pitchAt(index)};
+      offset.setValue(0);
+      setDrag({from: index, target: index});
+    },
+    update: dy => {
+      const now = held.current;
+      if (!now) {
+        return;
+      }
+      offset.setValue(dy);
+      const target = targetIndex(now.from, dy, now.pitch, rows.length);
+      if (target !== now.target) {
+        now.target = target;
+        setDrag({from: now.from, target});
+      }
+    },
+    end: commit => {
+      const now = held.current;
+      held.current = null;
+      offset.setValue(0);
+      setDrag(null);
+      if (now && commit && now.target !== now.from) {
+        move(now.from, now.target);
+      }
+    },
+    step: (index, by) => {
+      const to = index + by;
+      if (to >= 0 && to < rows.length) {
+        move(index, to);
+      }
+    },
+  };
+  const pitch = drag ? held.current?.pitch ?? 0 : 0;
+  return (
+    <>
+      {rows.map((item, index) => {
+        const itemScope = {...scope, data: item};
+        const dragging = drag?.from === index;
+        const shift = drag && !dragging ? shiftFor(index, drag.from, drag.target, pitch) : 0;
+        const title = asText(resolve(block.item?.title, itemScope));
+        return (
+          <Animated.View
+            key={keys[index]}
+            onLayout={event => {
+              tops.current[index] = event.nativeEvent.layout.y;
+            }}
+            style={[dragging ? styles.reorderHeld : null, {transform: [{translateY: dragging ? offset : shift}]}]}>
+            <MediaRow
+              block={block}
+              item={item}
+              scope={scope}
+              context={context}
+              playing={isPlayingRow(block, itemScope, playing)}
+              handle={<ReorderHandle index={index} count={rows.length} title={title} control={control} />}
+            />
+          </Animated.View>
+        );
+      })}
+    </>
+  );
+}
+
+/** A row's handle: dragged at once (its own responder, so the page does not scroll meanwhile),
+ * or moved one place with the accessibility actions Move up and Move down. */
+function ReorderHandle({
+  index, count, title, control,
+}: {index: number; count: number; title: string; control: React.MutableRefObject<ReorderControl | null>}) {
+  const indexRef = useRef(index);
+  indexRef.current = index;
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => control.current?.start(indexRef.current),
+      onPanResponderMove: (_, gesture) => control.current?.update(gesture.dy),
+      onPanResponderRelease: () => control.current?.end(true),
+      onPanResponderTerminate: () => control.current?.end(false),
+    }),
+  ).current;
+  const actions = [
+    ...(index > 0 ? [{name: 'moveUp', label: 'Move up'}] : []),
+    ...(index < count - 1 ? [{name: 'moveDown', label: 'Move down'}] : []),
+  ];
+  return (
+    <View
+      {...responder.panHandlers}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={title ? `Move ${title}` : 'Move'}
+      accessibilityHint="Drag up or down, or use the Move up and Move down actions"
+      accessibilityActions={actions}
+      onAccessibilityAction={event => {
+        const action = event.nativeEvent.actionName;
+        if (action === 'moveUp') {
+          control.current?.step(indexRef.current, -1);
+        } else if (action === 'moveDown') {
+          control.current?.step(indexRef.current, 1);
+        }
+      }}
+      testID="media-row-handle"
+      style={styles.rowHandle}>
+      <Icon name="menu" size={18} color={palette.text3} />
     </View>
   );
 }
@@ -705,8 +862,8 @@ export function MediaGroupHeading({label}: {label: string}) {
  */
 export const MediaRow = memo(
   function MediaRow({
-    block, item, scope, context, playing,
-  }: {block: UiBlock; item: any; scope: Scope; context: BlockContext; playing: boolean}) {
+    block, item, scope, context, playing, handle,
+  }: {block: UiBlock; item: any; scope: Scope; context: BlockContext; playing: boolean; handle?: React.ReactNode}) {
     const [, redraw] = useReducer((value: number) => value + 1, 0);
     const [menuOpen, setMenuOpen] = useState(false);
     const {color: accent} = useAccent();
@@ -750,7 +907,14 @@ export const MediaRow = memo(
     );
     const showMenu = menu.length ? () => setMenuOpen(true) : undefined;
     return (
-      <View style={[styles.row, styles.mediaRow, (quick.length > 0 || menu.length > 0) && styles.mediaRowActions]}>
+      <View
+        style={[
+          styles.row,
+          styles.mediaRow,
+          (quick.length > 0 || menu.length > 0) && styles.mediaRowActions,
+          handle !== undefined && styles.mediaRowHandled,
+        ]}>
+        {handle}
         {opens || showMenu ? (
           <Pressable
             accessibilityRole={opens ? 'button' : undefined}
@@ -804,6 +968,7 @@ export const MediaRow = memo(
     before.block === after.block &&
     before.item === after.item &&
     before.playing === after.playing &&
+    before.handle === after.handle &&
     before.context.runAction === after.context.runAction &&
     before.context.canRun === after.context.canRun &&
     before.scope.page === after.scope.page &&
@@ -1498,6 +1663,10 @@ const styles = StyleSheet.create({
   mediaRowActions: {paddingRight: space.xs, gap: 0},
   mediaRowOpen: {flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: space.md, alignSelf: 'stretch'},
   rowControl: {width: 40, minHeight: TOUCH_TARGET, alignItems: 'center', justifyContent: 'center', borderRadius: 9999},
+  // a reorderable list (change 8): the handle first, the held row raised above the others
+  mediaRowHandled: {paddingLeft: 0, gap: space.sm},
+  rowHandle: {width: 36, minHeight: TOUCH_TARGET, alignItems: 'center', justifyContent: 'center'},
+  reorderHeld: {zIndex: 2, elevation: 6, borderRadius: radii.control, backgroundColor: palette.controlStrong},
   mediaGroup: {...type.label, fontWeight: '600', paddingTop: space.md, paddingBottom: space.xs, paddingHorizontal: space.xs},
   search: {
     flexDirection: 'row',

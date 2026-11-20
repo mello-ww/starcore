@@ -20,7 +20,9 @@ import { createListPaging } from "./listpaging.js";
 import { icon } from "./icons.js";
 import { createMaps } from "./map.js";
 import { closeMenu, openMenu } from "./menu.js";
+import { openChooser, runChoose } from "./choose.js";
 import { pickMedia } from "./picker.js";
+import { attachReorder, handleGlyph, moveItem } from "./reorder.js";
 import { askSecrets, bodyWithSecrets, promptSecret, revealFrom, showRevealed } from "./secrets.js";
 import { promptPin, runSecure, secureProvider } from "./secure.js";
 import { chooseFiles, runUploads, sendFile, uploadReport } from "./upload.js";
@@ -814,6 +816,9 @@ export function mount(context) {
         if (action.upload !== undefined) {
             return runUpload(action, bindings);
         }
+        if (action.choose) {
+            return runChooseAction(action, bindings);
+        }
         if (action.play) {
             // 1.2: played by the shell's audio host - a search from whichever Satellite provides
             // audio.library, or this Satellite's own tracks (it must be the one the host plays from)
@@ -948,6 +953,46 @@ export function mount(context) {
         } else if (then === "update" && mergeItem(scope.data, result)) {
             // 1.2: the answer's item is merged into the row it ran from, which is drawn again
             (update || render)();
+        }
+        return true;
+    }
+
+    /** The choose action (1.2, change 8): one row of what the Satellite's source route answers,
+     * picked in Mission Control's dialog (or a new one named there), sent to the action's route
+     * as $value; a 409 asks before sending again. True once a request succeeded. */
+    async function runChooseAction(action, bindings) {
+        const post = (route, body) => call(`${satelliteBase}/${route}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        let outcome;
+        try {
+            outcome = await runChoose(action, bindings, {
+                load: (route) => call(`${satelliteBase}/${route}`),
+                choose: (options) => openChooser({
+                    ...options,
+                    frame: (route) => mediaFrame(route, {}, "ui-media-thumb ui-choose-thumb", ""),
+                }),
+                request: post,
+                confirm: (question) => window.confirm(question),
+            });
+        } catch (error) {
+            setNotice((error && error.payload && error.payload.message) || error.message, "error");
+            return false;
+        }
+        if (!outcome) {
+            return false;  // cancelled: nothing more runs
+        }
+        const result = outcome.result;
+        setNotice(result && typeof result.message === "string" ? result.message : null);
+        const then = action.then;
+        if (then === "back") {
+            goBack();
+        } else if (then && typeof then === "object" && then.navigate) {
+            navigate(then.navigate, resolve(then.params || {}, { ...bindings, data: result || {} }));
+        } else if (then === "refresh") {
+            loadData({ background: false });
         }
         return true;
     }
@@ -1138,6 +1183,15 @@ export function mount(context) {
         const quick = rowQuick(block, itemScope, canRun);
         const menu = rowMenu(block, itemScope, canRun);
         const row = el("div", `ui-list-row ui-media-row${block.action ? " is-action" : ""}`);
+        if (reorders(block)) {
+            // 1.2 (change 8): dragged by this handle, or moved with Alt+ArrowUp and Alt+ArrowDown
+            const handle = el("button", "sc-icon-button sc-icon-button-quiet ui-row-handle");
+            handle.type = "button";
+            handle.setAttribute("aria-label", `Move ${text(block.item.title, itemScope)}`);
+            handle.title = "Drag to move, or press Alt+Up or Alt+Down";
+            handle.appendChild(handleGlyph(18));
+            row.appendChild(handle);
+        }
         const open = el(block.action ? "button" : "div", "ui-media-row-open");
         if (block.action) {
             open.type = "button";
@@ -1210,6 +1264,38 @@ export function mount(context) {
             });
         }
         return row;
+    }
+
+    // a media-list whose rows the person may move: a whole list, never one loaded page by page
+    const reorders = (block) => block.type === "media-list" && Boolean(block.reorder) && !block.more;
+
+    /** A reorderable media-list's move (1.2, change 8): the rows move at once and the list is
+     * drawn again, then the route gets {from, to} as $value; if it fails, they move back. */
+    function reorderList(block, scope, list, items) {
+        let shown = list;
+        const redraw = (focus) => {
+            const fresh = BLOCKS["media-list"](block, scope);
+            if (shown.isConnected) {
+                shown.replaceWith(fresh);
+            }
+            shown = fresh;
+            const handle = focus === null ? null : fresh.querySelectorAll(".ui-row-handle")[focus];
+            if (handle) {
+                handle.focus();
+            }
+        };
+        attachReorder(list, async (from, to, { keyboard }) => {
+            const moved = items[from];
+            if (!moveItem(items, from, to)) {
+                return;
+            }
+            redraw(keyboard ? to : null);
+            const done = await runAction(block.reorder, { ...scope, data: moved }, { from, to });
+            if (!done) {
+                moveItem(items, to, from);
+                redraw(keyboard ? from : null);
+            }
+        });
     }
 
     /** Runs one of a row's own actions; `then: "update"` draws that row again in place (and
@@ -1429,6 +1515,10 @@ export function mount(context) {
             };
             for (const item of items) {
                 append(list, item, scope);
+            }
+            if (reorders(block)) {
+                list.classList.add("is-reorderable");
+                reorderList(block, scope, list, items);
             }
             return block.more ? pagedList(block, scope, list, append) : list;
         },

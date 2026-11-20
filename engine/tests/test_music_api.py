@@ -528,6 +528,98 @@ class PlaylistApiTest(MusicApiCase):
         self.assertEqual((status, served), (200, COVER))
         self.assertEqual(self.request(f"covers/{cover.split(':')[1]}", token=self.bob)[0], 404)
 
+    def test_the_shared_add_dialog_asks_before_adding_a_song_twice(self):
+        tracks = self.fill()
+        one, two = tracks["One"]["id"], tracks["Two"]["id"]
+        mine = self.call("playlists", {"name": "Mine", "tracks": [one]})[1]
+        self.call("playlists", {"name": "Ruled",
+                                "rules": {"rules": [{"field": "artist", "op": "is", "value": "Lumen"}]}})
+        editable = self.call("playlists?editable=1")[1]["playlists"]
+        self.assertEqual([(row["name"], row["line"]) for row in editable], [("Mine", "1 song")])
+
+        status, answer = self.call(f"playlists/{mine['id']}/add", {"tracks": [one], "ask": True})
+        self.assertEqual(status, 409)
+        self.assertEqual(answer["message"], "This song is already in Mine.")
+        self.assertEqual(answer["duplicates"], [one])
+        self.assertEqual(self.call(f"playlists/{mine['id']}")[1]["track_count"], 1)
+        # the listener says to add it anyway
+        status, answer = self.call(f"playlists/{mine['id']}/add", {"tracks": [one], "allow_duplicates": True})
+        self.assertEqual((status, answer["added"], answer["message"]), (200, 1, "Added to Mine."))
+        status, answer = self.call(f"playlists/{mine['id']}/add", {"tracks": [two], "ask": True})
+        self.assertEqual((status, answer["added"], answer["message"]), (200, 1, "Added to Mine."))
+        created = self.call("playlists", {"name": "Fresh"})
+        self.assertEqual((created[0], created[1]["message"]), (201, "Created Fresh."))
+
+    def test_a_playlist_page_says_what_its_forms_and_buttons_need(self):
+        tracks = self.fill()
+        plain = self.call("playlists", {"name": "Plain: one/two", "tracks": [tracks["One"]["id"]]})[1]
+        page = self.call(f"playlists/{plain['id']}")[1]
+        self.assertEqual((page["regular"], page["smart"], page["has_unmatched"]), (True, False, False))
+        self.assertEqual(page["export_name"], "Plain onetwo.m3u8")
+        self.assertTrue(page["tracks"][0]["entry_id"])
+
+        # a smart playlist as its forms send it: rows of text values
+        status, smart = self.call("playlists", {
+            "name": "Nineties", "smart": True, "match": "all", "sort": "title", "order": "asc", "limit": "50",
+            "conditions": [{"field": "year", "op": "between", "value": "1990, 1999"},
+                           {"field": "lossless", "op": "is", "value": "true"},
+                           {"field": "artist", "op": "contains", "value": "Lum"}]})
+        self.assertEqual(status, 201, smart)
+        self.assertEqual(smart["rules"]["rules"][0]["value"], [1990.0, 1999.0])
+        self.assertIs(smart["rules"]["rules"][1]["value"], True)
+        page = self.call(f"playlists/{smart['id']}")[1]
+        self.assertEqual((page["regular"], page["smart"], page["limit"], page["order"]), (False, True, 50, "asc"))
+        self.assertEqual(page["conditions"], [{"field": "year", "op": "between", "value": "1990 - 1999"},
+                                              {"field": "lossless", "op": "is", "value": "true"},
+                                              {"field": "artist", "op": "contains", "value": "Lum"}])
+        edited = self.call(f"playlists/{smart['id']}", {
+            "smart": True, "match": "any", "sort": "added", "order": "desc", "limit": 10,
+            "conditions": [{"field": "artist", "op": "is", "value": "Tidal"}]})[1]
+        self.assertEqual(([track["title"] for track in edited["tracks"]], edited["message"]), (["Three"], "Saved."))
+        status, answer = self.call(f"playlists/{smart['id']}", {
+            "smart": True, "conditions": [{"field": "year", "op": "between", "value": "1990"}]})
+        self.assertEqual(status, 400, answer)
+
+    def test_a_playlist_file_is_imported_from_its_raw_bytes(self):
+        tracks = self.fill()
+        text = "#EXTM3U\n#EXTINF:3,Lumen - One\nLumen/one.flac\n#EXTINF:5,Nobody - Missing\nelsewhere/missing.mp3\n"
+        octets = {"Content-Type": "application/octet-stream"}
+        status, _, body = self.request("playlists/import?name=Road%20songs.m3u8", "POST",
+                                       raw=("﻿" + text).encode("utf-8"), headers=octets)
+        self.assertEqual(status, 200, body)
+        result = json.loads(body)
+        self.assertEqual((result["playlist"]["name"], result["matched"]), ("Road songs", 1))
+        self.assertEqual(result["message"], "Imported Road songs: 1 song, 1 not found.")
+        page = self.call(f"playlists/{result['playlist']['id']}")[1]
+        self.assertEqual(page["tracks"][0]["id"], tracks["One"]["id"])
+        self.assertTrue(page["has_unmatched"])
+        self.assertEqual((page["unmatched"][0]["title"], page["unmatched"][0]["line"]), ("Missing", "Nobody"))
+        self.assertEqual(page["unmatched_line"], "1 song from the imported file is not in your library.")
+        dismissed = self.call(f"playlists/{result['playlist']['id']}/dismiss", {})[1]
+        self.assertEqual(dismissed["unmatched"], [])
+        self.assertFalse(self.call(f"playlists/{result['playlist']['id']}")[1]["has_unmatched"])
+
+        # a file naming its own playlist keeps that name
+        status, _, body = self.request("playlists/import?name=x.m3u", "POST",
+                                       raw=b"#PLAYLIST:Named\nLumen/two.flac\n", headers=octets)
+        self.assertEqual(json.loads(body)["playlist"]["name"], "Named")
+
+    def test_a_playlist_picture_is_its_cover_or_its_albums(self):
+        tracks = self.fill()
+        empty = self.call("playlists", {"name": "Empty"})[1]
+        self.assertEqual(self.request(f"playlists/{empty['id']}/picture")[0], 404)
+        filled = self.call("playlists", {"name": "Filled", "tracks": [tracks["One"]["id"]]})[1]
+        self.assertEqual(self.request(f"playlists/{filled['id']}/picture?size=120")[0], 200)
+        status, _, _ = self.request(f"playlists/{empty['id']}/cover", "POST", raw=COVER,
+                                    headers={"Content-Type": "image/png"})
+        self.assertEqual(status, 200)
+        status, _, served = self.request(f"playlists/{empty['id']}/picture")
+        self.assertEqual((status, served), (200, COVER))
+        self.assertEqual(self.request(f"playlists/{empty['id']}/picture", token=self.bob)[0], 404)
+        # back to the automatic picture
+        self.call(f"playlists/{empty['id']}/cover", {})
+        self.assertEqual(self.request(f"playlists/{empty['id']}/picture")[0], 404)
+
 
 class ListeningTest(MusicApiCase):
     def test_plays_skips_stats_and_wrapped(self):

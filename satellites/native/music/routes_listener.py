@@ -4,15 +4,18 @@ from datetime import datetime, timedelta, timezone
 import os
 import secrets
 
-from starcore.api.response import error_response, file_response
+from starcore.api.response import error_response, file_response, json_response
 
 from . import views
 from .history import year_now
-from .routes_catalog import mosaic_key
+from .playlists import parse_m3u
+from .routes_catalog import image_type, mosaic_key
 from .routing import identifier, ok, route
 
 COVER_LIMIT = 4 * 1024 * 1024
 IMPORT_LIMIT = 2 * 1024 * 1024
+# a playlist's picture changes with its cover and its songs: its URL carries ?v=<updated_at>
+PICTURE_CACHE = "private, max-age=86400"
 IMAGE_MAGIC = ((b"\x89PNG\r\n\x1a\n", "png"), (b"\xff\xd8\xff", "jpg"))
 
 
@@ -49,12 +52,23 @@ def playlists(call):
 
     if first is None:
         if call.method == "GET":
-            return ok({"playlists": store.list(call.user)})
+            rows = store.list(call.user)
+            if call.query.get("editable"):
+                # the playlists a song can be added to, as the "Add to playlist" dialog lists them
+                rows = [row for row in rows if not row["smart"]]
+                for row in rows:
+                    row["line"] = views.songs(row.get("tracks") or 0)
+            return ok({"playlists": rows})
         body = call.body
-        return ok(store.create(call.user, body.get("name"), body.get("description", ""), body.get("folder", ""),
-                               body.get("visibility", "private"), body.get("rules"), body.get("tracks")), status=201)
+        # a smart playlist as a form sends it: its rows of rules, then match, sort, order and limit
+        rules = _form_rules(body) if body.get("smart") else body.get("rules")
+        created = store.create(call.user, body.get("name"), body.get("description", ""), body.get("folder", ""),
+                               body.get("visibility", "private"), rules, body.get("tracks"))
+        return ok({**created, "message": f"Created {created['name']}."}, status=201)
 
     if first == "import" and call.method == "POST":
+        if call.request.raw is not None:
+            return _import_file(call)
         content = call.body.get("content")
         if isinstance(content, str):
             if len(content.encode("utf-8")) > IMPORT_LIMIT:
@@ -71,6 +85,8 @@ def playlists(call):
     if call.method == "GET":
         if action == "export":
             return _export(call, playlist_id)
+        if action == "picture":
+            return _picture(call, playlist_id)
         playlist = store.get(call.user, playlist_id)
         if playlist is None:
             return error_response(f"unknown playlist '{playlist_id}'")
@@ -85,20 +101,45 @@ def playlists(call):
             f"{playlist['unavailable']} unavailable" if playlist["unavailable"] else "") if part)
         # what the player says it plays from, as Music's own page names it
         playlist["context"] = f"playlist:{playlist_id}"
+        playlist["regular"] = not playlist["smart"]
+        playlist["has_unmatched"] = bool(playlist["unmatched"])
+        missing = len(playlist["unmatched"])
+        playlist["unmatched_line"] = (f"{views.songs(missing)} from the imported file {'is' if missing == 1 else 'are'}"
+                                      f" not in your library." if missing else "")
+        for entry in playlist["unmatched"]:
+            entry["line"] = " · ".join(part for part in (entry.get("artist"), entry.get("album")) if part)
+            entry["title"] = entry.get("title") or entry.get("path") or "Unknown song"
+        playlist["export_name"] = f"{_safe_name(playlist['name'])}.m3u8"
+        playlist.update(_rules_form(playlist["rules"]))
         return ok(playlist)
 
     body = call.body
     if action is None:
-        updated = store.update(call.user, playlist_id, body)
-        return ok(updated) if updated is not None else error_response(f"unknown playlist '{playlist_id}'")
+        changes = dict(body)
+        if changes.pop("smart", None):
+            changes["rules"] = _form_rules(body)
+        for key in ("conditions", "match", "sort", "order", "limit"):
+            changes.pop(key, None)
+        updated = store.update(call.user, playlist_id, changes)
+        if updated is None:
+            return error_response(f"unknown playlist '{playlist_id}'")
+        return ok({**updated, "message": "Saved."})
     if action == "delete":
         if not store.delete(call.user, playlist_id):
             return error_response(f"unknown playlist '{playlist_id}'")
-        return ok({"deleted": True})
+        return ok({"deleted": True, "message": "Playlist deleted."})
     if action == "add":
         position = body.get("position")
-        return ok(store.add(call.user, playlist_id, body.get("tracks"), bool(body.get("allow_duplicates")),
-                            int(position) if isinstance(position, (int, float)) else None))
+        allow = bool(body.get("allow_duplicates"))
+        if body.get("ask") and not allow:
+            # the shared "Add to playlist" dialog: a song already there is asked about first
+            return _add_asking(call, playlist_id, body.get("tracks"))
+        added = store.add(call.user, playlist_id, body.get("tracks"), allow,
+                          int(position) if isinstance(position, (int, float)) else None)
+        return ok({**added, "message": f"Added to {added['playlist']['name']}."})
+    if action == "dismiss":
+        dismissed = store.dismiss(call.user, playlist_id)
+        return ok(dismissed) if dismissed is not None else error_response(f"unknown playlist '{playlist_id}'")
     if action == "remove":
         return ok(store.remove(call.user, playlist_id, body.get("entries")))
     if action == "move":
@@ -108,6 +149,114 @@ def playlists(call):
     if action == "cover":
         return _upload_cover(call, playlist_id)
     return error_response(f"unknown playlist action '{action}'")
+
+
+def _form_rules(body: dict) -> dict:
+    """A smart playlist's rules from a form: `conditions` rows of {field, op, value}, then match,
+    sort, order and limit as the form's own fields. validate_rules checks every value."""
+    conditions = body.get("conditions")
+    if not isinstance(conditions, list):
+        conditions = []
+    return {"rules": [{"field": row.get("field"), "op": row.get("op"), "value": row.get("value")}
+                      for row in conditions if isinstance(row, dict)],
+            "match": body.get("match"), "sort": body.get("sort") or "added", "order": body.get("order"),
+            "limit": body.get("limit") or 500}
+
+
+def _rules_form(rules) -> dict:
+    """A smart playlist's rules as its edit form starts: the rows, and match, sort, order and limit."""
+    if not rules:
+        return {"conditions": [], "match": "all", "sort": "added", "order": "desc", "limit": 500}
+    rows = []
+    for rule in rules.get("rules") or []:
+        value = rule.get("value")
+        if isinstance(value, bool):
+            value = "true" if value else "false"
+        elif isinstance(value, list):
+            value = " - ".join(_number_text(item) for item in value)
+        elif isinstance(value, float):
+            value = _number_text(value)
+        rows.append({"field": rule.get("field"), "op": rule.get("op"),
+                     "value": "" if value is None else str(value)})
+    return {"conditions": rows, "match": rules.get("match", "all"), "sort": rules.get("sort", "added"),
+            "order": rules.get("order", "desc"), "limit": rules.get("limit", 500)}
+
+
+def _number_text(value) -> str:
+    return str(int(value)) if isinstance(value, float) and value.is_integer() else str(value)
+
+
+def _add_asking(call, playlist_id: str, tracks):
+    """Adds songs unless one is already in the playlist: then a 409 that names it, and nothing is
+    added until the listener says to add it anyway (`allow_duplicates`)."""
+    store = call.music.playlists
+    playlist = store.get(call.user, playlist_id)
+    if playlist is None:
+        return error_response(f"unknown playlist '{playlist_id}'")
+    if playlist["smart"]:
+        return error_response("a smart playlist is filled by its rules", status=400)
+    present = {entry.get("id") for entry in playlist["tracks"]}
+    wanted = [track for track in tracks if isinstance(track, str)] if isinstance(tracks, list) else []
+    duplicates = [track for track in wanted if track in present]
+    if duplicates:
+        text = (f"This song is already in {playlist['name']}." if len(wanted) == 1
+                else f"Some of these songs are already in {playlist['name']}.")
+        return json_response({"error": text, "message": text, "duplicates": duplicates}, status=409)
+    added = store.add(call.user, playlist_id, wanted)
+    return ok({**added, "message": f"Added to {playlist['name']}."})
+
+
+def _import_file(call):
+    """A playlist file sent as the raw body (the shared interface's upload). ?name= is the file's
+    own name, used when the file names no playlist itself."""
+    raw = call.request.raw
+    if raw.length > IMPORT_LIMIT:
+        return error_response("the playlist file is too large", status=413)
+    data = b"".join(raw)
+    try:
+        content = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        content = data.decode("latin-1")
+    entries = parse_m3u(content)
+    stem = str(call.query.get("name") or "").rsplit(".", 1)[0].strip()
+    name = next((entry["playlist"] for entry in entries if entry.get("playlist")), None) or stem or "Imported playlist"
+    result = call.music.playlists.import_entries(call.user, name, entries)
+    missing = len(result["unmatched"])
+    message = f"Imported {result['playlist']['name']}: {views.songs(result['matched'])}" + (
+        f", {missing} not found." if missing else ".")
+    return ok({**result, "message": message})
+
+
+def _picture(call, playlist_id: str):
+    """A playlist's picture: its uploaded cover, the album cover it was given, or else a mosaic
+    of its first albums' covers."""
+    music = call.music
+    row = music.db.one("SELECT cover FROM playlists WHERE id = ? AND owner = ?", (playlist_id, call.user))
+    if row is None:
+        return error_response(f"unknown playlist '{playlist_id}'")
+    size = call.integer("size", 0, 0, 2000) or None
+    cover = row["cover"] or ""
+    if cover.startswith("upload:"):
+        upload = cover.split(":", 1)[1]
+        path = next((candidate for candidate in music.covers_dir.glob(f"{upload}.*")
+                     if candidate.suffix != ".part"), None)
+        if path is not None:
+            return file_response(path, "image/png" if path.suffix == ".png" else "image/jpeg", PICTURE_CACHE)
+    if cover.startswith("album:"):
+        album = next(iter(music.catalog.albums_by_id([cover.split(":", 1)[1]])), None)
+        path = music.artwork_path(album, size) if album else None
+        if path is not None:
+            return file_response(path, image_type(path), PICTURE_CACHE)
+    ids = (music.playlists.get(call.user, playlist_id) or {}).get("mosaic") or []
+    found = {album["id"]: album for album in music.catalog.albums_by_id(ids)}
+    path = music.mosaic_path([found[album_id] for album_id in ids if album_id in found], size)
+    if path is None:
+        return error_response("this playlist has no picture")
+    return file_response(path, image_type(path), PICTURE_CACHE)
+
+
+def _safe_name(name: str) -> str:
+    return "".join(char for char in name if char.isalnum() or char in " -_").strip() or "playlist"
 
 
 def _export(call, playlist_id: str):
@@ -122,8 +271,7 @@ def _export(call, playlist_id: str):
     target.write_text(text, encoding="utf-8")
     for stale in sorted(directory.glob("*.m3u8"), key=lambda path: path.stat().st_mtime)[:-20]:
         stale.unlink(missing_ok=True)
-    safe = "".join(char for char in name if char.isalnum() or char in " -_").strip() or "playlist"
-    return file_response(target, "audio/x-mpegurl; charset=utf-8", download_name=f"{safe}.m3u8")
+    return file_response(target, "audio/x-mpegurl; charset=utf-8", download_name=f"{_safe_name(name)}.m3u8")
 
 
 def _upload_cover(call, playlist_id: str):

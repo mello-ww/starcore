@@ -11,6 +11,7 @@ from .db import dumps, loads, now
 MAX_TRACKS = 10_000
 MAX_NAME = 120
 MAX_DESCRIPTION = 1000
+MAX_UNMATCHED = 500
 VISIBILITIES = ("private", "public")
 
 RULE_FIELDS = {
@@ -133,6 +134,8 @@ class Playlists:
             "updated_at": row["updated_at"],
             "pinned": bool(row["pinned"]) if "pinned" in row.keys() else False,
             "collaborative": False,
+            # what an import could not find in this library, until the listener dismisses it
+            "unmatched": loads(row["unmatched"], []) or [],
         }
 
     def _owned(self, user: str, playlist_id: str):
@@ -180,6 +183,13 @@ class Playlists:
             fields["updated_at"] = now()
             assignments = ", ".join(f"{key} = ?" for key in fields)
             self.db.execute(f"UPDATE playlists SET {assignments} WHERE id = ?", [*fields.values(), playlist_id])
+        return self.get(user, playlist_id)
+
+    def dismiss(self, user: str, playlist_id: str):
+        """Forgets the entries an import could not match."""
+        if self._owned(user, playlist_id) is None:
+            return None
+        self.db.execute("UPDATE playlists SET unmatched = NULL WHERE id = ?", (playlist_id,))
         return self.get(user, playlist_id)
 
     def delete(self, user: str, playlist_id: str) -> bool:
@@ -316,6 +326,9 @@ class Playlists:
         playlist = self.create(user, name, description=description)
         if matched:
             self.add(user, playlist["id"], matched, allow_duplicates=True)
+        if unmatched:
+            self.db.execute("UPDATE playlists SET unmatched = ? WHERE id = ?",
+                            (dumps(unmatched[:MAX_UNMATCHED]), playlist["id"]))
         return {"playlist": self.get(user, playlist["id"]), "matched": len(matched), "unmatched": unmatched}
 
     def match(self, entry: dict):
@@ -414,6 +427,9 @@ def validate_rules(rules) -> dict:
             raise PlaylistError(f"'{condition['field']}' supports {', '.join(allowed)}")
         value = condition.get("value")
         if kind == "number":
+            if operator == "between" and isinstance(value, str):
+                # as a form's text input sends it: "1990, 1999", "1990-1999" or "1990 1999"
+                value = [part for part in re.split(r"[\s,;]+|(?<=\d)-", value.strip()) if part]
             values = value if operator == "between" else [value]
             if not isinstance(values, list) or len(values) != (2 if operator == "between" else 1):
                 raise PlaylistError("'between' needs two numbers")
@@ -423,7 +439,7 @@ def validate_rules(rules) -> dict:
                 raise PlaylistError(f"'{condition['field']}' needs a number")
             value = values if operator == "between" else values[0]
         elif kind == "bool":
-            value = bool(value)
+            value = value.strip().lower() in ("true", "yes", "1") if isinstance(value, str) else bool(value)
         elif operator in ("in_last_days", "not_in_last_days"):
             try:
                 value = int(value)

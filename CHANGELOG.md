@@ -34,6 +34,19 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   with Liked Songs paged; folders with a breadcrumb; a read-only playlist page. Every track
   row has a heart and a menu (Play next, Add to queue, radio, album, artist, credits), and
   album, artist, mix and playlist tiles have their own. Music's own interface is unchanged.
+- **Choose one of your lists, and move a list's rows (UI contract 1.2, contract change 8).**
+  The `choose` action lists what one of the Satellite's own routes answers (with pictures),
+  offers to create a new one, then sends the chosen row to its route; a `409` asks its
+  `conflict.confirm` before sending again. A `media-list`'s `reorder` lets the rows be dragged
+  by a handle (Alt+ArrowUp and Alt+ArrowDown on the web, Move up and Move down for TalkBack),
+  moving them at once and back if the route fails.
+- **Music's playlists on the shared interface (a preview, milestone A3).** Add to playlist in
+  every track row's menu, warning before a song is added twice; New playlist and New smart
+  playlist, with a smart playlist's rules as rows of field, operator and value; a playlist's
+  details, cover (or the automatic one), M3U export, delete, its rows reordered and removed;
+  Import a playlist file, which keeps the entries the library doesn't have for the playlist
+  page to show. Music's answers gain `playlists?editable=1`, `playlists/<id>/picture`, an
+  `ask` on `add` (the `409`) and a raw-body import.
 
 - **Satellites ship their own icons (UI contract 1.2, contract change 5).** A Satellite lists
   them in its `satellite.toml` (`[icons]`, each with a shared icon as fallback) and puts them

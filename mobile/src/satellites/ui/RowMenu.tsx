@@ -66,8 +66,9 @@ export function RowMenuSheet({
   );
 }
 
-/** The bottom sheet: clear of the status bar above it and the gesture bar below it. */
-function Sheet({children, onClose}: {children: React.ReactNode; onClose: () => void}) {
+/** The bottom sheet: clear of the status bar above it and the gesture bar below it (shared with
+ * the choose action's sheet, ChooseSheet.tsx). */
+export function Sheet({children, onClose}: {children: React.ReactNode; onClose: () => void}) {
   const insets = useSafeAreaInsets();
   return (
     <Pressable style={[styles.backdrop, {paddingTop: insets.top}]} onPress={onClose} accessibilityLabel="Close">

@@ -19,6 +19,8 @@ import {SatellitesApi} from '../satellites/api';
 import type {SatelliteSummary} from '../satellites/types';
 import {MemoryImages} from '../satellites/ui/memoryImages';
 import {MediaPicker, type MediaReference, type PickRequest} from '../satellites/ui/MediaPicker';
+import {ChooseSheet} from '../satellites/ui/ChooseSheet';
+import {runChoose, type ChooseAnswer, type ChooseOffer} from '../satellites/ui/choose';
 import {RevealSecret, SecretPrompt} from '../satellites/ui/SecretPrompt';
 import {askSecrets, bodyWithSecrets, revealFrom, type SecretAsk} from '../satellites/ui/secrets';
 import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
@@ -186,6 +188,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const [overlay, setOverlay] = useState<React.ReactNode>(null);
   // 1.2's pick action: the media picker open over the screen, until the person chooses or cancels
   const [pickRequest, setPickRequest] = useState<PickRequest | null>(null);
+  // 1.2's choose action (change 8): its sheet over the screen, until the person chooses or cancels
+  const [chooseRequest, setChooseRequest] = useState<{offer: ChooseOffer; resolve: (answer: ChooseAnswer) => void} | null>(null);
   // the secure action's prompt (1.2), while it asks: the app's own screen for the capability
   const [grantRequest, setGrantRequest] = useState<{
     component: React.ComponentType<SecurePromptProps>;
@@ -620,6 +624,44 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     [baseUrl, name, sessionToken],
   );
 
+  /** What follows a request that succeeded: the Satellite's kept copies forgotten, the answer's
+   * message, then the action's `then`. */
+  const finishAction = useCallback(
+    async (action: UiAction, scope: Scope, scoped: Scope, result: any, options?: {quiet?: boolean; update?: () => void}) => {
+      const quiet = Boolean(options?.quiet);
+      // something changed on the server: what was kept for this Satellite may no longer be true
+      // (an item gone, moved, renamed) - forgotten before the page reloads and keeps afresh
+      kept.current = null;
+      await store.forgetSatellite();
+      if (gatedRef.current && gateRef.current) {
+        // the store may have changed state: set up now (locked, the unlock card follows), a new
+        // PIN (every unlock ended), delinked (back to setup); still open stays as it is
+        gateRef.current.gate.check({quiet: true});
+      }
+      if (!quiet) {
+        showToast(typeof result?.message === 'string' ? result.message : null);
+      }
+      const then = action.then;
+      if (then === 'back') {
+        navigation.goBack();
+      } else if (then && typeof then === 'object' && then.navigate) {
+        go(then.navigate, resolve(then.params ?? {}, {...scoped, data: result ?? {}}));
+      } else if (then === 'refresh') {
+        loadData();
+      } else if (then === 'update' && mergeItem(scope.data, result)) {
+        // 1.2: the answer's item merged into its own row, which redraws in place - the list keeps
+        // its pages and its scroll position
+        if (options?.update) {
+          options.update();
+        } else {
+          setData((current: any) => (current && typeof current === 'object' ? {...current} : current));
+        }
+      }
+      return true;
+    },
+    [go, loadData, navigation, showToast, store],
+  );
+
   const runAction = useCallback(
     async (
       action: UiAction | undefined,
@@ -831,6 +873,39 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         }
         scoped.value = picked;
       }
+      const finish = (result: any) => finishAction(action, scope, scoped, result, options);
+      if (action.choose) {
+        // 1.2 (change 8): one row of what the Satellite's source answers, or a new one, in the
+        // app's own sheet; the route then gets it as $value, a 409 asked about before sending again
+        let chosen: {result: any} | null;
+        try {
+          chosen = await runChoose(action, scoped, {
+            load: route => api.read(name, route),
+            choose: offer =>
+              new Promise<ChooseAnswer>(done =>
+                setChooseRequest({
+                  offer,
+                  resolve: answer => {
+                    setChooseRequest(null);
+                    done(answer);
+                  },
+                }),
+              ),
+            request: (route, body) => api.act(name, route, 'POST', body),
+            confirm: text => confirmAction(text),
+          });
+        } catch (err: any) {
+          recheck(err);
+          if (!quiet) {
+            showToast(err?.message || 'That action failed.', true);
+          }
+          return false;
+        }
+        if (!chosen) {
+          return false; // cancelled or declined: nothing more is sent
+        }
+        return finish(chosen.result);
+      }
       if (action.confirm && !(await confirmAction(String(resolve(action.confirm, scoped))))) {
         return false;
       }
@@ -892,37 +967,9 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           ),
         );
       }
-      // something changed on the server: what was kept for this Satellite may no longer be true
-      // (an item gone, moved, renamed) - forgotten before the page reloads and keeps afresh
-      kept.current = null;
-      await store.forgetSatellite();
-      if (gatedRef.current && gateRef.current) {
-        // the store may have changed state: set up now (locked, the unlock card follows), a new
-        // PIN (every unlock ended), delinked (back to setup); still open stays as it is
-        gateRef.current.gate.check({quiet: true});
-      }
-      if (!quiet) {
-        showToast(typeof result?.message === 'string' ? result.message : null);
-      }
-      const then = action.then;
-      if (then === 'back') {
-        navigation.goBack();
-      } else if (then && typeof then === 'object' && then.navigate) {
-        go(then.navigate, resolve(then.params ?? {}, {...scoped, data: result ?? {}}));
-      } else if (then === 'refresh') {
-        loadData();
-      } else if (then === 'update' && mergeItem(scope.data, result)) {
-        // 1.2: the answer's item merged into its own row, which redraws in place - the list keeps
-        // its pages and its scroll position
-        if (options?.update) {
-          options.update();
-        } else {
-          setData((current: any) => (current && typeof current === 'object' ? {...current} : current));
-        }
-      }
-      return true;
+      return finish(result);
     },
-    [api, name, go, loadData, navigation, showToast, audio, providers, store, mediaSource, satellites, recheck, document],
+    [api, name, go, loadData, navigation, showToast, audio, providers, store, mediaSource, satellites, recheck, document, finishAction],
   );
 
   /** The secure action (1.2) on these items: one request, and one prompt when the session
@@ -1274,6 +1321,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       </ScrollView>
       )}
       {pickRequest && <MediaPicker request={pickRequest} read={readProvider} mediaSource={providerSource} />}
+      {chooseRequest && <ChooseSheet offer={chooseRequest.offer} mediaSource={mediaSource} onDone={chooseRequest.resolve} />}
       {grantRequest && (
         <grantRequest.component
           count={grantRequest.wanted.items.length}

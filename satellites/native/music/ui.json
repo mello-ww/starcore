@@ -1,5 +1,5 @@
 {
- "_about": "Music's shared interface (UI contract 1.2), a preview beside Music's own page and screens (docs/media-audio.md). A1: an album, an artist, a mix, a radio station, a mood, a genre and a track's credits, each played through the client's audio host with the play action's tracks or route. A2: Home (its sections as shelves and track rows), Search (recent searches and genres while empty, then the results, with a quality filter) and Your Library (one choice for its seven tabs, each filtered and sorted on the server, Liked Songs paged), a folder's page with its breadcrumb, and a playlist read-only; every track row has its heart, marks the track playing and has its menu, every album, artist, mix and playlist tile its own. It binds to Music's routes (views.py shapes the rows); pictures of mixes, moods, genres and playlists come from artwork/mosaic.",
+ "_about": "Music's shared interface (UI contract 1.2), a preview beside Music's own page and screens (docs/media-audio.md). A1: an album, an artist, a mix, a radio station, a mood, a genre and a track's credits, each played through the client's audio host with the play action's tracks or route. A2: Home (its sections as shelves and track rows), Search (recent searches and genres while empty, then the results, with a quality filter) and Your Library (one choice for its seven tabs, each filtered and sorted on the server, Liked Songs paged), a folder's page with its breadcrumb; every track row has its heart, marks the track playing and has its menu, every album, artist, mix and playlist tile its own. A3: playlists - Add to playlist in every track's menu (the choose action, which also creates one), a playlist's page with its details, cover, export and deletion, a regular playlist's songs reordered by dragging and removed from their menu, a smart playlist's rules edited as rows, new playlists, and a playlist file imported, with what it named that the library lacks. It binds to Music's routes (views.py shapes the rows); pictures of mixes, moods and genres come from artwork/mosaic, a playlist's from playlists/<id>/picture.",
  "contract": "starcore.ui/1.2",
  "title": "Music",
  "preview": true,
@@ -257,6 +257,51 @@
         "navigate": "artist",
         "params": {
          "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
         }
        }
       },
@@ -982,6 +1027,51 @@
        }
       },
       {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -1144,6 +1234,51 @@
         "navigate": "artist",
         "params": {
          "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
         }
        }
       },
@@ -1769,6 +1904,51 @@
        }
       },
       {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -2034,7 +2214,7 @@
      "items": "$.playlists",
      "size": "medium",
      "item": {
-      "image": "artwork/mosaic/{$.mosaic_key}?size=300",
+      "image": "playlists/{$.id}/picture?size=300&v={$.updated_at}",
       "key": "$.id",
       "title": "$.name",
       "subtitle": "$.line",
@@ -2287,6 +2467,51 @@
         "navigate": "artist",
         "params": {
          "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
         }
        }
       },
@@ -2545,6 +2770,51 @@
        }
       },
       {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -2810,7 +3080,7 @@
      "items": "$.playlists",
      "size": "medium",
      "item": {
-      "image": "artwork/mosaic/{$.mosaic_key}?size=300",
+      "image": "playlists/{$.id}/picture?size=300&v={$.updated_at}",
       "key": "$.id",
       "title": "$.name",
       "subtitle": "$.line",
@@ -3067,6 +3337,51 @@
        }
       },
       {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -3145,7 +3460,7 @@
      "item": {
       "title": "$.name",
       "subtitle": "$.line",
-      "image": "artwork/mosaic/{$.mosaic_key}?size=120",
+      "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}",
       "key": "$.id",
       "group": "$.group"
      },
@@ -3226,6 +3541,35 @@
        }
       }
      ]
+    },
+    {
+     "type": "button",
+     "label": "New playlist",
+     "style": "secondary",
+     "visible": "$.showing.playlists",
+     "action": {
+      "navigate": "new-playlist"
+     }
+    },
+    {
+     "type": "button",
+     "label": "New smart playlist",
+     "style": "secondary",
+     "visible": "$.showing.playlists",
+     "action": {
+      "navigate": "new-smart-playlist"
+     }
+    },
+    {
+     "type": "button",
+     "label": "Import a playlist file",
+     "style": "secondary",
+     "visible": "$.showing.playlists",
+     "action": {
+      "upload": {},
+      "route": "playlists/import?name={$value.name}",
+      "then": "refresh"
+     }
     },
     {
      "type": "choice",
@@ -3416,6 +3760,51 @@
         "navigate": "artist",
         "params": {
          "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
         }
        }
       },
@@ -3893,6 +4282,51 @@
        }
       },
       {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -4149,6 +4583,51 @@
        }
       },
       {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -4179,7 +4658,7 @@
    "blocks": [
     {
      "type": "image",
-     "src": "artwork/mosaic/{$.mosaic_key}?size=600",
+     "src": "playlists/{$.id}/picture?size=600&v={$.updated_at}",
      "alt": "$.name",
      "size": "large"
     },
@@ -4253,6 +4732,100 @@
      }
     },
     {
+     "type": "button",
+     "label": "Edit details",
+     "style": "secondary",
+     "action": {
+      "navigate": "playlist-edit",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Edit rules",
+     "style": "secondary",
+     "visible": "$.smart",
+     "action": {
+      "navigate": "playlist-rules",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Change cover",
+     "style": "secondary",
+     "action": {
+      "upload": {},
+      "route": "playlists/{$.id}/cover",
+      "then": "refresh"
+     }
+    },
+    {
+     "type": "button",
+     "label": "Use the automatic cover",
+     "style": "secondary",
+     "visible": "$.cover",
+     "action": {
+      "route": "playlists/{$.id}/cover",
+      "body": {},
+      "then": "refresh"
+     }
+    },
+    {
+     "type": "button",
+     "label": "Export as M3U",
+     "style": "secondary",
+     "action": {
+      "download": "playlists/{$.id}/export",
+      "name": "$.export_name"
+     }
+    },
+    {
+     "type": "button",
+     "label": "Delete playlist",
+     "style": "danger",
+     "action": {
+      "route": "playlists/{$.id}/delete",
+      "body": {},
+      "confirm": "Delete this playlist? This cannot be undone.",
+      "then": "back"
+     }
+    },
+    {
+     "type": "card",
+     "title": "Not in your library",
+     "visible": "$.has_unmatched",
+     "blocks": [
+      {
+       "type": "text",
+       "style": "caption",
+       "text": "$.unmatched_line"
+      },
+      {
+       "type": "list",
+       "items": "$.unmatched",
+       "item": {
+        "title": "$.title",
+        "subtitle": "$.line"
+       }
+      },
+      {
+       "type": "button",
+       "label": "Dismiss",
+       "style": "secondary",
+       "action": {
+        "route": "playlists/{$.id}/dismiss",
+        "body": {},
+        "then": "refresh"
+       }
+      }
+     ]
+    },
+    {
      "type": "media-list",
      "items": "$.tracks",
      "empty": "This playlist is empty.",
@@ -4264,6 +4837,7 @@
        "meta": "duration"
       },
       "audio": "$.id",
+      "key": "$.entry_id",
       "image": "artwork/{$.album_id}?size=120"
      },
      "action": {
@@ -4393,6 +4967,274 @@
        }
       },
       {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        },
+        "then": "refresh"
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      },
+      {
+       "label": "Remove from this playlist",
+       "icon": "x",
+       "visible": "$.entry_id",
+       "action": {
+        "route": "playlists/{$page.id}/remove",
+        "body": {
+         "entries": [
+          "$.entry_id"
+         ]
+        },
+        "then": "refresh"
+       }
+      }
+     ],
+     "reorder": {
+      "route": "playlists/{$page.id}/move",
+      "body": {
+       "entry": "$.entry_id",
+       "to": "$value.to"
+      }
+     },
+     "size": "small",
+     "id": "playlist-tracks",
+     "visible": "$.regular"
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "empty": "No songs match these rules yet.",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -4403,7 +5245,656 @@
        }
       }
      ],
-     "size": "small"
+     "size": "small",
+     "visible": "$.smart"
+    }
+   ]
+  },
+  "playlist-edit": {
+   "title": "Edit playlist",
+   "params": [
+    "id"
+   ],
+   "source": {
+    "route": "playlists/{$params.id}"
+   },
+   "blocks": [
+    {
+     "type": "form",
+     "fields": [
+      {
+       "key": "name",
+       "label": "Name",
+       "kind": "text",
+       "required": true,
+       "value": "$.name"
+      },
+      {
+       "key": "description",
+       "label": "Description",
+       "kind": "text",
+       "value": "$.description"
+      },
+      {
+       "key": "folder",
+       "label": "Folder",
+       "kind": "text",
+       "placeholder": "None",
+       "value": "$.folder"
+      }
+     ],
+     "submit": {
+      "label": "Save",
+      "action": {
+       "route": "playlists/{$params.id}",
+       "body": {
+        "name": "$form.name",
+        "description": "$form.description",
+        "folder": "$form.folder"
+       },
+       "then": "back"
+      }
+     }
+    }
+   ]
+  },
+  "playlist-rules": {
+   "title": "Edit rules",
+   "params": [
+    "id"
+   ],
+   "source": {
+    "route": "playlists/{$params.id}"
+   },
+   "blocks": [
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "Each rule is a field, a comparison and a value: a number, a year range such as 1990 - 1999, true or false for Lossless and Liked, a number of days, or a date such as 2026-01-31."
+    },
+    {
+     "type": "form",
+     "fields": [
+      {
+       "key": "conditions",
+       "label": "Rules",
+       "kind": "rows",
+       "add": "Add a rule",
+       "required": true,
+       "value": "$.conditions",
+       "fields": [
+        {
+         "key": "field",
+         "label": "Field",
+         "kind": "select",
+         "required": true,
+         "options": [
+          {
+           "value": "title",
+           "label": "Title"
+          },
+          {
+           "value": "artist",
+           "label": "Artist"
+          },
+          {
+           "value": "album",
+           "label": "Album"
+          },
+          {
+           "value": "album_artist",
+           "label": "Album artist"
+          },
+          {
+           "value": "genre",
+           "label": "Genre"
+          },
+          {
+           "value": "composer",
+           "label": "Composer"
+          },
+          {
+           "value": "label",
+           "label": "Label"
+          },
+          {
+           "value": "format",
+           "label": "Format"
+          },
+          {
+           "value": "folder",
+           "label": "Folder"
+          },
+          {
+           "value": "year",
+           "label": "Year"
+          },
+          {
+           "value": "duration",
+           "label": "Length (seconds)"
+          },
+          {
+           "value": "bitrate",
+           "label": "Bitrate (kbps)"
+          },
+          {
+           "value": "sample_rate",
+           "label": "Sample rate (Hz)"
+          },
+          {
+           "value": "bit_depth",
+           "label": "Bit depth"
+          },
+          {
+           "value": "lossless",
+           "label": "Lossless"
+          },
+          {
+           "value": "added",
+           "label": "Added"
+          },
+          {
+           "value": "plays",
+           "label": "Plays"
+          },
+          {
+           "value": "last_played",
+           "label": "Last played"
+          },
+          {
+           "value": "liked",
+           "label": "Liked"
+          }
+         ]
+        },
+        {
+         "key": "op",
+         "label": "Comparison",
+         "kind": "select",
+         "required": true,
+         "options": [
+          {
+           "value": "is",
+           "label": "is"
+          },
+          {
+           "value": "is_not",
+           "label": "is not"
+          },
+          {
+           "value": "contains",
+           "label": "contains"
+          },
+          {
+           "value": "not_contains",
+           "label": "does not contain"
+          },
+          {
+           "value": "starts_with",
+           "label": "starts with"
+          },
+          {
+           "value": "gt",
+           "label": "is more than"
+          },
+          {
+           "value": "lt",
+           "label": "is less than"
+          },
+          {
+           "value": "between",
+           "label": "is between"
+          },
+          {
+           "value": "in_last_days",
+           "label": "in the last days"
+          },
+          {
+           "value": "not_in_last_days",
+           "label": "not in the last days"
+          },
+          {
+           "value": "before",
+           "label": "before (date)"
+          },
+          {
+           "value": "after",
+           "label": "after (date)"
+          }
+         ]
+        },
+        {
+         "key": "value",
+         "label": "Value",
+         "kind": "text"
+        }
+       ]
+      },
+      {
+       "key": "match",
+       "label": "Songs must match",
+       "kind": "select",
+       "options": [
+        {
+         "value": "all",
+         "label": "Every rule"
+        },
+        {
+         "value": "any",
+         "label": "Any rule"
+        }
+       ],
+       "value": "$.match"
+      },
+      {
+       "key": "sort",
+       "label": "Sort by",
+       "kind": "select",
+       "options": [
+        {
+         "value": "added",
+         "label": "Recently added"
+        },
+        {
+         "value": "title",
+         "label": "Title"
+        },
+        {
+         "value": "artist",
+         "label": "Artist"
+        },
+        {
+         "value": "year",
+         "label": "Year"
+        },
+        {
+         "value": "plays",
+         "label": "Plays"
+        },
+        {
+         "value": "last_played",
+         "label": "Last played"
+        },
+        {
+         "value": "duration",
+         "label": "Length"
+        },
+        {
+         "value": "random",
+         "label": "Random"
+        }
+       ],
+       "value": "$.sort"
+      },
+      {
+       "key": "order",
+       "label": "Order",
+       "kind": "select",
+       "options": [
+        {
+         "value": "desc",
+         "label": "Descending"
+        },
+        {
+         "value": "asc",
+         "label": "Ascending"
+        }
+       ],
+       "value": "$.order"
+      },
+      {
+       "key": "limit",
+       "label": "At most this many songs",
+       "kind": "number",
+       "value": "$.limit"
+      }
+     ],
+     "submit": {
+      "label": "Save",
+      "action": {
+       "route": "playlists/{$params.id}",
+       "body": {
+        "smart": true,
+        "conditions": "$form.conditions",
+        "match": "$form.match",
+        "sort": "$form.sort",
+        "order": "$form.order",
+        "limit": "$form.limit"
+       },
+       "then": "back"
+      }
+     }
+    }
+   ]
+  },
+  "new-playlist": {
+   "title": "New playlist",
+   "blocks": [
+    {
+     "type": "form",
+     "fields": [
+      {
+       "key": "name",
+       "label": "Name",
+       "kind": "text",
+       "required": true
+      },
+      {
+       "key": "description",
+       "label": "Description",
+       "kind": "text"
+      },
+      {
+       "key": "folder",
+       "label": "Folder",
+       "kind": "text",
+       "placeholder": "None"
+      }
+     ],
+     "submit": {
+      "label": "Create",
+      "action": {
+       "route": "playlists",
+       "body": {
+        "name": "$form.name",
+        "description": "$form.description",
+        "folder": "$form.folder"
+       },
+       "then": {
+        "navigate": "playlist",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "new-smart-playlist": {
+   "title": "New smart playlist",
+   "blocks": [
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "Each rule is a field, a comparison and a value: a number, a year range such as 1990 - 1999, true or false for Lossless and Liked, a number of days, or a date such as 2026-01-31."
+    },
+    {
+     "type": "form",
+     "fields": [
+      {
+       "key": "name",
+       "label": "Name",
+       "kind": "text",
+       "required": true
+      },
+      {
+       "key": "description",
+       "label": "Description",
+       "kind": "text"
+      },
+      {
+       "key": "folder",
+       "label": "Folder",
+       "kind": "text",
+       "placeholder": "None"
+      },
+      {
+       "key": "conditions",
+       "label": "Rules",
+       "kind": "rows",
+       "add": "Add a rule",
+       "required": true,
+       "fields": [
+        {
+         "key": "field",
+         "label": "Field",
+         "kind": "select",
+         "required": true,
+         "options": [
+          {
+           "value": "title",
+           "label": "Title"
+          },
+          {
+           "value": "artist",
+           "label": "Artist"
+          },
+          {
+           "value": "album",
+           "label": "Album"
+          },
+          {
+           "value": "album_artist",
+           "label": "Album artist"
+          },
+          {
+           "value": "genre",
+           "label": "Genre"
+          },
+          {
+           "value": "composer",
+           "label": "Composer"
+          },
+          {
+           "value": "label",
+           "label": "Label"
+          },
+          {
+           "value": "format",
+           "label": "Format"
+          },
+          {
+           "value": "folder",
+           "label": "Folder"
+          },
+          {
+           "value": "year",
+           "label": "Year"
+          },
+          {
+           "value": "duration",
+           "label": "Length (seconds)"
+          },
+          {
+           "value": "bitrate",
+           "label": "Bitrate (kbps)"
+          },
+          {
+           "value": "sample_rate",
+           "label": "Sample rate (Hz)"
+          },
+          {
+           "value": "bit_depth",
+           "label": "Bit depth"
+          },
+          {
+           "value": "lossless",
+           "label": "Lossless"
+          },
+          {
+           "value": "added",
+           "label": "Added"
+          },
+          {
+           "value": "plays",
+           "label": "Plays"
+          },
+          {
+           "value": "last_played",
+           "label": "Last played"
+          },
+          {
+           "value": "liked",
+           "label": "Liked"
+          }
+         ]
+        },
+        {
+         "key": "op",
+         "label": "Comparison",
+         "kind": "select",
+         "required": true,
+         "options": [
+          {
+           "value": "is",
+           "label": "is"
+          },
+          {
+           "value": "is_not",
+           "label": "is not"
+          },
+          {
+           "value": "contains",
+           "label": "contains"
+          },
+          {
+           "value": "not_contains",
+           "label": "does not contain"
+          },
+          {
+           "value": "starts_with",
+           "label": "starts with"
+          },
+          {
+           "value": "gt",
+           "label": "is more than"
+          },
+          {
+           "value": "lt",
+           "label": "is less than"
+          },
+          {
+           "value": "between",
+           "label": "is between"
+          },
+          {
+           "value": "in_last_days",
+           "label": "in the last days"
+          },
+          {
+           "value": "not_in_last_days",
+           "label": "not in the last days"
+          },
+          {
+           "value": "before",
+           "label": "before (date)"
+          },
+          {
+           "value": "after",
+           "label": "after (date)"
+          }
+         ]
+        },
+        {
+         "key": "value",
+         "label": "Value",
+         "kind": "text"
+        }
+       ]
+      },
+      {
+       "key": "match",
+       "label": "Songs must match",
+       "kind": "select",
+       "options": [
+        {
+         "value": "all",
+         "label": "Every rule"
+        },
+        {
+         "value": "any",
+         "label": "Any rule"
+        }
+       ],
+       "value": "all"
+      },
+      {
+       "key": "sort",
+       "label": "Sort by",
+       "kind": "select",
+       "options": [
+        {
+         "value": "added",
+         "label": "Recently added"
+        },
+        {
+         "value": "title",
+         "label": "Title"
+        },
+        {
+         "value": "artist",
+         "label": "Artist"
+        },
+        {
+         "value": "year",
+         "label": "Year"
+        },
+        {
+         "value": "plays",
+         "label": "Plays"
+        },
+        {
+         "value": "last_played",
+         "label": "Last played"
+        },
+        {
+         "value": "duration",
+         "label": "Length"
+        },
+        {
+         "value": "random",
+         "label": "Random"
+        }
+       ],
+       "value": "added"
+      },
+      {
+       "key": "order",
+       "label": "Order",
+       "kind": "select",
+       "options": [
+        {
+         "value": "desc",
+         "label": "Descending"
+        },
+        {
+         "value": "asc",
+         "label": "Ascending"
+        }
+       ],
+       "value": "desc"
+      },
+      {
+       "key": "limit",
+       "label": "At most this many songs",
+       "kind": "number",
+       "value": 500
+      }
+     ],
+     "submit": {
+      "label": "Create",
+      "action": {
+       "route": "playlists",
+       "body": {
+        "name": "$form.name",
+        "description": "$form.description",
+        "folder": "$form.folder",
+        "smart": true,
+        "conditions": "$form.conditions",
+        "match": "$form.match",
+        "sort": "$form.sort",
+        "order": "$form.order",
+        "limit": "$form.limit"
+       },
+       "then": {
+        "navigate": "playlist",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     }
     }
    ]
   },
@@ -4609,6 +6100,51 @@
         "navigate": "artist",
         "params": {
          "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
         }
        }
       },
@@ -4898,6 +6434,51 @@
         "navigate": "artist",
         "params": {
          "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
         }
        }
       },
@@ -5335,6 +6916,51 @@
         "navigate": "artist",
         "params": {
          "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
         }
        }
       },
@@ -5999,6 +7625,51 @@
        }
       },
       {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -6197,6 +7868,51 @@
        }
       },
       {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -6391,6 +8107,51 @@
         "navigate": "artist",
         "params": {
          "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
         }
        }
       },
@@ -6751,6 +8512,51 @@
         "navigate": "artist",
         "params": {
          "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
         }
        }
       },
