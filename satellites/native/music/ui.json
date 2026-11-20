@@ -1,5 +1,5 @@
 {
- "_about": "Music's shared interface (UI contract 1.2), a preview beside Music's own page and screens (docs/media-audio.md). A1: an album, an artist, a mix, a radio station, a mood, a genre and a track's credits, each played through the client's audio host with the play action's tracks or route. A2: Home (its sections as shelves and track rows), Search (recent searches and genres while empty, then the results, with a quality filter) and Your Library (one choice for its seven tabs, each filtered and sorted on the server, Liked Songs paged), a folder's page with its breadcrumb; every track row has its heart, marks the track playing and has its menu, every album, artist, mix and playlist tile its own. A3: playlists - Add to playlist in every track's menu (the choose action, which also creates one), a playlist's page with its details, cover, export and deletion, a regular playlist's songs reordered by dragging and removed from their menu, a smart playlist's rules edited as rows, new playlists, and a playlist file imported, with what it named that the library lacks. It binds to Music's routes (views.py shapes the rows); pictures of mixes, moods and genres come from artwork/mosaic, a playlist's from playlists/<id>/picture.",
+ "_about": "Music's shared interface (UI contract 1.2), a preview beside Music's own page and screens (docs/media-audio.md). A1: an album, an artist, a mix, a radio station, a mood, a genre and a track's credits, each played through the client's audio host with the play action's tracks or route. A2: Home (its sections as shelves and track rows), Search (recent searches and genres while empty, then the results, with a quality filter) and Your Library (one choice for its seven tabs, each filtered and sorted on the server, Liked Songs paged), a folder's page with its breadcrumb; every track row has its heart, marks the track playing and has its menu, every album, artist, mix and playlist tile its own. A3: playlists - Add to playlist in every track's menu (the choose action, which also creates one), a playlist's page with its details, cover, export and deletion, a regular playlist's songs reordered by dragging and removed from their menu, a smart playlist's rules edited as rows, new playlists, and a playlist file imported, with what it named that the library lacks. A4: what the player adds while it plays Music (`audio`: its More menu, the title's and artist's links, Open Music), a like on a page reaching the player at once (`reloads`) and the pages with hearts following a like in the player (`follows`). It binds to Music's routes (views.py shapes the rows); pictures of mixes, moods and genres come from artwork/mosaic, a playlist's from playlists/<id>/picture.",
  "contract": "starcore.ui/1.2",
  "title": "Music",
  "preview": true,
@@ -154,6 +154,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -170,6 +171,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -211,6 +213,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -226,6 +229,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -557,6 +561,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -572,6 +577,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -671,6 +677,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -686,6 +693,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -813,6 +821,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -828,6 +837,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -920,6 +930,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -936,6 +947,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -977,6 +989,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -992,6 +1005,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -1131,6 +1145,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -1147,6 +1162,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -1188,6 +1204,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -1203,6 +1220,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -1543,6 +1561,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -1558,6 +1577,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -1604,6 +1624,9 @@
       }
      ]
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "search": {
@@ -1797,6 +1820,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -1813,6 +1837,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -1854,6 +1879,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -1869,6 +1895,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -2047,6 +2074,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -2062,6 +2090,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -2154,6 +2183,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -2169,6 +2199,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -2364,6 +2395,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -2380,6 +2412,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -2421,6 +2454,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -2436,6 +2470,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -2530,6 +2565,9 @@
      "id": "search-songs",
      "visible": "$.found"
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "results": {
@@ -2663,6 +2701,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -2679,6 +2718,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -2720,6 +2760,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -2735,6 +2776,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -2913,6 +2955,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -2928,6 +2971,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -3020,6 +3064,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -3035,6 +3080,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -3230,6 +3276,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -3246,6 +3293,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -3287,6 +3335,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -3302,6 +3351,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -3396,6 +3446,9 @@
      "id": "search-songs",
      "visible": "$.found"
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "library": {
@@ -3657,6 +3710,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -3673,6 +3727,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -3714,6 +3769,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -3729,6 +3785,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -3959,6 +4016,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -3974,6 +4032,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -4086,6 +4145,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -4101,6 +4161,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -4175,6 +4236,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -4191,6 +4253,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -4232,6 +4295,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -4247,6 +4311,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -4377,6 +4442,9 @@
       }
      }
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "liked": {
@@ -4476,6 +4544,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -4492,6 +4561,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -4533,6 +4603,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -4548,6 +4619,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -4645,6 +4717,9 @@
      },
      "id": "liked"
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "playlist": {
@@ -4860,6 +4935,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -4876,6 +4952,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -4917,6 +4994,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -4932,6 +5010,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -5083,6 +5162,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -5099,6 +5179,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -5140,6 +5221,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -5155,6 +5237,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -5248,6 +5331,9 @@
      "size": "small",
      "visible": "$.smart"
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "playlist-edit": {
@@ -5997,6 +6083,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -6013,6 +6100,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -6054,6 +6142,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -6069,6 +6158,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -6160,6 +6250,9 @@
       }
      ]
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "album": {
@@ -6245,6 +6338,7 @@
        "id": "$.id",
        "liked": true
       },
+      "reloads": "audio.session",
       "then": "refresh"
      }
     },
@@ -6261,6 +6355,7 @@
        "id": "$.id",
        "liked": false
       },
+      "reloads": "audio.session",
       "then": "refresh"
      }
     },
@@ -6331,6 +6426,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -6347,6 +6443,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -6388,6 +6485,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -6403,6 +6501,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -6625,6 +6724,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -6640,6 +6740,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -6686,6 +6787,9 @@
       }
      ]
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "artist": {
@@ -6755,6 +6859,7 @@
        "id": "$.id",
        "liked": true
       },
+      "reloads": "audio.session",
       "then": "refresh"
      }
     },
@@ -6771,6 +6876,7 @@
        "id": "$.id",
        "liked": false
       },
+      "reloads": "audio.session",
       "then": "refresh"
      }
     },
@@ -6813,6 +6919,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -6829,6 +6936,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -6870,6 +6978,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -6885,6 +6994,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7061,6 +7171,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7076,6 +7187,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7207,6 +7319,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7222,6 +7335,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7353,6 +7467,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7368,6 +7483,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7434,6 +7550,9 @@
       }
      }
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "mix": {
@@ -7518,6 +7637,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7534,6 +7654,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -7575,6 +7696,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7590,6 +7712,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7682,6 +7805,9 @@
      ],
      "size": "small"
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "mood": {
@@ -7761,6 +7887,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7777,6 +7904,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -7818,6 +7946,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7833,6 +7962,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -7925,6 +8055,9 @@
      ],
      "size": "small"
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "radio": {
@@ -8004,6 +8137,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -8020,6 +8154,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -8061,6 +8196,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -8076,6 +8212,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -8168,6 +8305,9 @@
      ],
      "size": "small"
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "genre": {
@@ -8309,6 +8449,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -8324,6 +8465,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -8409,6 +8551,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -8425,6 +8568,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       }
@@ -8466,6 +8610,7 @@
          "id": "$.id",
          "liked": true
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -8481,6 +8626,7 @@
          "id": "$.id",
          "liked": false
         },
+        "reloads": "audio.session",
         "then": "update"
        }
       },
@@ -8573,6 +8719,9 @@
      ],
      "size": "small"
     }
+   ],
+   "follows": [
+    "audio.session"
    ]
   },
   "track": {
@@ -8745,6 +8894,114 @@
      ]
     }
    ]
+  }
+ },
+ "audio": {
+  "menu": [
+   {
+    "label": "Add to playlist",
+    "icon": "plus",
+    "action": {
+     "choose": {
+      "source": "playlists?editable=1",
+      "items": "$.playlists",
+      "title": "Add to playlist",
+      "empty": "No playlists yet.",
+      "item": {
+       "title": "$.name",
+       "subtitle": "$.line",
+       "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+      },
+      "create": {
+       "label": "New playlist",
+       "field": "Playlist name",
+       "route": "playlists",
+       "body": {
+        "name": "$value",
+        "tracks": [
+         "$.id"
+        ]
+       }
+      }
+     },
+     "route": "playlists/{$value.id}/add",
+     "body": {
+      "tracks": [
+       "$.id"
+      ],
+      "ask": true
+     },
+     "conflict": {
+      "confirm": "This song is already in this playlist. Add it again?",
+      "route": "playlists/{$value.id}/add",
+      "body": {
+       "tracks": [
+        "$.id"
+       ],
+       "allow_duplicates": true
+      }
+     }
+    }
+   },
+   {
+    "label": "Start radio",
+    "icon": "activity",
+    "action": {
+     "play": {
+      "route": "radio/track/{$.id}"
+     }
+    }
+   },
+   {
+    "label": "Go to album",
+    "icon": "music",
+    "visible": "$.album_id",
+    "action": {
+     "navigate": "album",
+     "params": {
+      "id": "$.album_id"
+     }
+    }
+   },
+   {
+    "label": "Go to artist",
+    "icon": "star",
+    "visible": "$.artist_id",
+    "action": {
+     "navigate": "artist",
+     "params": {
+      "id": "$.artist_id"
+     }
+    }
+   },
+   {
+    "label": "Credits",
+    "icon": "info",
+    "action": {
+     "navigate": "track",
+     "params": {
+      "id": "$.id"
+     }
+    }
+   }
+  ],
+  "album": {
+   "navigate": "album",
+   "params": {
+    "id": "$.album_id"
+   }
+  },
+  "artist": {
+   "navigate": "artist",
+   "params": {
+    "id": "$.artist_id"
+   }
+  },
+  "library": {
+   "label": "Open Music",
+   "action": {
+    "navigate": "home"
+   }
   }
  }
 }

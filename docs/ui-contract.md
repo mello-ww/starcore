@@ -112,6 +112,7 @@ comes from the Satellite's ordinary routes, through bindings.
 | `header` | 1.1, optional: blocks shown above the navigation on every top-level page, with a `source` of their own - see [Dashboards, headers and widgets](#dashboards-headers-and-widgets). |
 | `widgets` | 1.1, optional: up to 4 summaries a client may show outside the Satellite (Home). |
 | `preview` | 1.2, optional `true`: the document doesn't replace the Satellite's own interface yet. A client that has one (a `page.js` on the web, a screen of its own in the app) keeps opening it and offers the document in Developer Mode; a client without one opens the document. The listing reports it as `ui.preview`. Without it, the document is the default and Developer Mode offers the Satellite's own interface instead, on both clients. |
+| `audio` | 1.2 (change 9), optional: what the client's audio host adds to its player while it plays from this Satellite - see [The player's additions](#the-players-additions). |
 | `protected` | 1.2, optional `{capability, setup, forgot?}`: the document belongs to a store its own Satellite keeps locked, and a client unlocks it before showing any page - see [Protected documents](#protected-documents). |
 | `pages` | Page id (lower case, digits, `-`, `_`) to page. |
 
@@ -131,7 +132,11 @@ A **page** has `blocks` and optionally:
 - `offline` (1.2): `true` lets the client keep the page's data - and the pages a `media-grid`
   on it loaded after that - to show while StarCore can't be reached. Its `source` may depend on
   `$state` only where a `choice` on the page sets it (a few fixed values, one kept collection
-  each), never on a search's text. See [Offline pages](#offline-pages).
+  each), never on a search's text. See [Offline pages](#offline-pages);
+- `follows` (1.2, change 9): Satellite capabilities whose state the client keeps, so far only
+  `audio.session` (its likes and preferences). When the client itself changes that state
+  elsewhere (a like in the player), the page loads its sources again. The document's own
+  Satellite must provide the capability.
 
 While a page is visible, its sources refresh on their own; a hidden browser tab or an app in
 the background polls nothing. When a refresh fails, the page keeps what it last showed,
@@ -676,6 +681,11 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
     `item` into that row (see [Row and tile menus](#row-and-tile-menus));
   - `{navigate, params}` opens a page, where `$.` refers to the action's **response**, which is
     how "add an item, then open it" works.
+- **`reloads`** (1.2, change 9), on a route or `choose` action: a capability the client keeps
+  state from (`reloadable_capabilities` in `vocabulary.json`, so far `audio.session`), which the
+  document's own Satellite provides. Once the request succeeded the client reads that state
+  again, so a like on a page shows in the player at once. It doesn't tell the pages that
+  `follows` it: the page that acted refreshes through its own `then`.
 - **`navigate`** on its own is a navigation-only action.
 - **`play`** (1.2), on its own: `{"play": {"search": "$.query"}}` asks the client to play what
   the catalog's `audio.library` provider finds for `search` (text or a binding), through the
@@ -902,6 +912,39 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
 
 A response may carry `{"message": "..."}`, shown as a short notice; an error response's
 `error` is shown the same way. Either way, the page then shows what is actually true again.
+
+### The player's additions
+
+`audio` (1.2, change 9), in a document whose Satellite provides `audio.library`, says what
+the client's audio host adds to its player while it plays that Satellite's tracks. Every
+action runs with the **playing track** (as the provider's `track` operation answers it) as
+`$.`, and with no page around it: no `$page`, `$params`, `$state` or `$sources`, and no
+`then`.
+
+```json
+"audio": {
+  "menu": [
+    {"label": "Start radio", "icon": "activity", "action": {"play": {"route": "radio/track/{$.id}"}}},
+    {"label": "Go to album", "visible": "$.album_id", "action": {"navigate": "album", "params": {"id": "$.album_id"}}}
+  ],
+  "album": {"navigate": "album", "params": {"id": "$.album_id"}},
+  "artist": {"navigate": "artist", "params": {"id": "$.artist_id"}},
+  "library": {"label": "Open Music", "action": {"navigate": "home"}}
+}
+```
+
+- `menu`: up to 10 entries (`label`, `icon`, `visible`, `action`) shown after the host's own
+  (Play next) in the player's More menu. An entry runs `navigate`, `play`, `choose` or a route
+  action.
+- `album`, `artist`: navigate actions behind the player's title and artist. The id the player
+  shows (one of several artists, say) stands in for the track's own `album_id` or `artist_id`.
+- `library`: `{label, action}`, a navigate action, the host's way to the Satellite's pages
+  (More on the web bar, the end of the menu on Android).
+- A navigate opens that page of the Satellite's shared interface wherever the player is, on top
+  of what is shown (pushed on Android).
+- Without `audio`, the host offers only its own entries. While the Satellite's own interface is
+  shown (its `page.js` or its native screens), what that interface registers wins.
+- A protected document has no `audio`.
 
 ## Formats
 

@@ -15,9 +15,17 @@ import { seekBar } from "./seek.js";
 let bar = null;
 
 // a title or artist links into the provider's own page when it offers one, else it is text
-function setHref(node, target) {
+// a link to the provider's view: an own page's href, else a hook that opens it
+function setLink(node, target, open) {
+    node.onclick = null;
     if (target) {
         node.href = target;
+    } else if (open) {
+        node.href = "#";
+        node.onclick = (event) => {
+            event.preventDefault();
+            open();
+        };
     } else {
         node.removeAttribute("href");
     }
@@ -176,7 +184,11 @@ export function mountBar() {
     const sleep = iconButton("timer", "Sleep timer", (event) => sleepMenu(event));
     const more = iconButton("more", "More", (event) => {
         const track = player().current;
-        if (track) {
+        if (track && extension("menuEntries")) {
+            // what the provider's document adds (its `audio`, see document.js)
+            const library = extension("openLibrary");
+            menu([...extension("menuEntries")(track), library ? "-" : null, library ? { label: library.label, action: library.action } : null], event);
+        } else if (track) {
             // what the provider's own page added (see extensions.js); nothing else to offer without it
             const add = extension("addToPlaylist");
             const album = extension("openAlbum");
@@ -192,7 +204,7 @@ export function mountBar() {
     });
     // More lists only what the provider's page added; with nothing to offer it stays out of the way
     const updateMore = () => {
-        more.hidden = !["addToPlaylist", "openAlbum", "openArtist", "openLibrary"].some((name) => extension(name));
+        more.hidden = !["menuEntries", "addToPlaylist", "openAlbum", "openArtist", "openLibrary"].some((name) => extension(name));
     };
     session.on("extensions", updateMore);
     updateMore();
@@ -326,14 +338,16 @@ export function mountBar() {
             followArtwork(track.album_id);
         }
         title.textContent = track.title || "";
-        setHref(title, track.album_id && extension("albumHref") ? extension("albumHref")(track.album_id) : null);
+        setLink(title, track.album_id && extension("albumHref") ? extension("albumHref")(track.album_id) : null,
+            track.album_id && extension("openAlbum") ? () => extension("openAlbum")(track.album_id, track) : null);
         subtitle.replaceChildren();
         const badge = qualityBadge(track.quality);
         if (badge) {
             subtitle.append(badge);
         }
         const artist = el("a", "pl-link", track.artist || track.album_artist || "");
-        setHref(artist, track.artist_id && extension("artistHref") ? extension("artistHref")(track.artist_id) : null);
+        setLink(artist, track.artist_id && extension("artistHref") ? extension("artistHref")(track.artist_id) : null,
+            track.artist_id && extension("openArtist") ? () => extension("openArtist")(track.artist_id, track) : null);
         subtitle.append(artist);
         if (like.dataset.track !== track.id) {
             like.dataset.track = track.id;

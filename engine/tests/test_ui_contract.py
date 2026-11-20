@@ -151,6 +151,24 @@ class DocumentFixturesTest(unittest.TestCase):
         search = next(case["document"] for case in fixture("documents.json")["valid"] if case["name"] == "play-action")
         self.assertEqual(ui_contract.validate(search, {}), [])
 
+    def test_the_player_section_and_reloads_need_the_satellites_own_audio_capabilities(self):
+        # known only at load, from the Satellite's manifest: the host adds `audio` while it plays
+        # the document's own Satellite, and `reloads` and `follows` name that Satellite's session
+        document = next(case["document"] for case in fixture("documents.json")["valid"]
+                        if case["name"] == "audio-reloads-and-follows")
+        audio = {"audio.library": {"version": 1, "operations": {"search": "search", "track": "tracks",
+                                                                "resolve": "playback", "artwork": "artwork"}},
+                 "audio.session": {"version": 1, "operations": {"queue": "queue"}}}
+        self.assertEqual(ui_contract.validate(document, audio), [])
+        errors = ui_contract.validate(document, {"audio.session": audio["audio.session"]})
+        self.assertTrue(any(error.startswith("audio:") and "audio.library" in error for error in errors), errors)
+        errors = ui_contract.validate(document, {"audio.library": audio["audio.library"]})
+        self.assertTrue(any("reloads" in error and "audio.session" in error for error in errors), errors)
+        self.assertTrue(any("follows" in error and "audio.session" in error for error in errors), errors)
+        self.assertEqual(set(ui_contract.RELOADABLE_CAPABILITIES), {"audio.session"})
+        for name in ui_contract.RELOADABLE_CAPABILITIES:
+            self.assertIn(name, ui_contract.SATELLITE_CAPABILITIES)
+
     def test_every_sync_capability_opens_a_reserved_client_capability(self):
         self.assertEqual(ui_contract.SYNC_CAPABILITIES, {"media.sync": "device.media-sync"})
         for name, client in ui_contract.SYNC_CAPABILITIES.items():

@@ -354,9 +354,9 @@ Legend, as in [the Photos audit](photos-parity-audit.md):
 | 35 | Credits and file info (tags, file, format) | ✅ dialog | ✗ | ✅ a `track` detail page of `field`s | The resolved stream's plan stays in the full player's Info tab. | J | P1 |
 | 36 | Offline downloads: an album or a playlist, a song from its menu, Remove download, a downloaded mark | n/a | ✅ | ✗ | Keeping a provider's tracks on the device is the client's: the document names tracks, the client owns the storage and the control's state. | C10 | P0 (Android) |
 | 37 | Downloads page: jobs and progress, kept songs with size and quality, removal; download quality, network, storage limit | n/a | ✅ | ✗ | A screen of the client's own, like the phone sync's. | C10 | P0 (Android) |
-| 38 | The player's track menu (More in the full player) | ✅ registered | ✅ `TrackMenu` | ✗ only from a page's own code | The provider's document declares it. | C9 | P0 |
-| 39 | The player's title and artist links, Add to playlist, Open library | ✅ registered | ◐ album and artist | ✗ | As #38. | C9 | P0 |
-| 40 | A like in the player shows on the page, and the reverse | ✅ shared store | ✅ shared context | ✗ page data is a snapshot | A page follows the session's likes and preferences. | C9 (`follows`) | P1 |
+| 38 | The player's track menu (More in the full player) | ✅ registered | ✅ `TrackMenu` | ✅ `audio.menu` (A4) | The provider's document declares it. | C9 | P0 |
+| 39 | The player's title and artist links, Add to playlist, Open library | ✅ registered | ◐ album and artist | ✅ `audio.album`, `artist`, `library` (A4) | As #38. | C9 | P0 |
+| 40 | A like in the player shows on the page, and the reverse | ✅ shared store | ✅ shared context | ✅ `follows` and `reloads` (A4) | A page follows the session's likes and preferences. | C9 (`follows`) | P1 |
 | 41 | Web keyboard shortcuts: Space, Shift+arrows, arrows, M, L, Q, `/` | ◐ only on Music's page (`.pl-root`) | n/a | – | Active wherever the host plays; `/` focuses the page's `search` block. | H | P1 |
 | 42 | Offline browsing (Android) | n/a | ✗ | ✅ `offline` pages | Shared is ahead: Home, Your Library and album pages can be kept. | J | P2 |
 
@@ -609,7 +609,18 @@ playlist file (`upload`, the raw M3U). As planned:
 - Tests: fixtures; renderer tests (a declined conflict runs nothing, a failed move is put
   back); Music's engine tests for import, cover and duplicates; both clients.
 
-**A4 - the player's additions from the document.**
+**A4 - the player's additions from the document.** **Done.** Change 9 is in the Engine, the
+fixtures and both hosts. Mission Control reads the provider's document in
+`mission_control/media/document.js`; `extensions.js` keeps the own page's hooks, which win
+while that page is shown, and otherwise uses the document's. A navigate opens the shared page
+even when the Satellite's own page is its default (a shared visit, `app.js`). The app reads it
+in `AudioHost.tsx` (`audio`, `openPage`, `reload`, `onChanged`). It runs it with
+`media/additions.ts`, and the full player draws it through `media/ui/AudioMenu.tsx`. Music's
+native screens claim the player while they are shown (`useOwnAudioInterface`, wired in
+`satellites/builtins.tsx`). Music's `audio` adds Add to playlist, Start radio, Go to album, Go to
+artist, Credits and Open Music. Its hearts `reloads` the session, and its pages with track
+hearts `follows` it. The repeat rule for a radio is `mission_control/media/repeat.js` and
+`mobile/src/media/queue.ts`. As planned:
 - Contract: change 9 (`audio`, `reloads`, `follows`) in the Engine, the fixtures and both
   hosts: `mission_control/media/` reads the provider's document instead of `extensions.js`, and
   `mobile/src/media/AudioHost.tsx` instead of `AudioHostExtensions`. The own interface keeps

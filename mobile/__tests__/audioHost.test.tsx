@@ -91,7 +91,7 @@ describe('AudioHost', () => {
     // no session: no Connect, and nothing asked of routes the provider never declared
     expect(captured!.connect).toBeNull();
     const asked = http.get.mock.calls.map(([path]) => path);
-    expect(asked.filter(path => !path.startsWith('/api/satellites/Radio/tune/') && path !== '/api/catalog')).toEqual([]);
+    expect(asked.filter(path => !path.startsWith('/api/satellites/Radio/tune/') && path !== '/api/catalog' && path !== '/api/satellites/Radio/ui')).toEqual([]);
     expect(captured!.library.offers('lyrics')).toBe(false);
     tree.unmount();
   });
@@ -170,7 +170,8 @@ describe('a session with only its required queue', () => {
     expect(http.post).not.toHaveBeenCalled();
     expect(captured!.liked.size).toBe(0);
     expect(captured!.connect).toBeNull();
-    expect(http.get.mock.calls.map(([path]) => path)).toEqual(['/api/catalog']);
+    // the provider's document is read for what it adds to the player (its `audio`), and nothing else
+    expect(http.get.mock.calls.map(([path]) => path)).toEqual(['/api/catalog', '/api/satellites/Radio/ui']);
     tree.unmount();
   });
 });

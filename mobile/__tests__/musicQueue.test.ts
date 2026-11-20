@@ -29,6 +29,17 @@ describe('music queue', () => {
     expect(Q.cycleRepeat('one')).toBe('off');
   });
 
+  it('repeats a radio, which has no end, only one track at a time', () => {
+    expect(Q.isEndless('radio:track:t1')).toBe(true);
+    expect(Q.isEndless('album:a1')).toBe(false);
+    expect(Q.isEndless(null)).toBe(false);
+    expect(Q.cycleRepeat('off', 'radio:track:t1')).toBe('one');
+    expect(Q.cycleRepeat('one', 'radio:track:t1')).toBe('off');
+    // a repeat-all carried over from another list goes off at once
+    expect(Q.cycleRepeat('all', 'radio:track:t1')).toBe('off');
+    expect(Q.cycleRepeat('off', 'album:a1')).toBe('all');
+  });
+
   it('shuffles around the playing track and unshuffles back to the original order', () => {
     const queue = Q.load(tracks, 3);
     const shuffled = Q.setShuffle(queue, true, seeded());

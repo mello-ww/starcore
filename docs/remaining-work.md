@@ -211,9 +211,10 @@ and the Android screens against what the contract can draw.
   scroll sideways, and going back restores the scroll position and loaded pages.
 - [x] **Playlists** (A3): create, rename, cover, reorder, add and remove tracks, smart rules,
   M3U import and export (change 8): `choose` for Add to playlist, a `media-list`'s `reorder`.
-- [ ] **The player's additions declared by the document** (A4): its track menu, Add to
-  playlist and the links to an album or artist, instead of `MUSIC_AUDIO_EXTENSIONS` and
-  `setExtensions` (change 9).
+- [x] **The player's additions declared by the document** (A4): its track menu, Add to
+  playlist and the links to an album or artist (change 9: `audio`, `reloads`, `follows`).
+  `MUSIC_AUDIO_EXTENSIONS` and `setExtensions` stay for the own interface while it is shown,
+  until A10 removes it.
 - [ ] **Settings and equalizer** as forms (A5); **stats and Wrapped** as dashboard pages (A6).
 - [ ] **Offline downloads** as a generic client capability (keep a provider's tracks on the
   device), with its Downloads page (A7, change 10).

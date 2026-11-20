@@ -104,6 +104,12 @@ AUDIO_LIBRARY = "audio.library"
 # it opens} - the document's own Satellite must provide it
 SYNC_CAPABILITIES = {name: client for name, client in VOCABULARY["sync_capabilities"].items()
                      if not name.startswith("_")}
+# what a route action's `reloads` and a page's `follows` may name (1.2, change 9): {Satellite
+# capability: what a client keeps from it} - the document's own Satellite must provide it
+RELOADABLE_CAPABILITIES = {name: kept for name, kept in VOCABULARY["reloadable_capabilities"].items()
+                           if not name.startswith("_")}
+# the bindings an `audio` section (1.2) may use: the playing track, and a choose's row
+AUDIO_BINDINGS = ("$page", "$params", "$form", "$state", "$sources")
 # a section of a Satellite's own interface, for the own action (1.2)
 OWN_SECTION = re.compile(r"[a-z][a-z0-9-]{0,31}")
 # a Satellite's name, for the section action (1.2)
@@ -269,6 +275,7 @@ class _Validator:
         self.in_bulk = False  # a selection's or a tile's quick actions: no download or share there
         self.in_selection = False  # a selection's actions: no play there
         self.in_row = False  # a row's or a tile's quick and menu entries: `then: update` there
+        self.in_audio = False  # the document's `audio` section: no page, only the playing track
         self.errors = []
         self.lenient = False  # a newer minor: unknown blocks and keys are skipped by clients
         self.minor = MINOR
@@ -306,7 +313,7 @@ class _Validator:
         self.minor = version[1]
 
         known = {"contract", "title", "requires", "entry", "navigation", "pages", "header", "widgets", "preview",
-                 "protected", "icons"}
+                 "protected", "icons", "audio"}
         self.unknown_keys("", document, known)
         if "icons" in document:
             self.check_icons(document["icons"])
@@ -366,11 +373,76 @@ class _Validator:
             self.check_page(f"pages.{page_id}", page)
         if "header" in document:
             self.check_header(document["header"])
+        if "audio" in document:
+            self.check_audio(document["audio"])
         if "widgets" in document:
             if self.protected:
                 self.error("widgets", "a protected document has no widgets: nothing of it is shown outside it")
             self.check_widgets(document["widgets"])
         return self.errors
+
+    def check_audio(self, audio):
+        """audio: {menu?, album?, artist?, library?} (1.2, change 9): what a client's audio host
+        adds to its player while it plays from this Satellite, with the playing track (as the
+        audio.library provider's `track` operation answers it) as $. - `menu` after the host's own
+        entries in the player's More, `album` and `artist` (navigate actions) on the player's title
+        and artist, `library` ({label, action}) as the host's way to the Satellite's pages. The
+        host runs them without a page: navigate, play, choose or a route action, no `then`, and no
+        binding but $. (and a choose's $value)."""
+        where = "audio"
+        self.since(where, "the audio section", 2)
+        if not isinstance(audio, dict) or not audio:
+            self.error(where, "must be an object with menu, album, artist or library")
+            return
+        self.unknown_keys(where, audio, {"menu", "album", "artist", "library"})
+        if self.protected:
+            self.error(where, "a protected document adds nothing to the player: nothing of it is shown outside it")
+        if self.provides is not None and AUDIO_LIBRARY not in self.provides:
+            self.error(where, f"adds to the player while it plays this Satellite's tracks, and it provides no {AUDIO_LIBRARY}")
+        self.state_keys, self.source_names = set(), set()
+        self.in_audio = True
+        try:
+            if "menu" in audio:
+                menu = audio["menu"]
+                self.check_media_actions(f"{where}.menu", menu, LIMITS["menu_entries"], required=True,
+                                         secure=False)
+                for index, entry in enumerate(menu if isinstance(menu, list) else []):
+                    if isinstance(entry, dict):
+                        if "style" in entry:
+                            self.error(f"{where}.menu[{index}].style", "a player's entry has no style")
+                        self.check_audio_action(f"{where}.menu[{index}].action", entry.get("action"))
+            for key in ("album", "artist"):
+                if key in audio:
+                    self.check_audio_link(f"{where}.{key}", audio[key])
+            if "library" in audio:
+                library = audio["library"]
+                if not isinstance(library, dict):
+                    self.error(f"{where}.library", "must be {label, action}")
+                else:
+                    self.unknown_keys(f"{where}.library", library, {"label", "action"})
+                    if not isinstance(library.get("label"), str) or not library["label"]:
+                        self.error(f"{where}.library.label", "needs a label")
+                    self.check_audio_link(f"{where}.library.action", library.get("action"))
+        finally:
+            self.in_audio = False
+
+    def check_audio_link(self, where: str, action):
+        if not isinstance(action, dict) or "navigate" not in action:
+            self.error(where, "must be a navigate action")
+            return
+        self.check_action(where, action)
+
+    def check_audio_action(self, where: str, action):
+        """What a player's menu entry may run: navigate, play, choose or a route action (no pick,
+        secrets or reveal), never with `then` - there is no page to refresh or go back from."""
+        if not isinstance(action, dict):
+            return
+        kinds = {"navigate", "play", "choose"}
+        others = {"own", "secure", "section", "sync", "download", "share", "upload", "pick", "secrets", "reveal"}
+        if not kinds & set(action) and others & set(action):
+            self.error(where, f"the player runs navigate, play, choose or a route action, not {sorted(others & set(action))[0]}")
+        if "then" in action:
+            self.error(f"{where}.then", "the player has no page: no then")
 
     def check_icons(self, icons):
         """The Satellite's own icons, as the Engine adds them (1.2): each name is then one the
@@ -551,7 +623,17 @@ class _Validator:
         if not isinstance(page, dict):
             self.error(where, "must be an object")
             return
-        self.unknown_keys(where, page, {"title", "params", "source", "sources", "state", "template", "blocks", "offline"})
+        self.unknown_keys(where, page, {"title", "params", "source", "sources", "state", "template", "blocks", "offline",
+                                        "follows"})
+        if "follows" in page:
+            # 1.2: the page's sources load again when the client changes that state itself
+            self.since(f"{where}.follows", "page follows", 2)
+            follows = page["follows"]
+            if not isinstance(follows, list) or not follows or not all(isinstance(name, str) for name in follows):
+                self.error(f"{where}.follows", "must be a list of capabilities")
+            else:
+                for name in follows:
+                    self.check_reloadable(f"{where}.follows", name)
         if "offline" in page:
             # 1.2: the client may keep this page's data (and a grid's loaded pages) to show while
             # StarCore can't be reached; a page whose source depends on what the person types or
@@ -1271,7 +1353,11 @@ class _Validator:
         if "choose" in action:
             self.check_choose(where, action)
             return
-        known = {"route", "method", "body", "confirm", "then"}
+        known = {"route", "method", "body", "confirm", "then", "reloads"}
+        if "reloads" in action:
+            # 1.2: once the request succeeded, the client reloads what it keeps from the capability
+            self.since(f"{where}.reloads", "reloads", 2)
+            self.check_reloadable(f"{where}.reloads", action["reloads"])
         if "pick" in action:
             self.check_pick(where, action["pick"])
             known.add("pick")
@@ -1303,6 +1389,12 @@ class _Validator:
         elif then == "update" and not self.in_row:
             # the answer's `item` is merged into the row the action ran from
             self.error(f"{where}.then", "update redraws a row: only in a media-list's or media-grid's quick and menu")
+
+    def check_reloadable(self, where: str, name):
+        if name not in RELOADABLE_CAPABILITIES:
+            self.error(where, f"must be one of {sorted(RELOADABLE_CAPABILITIES)}")
+        elif self.provides is not None and name not in self.provides:
+            self.error(where, f"reloads what the Satellite's own {name} keeps, and it provides no {name}")
 
     def check_secrets(self, where: str, action: dict):
         """secrets: {key: {kind, new?}} (1.2), only in a protected document: before the request
@@ -1722,6 +1814,9 @@ class _Validator:
         if is_binding(value) and valid_binding(value):
             if value.startswith("$value."):
                 self.since(where, "$value. bindings", 2)
+            if self.in_audio and any(value == root or value.startswith(f"{root}.") for root in AUDIO_BINDINGS):
+                self.error(where, f"{value!r}: the player has no page, only the playing track ($.)")
+                return
             self.check_scope(where, value)
             return
         if required and not is_binding(value):

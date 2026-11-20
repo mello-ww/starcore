@@ -1,6 +1,6 @@
 import {BottomTabBar, createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import React, {useState} from 'react';
+import React, {useCallback, useRef, useState} from 'react';
 import {StyleSheet, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {SETTINGS_ICON} from '../components/SettingsButton';
@@ -66,12 +66,21 @@ const stackScreenOptions = {
   headerRight: () => <TopBarSlot />,
 };
 
+/** The Satellites stack's navigation once it is shown, so the audio host can open a page of a
+ * Satellite's shared interface on top of it from anywhere (AudioHost's openPage). */
+const satellitesStack: {current: any} = {current: null};
+
 /** "Satellites" tab's own stack: the list, then whichever Satellite the
  * user opens - see "Fully modular satellite mobile architecture" in the
  * task brief. Nothing here names a specific Satellite. */
 function SatellitesStack() {
   return (
-    <SatellitesStackNav.Navigator screenOptions={stackScreenOptions}>
+    <SatellitesStackNav.Navigator
+      screenOptions={stackScreenOptions}
+      screenListeners={({navigation}) => {
+        satellitesStack.current = navigation;
+        return {};
+      }}>
       <SatellitesStackNav.Screen name="SatellitesList" component={SatellitesListScreen} options={{title: 'Satellites', headerShown: false}} />
       <SatellitesStackNav.Screen name="SatelliteUi" component={SatelliteUiScreen} />
       <SatellitesStackNav.Screen name="MediaSync" component={MediaSyncScreen} options={{title: 'Phone backup'}} />
@@ -151,20 +160,35 @@ export function MainTabs() {
   const [tabBarHeight, setTabBarHeight] = useState(0);
   // and the screens leave its measured height (0 while it is hidden) at the end of their scrolling
   const [playerHeight, setPlayerHeight] = useState(0);
+  // the tabs' navigation, from the tab bar: the audio host opens a Satellite's page through it
+  const tabs = useRef<any>(null);
+  const openPage = useCallback((satellite: string, page: string, params: Record<string, string>) => {
+    const target = {name: satellite, page, params};
+    const stack = satellitesStack.current;
+    if (stack) {
+      tabs.current?.navigate('Satellites');
+      stack.push('SatelliteUi', target);
+    } else {
+      tabs.current?.navigate('Satellites', {screen: 'SatelliteUi', params: target, initial: false});
+    }
+  }, []);
   return (
-    <AudioHost extensions={BUILTIN_AUDIO.extensions}>
+    <AudioHost extensions={BUILTIN_AUDIO.extensions} openPage={openPage}>
       <TopBarSlotProvider component={AudioDisc}>
       <FloatingPlayerInsetProvider value={playerHeight > 0 ? playerHeight + tokens.space.sm : 0}>
       <View style={styles.fill}>
       <Tab.Navigator
-      tabBar={props => (
+      tabBar={props => {
+        tabs.current = props.navigation;
+        return (
         <>
           <View onLayout={event => setTabBarHeight(event.nativeEvent.layout.height)}>
             <BottomTabBar {...props} />
           </View>
           <FullPlayer />
         </>
-      )}
+        );
+      }}
       screenOptions={{
         headerShown: false,
         tabBarStyle: {backgroundColor: tokens.palette.bg, borderTopColor: tokens.palette.line},

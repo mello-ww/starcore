@@ -39,7 +39,7 @@ function artistLine(track) {
         if (index) {
             wrap.append(", ");
         }
-        wrap.append(jump(artist.name, artist.id && open && (() => open(artist.id))));
+        wrap.append(jump(artist.name, artist.id && open && (() => open(artist.id, track))));
     });
     return wrap;
 }
@@ -169,7 +169,7 @@ export async function openFullscreen(tab = "lyrics") {
         const line = el("div", "pl-full-sub");
         line.append(artistLine(track));
         if (track.album_id) {
-            line.append(" · ", jump(track.album || "", extension("openAlbum") && (() => extension("openAlbum")(track.album_id))));
+            line.append(" · ", jump(track.album || "", extension("openAlbum") && (() => extension("openAlbum")(track.album_id, track))));
         }
         const badges = el("div", "pl-full-badges");
         const badge = qualityBadge(track.quality);
@@ -187,7 +187,10 @@ export async function openFullscreen(tab = "lyrics") {
         }
         titles.replaceChildren(title, line, badges);
         const add = extension("addToPlaylist");
-        extras.replaceChildren(likeButton("track", track.id), ...(add ? [iconButton("plus", "Add to playlist", () => add([track]))] : []),
+        const entries = extension("menuEntries");
+        // the provider's document's entries (its `audio`), in a menu of their own
+        const more = entries ? [iconButton("more", "More", (event) => menu(entries(track), event))] : [];
+        extras.replaceChildren(likeButton("track", track.id), ...(add ? [iconButton("plus", "Add to playlist", () => add([track]))] : []), ...more,
             button(`${instance.engine.speed}×`, "pl-chip", (event) => speedMenu(event), "Playback speed"),
             iconButton("timer", "Sleep timer", (event) => sleepMenu(event)));
         canvas.hidden = session.preference("visualizer", "off") === "off";

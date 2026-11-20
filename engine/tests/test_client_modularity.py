@@ -195,13 +195,17 @@ class ClientModularityTest(unittest.TestCase):
 
     def test_the_web_audio_host_imports_no_satellite_code(self):
         """Mission Control's shared player (mission_control/media/) stays Satellite-agnostic:
-        it imports only its own folder, never a Satellite's page modules."""
+        it imports only its own folder and the shared renderer's (mission_control/ui/, whose
+        contract checks and choose dialog it runs a provider's document with), never a
+        Satellite's page modules."""
         files = sorted(REPO.glob("mission_control/media/*.js"))
         self.assertTrue(files)
         for path in files:
             for match in IMPORT_ANY.finditer(path.read_text(encoding="utf-8")):
                 target = next(group for group in match.groups() if group)
-                self.assertTrue(target.startswith("./") and "/" not in target[2:],
+                local = target.startswith("./") and "/" not in target[2:]
+                shared = target.startswith("../ui/") and "/" not in target[6:]
+                self.assertTrue(local or shared,
                                 f"{path.relative_to(REPO).as_posix()} imports {target}")
 
     def test_the_audio_host_and_shared_layout_import_no_satellite_folder(self):

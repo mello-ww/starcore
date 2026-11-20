@@ -373,7 +373,7 @@ export class PlayerController {
   }
 
   cycleRepeat() {
-    const mode = Q.cycleRepeat(this.state.queue.repeat);
+    const mode = Q.cycleRepeat(this.state.queue.repeat, this.state.context);
     if (this.state.remote) {
       this.remote('repeat', {mode});
       return;

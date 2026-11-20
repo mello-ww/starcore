@@ -105,7 +105,8 @@ describe('the choose action', () => {
   it("throws any other error, and a 409 without `conflict`, as the route's own", async () => {
     const missing = depsWith(firstRow, new ApiError('Playlist not found.', 404));
     await expect(runChoose(action, scope, missing.deps)).rejects.toThrow('Playlist not found.');
-    const {conflict: _ignored, ...plain} = action;
+    const plain: UiAction = {...action};
+    delete plain.conflict;
     const already = depsWith(firstRow, new ApiError('Already there.', 409));
     await expect(runChoose(plain, scope, already.deps)).rejects.toThrow('Already there.');
     expect(already.asked).toEqual([]);

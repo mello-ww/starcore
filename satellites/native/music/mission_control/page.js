@@ -2,7 +2,7 @@ import * as api from "./api.js";
 import * as store from "./store.js";
 import { current, encode, go, href, setSatellite } from "./router.js";
 import { register } from "/media/theme.js";
-import { setExtensions } from "/media/extensions.js";
+import { clearExtensions, setExtensions } from "/media/extensions.js";
 import { start as startAudioHost } from "/media/host.js";
 import { addToPlaylist, trackMenu } from "./ui/actions.js";
 import { mosaic } from "./ui/artwork.js";
@@ -183,5 +183,7 @@ export function mount(context) {
         }
         host?.classList.remove("pl-host");
         unregister();
+        // the player goes back to what Music's document adds (its `audio`)
+        clearExtensions();
     };
 }

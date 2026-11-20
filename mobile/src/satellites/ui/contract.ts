@@ -121,6 +121,9 @@ export interface UiAction {
   /** 1.2: open this app's own sync screen for the Satellite's own provider of `capability`
    * (src/satellites/ui/sync.ts); hidden where the app has no such screen. */
   sync?: {capability: string};
+  /** 1.2 (change 9), on a route action: once it succeeded, the app reloads what it keeps from
+   * that capability of the Satellite ("audio.session": the audio host's preferences and likes). */
+  reloads?: string;
 }
 
 /** One block. Deliberately loose: a document is network data, so every
@@ -152,7 +155,19 @@ export interface UiPage {
   /** 1.2: this page may be kept to show while StarCore can't be reached - only the fields its
    * blocks bind, and never one named in `omit`, at any depth (satellites/ui/offline.ts) */
   offline?: boolean | {omit?: string[]};
+  /** 1.2 (change 9): its sources load again when the app changes that state itself (a like in
+   * the player). */
+  follows?: string[];
   blocks: UiBlock[];
+}
+
+/** 1.2 (change 9): what the app's audio host adds to its player while it plays from the
+ * document's Satellite, with the playing track as $. (media/additions.ts). */
+export interface UiAudio {
+  menu?: Array<{label: Json; icon?: string; visible?: Json; action: UiAction}>;
+  album?: UiAction;
+  artist?: UiAction;
+  library?: {label: string; action: UiAction};
 }
 
 /** 1.1: a summary any client may show outside the Satellite's pages (Home).
@@ -183,6 +198,8 @@ export interface UiDocument {
   /** 1.2: a store the app unlocks first, through the capability its own Satellite provides;
    * `setup` is the page shown while it isn't set up (src/vault/gate.ts). */
   protected?: {capability: string; setup: string; forgot?: string};
+  /** 1.2 (change 9): what the audio host adds to its player (UiAudio). */
+  audio?: UiAudio;
 }
 
 export interface CapabilityProvider {

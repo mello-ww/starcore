@@ -548,6 +548,21 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     }
   }, [loadData, loadSource, page]);
 
+  // 1.2 (change 9): a page that `follows` a capability reloads when this app changes it
+  // elsewhere (a like in the player)
+  const followed = Array.isArray(page?.follows) ? page!.follows : null;
+  const onAudioChanged = audio?.onChanged;
+  useEffect(() => {
+    if (!onAudioChanged || !followed?.length || !live) {
+      return;
+    }
+    return onAudioChanged(capability => {
+      if (followed.includes(capability)) {
+        loadAll();
+      }
+    });
+  }, [onAudioChanged, followed, live, loadAll]);
+
   // on open, on a new page or choice, and again on coming back - to this
   // screen (a detail page may have changed what it shows) or to the app
   useEffect(() => {
@@ -638,6 +653,10 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         // PIN (every unlock ended), delinked (back to setup); still open stays as it is
         gateRef.current.gate.check({quiet: true});
       }
+      if (typeof action.reloads === 'string') {
+        // 1.2 (change 9): what the app keeps of that capability (the player's likes) read again
+        void audio?.reload(action.reloads);
+      }
       if (!quiet) {
         showToast(typeof result?.message === 'string' ? result.message : null);
       }
@@ -659,7 +678,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       }
       return true;
     },
-    [go, loadData, navigation, showToast, store],
+    [audio, go, loadData, navigation, showToast, store],
   );
 
   const runAction = useCallback(

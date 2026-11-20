@@ -1,6 +1,7 @@
 import * as library from "./library.js";
 import * as session from "./session.js";
 import { Engine } from "./engine.js";
+import { nextRepeat } from "./repeat.js";
 
 const SAVE_DELAY = 1500;
 const DEVICE_KEY = "starcore.player.device";
@@ -393,7 +394,7 @@ class Player {
     }
 
     cycleRepeat() {
-        const next = { off: "all", all: "one", one: "off" }[this.repeat];
+        const next = nextRepeat(this.repeat, this.context);
         if (this.remote) {
             return this.remoteCommand("repeat", { mode: next });
         }

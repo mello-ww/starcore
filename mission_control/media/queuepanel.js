@@ -92,7 +92,7 @@ export function queuePanel() {
         const footer = el("div", "pl-queue-foot");
         const openAlbum = extension("openAlbum");
         if (current && current.album_id && openAlbum) {
-            footer.append(button("Go to album", "pl-text-button", () => openAlbum(current.album_id)));
+            footer.append(button("Go to album", "pl-text-button", () => openAlbum(current.album_id, current)));
         }
         items.push(footer);
         node.replaceChildren(...items);

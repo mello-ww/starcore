@@ -78,7 +78,17 @@ export function setShuffle(queue: Queue, on: boolean, random = Math.random): Que
   return {...queue, shuffle: false, order: identity(queue.tracks.length), position: playing};
 }
 
-export function cycleRepeat(mode: RepeatMode): RepeatMode {
+/** A radio (a context starting with "radio:") never runs out: repeating all of it means
+ * nothing, so there repeat moves between off and one only. The same rule as Mission Control's
+ * mission_control/media/repeat.js. */
+export function isEndless(context: string | null | undefined): boolean {
+  return typeof context === 'string' && context.startsWith('radio:');
+}
+
+export function cycleRepeat(mode: RepeatMode, context?: string | null): RepeatMode {
+  if (isEndless(context)) {
+    return mode === 'off' ? 'one' : 'off';
+  }
   return mode === 'off' ? 'all' : mode === 'all' ? 'one' : 'off';
 }
 

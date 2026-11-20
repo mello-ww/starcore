@@ -341,7 +341,10 @@ default ([docs/media-audio.md](../media-audio.md), "Music on the shared interfac
 A10). It has Home, Search and Your Library (A2) and the album, artist, playlist, folder, mix,
 radio, mood, genre, search results, Liked Songs and track (credits) pages, and the playlists'
 own (A3): New playlist, New smart playlist, a playlist's details and rules, Import a playlist
-file. They play through the client's audio host with the `play` action's `tracks` and `route`
+file. Its `audio` section (A4) adds to the client's player while it plays Music: Add to
+playlist, Start radio, Go to album, Go to artist, Credits and Open Music in its menu, and the
+title's and artist's links. The hearts `reloads` the session, and the pages with track hearts
+`follows` it. They play through the client's audio host with the `play` action's `tracks` and `route`
 (Liked Songs paged, so shuffling 10,000 songs costs one page). Every track row has a heart and
 a 9-entry menu (Play next, Add to queue, Add to playlist, like, radio, album, artist, credits),
 and a playlist's own rows add Remove from this playlist and can be dragged into another order;

@@ -326,6 +326,44 @@ export function mount(context) {
         }).catch(() => {});
     }
 
+    // reloads and follows (1.2): what the client keeps from one of this Satellite's
+    // capabilities - only the audio host's preferences and likes (audio.session) so far
+    const RELOADERS = {
+        "audio.session": () => import("/media/session.js").then((session) => session.reload()),
+    };
+    const followed = { off: null };
+
+    function reloadKept(capability) {
+        const reload = RELOADERS[capability];
+        if (reload) {
+            reload().catch(() => {});
+        }
+    }
+
+    // a page that follows a capability loads again when the client changes that state itself
+    // (a like in the player): its source and named sources, in the background
+    function watchFollowed() {
+        if (followed.off) {
+            return;
+        }
+        followed.off = () => {};
+        import("/media/session.js").then((session) => {
+            if (state.disposed || typeof session.on !== "function") {
+                return;
+            }
+            followed.off = session.on("changed", (capability) => {
+                const page = state.document && state.page ? pageDefinition() : null;
+                if (state.disposed || !page || !Array.isArray(page.follows) || !page.follows.includes(capability)) {
+                    return;
+                }
+                loadData({ background: true });
+                for (const name of Object.keys(page.sources || {})) {
+                    loadNamed(name);
+                }
+            });
+        }).catch(() => {});
+    }
+
     function resetLists() {
         listPaging.reset();
         listViews = new WeakMap();
@@ -943,6 +981,9 @@ export function mount(context) {
             // PIN (every unlock ended), delinked (back to setup); still open stays as it is
             gate.check({ quiet: true });
         }
+        if (typeof action.reloads === "string") {
+            reloadKept(action.reloads);
+        }
         const then = action.then;
         if (then === "back") {
             goBack();
@@ -986,6 +1027,9 @@ export function mount(context) {
         }
         const result = outcome.result;
         setNotice(result && typeof result.message === "string" ? result.message : null);
+        if (typeof action.reloads === "string") {
+            reloadKept(action.reloads);
+        }
         const then = action.then;
         if (then === "back") {
             goBack();
@@ -2372,6 +2416,9 @@ export function mount(context) {
             }
             state.document = payload.document;
             state.revision = payload.revision;
+            if (Object.values(state.document.pages || {}).some((page) => Array.isArray(page.follows))) {
+                watchFollowed();
+            }
             state.catalog = catalog;
             const missing = missingRequirements(state.document.requires, catalog.capabilities);
             if (missing.length) {
@@ -2428,6 +2475,9 @@ export function mount(context) {
         closeMenu();
         if (playing.off) {
             playing.off();
+        }
+        if (followed.off) {
+            followed.off();
         }
     };
     cleanup.showSection = showSection;

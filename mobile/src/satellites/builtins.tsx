@@ -6,8 +6,9 @@
  * (docs/ui-contract.md, "Migration"); engine/tests/test_client_modularity.py checks that no
  * other shared file imports a Satellite folder.
  */
+import {useIsFocused} from '@react-navigation/native';
 import React from 'react';
-import type {AudioHostExtensions} from '../media/AudioHost';
+import {type AudioHostExtensions, useOwnAudioInterface} from '../media/AudioHost';
 import {MUSIC_AUDIO_EXTENSIONS} from '../music/MusicProvider';
 import {AlbumScreen} from '../music/screens/AlbumScreen';
 import {ArtistScreen} from '../music/screens/ArtistScreen';
@@ -37,16 +38,27 @@ export interface BuiltinScreen {
   title?: string;
 }
 
+/** A native screen of the audio provider's own: while it is shown, the player offers its own
+ * extensions (BUILTIN_AUDIO) rather than what the provider's document adds. */
+function ownAudioScreen<P extends object>(Screen: React.ComponentType<P>): React.ComponentType<P> {
+  const Own = (props: P) => {
+    useOwnAudioInterface(useIsFocused());
+    return <Screen {...props} />;
+  };
+  Own.displayName = `Own(${Screen.displayName || Screen.name || 'Screen'})`;
+  return Own;
+}
+
 /** Native screens in the Satellites stack, until their Satellite's ui.json replaces them. */
 export const BUILTIN_SCREENS: BuiltinScreen[] = [
-  {name: 'MusicHome', component: MusicHomeScreen, title: ''},
-  {name: 'MusicAlbum', component: AlbumScreen, title: 'Album'},
-  {name: 'MusicArtist', component: ArtistScreen, title: 'Artist'},
-  {name: 'MusicPlaylist', component: PlaylistScreen, title: 'Playlist'},
-  {name: 'MusicTracks', component: TrackListScreen},
-  {name: 'MusicSettings', component: MusicSettingsScreen, title: ''},
-  {name: 'MusicEqualizer', component: EqualizerScreen, title: 'Equalizer'},
-  {name: 'MusicDownloads', component: DownloadsScreen, title: 'Downloads'},
+  {name: 'MusicHome', component: ownAudioScreen(MusicHomeScreen), title: ''},
+  {name: 'MusicAlbum', component: ownAudioScreen(AlbumScreen), title: 'Album'},
+  {name: 'MusicArtist', component: ownAudioScreen(ArtistScreen), title: 'Artist'},
+  {name: 'MusicPlaylist', component: ownAudioScreen(PlaylistScreen), title: 'Playlist'},
+  {name: 'MusicTracks', component: ownAudioScreen(TrackListScreen)},
+  {name: 'MusicSettings', component: ownAudioScreen(MusicSettingsScreen), title: ''},
+  {name: 'MusicEqualizer', component: ownAudioScreen(EqualizerScreen), title: 'Equalizer'},
+  {name: 'MusicDownloads', component: ownAudioScreen(DownloadsScreen), title: 'Downloads'},
 ];
 
 /** What native code adds to the shared AudioHost: a track menu and links into its own screens. */

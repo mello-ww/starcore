@@ -6,6 +6,7 @@ import {ModalSafeArea} from '../../components/ModalSafeArea';
 import {colors, spacing, touchTarget, typography, useAccent} from '../../theme';
 import {useAudioHost, usePlayerState} from '../AudioHost';
 import {Artwork} from './Artwork';
+import {useAudioAdditions} from './AudioMenu';
 import {DevicesPanel} from './DevicesPanel';
 import {InfoPanel} from './InfoPanel';
 import {LyricsPanel} from './LyricsPanel';
@@ -43,6 +44,8 @@ function PlayerBody() {
   const useLinks = extensions.useTrackLinks ?? noLinks;
   const go = useLinks();
   const TrackMenu = extensions.TrackMenu;
+  // otherwise what the provider's document adds (its `audio`)
+  const added = useAudioAdditions();
   const panels = (['lyrics', 'queue', 'devices', 'info'] as Panel[]).filter(
     name => (name !== 'lyrics' || library.offers('lyrics')) && (name !== 'devices' || connect),
   );
@@ -70,6 +73,9 @@ function PlayerBody() {
     close();
     to();
   };
+  const albumLink = go.album ? open(() => go.album!(track.album_id)) : added.link('album', track, track.album_id);
+  const artistLink = go.artist ? open(() => go.artist!(track.artist_id)) : added.link('artist', track, track.artist_id);
+  const showMenu = TrackMenu ? () => setActions(true) : added.hasMenu ? () => added.openMenu(track) : null;
 
   return (
     <>
@@ -77,8 +83,8 @@ function PlayerBody() {
         <View style={styles.top} {...responder.panHandlers}>
           <Pressable onPress={close} style={styles.touch} accessibilityRole="button" accessibilityLabel="Close the player"><Text style={styles.chevron}>⌄</Text></Pressable>
           <Text numberOfLines={1} style={typography.label}>{remote ? `Playing on ${remote.name}` : state.context ?? 'Now playing'}</Text>
-          {TrackMenu ? (
-            <Pressable onPress={() => setActions(true)} style={styles.touch} accessibilityRole="button" accessibilityLabel="Track options"><Text style={styles.chevron}>⋮</Text></Pressable>
+          {showMenu ? (
+            <Pressable onPress={showMenu} style={styles.touch} accessibilityRole="button" accessibilityLabel="Track options"><Text style={styles.chevron}>⋮</Text></Pressable>
           ) : (
             <View style={styles.touch} />
           )}
@@ -98,10 +104,10 @@ function PlayerBody() {
 
         <View style={styles.titleRow}>
           <View style={styles.titles}>
-            <Pressable onPress={go.album ? open(() => go.album!(track.album_id)) : undefined}>
+            <Pressable onPress={albumLink ?? undefined} disabled={!albumLink}>
               <Text numberOfLines={1} style={typography.title}>{track.title}</Text>
             </Pressable>
-            <Pressable onPress={go.artist ? open(() => go.artist!(track.artist_id)) : undefined}>
+            <Pressable onPress={artistLink ?? undefined} disabled={!artistLink}>
               <Text numberOfLines={1} style={typography.body}>{track.artist ?? track.album_artist}</Text>
             </Pressable>
             <Text style={typography.label}>
@@ -152,6 +158,7 @@ function PlayerBody() {
         </View>
       </View>
       {actions && TrackMenu && <TrackMenu tracks={[track]} onClose={() => setActions(false)} />}
+      {added.overlays}
     </>
   );
 }

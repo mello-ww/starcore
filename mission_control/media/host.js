@@ -7,6 +7,9 @@ import * as library from "./library.js";
 import { mountBar, toggleQueue } from "./bar.js";
 import { connect } from "./connect.js";
 import { extension } from "./extensions.js";
+import { watchDocument } from "./document.js";
+import { closeFullscreen } from "./fullscreen.js";
+import { menu } from "./overlay.js";
 import { installKeys } from "./keys.js";
 import { handOver } from "./handover.js";
 import { player } from "./player.js";
@@ -105,6 +108,8 @@ export function start() {
             if (library.offersSession("connect")) {
                 connect(instance).start();
             }
+            // what the provider's document adds to the player (its `audio`, UI contract 1.2)
+            watchDocument(provider.satellite, { player, menu, handOver, playSearch, closeFullscreen });
             installKeys(() => {
                 const focus = extension("focusSearch");
                 if (focus) {

@@ -174,3 +174,121 @@ test("shuffling a paged list asks only for the positions it draws, and its first
     assert.equal(player.queue.length, 150);
     assert.equal(new Set(player.queue.map((track) => track.id)).size, 150);
 });
+
+// UI contract 1.2, the document's `audio`: what the player adds while it plays from a provider
+const AUDIO = {
+    menu: [
+        { label: "Start radio", icon: "activity", action: { play: { route: "radio/track/{$.id}" } } },
+        { label: "Go to album", visible: "$.album_id", action: { navigate: "album", params: { id: "$.album_id" } } },
+        { label: "Keep", action: { route: "tracks/{$.id}/keep", reloads: "audio.session" } },
+    ],
+    album: { navigate: "album", params: { id: "$.album_id" } },
+    artist: { navigate: "artist", params: { id: "$.artist_id" } },
+    library: { label: "Open Radio", action: { navigate: "home" } },
+};
+
+function fakeDeps() {
+    const calls = { open: [], post: [], load: [], play: [], reload: [], notify: [] };
+    return {
+        calls,
+        open: (section) => calls.open.push(section),
+        load: async (route) => {
+            calls.load.push(route);
+            return { tracks: [{ id: "r1" }, { id: "r2" }], context: "radio:track-t1" };
+        },
+        post: async (route, body) => {
+            calls.post.push([route, body]);
+            return { message: "Kept." };
+        },
+        play: async (tracks, options) => {
+            calls.play.push([tracks, options.context]);
+            return tracks.length;
+        },
+        playSearch: async () => 0,
+        choose: async () => null,
+        confirm: () => true,
+        reload: async (capability) => calls.reload.push(capability),
+        notify: (message, kind) => calls.notify.push([message, kind]),
+    };
+}
+
+test("the player's menu and links come from the provider's document, with the playing track as $.", async () => {
+    const { actionRunner, audioHooks } = await import("../media/document.js");
+    const deps = fakeDeps();
+    const run = actionRunner(deps);
+    const menus = [];
+    const track = { id: "t1", album_id: "a1", artist_id: "p1" };
+    const hooks = audioHooks(AUDIO, { run, menu: (items) => menus.push(items), current: () => track, playNext: () => {} });
+    assert.deepEqual(hooks.menuEntries(track).map((entry) => entry.label), ["Start radio", "Go to album", "Keep"]);
+    assert.deepEqual(hooks.menuEntries({ id: "t2" }).map((entry) => entry.label), ["Start radio", "Keep"]);
+    await hooks.openAlbum("a1", track);
+    await hooks.openArtist("p2", track);  // one of several artists: its own id
+    await hooks.openLibrary.action();
+    assert.deepEqual(deps.calls.open, ["album?id=a1", "artist?id=p2", "home"]);
+    await hooks.menuEntries(track)[0].action();
+    assert.deepEqual(deps.calls.load, ["radio/track/t1"]);
+    assert.deepEqual(deps.calls.play, [[[{ id: "r1" }, { id: "r2" }], "radio:track-t1"]]);
+    hooks.trackMenu(track, null, [{ label: "Remove from queue", action: () => {} }]);
+    assert.deepEqual(menus[0].map((item) => (item === "-" ? "-" : item.label)),
+        ["Play next", "-", "Start radio", "Go to album", "Keep", "-", "Remove from queue"]);
+});
+
+test("without audio the host adds nothing, and a route outside the Satellite is refused", async () => {
+    const { actionRunner, audioHooks } = await import("../media/document.js");
+    assert.deepEqual(audioHooks(undefined, {}), {});
+    const deps = fakeDeps();
+    const run = actionRunner(deps);
+    assert.equal(await run({ route: "../api/auth" }, { id: "t1" }), false);
+    assert.deepEqual(deps.calls.post, []);
+    assert.equal(deps.calls.notify[0][1], "error");
+});
+
+test("a route action with reloads reloads the host's preferences and likes once it succeeded", async () => {
+    const { actionRunner } = await import("../media/document.js");
+    const deps = fakeDeps();
+    const run = actionRunner(deps);
+    assert.equal(await run(AUDIO.menu[2].action, { id: "t1" }), true);
+    assert.deepEqual(deps.calls.post, [["tracks/t1/keep", {}]]);
+    assert.deepEqual(deps.calls.reload, ["audio.session"]);
+    assert.deepEqual(deps.calls.notify, [["Kept.", "info"]]);
+    deps.post = async () => { throw new Error("No."); };
+    assert.equal(await actionRunner(deps)(AUDIO.menu[2].action, { id: "t1" }), false);
+    assert.deepEqual(deps.calls.reload, ["audio.session"]);  // a failed one reloads nothing
+});
+
+test("session.reload reads preferences and likes again; only a change the client makes itself is followed", async () => {
+    library.setProvider(library.resolveProvider({
+        "audio.library": [radio],
+        "audio.session": [{ satellite: "Radio", version: 1, enabled: true, operations: { preferences: "prefs", favorites: "likes" } }],
+    }));
+    const saved = globalThis.fetch;
+    let liked = ["t9"];
+    globalThis.fetch = async (path, options = {}) => {
+        const body = path.endsWith("/prefs") ? { speed: 1.5 } : { ids: { track: liked } };
+        if (options.method === "POST" && path.endsWith("/likes")) {
+            liked = [...liked, ...JSON.parse(options.body).ids];
+        }
+        return { ok: true, status: 200, json: async () => ({ ...body, ids: { track: liked } }) };
+    };
+    const changed = [];
+    const off = session.on("changed", (capability) => changed.push(capability));
+    try {
+        await session.reload();
+        assert.equal(session.preference("speed", 1), 1.5);
+        assert.equal(session.isLiked("track", "t9"), true);
+        assert.deepEqual(changed, []);
+        await session.setLiked("track", "t3", true);
+        assert.equal(session.isLiked("track", "t3"), true);
+        assert.deepEqual(changed, ["audio.session"]);
+    } finally {
+        off();
+        globalThis.fetch = saved;
+    }
+});
+
+test("repeat cycles off, all and one, and on a radio between off and one only", async () => {
+    const { nextRepeat } = await import("../media/repeat.js");
+    assert.deepEqual(["off", "all", "one"].map((mode) => nextRepeat(mode, "album:a1")), ["all", "one", "off"]);
+    assert.deepEqual(["off", "all", "one"].map((mode) => nextRepeat(mode, "radio:track-t1")), ["one", "off", "off"]);
+    assert.equal(nextRepeat("off", null), "all");
+});

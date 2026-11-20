@@ -50,6 +50,22 @@ export function load() {
     return state.ready;
 }
 
+/** Reads the preferences and likes again (a page's route action with `reloads:
+ * "audio.session"`, UI contract 1.2, changed them on the server). Emits "preferences" and
+ * "favorites", never "changed": the page that changed them already shows it. */
+export async function reload() {
+    await library.ready;
+    await Promise.all([
+        library.offersSession("preferences")
+            ? library.get("session", "preferences").then((prefs) => {
+                state.preferences = prefs;
+                emit("preferences", prefs);
+            })
+            : null,
+        library.offersSession("favorites") ? refreshFavorites() : null,
+    ]);
+}
+
 export function preference(key, fallback) {
     const prefs = state.preferences;
     return prefs && key in prefs ? prefs[key] : fallback;
@@ -64,6 +80,8 @@ export async function setPreferences(changes) {
     const saved = await library.post("session", "preferences", "", changes);
     state.preferences = saved;
     emit("preferences", saved);
+    // the client changed it itself: a page that follows audio.session loads again
+    emit("changed", "audio.session");
     return saved;
 }
 
@@ -101,6 +119,7 @@ export async function setLiked(kind, ids, liked) {
     emit("favorites", state.favorites);
     const payload = await library.post("session", "favorites", "", { kind, ids: list, liked });
     applyFavorites(payload.ids);
+    emit("changed", "audio.session");
 }
 
 export function toggleLiked(kind, id) {

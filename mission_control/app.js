@@ -176,6 +176,9 @@ function usesOwnPage(satellite) {
     if (!hasUiDocument(satellite) || visitsOwnPage(satellite)) {
         return true;
     }
+    if (visitsSharedPage(satellite)) {
+        return false;
+    }
     return isPreviewDocument(satellite) ? !switched(satellite) : switched(satellite);
 }
 
@@ -192,6 +195,55 @@ function visitsOwnPage(satellite) {
     }
     return Boolean(history.state && history.state[OWN_VISIT] === satellite.name);
 }
+
+// The other way round: the audio host opens a page of the Satellite it plays from in its
+// shared interface (a navigate from the document's `audio`, UI contract 1.2), even where that
+// Satellite's own page is the default. The visit lasts while the route stays on that
+// Satellite (and over a reload, in sessionStorage); leaving it, or the own action, ends it.
+const SHARED_VISIT = "starcore.sharedVisit";
+let sharedVisit = (() => {
+    try {
+        return sessionStorage.getItem(SHARED_VISIT);
+    } catch {
+        return null;
+    }
+})();
+
+function setSharedVisit(name) {
+    sharedVisit = name;
+    try {
+        if (name) {
+            sessionStorage.setItem(SHARED_VISIT, name);
+        } else {
+            sessionStorage.removeItem(SHARED_VISIT);
+        }
+    } catch {
+        // without storage the visit lasts until the page is reloaded
+    }
+}
+
+function visitsSharedPage(satellite) {
+    return route.name === "satellite" && route.satellite.toLowerCase() === satellite.name.toLowerCase()
+        && sharedVisit === satellite.name;
+}
+
+window.addEventListener("starcore:open-shared", (event) => {
+    const { satellite: name, section } = event.detail || {};
+    const target = typeof name === "string" ? findSatellite(name) : null;
+    if (!target || !hasUiDocument(target) || isSection(target)) {
+        return;
+    }
+    setSharedVisit(target.name);
+    const hash = section ? `${satelliteHash(target)}/${section}` : satelliteHash(target);
+    if (location.hash === hash) {
+        // already there, perhaps in the own page: draw the shared interface
+        history.replaceState(null, "", hash);
+        updateSatelliteOwnPageButton();
+        renderSatellitePage();
+    } else {
+        location.hash = hash;
+    }
+});
 
 // the Satellite `name` when its manifest says it is a section of `host`
 function hostedSection(host, name) {
@@ -211,6 +263,7 @@ function hostedInterface(satellite) {
 
 function openOwnPage(satellite, section) {
     const hash = `#/satellite/${encodeURIComponent(satellite.name)}/${encodeURIComponent(section)}`;
+    setSharedVisit(null);
     history.pushState({ [OWN_VISIT]: satellite.name }, "", hash);
     applyRoute();
 }
@@ -352,10 +405,16 @@ function applyRoute() {
     if (name === "satellite" && param) {
         route = { name: "satellite", satellite: decodeURIComponent(param), section: section ? decodeURIComponent(section) : null,
             inner: inner ? decodeURIComponent(inner) : null };
+        if (sharedVisit && route.satellite.toLowerCase() !== sharedVisit.toLowerCase()) {
+            setSharedVisit(null);
+        }
     } else if (name in CORE_PAGES && (developerMode || !DEVELOPER_ROUTES.has(name))) {
         route = { name, satellite: null, section: null, inner: null };
     } else {
         route = { name: "overview", satellite: null, section: null, inner: null };
+    }
+    if (route.name !== "satellite" && sharedVisit) {
+        setSharedVisit(null);
     }
 
     // a real navigation to the page already showing: let it switch section (unless it now
@@ -1754,6 +1813,13 @@ function updateSatelliteOwnPageButton() {
     button.title = usesOwnPage(satellite) ? "Show the shared interface (ui.json)" : "Show the Satellite's own page (page.js)";
     button.setAttribute("aria-label", button.title);
     button.onclick = () => {
+        if (visitsSharedPage(satellite)) {
+            // a visit from the player (the document's audio): leave it, the choice stays
+            setSharedVisit(null);
+            updateSatelliteOwnPageButton();
+            renderSatellitePage();
+            return;
+        }
         if (history.state && history.state[OWN_VISIT] === satellite.name) {
             // a visit from the shared interface (the own action): leave it, the choice stays
             history.replaceState(null, "", location.hash);

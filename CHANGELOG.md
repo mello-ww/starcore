@@ -47,6 +47,16 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   Import a playlist file, which keeps the entries the library doesn't have for the playlist
   page to show. Music's answers gain `playlists?editable=1`, `playlists/<id>/picture`, an
   `ask` on `add` (the `409`) and a raw-body import.
+- **What the player adds from the document (UI contract 1.2, contract change 9).** A document
+  whose Satellite provides `audio.library` may declare `audio`: entries for the player's More
+  menu, the title's and artist's links and a way to its pages, run with the playing track. Both
+  hosts read it from the provider's document, and a navigate opens the shared page wherever
+  the player is. A route action's `reloads: "audio.session"` has the client read its likes and
+  preferences again, and a page that `follows` it reloads when the player changes them. While
+  the player plays a radio, repeat cycles between off and repeat one only.
+- **Music's player additions on the shared interface (a preview, milestone A4).** Add to
+  playlist, Start radio, Go to album, Go to artist, Credits and Open Music in the player's
+  menu; a heart on a page turns the player's over at once, and the reverse.
 
 - **Satellites ship their own icons (UI contract 1.2, contract change 5).** A Satellite lists
   them in its `satellite.toml` (`[icons]`, each with a shared icon as fallback) and puts them

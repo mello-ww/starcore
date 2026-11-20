@@ -2,6 +2,8 @@ import React, {createContext, useCallback, useContext, useEffect, useMemo, useRe
 import {AppState, PermissionsAndroid, Platform, StyleSheet, View} from 'react-native';
 import Video, {type VideoRef} from 'react-native-video';
 import {useAuth} from '../auth/AuthContext';
+import {UiApi} from '../satellites/ui/api';
+import type {UiAudio} from '../satellites/ui/contract';
 import {useServers} from '../servers/ServersContext';
 import {ConnectClient} from './connect';
 import {DownloadManager} from './downloads';
@@ -44,7 +46,21 @@ export interface AudioHostValue {
   /** Plays tracks a Satellite's own page hands over (the play action with tracks or route):
    * only that Satellite's, and only when it is the provider; resolves with how many it took. */
   playTracks: (satellite: string, tracks: unknown, options?: HandOverOptions) => Promise<number>;
+  /** The own native code's additions: only while one of its screens is shown, or when the
+   * provider's document adds nothing (its `audio`, below). */
   extensions: AudioHostExtensions;
+  /** What the provider's document adds to the player (UI contract 1.2, its `audio`): null
+   * without one, and while the provider's own screens are shown (their extensions win). */
+  audio: UiAudio | null;
+  /** Opens a page of the provider's shared interface, wherever the player is. */
+  openPage: (page: string, params: Record<string, string>) => void;
+  /** Marks one of the provider's own screens as shown; returns the function that unmarks it. */
+  claimOwnInterface: () => () => void;
+  /** Reads again what the app keeps of a capability (`reloads`: "audio.session"). */
+  reload: (capability: string) => Promise<void>;
+  /** Tells `listener` the capability the app itself changed (a like, a preference), so a page
+   * that `follows` it reloads; returns the function that stops it. */
+  onChanged: (listener: (capability: string) => void) => () => void;
 }
 
 const AudioHostContext = createContext<AudioHostValue | null>(null);
@@ -65,9 +81,12 @@ async function requestNotifications() {
 export function AudioHost({
   children,
   extensions = {},
+  openPage,
 }: {
   children: React.ReactNode;
   extensions?: AudioHostExtensions;
+  /** opens a page of a Satellite's shared interface (the app's navigation) */
+  openPage?: (satellite: string, page: string, params: Record<string, string>) => void;
 }) {
   const {client, state} = useAuth();
   const {activeServer} = useServers();
@@ -86,6 +105,9 @@ export function AudioHost({
   deviceRef.current = deviceId;
   const [liked, setLikedState] = useState<Set<string>>(new Set());
   const [fullPlayer, setFullPlayer] = useState(false);
+  const [audioDoc, setAudioDoc] = useState<UiAudio | null>(null);
+  const [ownShown, setOwnShown] = useState(0);
+  const changedListeners = useRef(new Set<(capability: string) => void>());
   const videoRef = useRef<VideoRef>(null);
 
   const downloads = useMemo(
@@ -203,11 +225,17 @@ export function AudioHost({
       if (library.offersSession('favorites')) {
         library.favorites().then(value => !cancelled && setLikedState(new Set(value.ids.track ?? []))).catch(() => undefined);
       }
+      // what the provider's document adds to the player; one that can't be read adds nothing
+      new UiApi(client, serverId)
+        .document(resolved.satellite)
+        .then(loaded => !cancelled && setAudioDoc(loaded.document.audio ?? null))
+        .catch(() => undefined);
     })();
     return () => {
       cancelled = true;
+      setAudioDoc(null);
     };
-  }, [client, library]);
+  }, [client, library, serverId]);
 
   useEffect(() => {
     if (!connect) {
@@ -247,6 +275,7 @@ export function AudioHost({
       setPreferences(current => (current ? {...current, ...changes} : current));
       const saved = await library.updatePreferences(changes);
       setPreferences(saved);
+      changedListeners.current.forEach(listener => listener('audio.session'));
     },
     [library],
   );
@@ -264,8 +293,57 @@ export function AudioHost({
       });
       const result = await library.setFavorite('track', trackIds, isLiked);
       setLikedState(new Set(result.ids.track ?? []));
+      changedListeners.current.forEach(listener => listener('audio.session'));
     },
     [library],
+  );
+
+  // a page's action changed what the session keeps: read it again, without telling the pages
+  // that follow it (the page that acted refreshes itself)
+  const reload = useCallback(
+    async (capability: string) => {
+      if (capability !== 'audio.session' || !library.provider) {
+        return;
+      }
+      const reads: Promise<unknown>[] = [];
+      if (library.offersSession('preferences')) {
+        reads.push(library.preferences().then(setPreferences));
+      }
+      if (library.offersSession('favorites')) {
+        reads.push(library.favorites().then(value => setLikedState(new Set(value.ids.track ?? []))));
+      }
+      await Promise.all(reads.map(read => read.catch(() => undefined)));
+    },
+    [library],
+  );
+
+  const onChanged = useCallback((listener: (capability: string) => void) => {
+    changedListeners.current.add(listener);
+    return () => {
+      changedListeners.current.delete(listener);
+    };
+  }, []);
+
+  const claimOwnInterface = useCallback(() => {
+    let released = false;
+    setOwnShown(count => count + 1);
+    return () => {
+      if (!released) {
+        released = true;
+        setOwnShown(count => count - 1);
+      }
+    };
+  }, []);
+
+  const satellite = provider?.satellite ?? null;
+  const openProviderPage = useCallback(
+    (page: string, params: Record<string, string>) => {
+      if (satellite && openPage) {
+        setFullPlayer(false);
+        openPage(satellite, page, params);
+      }
+    },
+    [openPage, satellite],
   );
 
   const playSearch = useCallback(
@@ -318,7 +396,12 @@ export function AudioHost({
     resolveTracks,
     playSearch,
     playTracks,
-    extensions,
+    extensions: ownShown > 0 || !audioDoc ? extensions : {},
+    audio: ownShown > 0 ? null : audioDoc,
+    openPage: openProviderPage,
+    claimOwnInterface,
+    reload,
+    onChanged,
   };
 
   return (
@@ -406,6 +489,13 @@ export function useAudioHost(): AudioHostValue {
     throw new Error('useAudioHost() must be used inside an AudioHost');
   }
   return value;
+}
+
+/** Marks the screen it is called in as one of the provider's own while it is focused: its
+ * native extensions then win over what the provider's document adds (AudioHostValue.audio). */
+export function useOwnAudioInterface(focused: boolean) {
+  const claim = useContext(AudioHostContext)?.claimOwnInterface;
+  useEffect(() => (focused && claim ? claim() : undefined), [claim, focused]);
 }
 
 /** The host, or null outside one (a screen rendered on its own, as in tests). */
