@@ -334,8 +334,9 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 
 **File Explorer (own, unless noted)**
 
-- [ ] Readable type names for the well-known extensions (`.exe` is a Windows application, and
-      so on), in the Satellite's Engine code and shown as file metadata.
+- [x] Readable type names for the well-known extensions (`.exe` is a Windows application, and
+      so on), in the Satellite's Engine code and shown as file metadata. Done in its
+      `views.py` (`KINDS`), shown as the file page's Type; any other extension stays "XYZ file".
 - [x] Its header actions (new folder, this folder, upload, up) on one line, those that need a
       field opening their own drop-down (above); a file's page too (open, download, share,
       and Manage for the rename and delete).

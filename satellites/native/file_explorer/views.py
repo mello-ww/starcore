@@ -140,10 +140,59 @@ PICTURES = {".png": "PNG image", ".jpg": "JPEG image", ".jpeg": "JPEG image", ".
 PREVIEW_LIMIT = 20 * 1024 * 1024
 
 
+# what the well-known extensions are, in words, for a file's Type; any other shows its
+# extension ("XYZ file")
+KINDS = {
+    # applications and scripts
+    ".exe": "Windows application", ".msi": "Windows installer", ".bat": "Windows batch script",
+    ".cmd": "Windows command script", ".ps1": "PowerShell script", ".dll": "Windows library",
+    ".lnk": "Windows shortcut", ".apk": "Android app", ".dmg": "macOS disk image",
+    ".app": "macOS application", ".deb": "Debian package", ".rpm": "RPM package",
+    ".appimage": "AppImage application", ".sh": "Shell script", ".jar": "Java archive",
+    ".iso": "Disc image", ".img": "Disk image",
+    # documents
+    ".pdf": "PDF document", ".txt": "Text file", ".md": "Markdown document", ".rtf": "Rich text document",
+    ".doc": "Word document", ".docx": "Word document", ".odt": "OpenDocument text",
+    ".xls": "Excel spreadsheet", ".xlsx": "Excel spreadsheet", ".ods": "OpenDocument spreadsheet",
+    ".csv": "CSV spreadsheet", ".ppt": "PowerPoint presentation", ".pptx": "PowerPoint presentation",
+    ".odp": "OpenDocument presentation", ".epub": "EPUB book", ".log": "Log file",
+    # data and code
+    ".json": "JSON data", ".xml": "XML data", ".yaml": "YAML data", ".yml": "YAML data",
+    ".toml": "TOML settings", ".ini": "Settings file", ".conf": "Settings file", ".cfg": "Settings file",
+    ".env": "Environment settings", ".sql": "SQL script", ".db": "Database", ".sqlite": "SQLite database",
+    ".html": "Web page", ".htm": "Web page", ".css": "Stylesheet", ".js": "JavaScript source",
+    ".ts": "TypeScript source", ".py": "Python source", ".java": "Java source", ".c": "C source",
+    ".cpp": "C++ source", ".h": "C header", ".cs": "C# source", ".go": "Go source", ".rs": "Rust source",
+    ".kt": "Kotlin source", ".rb": "Ruby source", ".php": "PHP source",
+    # archives
+    ".zip": "ZIP archive", ".rar": "RAR archive", ".7z": "7-Zip archive", ".tar": "TAR archive",
+    ".gz": "Gzip archive", ".tgz": "Gzip archive", ".bz2": "Bzip2 archive", ".xz": "XZ archive",
+    # pictures the file page does not preview
+    ".bmp": "Bitmap image", ".tif": "TIFF image", ".tiff": "TIFF image", ".svg": "SVG image",
+    ".heic": "HEIC image", ".heif": "HEIF image", ".avif": "AVIF image", ".ico": "Icon",
+    ".raw": "Camera raw image", ".dng": "Camera raw image", ".cr2": "Camera raw image",
+    ".nef": "Camera raw image", ".arw": "Camera raw image", ".psd": "Photoshop image",
+    # sound
+    ".mp3": "MP3 audio", ".flac": "FLAC audio", ".wav": "WAV audio", ".ogg": "Ogg audio",
+    ".opus": "Opus audio", ".m4a": "MPEG-4 audio", ".aac": "AAC audio", ".wma": "Windows Media audio",
+    ".aiff": "AIFF audio", ".mid": "MIDI file", ".m3u": "Playlist", ".m3u8": "Playlist",
+    # video
+    ".mp4": "MPEG-4 video", ".mkv": "Matroska video", ".mov": "QuickTime video", ".avi": "AVI video",
+    ".webm": "WebM video", ".wmv": "Windows Media video", ".m4v": "MPEG-4 video", ".srt": "Subtitles",
+    # fonts
+    ".ttf": "TrueType font", ".otf": "OpenType font", ".woff": "Web font", ".woff2": "Web font",
+    # other
+    ".torrent": "Torrent file", ".ics": "Calendar file", ".vcf": "Contact card", ".eml": "Email message",
+    ".bak": "Backup file", ".tmp": "Temporary file", ".part": "Partial download",
+}
+
+
 def _kind(name: str) -> str:
-    suffix = Path(name).suffix
-    if suffix.lower() in PICTURES:
-        return PICTURES[suffix.lower()]
+    suffix = Path(name).suffix.lower()
+    if suffix in PICTURES:
+        return PICTURES[suffix]
+    if suffix in KINDS:
+        return KINDS[suffix]
     return f"{suffix[1:].upper()} file" if suffix else "File"
 
 

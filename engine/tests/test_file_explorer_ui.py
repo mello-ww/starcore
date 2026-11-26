@@ -151,7 +151,7 @@ class FileExplorerViewTest(unittest.TestCase):
         status, view = self.file(notes)
         self.assertEqual(status, 200)
         self.assertEqual((view["name"], view["path"], view["folder"]), ("notes.txt", str(notes), str(self.directory)))
-        self.assertEqual((view["size"], view["kind"], view["preview"]), (5, "TXT file", False))
+        self.assertEqual((view["size"], view["kind"], view["preview"]), (5, "Text file", False))
         self.assertEqual(view["modified"], int(notes.stat().st_mtime))  # epoch seconds, for the datetime format
 
     def test_a_picture_is_previewed_unless_it_is_too_large(self):
@@ -168,6 +168,12 @@ class FileExplorerViewTest(unittest.TestCase):
         self.assertFalse(self.file(self.directory / "drawing.svg")[1]["preview"])
         (self.directory / "README").write_text("x", encoding="utf-8")
         self.assertEqual(self.file(self.directory / "README")[1]["kind"], "File")
+
+    def test_a_well_known_extension_has_a_readable_type(self):
+        for name, kind in (("setup.EXE", "Windows application"), ("report.pdf", "PDF document"),
+                           ("song.flac", "FLAC audio"), ("data.xyz", "XYZ file")):
+            (self.directory / name).write_bytes(b"x")
+            self.assertEqual(self.file(self.directory / name)[1]["kind"], kind, name)
 
     def test_a_file_page_refuses_what_is_not_a_file(self):
         self.assertEqual(self.file(self.directory)[0], 400)
