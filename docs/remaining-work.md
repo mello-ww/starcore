@@ -301,13 +301,14 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 **Shared mechanisms (one change serves several items)**
 
 - [ ] **Page width.** On a 1080p screen the web interface stops at about two thirds of the
-      page. Centre it, or let it fill the width, in the shared page layout (web).
+      page. It must not: the shared page layout (web) uses the full width.
 - [ ] **Accent colour** on the shared controls that still lack it (selected and active states),
       on both clients.
-- [ ] **A header row of actions with an overflow menu.** The page's actions sit on one line
-      above the content, the less used ones in a drop-down, instead of a column. Most likely a
-      contract change (an `actions` block's `menu`), then both clients and every `ui.json` that
-      has such actions. Used by File Explorer and Photos below.
+- [ ] **A header row of actions, each with its own drop-down.** Every action of the page sits
+      on one line above the content, instead of a column. An action that needs a text field or
+      buttons (a name, a choice) opens a drop-down under the button that was pressed, holding
+      them. Most likely a contract change, then both clients and every `ui.json` that has such
+      actions. Used by File Explorer and Photos below.
 - [ ] **A viewer hides the floating player.** While a photo (any media viewer) is full screen,
       the floating player slides down out of the way, with a restrained animation that respects
       reduced motion, and comes back after. Both clients, in the shared player and viewer.
@@ -320,12 +321,12 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 
 - [ ] Readable type names for the well-known extensions (`.exe` is a Windows application, and
       so on), in the Satellite's Engine code and shown as file metadata.
-- [ ] Its header actions (new folder, this folder, upload, up) on one line, with the
-      overflow menu above.
+- [ ] Its header actions (new folder, this folder, upload, up) on one line, those that need a
+      field opening their own drop-down (above).
 - [ ] A graceful error when the server refuses a change for lack of permission (create,
       rename, delete, upload), checked on both clients.
-- [ ] Drop the back button beside the folder name, since "up" exists; "All locations" is
-      called "Up" too when the folder is a root's direct child.
+- [ ] On the web only (Mission Control): drop the back button beside the folder name, since
+      "up" exists. "All locations" is called "Up" too when the folder is a root's direct child.
 
 **Music (own, unless noted)**
 
@@ -336,8 +337,8 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 
 **Photos**
 
-- [ ] The album page's buttons on one line, "Create album" in the drop-down (the overflow menu
-      above).
+- [ ] The album page's buttons on one line, "Create album" opening its own drop-down with the
+      name field (above).
 
 **Status**
 
