@@ -1227,7 +1227,7 @@ A client that meets a block or action it doesn't know skips it (see "Trust and v
   other. A route enforces its own rules even when the document hides the control; Showcase's
   counter refuses an increment while disabled, whatever the client shows.
 - The Engine validates every document at load and rediscovery: structure, vocabulary,
-  bindings, route templates, limits (256 KB, 32 pages, 200 blocks per page, nesting depth 4,
+  bindings, route templates, limits (512 KB, 32 pages, 200 blocks per page, nesting depth 4,
   refresh of at least 2 s; from 1.1, 4 sources per page, 4 widgets, 4 series per chart, 10
   columns per table, 8 options per choice). A `$state` or `$sources` binding must name what
   its page declares. A refused document is reported in the Satellite's `ui.error` and never

@@ -179,7 +179,7 @@
     "reserved": ["device.biometrics", "device.media-sync", "media.audio", "media.picker", "secure.screen"]
   },
   "limits": {
-    "document_bytes": 262144,
+    "document_bytes": 524288,
     "pages": 32,
     "blocks_per_page": 200,
     "nesting_depth": 4,
