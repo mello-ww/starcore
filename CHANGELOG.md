@@ -66,6 +66,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   answers the whole page, takes the accent as a mode and a colour, and an equalizer change one
   part at a time (a preset, one band); its `configuration` route saves a form's `values`
   together, all checked before any is saved.
+- **Music's Stats and Wrapped on the shared interface (a preview, milestone A6).** A Stats tab
+  (with Music's own bar-chart icon): a range from 7 days to all time, minutes, plays and songs,
+  plays by hour, top songs that play from the list, top artists, albums and genres, and the
+  library's totals. Wrapped for a year: its tiles, rankings and new artists, Play your top
+  songs, and the years before and after it that have one.
 
 - **Satellites ship their own icons (UI contract 1.2, contract change 5).** A Satellite lists
   them in its `satellite.toml` (`[icons]`, each with a shared icon as fallback) and puts them

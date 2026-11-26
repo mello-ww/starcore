@@ -216,7 +216,7 @@ and the Android screens against what the contract can draw.
   `MUSIC_AUDIO_EXTENSIONS` and `setExtensions` stay for the own interface while it is shown,
   until A10 removes it.
 - [x] **Settings and equalizer** as forms (A5): Settings, Equalizer, Scan and Duplicates.
-- [ ] **Stats and Wrapped** as dashboard pages (A6).
+- [x] **Stats and Wrapped** as dashboard pages (A6).
 - [ ] **Offline downloads** as a generic client capability (keep a provider's tracks on the
   device), with its Downloads page (A7, change 10).
 - [ ] **The web player's keyboard shortcuts** active wherever the host plays, not only on

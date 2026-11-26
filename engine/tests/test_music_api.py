@@ -864,6 +864,54 @@ class SettingsPageTest(MusicApiCase):
         self.assertIn("Nothing is ever deleted", duplicates["summary"])
 
 
+class StatsPageTest(MusicApiCase):
+    """What Music's shared Stats and Wrapped pages read (A6)."""
+
+    def test_stats_read_as_a_dashboard(self):
+        empty = self.call("stats?view=shared&days=7")[1]
+        self.assertEqual((empty["no_plays"], empty["range"], empty["top_songs"]), (True, "Last 7 days", []))
+        tracks = self.fill()
+        one = tracks["One"]["id"]
+        for _ in range(2):
+            self.call("history", {"track_id": one, "seconds": 200})
+        self.call("history", {"track_id": tracks["Three"]["id"], "seconds": 200})
+        stats = self.call("stats?view=shared&days=0")[1]
+        year = module("history").year_now()
+        self.assertEqual((stats["has_plays"], stats["range"], stats["context"]), (True, "All time", "library:stats"))
+        self.assertEqual((stats["wrapped_year"], stats["wrapped_label"]), (year, f"{year} Wrapped"))
+        self.assertEqual(stats["top_songs"][0]["id"], one)
+        self.assertEqual(stats["top_songs"][0]["plays_line"], "2 plays")
+        self.assertEqual(stats["top_artists"][0]["line"].split(" · ")[1], "2 plays")
+        self.assertTrue(stats["top_artists"][0]["artwork"])
+        self.assertEqual(stats["top_albums"][0]["album"], "First")
+        self.assertEqual(stats["top_genres"][0]["line"], "3 plays")
+        self.assertEqual((len(stats["by_hour"]), sum(stats["by_hour"])), (24, 3))
+        self.assertEqual(stats["library"]["tracks"], 3)
+
+    def test_wrapped_goes_back_to_the_first_year_with_a_play_and_up_to_this_one(self):
+        tracks = self.fill()
+        year = module("history").year_now()
+        history = module("library").library(self.satellite).history
+        history.record("alice", tracks["One"]["id"], 200, played_at=f"{year - 2}-05-01T10:00:00+00:00")
+        self.call("history", {"track_id": tracks["Two"]["id"], "seconds": 100})
+
+        now = self.call(f"wrapped?view=shared&year={year}")[1]
+        self.assertEqual((now["previous"], now["next"], now["title"]), (year - 1, None, f"{year} Wrapped"))
+        self.assertEqual(now["play_label"], f"Play your top songs of {year}")
+        self.assertEqual(now["context"], f"mix:wrapped-{year}")
+        self.assertEqual([track["id"] for track in now["top_songs"]], [tracks["Two"]["id"]])
+        first = self.call(f"wrapped?view=shared&year={year - 2}")[1]
+        self.assertEqual((first["previous"], first["next"]), (None, year - 1))
+        self.assertEqual([artist["name"] for artist in first["new_artists"]], ["Lumen"])
+        self.assertTrue(first["new_artists"][0]["line"].startswith(f"First played {year - 2}-05-01"))
+        self.assertEqual(first["streak_line"], "1 day")
+        self.assertEqual(first["peak_line"], "10:00")
+        # a listener without a play has no year before this one
+        alone = self.call(f"wrapped?view=shared&year={year}", token=self.bob)[1]
+        self.assertEqual((alone["previous"], alone["next"], alone["no_plays"]), (None, None, True))
+        self.assertEqual(alone["busiest_line"], "—")
+
+
 class OpenInstallTest(MusicApiCase):
     """Before an account exists the Core is open by design; Music then keeps one local listener."""
     bootstrap = False

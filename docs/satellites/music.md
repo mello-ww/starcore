@@ -312,8 +312,10 @@ POST playlists/import             {"name", "content"} for M3U, or {"name", "entr
 POST playlists/preview            {"rules"}
 GET  covers/<id>                  an uploaded playlist cover
 GET  history?limit=               POST {"track_id", "seconds", "device", "context"};  POST history/clear
-GET  stats?days=                  GET wrapped?year=
+GET  stats?days=                  GET wrapped?year=   (each with &view=shared for the shared pages,
+                                  Wrapped then with `previous` and `next`)
 GET  preferences                  POST {key: value, ...}
+GET  settings                     POST {key: value, ...}, the accent as accent_mode and accent_colour
 GET  home?hour=                   GET recommendations;  home?view=shelves for the shared interface
 GET  mixes                        GET mixes/<id>   (each with mosaic_key; a mix with context)
 GET  radio/<track|artist|album|genre>/<id>

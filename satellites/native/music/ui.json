@@ -1,5 +1,5 @@
 {
- "_about": "Music's shared interface (UI contract 1.2), a preview beside Music's own page and screens (docs/media-audio.md). A1: an album, an artist, a mix, a radio station, a mood, a genre and a track's credits, each played through the client's audio host with the play action's tracks or route. A2: Home (its sections as shelves and track rows), Search (recent searches and genres while empty, then the results, with a quality filter) and Your Library (one choice for its seven tabs, each filtered and sorted on the server, Liked Songs paged), a folder's page with its breadcrumb; every track row has its heart, marks the track playing and has its menu, every album, artist, mix and playlist tile its own. A3: playlists - Add to playlist in every track's menu (the choose action, which also creates one), a playlist's page with its details, cover, export and deletion, a regular playlist's songs reordered by dragging and removed from their menu, a smart playlist's rules edited as rows, new playlists, and a playlist file imported, with what it named that the library lacks. A4: what the player adds while it plays Music (`audio`: its More menu, the title's and artist's links, Open Music), a like on a page reaching the player at once (`reloads`) and the pages with hearts following a like in the player (`follows`). A5: a Settings tab (the library's folders as rows, scanning in Developer Mode, playback, streaming quality, appearance, privacy, devices), the equalizer, a scan page refreshed every 2 seconds with Cancel, and duplicates. It binds to Music's routes (views.py shapes the rows); pictures of mixes, moods and genres come from artwork/mosaic, a playlist's from playlists/<id>/picture.",
+ "_about": "Music's shared interface (UI contract 1.2), a preview beside Music's own page and screens (docs/media-audio.md). A1: an album, an artist, a mix, a radio station, a mood, a genre and a track's credits, each played through the client's audio host with the play action's tracks or route. A2: Home (its sections as shelves and track rows), Search (recent searches and genres while empty, then the results, with a quality filter) and Your Library (one choice for its seven tabs, each filtered and sorted on the server, Liked Songs paged), a folder's page with its breadcrumb; every track row has its heart, marks the track playing and has its menu, every album, artist, mix and playlist tile its own. A3: playlists - Add to playlist in every track's menu (the choose action, which also creates one), a playlist's page with its details, cover, export and deletion, a regular playlist's songs reordered by dragging and removed from their menu, a smart playlist's rules edited as rows, new playlists, and a playlist file imported, with what it named that the library lacks. A4: what the player adds while it plays Music (`audio`: its More menu, the title's and artist's links, Open Music), a like on a page reaching the player at once (`reloads`) and the pages with hearts following a like in the player (`follows`). A5: a Settings tab (the library's folders as rows, scanning in Developer Mode, playback, streaming quality, appearance, privacy, devices), the equalizer, a scan page refreshed every 2 seconds with Cancel, and duplicates. A6: Stats (a range as a choice, metrics, plays by hour, rankings that play or open) and Wrapped by year, with Play your top songs and the years before and after. It binds to Music's routes (views.py shapes the rows); pictures of mixes, moods and genres come from artwork/mosaic, a playlist's from playlists/<id>/picture.",
  "contract": "starcore.ui/1.2",
  "title": "Music",
  "preview": true,
@@ -27,6 +27,11 @@
    "page": "library",
    "label": "Your Library",
    "icon": "layers"
+  },
+  {
+   "page": "stats",
+   "label": "Stats",
+   "icon": "stats"
   },
   {
    "page": "settings",
@@ -10250,6 +10255,822 @@
       }
      ],
      "empty": "No likely duplicates."
+    }
+   ]
+  },
+  "stats": {
+   "title": "Stats",
+   "template": "dashboard",
+   "state": {
+    "days": "30"
+   },
+   "source": {
+    "route": "stats?view=shared&days={$state.days}"
+   },
+   "follows": [
+    "audio.session"
+   ],
+   "blocks": [
+    {
+     "type": "choice",
+     "key": "days",
+     "label": "Range",
+     "options": [
+      {
+       "value": "7",
+       "label": "7 days"
+      },
+      {
+       "value": "30",
+       "label": "30 days"
+      },
+      {
+       "value": "90",
+       "label": "90 days"
+      },
+      {
+       "value": "365",
+       "label": "A year"
+      },
+      {
+       "value": "0",
+       "label": "All time"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "style": "eyebrow",
+     "text": "$.range"
+    },
+    {
+     "type": "metric",
+     "label": "Minutes listened",
+     "value": "$.minutes",
+     "format": "integer"
+    },
+    {
+     "type": "metric",
+     "label": "Plays",
+     "value": "$.plays",
+     "format": "integer"
+    },
+    {
+     "type": "metric",
+     "label": "Different songs",
+     "value": "$.distinct_tracks",
+     "format": "integer"
+    },
+    {
+     "type": "text",
+     "visible": "$.no_plays",
+     "text": "Nothing played in this range yet. Songs you play past their halfway point count here."
+    },
+    {
+     "type": "chart",
+     "kind": "bars",
+     "title": "Plays by hour",
+     "visible": "$.has_plays",
+     "series": [
+      {
+       "label": "Plays",
+       "points": "$.by_hour"
+      }
+     ],
+     "empty": "No plays."
+    },
+    {
+     "type": "heading",
+     "text": "Top songs",
+     "visible": "$.has_plays"
+    },
+    {
+     "type": "media-list",
+     "items": "$.top_songs",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.plays_line",
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.top_songs",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "reloads": "audio.session",
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "reloads": "audio.session",
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "reloads": "audio.session",
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "reloads": "audio.session",
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small"
+    },
+    {
+     "type": "heading",
+     "text": "Top artists",
+     "visible": "$.has_plays"
+    },
+    {
+     "type": "media-list",
+     "items": "$.top_artists",
+     "size": "small",
+     "shape": "round",
+     "item": {
+      "title": "$.name",
+      "subtitle": "$.line",
+      "image": "artwork/{$.artwork}?size=120",
+      "key": "$.id"
+     },
+     "action": {
+      "navigate": "artist",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Top albums",
+     "visible": "$.has_plays"
+    },
+    {
+     "type": "media-list",
+     "items": "$.top_albums",
+     "size": "small",
+     "item": {
+      "title": "$.album",
+      "subtitle": "$.line",
+      "image": "artwork/{$.id}?size=120",
+      "key": "$.id"
+     },
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Top genres",
+     "visible": "$.top_genres"
+    },
+    {
+     "type": "list",
+     "items": "$.top_genres",
+     "item": {
+      "title": "$.name",
+      "value": "$.line"
+     },
+     "action": {
+      "navigate": "genre",
+      "params": {
+       "name": "$.name"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "$.wrapped_label",
+     "style": "primary",
+     "action": {
+      "navigate": "wrapped",
+      "params": {
+       "year": "$.wrapped_year"
+      }
+     }
+    },
+    {
+     "type": "card",
+     "title": "Your library",
+     "blocks": [
+      {
+       "type": "field",
+       "label": "Tracks",
+       "value": "$.library.tracks",
+       "format": "integer"
+      },
+      {
+       "type": "field",
+       "label": "Albums",
+       "value": "$.library.albums",
+       "format": "integer"
+      },
+      {
+       "type": "field",
+       "label": "Artists",
+       "value": "$.library.artists",
+       "format": "integer"
+      },
+      {
+       "type": "field",
+       "label": "Lossless",
+       "value": "$.library.lossless",
+       "format": "integer"
+      },
+      {
+       "type": "field",
+       "label": "Hi-res",
+       "value": "$.library.hires",
+       "format": "integer"
+      },
+      {
+       "type": "field",
+       "label": "Size",
+       "value": "$.library.size_bytes",
+       "format": "bytes"
+      }
+     ]
+    }
+   ]
+  },
+  "wrapped": {
+   "title": "$.title",
+   "template": "dashboard",
+   "params": [
+    "year"
+   ],
+   "source": {
+    "route": "wrapped?view=shared&year={$params.year}"
+   },
+   "follows": [
+    "audio.session"
+   ],
+   "blocks": [
+    {
+     "type": "text",
+     "style": "eyebrow",
+     "text": "$.personality"
+    },
+    {
+     "type": "button",
+     "label": "$.play_label",
+     "style": "primary",
+     "visible": "$.has_plays",
+     "action": {
+      "play": {
+       "tracks": "$.top_songs",
+       "context": "$.context"
+      }
+     }
+    },
+    {
+     "type": "metric",
+     "label": "Minutes listened",
+     "value": "$.minutes",
+     "format": "integer"
+    },
+    {
+     "type": "metric",
+     "label": "Plays",
+     "value": "$.plays",
+     "format": "integer"
+    },
+    {
+     "type": "metric",
+     "label": "Different songs",
+     "value": "$.distinct_tracks",
+     "format": "integer"
+    },
+    {
+     "type": "metric",
+     "label": "Days with music",
+     "value": "$.listening_days",
+     "format": "integer"
+    },
+    {
+     "type": "metric",
+     "label": "New artists",
+     "value": "$.new_artist_count",
+     "format": "integer"
+    },
+    {
+     "type": "card",
+     "title": "Your year",
+     "visible": "$.has_plays",
+     "blocks": [
+      {
+       "type": "field",
+       "label": "Longest streak",
+       "value": "$.streak_line"
+      },
+      {
+       "type": "field",
+       "label": "Favourite hour",
+       "value": "$.peak_line"
+      },
+      {
+       "type": "field",
+       "label": "Biggest day",
+       "value": "$.busiest_line"
+      }
+     ]
+    },
+    {
+     "type": "chart",
+     "kind": "bars",
+     "title": "Plays by hour",
+     "visible": "$.has_plays",
+     "series": [
+      {
+       "label": "Plays",
+       "points": "$.by_hour"
+      }
+     ],
+     "empty": "No plays."
+    },
+    {
+     "type": "heading",
+     "text": "Top songs",
+     "visible": "$.has_plays"
+    },
+    {
+     "type": "media-list",
+     "items": "$.top_songs",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.line",
+      "meta": "$.plays_line",
+      "audio": "$.id",
+      "key": "$.id",
+      "image": "artwork/{$.album_id}?size=120"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.top_songs",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "reloads": "audio.session",
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "reloads": "audio.session",
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "reloads": "audio.session",
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "reloads": "audio.session",
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "size": "small"
+    },
+    {
+     "type": "heading",
+     "text": "Top artists",
+     "visible": "$.has_plays"
+    },
+    {
+     "type": "media-list",
+     "items": "$.top_artists",
+     "size": "small",
+     "shape": "round",
+     "item": {
+      "title": "$.name",
+      "subtitle": "$.line",
+      "image": "artwork/{$.artwork}?size=120",
+      "key": "$.id"
+     },
+     "action": {
+      "navigate": "artist",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Top albums",
+     "visible": "$.has_plays"
+    },
+    {
+     "type": "media-list",
+     "items": "$.top_albums",
+     "size": "small",
+     "item": {
+      "title": "$.album",
+      "subtitle": "$.line",
+      "image": "artwork/{$.id}?size=120",
+      "key": "$.id"
+     },
+     "action": {
+      "navigate": "album",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Top genres",
+     "visible": "$.top_genres"
+    },
+    {
+     "type": "list",
+     "items": "$.top_genres",
+     "item": {
+      "title": "$.name",
+      "value": "$.line"
+     },
+     "action": {
+      "navigate": "genre",
+      "params": {
+       "name": "$.name"
+      }
+     }
+    },
+    {
+     "type": "heading",
+     "text": "Artists you discovered",
+     "visible": "$.new_artists"
+    },
+    {
+     "type": "media-list",
+     "items": "$.new_artists",
+     "size": "small",
+     "shape": "round",
+     "item": {
+      "title": "$.name",
+      "subtitle": "$.line",
+      "image": "artwork/{$.artwork}?size=120",
+      "key": "$.id"
+     },
+     "action": {
+      "navigate": "artist",
+      "params": {
+       "id": "$.id"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "$.previous_label",
+     "style": "secondary",
+     "visible": "$.previous",
+     "action": {
+      "navigate": "wrapped",
+      "params": {
+       "year": "$.previous"
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "$.next_label",
+     "style": "secondary",
+     "visible": "$.next",
+     "action": {
+      "navigate": "wrapped",
+      "params": {
+       "year": "$.next"
+      }
+     }
     }
    ]
   }

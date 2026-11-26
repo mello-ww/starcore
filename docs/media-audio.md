@@ -647,7 +647,15 @@ Cancel; duplicates; devices (S: `connect/forget`). Tests: Music's engine tests f
 preference keys and the configuration; a setting changed on the page heard at once, on both
 clients.
 
-**A6 - stats and Wrapped.** Two `dashboard` pages: the range as a `choice`, metrics, rankings
+**A6 - stats and Wrapped.** **Done.** A Stats tab (Music's own icon `stats`, a bar chart,
+`activity` where it is refused) reading `stats?view=shared&days=`: the range as a `choice`
+(7, 30, 90, 365 days, all time), metrics, plays by hour as a `bars` chart, top songs that play
+from the list, top artists, albums and genres that open their page, the library's totals and
+a button to this year's Wrapped. `wrapped?view=shared&year=` answers the year's tiles as text,
+its rankings and new artists as rows, `previous` and `next` (from the year of the first counted
+play, `history.first_year`, to this one; `null` past either end) and Play your top songs
+(`play` with the page's `top_songs`, context `mix:wrapped-<year>`). As planned:
+Two `dashboard` pages: the range as a `choice`, metrics, rankings
 as `media-list`s, plays by hour as a `bars` chart; Wrapped by year, with Play your top songs
 (change 6). Tests: Music's engine tests for `wrapped`'s `previous` and `next`; both clients.
 
