@@ -304,11 +304,11 @@ mechanisms first, since several Satellites use them, then each Satellite's items
       reading width and the 1400 px cap on every view are gone).
 - [ ] **Accent colour** on the shared controls that still lack it (selected and active states),
       on both clients.
-- [ ] **A header row of actions, each with its own drop-down.** Every action of the page sits
+- [x] **A header row of actions, each with its own drop-down.** Every action of the page sits
       on one line above the content, instead of a column. An action that needs a text field or
       buttons (a name, a choice) opens a drop-down under the button that was pressed, holding
-      them. Most likely a contract change, then both clients and every `ui.json` that has such
-      actions. Used by File Explorer and Photos below.
+      them. Done as contract change 11 (the `actions` and `dropdown` blocks), on both clients,
+      used by File Explorer and Photos below.
 - [ ] **A viewer hides the floating player.** While a photo (any media viewer) is full screen,
       the floating player slides down out of the way, with a restrained animation that respects
       reduced motion, and comes back after. Both clients, in the shared player and viewer.
@@ -321,12 +321,14 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 
 - [ ] Readable type names for the well-known extensions (`.exe` is a Windows application, and
       so on), in the Satellite's Engine code and shown as file metadata.
-- [ ] Its header actions (new folder, this folder, upload, up) on one line, those that need a
-      field opening their own drop-down (above).
+- [x] Its header actions (new folder, this folder, upload, up) on one line, those that need a
+      field opening their own drop-down (above); a file's page too (open, download, share,
+      and Manage for the rename and delete).
+- [x] "All locations" is called "Up" too when the folder is a drive's root.
 - [ ] A graceful error when the server refuses a change for lack of permission (create,
       rename, delete, upload), checked on both clients.
 - [ ] On the web only (Mission Control): drop the back button beside the folder name, since
-      "up" exists. "All locations" is called "Up" too when the folder is a root's direct child.
+      "up" exists.
 
 **Music (own, unless noted)**
 
@@ -337,8 +339,9 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 
 **Photos**
 
-- [ ] The album page's buttons on one line, "Create album" opening its own drop-down with the
-      name field (above).
+- [x] The album page's buttons on one line, "Create album" opening its own drop-down with the
+      name field (above); an album's own page too (Add photos, and Album for the rename and
+      delete).
 
 **Status**
 

@@ -7,6 +7,12 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **A page's actions on one row, with drop-downs (UI contract 1.2, contract change 11).** The
+  `actions` block holds up to 8 buttons and `dropdown`s on one line that wraps; a dropdown opens
+  a panel under its button with the fields or buttons it needs, one at a time, closed again by
+  its button or by an action inside it that succeeded (and on the web by Escape or a press
+  outside). File Explorer's folder and file pages and Photos' albums and album pages use it in
+  place of their cards of actions; "All locations" at a drive's root is called "Up".
 - **Music opens in its shared interface on both clients (A9).** Its `ui.json` is no longer a
   preview: Mission Control and the Android app draw it by default, after an end-to-end run on
   an isolated demo and the owner's validation. The own page and screens stay in Developer Mode

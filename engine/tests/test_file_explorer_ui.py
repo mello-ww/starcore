@@ -13,7 +13,7 @@ import tempfile
 import unittest
 
 from starcore import ui_contract
-from tests.support import start_engine, stop_engine
+from tests.support import every_block, start_engine, stop_engine
 from tests.test_photo_gallery import routes_in
 
 REPO = Path(__file__).resolve().parents[2]
@@ -274,7 +274,9 @@ class FileDocumentTest(unittest.TestCase):
         self.assertEqual(files["action"], {"navigate": "file", "params": {"path": "$.path"}})
         page = document["pages"]["file"]
         self.assertEqual(page["source"]["route"], "view/file?path={$params.path}")
-        actions = {block["label"]: block["action"] for block in page["blocks"] if block["type"] == "button"}
+        # on one row (an actions block), with the rename and delete in its Manage dropdown
+        [row] = [block for block in page["blocks"] if block["type"] == "actions"]
+        actions = {block["label"]: block["action"] for block in row["blocks"] if block["type"] == "button"}
         self.assertEqual(actions["Open"], {"download": "content?path={$params.path}", "name": "$.name", "open": True})
         self.assertEqual(actions["Download"]["download"], "content?path={$params.path}&download=1")
         self.assertEqual(actions["Share"]["share"], "content?path={$params.path}")
@@ -285,10 +287,7 @@ class FileDocumentTest(unittest.TestCase):
         document = ui_contract.load(FILE_EXPLORER_DIR / "ui.json")
 
         def controls(page):
-            found = []
-            for block in page["blocks"]:
-                found.extend(block.get("blocks", [block]))
-            return found
+            return list(every_block(page["blocks"]))
 
         folder = controls(document["pages"]["folder"])
         [create] = [b for b in folder if b["type"] == "form" and b["submit"]["label"] == "Create folder"]
@@ -299,9 +298,12 @@ class FileDocumentTest(unittest.TestCase):
         # share what was typed
         [rename] = [b for b in folder if b["type"] == "form" and b["submit"]["label"] == "Rename"]
         self.assertNotEqual([f["key"] for f in create["fields"]], [f["key"] for f in rename["fields"]])
-        # a drive's root has no parent: it shows no rename and no delete
-        [manage] = [b for b in document["pages"]["folder"]["blocks"] if b.get("title") == "This folder"]
-        self.assertEqual(manage["visible"], "$.parent")
+        # a drive's root has no parent: it shows no rename and no delete; both sit in a dropdown
+        # of the page's actions row, as does the new folder's name
+        [manage] = [b for b in folder if b.get("label") == "This folder"]
+        self.assertEqual((manage["type"], manage["visible"]), ("dropdown", "$.parent"))
+        [new] = [b for b in folder if b.get("label") == "New folder"]
+        self.assertEqual((new["type"], new["blocks"]), ("dropdown", [create]))
 
         # after a rename or a delete the page's path is gone: both go back to the folder, which
         # reloads and shows what is there now
@@ -318,7 +320,7 @@ class FileDocumentTest(unittest.TestCase):
 
     def test_a_folder_uploads_into_itself_and_asks_before_replacing_a_file(self):
         document = ui_contract.load(FILE_EXPLORER_DIR / "ui.json")
-        [upload] = [block for block in document["pages"]["folder"]["blocks"]
+        [upload] = [block for block in every_block(document["pages"]["folder"]["blocks"])
                     if block["type"] == "button" and "upload" in block.get("action", {})]
         action = upload["action"]
         self.assertEqual(upload["label"], "Upload files")

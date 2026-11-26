@@ -11,7 +11,7 @@ import tomllib
 import unittest
 
 from starcore import icons, ui_contract
-from tests.support import start_engine, stop_engine
+from tests.support import every_block, start_engine, stop_engine
 from tests.test_photo import png
 
 REPO = Path(__file__).resolve().parents[2]
@@ -180,7 +180,7 @@ class PhotoUiDocumentTest(unittest.TestCase):
         walk(self.document["pages"])
         self.assertEqual(owns, [])
         blocks = self.document["pages"]["albums"]["blocks"]
-        settings = [block for block in blocks if block.get("label") == "Settings"]
+        settings = [block for block in every_block(blocks) if block.get("label") == "Settings"]
         self.assertEqual(settings[0]["action"], {"navigate": "settings"})
         # a Satellite Photo hosts is a tile among the albums, opened through the section action:
         # the document names none of them, and nothing about the vault is in it
@@ -566,7 +566,7 @@ class PhotoGalleryApiTest(unittest.TestCase):
     def test_the_album_page_adds_photos_through_the_picker(self):
         document = photo_document()
         blocks = document["pages"]["album"]["blocks"]
-        add = next(block for block in blocks if block.get("label") == "Add photos")
+        add = next(block for block in every_block(blocks) if block.get("label") == "Add photos")
         self.assertEqual(add["action"]["pick"]["capability"], "media.gallery")
         self.assertEqual(add["action"]["route"], "albums/{$params.id}/photos")
         self.assertEqual(add["action"]["body"], {"items": "$value"})

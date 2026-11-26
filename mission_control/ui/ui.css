@@ -357,6 +357,81 @@ button.ui-list-row:hover {
     cursor: default;
 }
 
+/* a page's row of actions (1.2): every action on one line, wrapping where the page is narrow */
+.ui-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--sc-space-2);
+}
+
+.ui-actions > .ui-button {
+    align-self: auto;
+}
+
+/* a dropdown: its button opens a small floating card under itself */
+.ui-dropdown {
+    position: relative;
+}
+
+.ui-dropdown-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sc-space-2);
+}
+
+.ui-dropdown.open > .ui-dropdown-toggle:not(.sc-button-accent):not(.ui-button-danger) {
+    box-shadow: inset 0 0 0 1px var(--sc-accent);
+}
+
+.ui-dropdown-caret {
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid currentColor;
+    transition: transform 150ms ease-out;
+}
+
+.ui-dropdown.open .ui-dropdown-caret {
+    transform: rotate(180deg);
+}
+
+.ui-dropdown-panel {
+    position: absolute;
+    top: calc(100% + var(--sc-space-2));
+    left: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-3);
+    width: max-content;
+    min-width: 280px;
+    max-width: min(420px, calc(100vw - 32px));
+    padding: var(--sc-space-4);
+    border: 1px solid var(--sc-line);
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    animation: ui-dropdown-in 140ms ease-out both;
+}
+
+.ui-dropdown-panel[hidden] {
+    display: none;
+}
+
+@keyframes ui-dropdown-in {
+    from { opacity: 0; transform: translateY(-4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-dropdown-caret,
+    .ui-dropdown-panel {
+        transition: none;
+        animation: none;
+    }
+}
+
 .ui-toggle {
     display: flex;
     align-items: center;

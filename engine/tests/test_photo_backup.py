@@ -26,7 +26,7 @@ import tracemalloc
 import unittest
 
 from starcore.auth import AuthStore
-from tests.support import start_engine, stop_engine
+from tests.support import every_block, start_engine, stop_engine
 from tests.test_photo import png
 
 
@@ -442,7 +442,7 @@ class PhotoBackupTest(unittest.TestCase):
         self.assertEqual(page["source"], {"route": "gallery/backup"})
         actions = [block["action"] for block in page["blocks"] if block.get("type") == "button"]
         self.assertEqual(actions, [{"sync": {"capability": "media.sync"}}])
-        albums = [block.get("action") for block in document["pages"]["albums"]["blocks"]]
+        albums = [block.get("action") for block in every_block(document["pages"]["albums"]["blocks"])]
         self.assertIn({"navigate": "backup"}, albums)
 
     # ---------- the device credential ----------

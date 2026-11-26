@@ -49,3 +49,10 @@ def start_engine(mission_control=False, services=False, host="127.0.0.1", port=0
 def stop_engine(engine):
     with redirect_stdout(io.StringIO()):
         engine.stop()
+
+
+def every_block(blocks):
+    """Each block of a page, also inside a card, an actions row or a dropdown."""
+    for block in blocks:
+        yield block
+        yield from every_block(block.get("blocks", []))

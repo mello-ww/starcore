@@ -25,15 +25,32 @@
         {"type": "breadcrumb", "items": "$.crumbs", "item": {"title": "$.name"},
          "action": {"navigate": "folder", "params": {"path": "$.path"}}},
         {"type": "text", "style": "caption", "text": "$.summary"},
-        {"type": "button", "label": "Up", "style": "secondary", "visible": "$.parent",
-         "action": {"navigate": "folder", "params": {"path": "$.parent"}}},
-        {"type": "button", "label": "All locations", "style": "secondary", "visible": "$.at_drive_root",
-         "action": {"navigate": "locations"}},
-        {"type": "button", "label": "Upload files", "style": "primary",
-         "action": {"upload": {"multiple": true}, "route": "upload?path={$params.path}&name={$value.name}",
-                    "conflict": {"confirm": "A file with this name is already in this folder. Replace it?",
-                                 "route": "upload?path={$params.path}&name={$value.name}&overwrite=1"},
-                    "then": "refresh"}},
+        {"type": "actions", "blocks": [
+          {"type": "button", "label": "Up", "style": "secondary", "visible": "$.parent",
+           "action": {"navigate": "folder", "params": {"path": "$.parent"}}},
+          {"type": "button", "label": "Up", "style": "secondary", "visible": "$.at_drive_root",
+           "action": {"navigate": "locations"}},
+          {"type": "button", "label": "Upload files", "style": "primary",
+           "action": {"upload": {"multiple": true}, "route": "upload?path={$params.path}&name={$value.name}",
+                      "conflict": {"confirm": "A file with this name is already in this folder. Replace it?",
+                                   "route": "upload?path={$params.path}&name={$value.name}&overwrite=1"},
+                      "then": "refresh"}},
+          {"type": "dropdown", "label": "New folder", "blocks": [
+            {"type": "form",
+             "fields": [{"key": "folder", "label": "Name", "kind": "text", "placeholder": "Folder name", "required": true}],
+             "submit": {"label": "Create folder",
+                        "action": {"route": "mkdir", "body": {"path": "$params.path", "name": "$form.folder"}, "then": "refresh"}}}
+          ]},
+          {"type": "dropdown", "label": "This folder", "visible": "$.parent", "blocks": [
+            {"type": "form",
+             "fields": [{"key": "name", "label": "Name", "kind": "text", "value": "$.name", "required": true}],
+             "submit": {"label": "Rename",
+                        "action": {"route": "rename", "body": {"path": "$params.path", "name": "$form.name"}, "then": "back"}}},
+            {"type": "button", "label": "Delete this folder", "style": "danger",
+             "action": {"route": "delete", "body": {"path": "$params.path"},
+                        "confirm": "Delete this folder and everything in it? This cannot be undone.", "then": "back"}}
+          ]}
+        ]},
         {"type": "text", "style": "caption", "text": "This folder is empty.", "visible": "$.empty"},
         {"type": "list", "id": "folders", "visible": "$.has_folders", "items": "$.folders",
          "item": {"title": "$.name", "subtitle": "$.subtitle", "format": {"subtitle": "datetime"}, "icon": "$.icon"},
@@ -43,22 +60,7 @@
          "item": {"title": "$.name", "subtitle": "$.modified", "value": "$.size", "format": {"subtitle": "datetime", "value": "bytes"}, "icon": "$.icon"},
          "action": {"navigate": "file", "params": {"path": "$.path"}},
          "more": {"route": "view/folder?path={$params.path}&part=files&cursor={$value}", "cursor": "$.files_next"}},
-        {"type": "text", "style": "caption", "text": "$.storage", "visible": "$.storage"},
-        {"type": "card", "title": "New folder", "blocks": [
-          {"type": "form",
-           "fields": [{"key": "folder", "label": "Name", "kind": "text", "placeholder": "Folder name", "required": true}],
-           "submit": {"label": "Create folder",
-                      "action": {"route": "mkdir", "body": {"path": "$params.path", "name": "$form.folder"}, "then": "refresh"}}}
-        ]},
-        {"type": "card", "title": "This folder", "visible": "$.parent", "blocks": [
-          {"type": "form",
-           "fields": [{"key": "name", "label": "Name", "kind": "text", "value": "$.name", "required": true}],
-           "submit": {"label": "Rename",
-                      "action": {"route": "rename", "body": {"path": "$params.path", "name": "$form.name"}, "then": "back"}}},
-          {"type": "button", "label": "Delete this folder", "style": "danger",
-           "action": {"route": "delete", "body": {"path": "$params.path"},
-                      "confirm": "Delete this folder and everything in it? This cannot be undone.", "then": "back"}}
-        ]}
+        {"type": "text", "style": "caption", "text": "$.storage", "visible": "$.storage"}
       ]
     },
     "file": {
@@ -74,20 +76,22 @@
           {"type": "field", "label": "Type", "value": "$.kind"},
           {"type": "field", "label": "Folder", "value": "$.folder"}
         ]},
-        {"type": "button", "label": "Open", "style": "primary",
-         "action": {"download": "content?path={$params.path}", "name": "$.name", "open": true}},
-        {"type": "button", "label": "Download", "style": "secondary",
-         "action": {"download": "content?path={$params.path}&download=1", "name": "$.name"}},
-        {"type": "button", "label": "Share", "style": "secondary",
-         "action": {"share": "content?path={$params.path}", "name": "$.name"}},
-        {"type": "card", "title": "Manage", "blocks": [
-          {"type": "form",
-           "fields": [{"key": "name", "label": "Name", "kind": "text", "value": "$.name", "required": true}],
-           "submit": {"label": "Rename",
-                      "action": {"route": "rename", "body": {"path": "$params.path", "name": "$form.name"}, "then": "back"}}},
-          {"type": "button", "label": "Delete this file", "style": "danger",
-           "action": {"route": "delete", "body": {"path": "$params.path"},
-                      "confirm": "Delete this file? This cannot be undone.", "then": "back"}}
+        {"type": "actions", "blocks": [
+          {"type": "button", "label": "Open", "style": "primary",
+           "action": {"download": "content?path={$params.path}", "name": "$.name", "open": true}},
+          {"type": "button", "label": "Download", "style": "secondary",
+           "action": {"download": "content?path={$params.path}&download=1", "name": "$.name"}},
+          {"type": "button", "label": "Share", "style": "secondary",
+           "action": {"share": "content?path={$params.path}", "name": "$.name"}},
+          {"type": "dropdown", "label": "Manage", "blocks": [
+            {"type": "form",
+             "fields": [{"key": "name", "label": "Name", "kind": "text", "value": "$.name", "required": true}],
+             "submit": {"label": "Rename",
+                        "action": {"route": "rename", "body": {"path": "$params.path", "name": "$form.name"}, "then": "back"}}},
+            {"type": "button", "label": "Delete this file", "style": "danger",
+             "action": {"route": "delete", "body": {"path": "$params.path"},
+                        "confirm": "Delete this file? This cannot be undone.", "then": "back"}}
+          ]}
         ]}
       ]
     }

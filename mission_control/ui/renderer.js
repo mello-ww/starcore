@@ -789,7 +789,16 @@ export function mount(context) {
 
     /** Runs one action; true once its request (if any) succeeded. `quiet` (one item of a
      * selection) leaves notices and refreshing to the caller. */
-    async function runAction(action, scope, value, { quiet = false, update = null } = {}) {
+    // an action that succeeded closes the open dropdown, wherever it ran from (1.2, change 11)
+    async function runAction(action, scope, value, options) {
+        const done = await runActionNow(action, scope, value, options);
+        if (done) {
+            closeDropdown();
+        }
+        return done;
+    }
+
+    async function runActionNow(action, scope, value, { quiet = false, update = null } = {}) {
         if (!action) {
             return false;
         }
@@ -1140,6 +1149,95 @@ export function mount(context) {
     function text(value, scope) {
         const resolved = resolve(value, scope);
         return resolved === null || resolved === undefined ? "" : String(resolved);
+    }
+
+    // The dropdown whose panel is open (1.2, change 11): one at a time, on the page it was opened
+    // on, kept open through a redraw (a refresh of the page's data).
+    let openDropdown = null;
+    let openDropdownPage = null;
+    let releaseDropdown = null;  // hides the open panel and drops its document listeners
+    let dropdownCount = 0;
+
+    function closeDropdown() {
+        openDropdown = null;
+        openDropdownPage = null;
+        if (releaseDropdown) {
+            const release = releaseDropdown;
+            releaseDropdown = null;
+            release();
+        }
+    }
+
+    // A button of an actions row that opens a panel under itself holding its own blocks (a form,
+    // buttons). Pressing it again, pressing elsewhere or Escape closes it, and so does an action
+    // that succeeded.
+    function renderDropdown(block, scope) {
+        const holder = el("div", "ui-dropdown");
+        const style = block.style || "secondary";
+        const button = el("button", `sc-button ui-button ui-dropdown-toggle${style === "primary" ? " sc-button-accent" : ""}${style === "danger" ? " ui-button-danger" : ""}`);
+        button.type = "button";
+        button.appendChild(el("span", "", text(block.label, scope)));
+        const caret = el("span", "ui-dropdown-caret");
+        caret.setAttribute("aria-hidden", "true");
+        button.appendChild(caret);
+        const panel = el("div", "ui-dropdown-panel");
+        dropdownCount += 1;
+        panel.id = `ui-dropdown-${dropdownCount}`;
+        panel.hidden = true;
+        button.setAttribute("aria-controls", panel.id);
+        button.setAttribute("aria-expanded", "false");
+        renderBlocks(block.blocks, scope, panel);
+        holder.append(button, panel);
+        const show = (focus) => {
+            if (releaseDropdown) {
+                const release = releaseDropdown;
+                releaseDropdown = null;
+                release();
+            }
+            openDropdown = block;
+            openDropdownPage = state.page;
+            panel.hidden = false;
+            holder.classList.add("open");
+            button.setAttribute("aria-expanded", "true");
+            const outside = (event) => {
+                if (!holder.contains(event.target)) {
+                    closeDropdown();
+                }
+            };
+            const escape = (event) => {
+                if (event.key === "Escape") {
+                    event.stopPropagation();
+                    closeDropdown();
+                    button.focus();
+                }
+            };
+            document.addEventListener("pointerdown", outside, true);
+            document.addEventListener("keydown", escape, true);
+            releaseDropdown = () => {
+                panel.hidden = true;
+                holder.classList.remove("open");
+                button.setAttribute("aria-expanded", "false");
+                document.removeEventListener("pointerdown", outside, true);
+                document.removeEventListener("keydown", escape, true);
+            };
+            if (focus) {
+                const first = panel.querySelector("input, select, textarea, button");
+                if (first) {
+                    first.focus();
+                }
+            }
+        };
+        button.addEventListener("click", () => {
+            if (openDropdown === block && !panel.hidden) {
+                closeDropdown();
+            } else {
+                show(true);
+            }
+        });
+        if (openDropdown === block && openDropdownPage === state.page) {
+            show(false);
+        }
+        return holder;
     }
 
     // consecutive fields form one group, which a wide card lays out as a grid of facts
@@ -1496,6 +1594,23 @@ export function mount(context) {
             }
             return figure;
         },
+
+        // A page's actions on one line (1.2, change 11): buttons and dropdowns, wrapping where
+        // the page is narrow. With none of them shown, the row isn't drawn.
+        actions: (block, scope) => {
+            const row = el("div", "ui-actions");
+            for (const child of block.blocks || []) {
+                if (child && (child.type === "button" || child.type === "dropdown")) {
+                    const node = renderBlock(child, scope);
+                    if (node) {
+                        row.appendChild(node);
+                    }
+                }
+            }
+            return row.childElementCount ? row : null;
+        },
+
+        dropdown: (block, scope) => renderDropdown(block, scope),
 
         "media-grid": (block, scope) => gallery.render(block, scope),
 

@@ -191,6 +191,17 @@
       "offline": {"omit": ["location", "folder"]},
       "source": {"route": "gallery/albums"},
       "blocks": [
+        {"type": "actions", "blocks": [
+          {"type": "dropdown", "label": "Create album", "style": "primary", "blocks": [
+            {"type": "form",
+             "fields": [{"key": "name", "label": "Name", "kind": "text", "placeholder": "Holidays", "required": true}],
+             "submit": {"label": "Create album",
+                        "action": {"route": "albums", "body": {"name": "$form.name"}, "then": {"navigate": "album", "params": {"id": "$.id"}}}}}
+          ]},
+          {"type": "button", "label": "Recycle bin", "style": "secondary", "action": {"navigate": "trash"}},
+          {"type": "button", "label": "Phone backup", "style": "secondary", "action": {"navigate": "backup"}},
+          {"type": "button", "label": "Settings", "style": "secondary", "action": {"navigate": "settings"}}
+        ]},
         {
           "type": "media-grid",
           "id": "albums",
@@ -202,20 +213,7 @@
             {"visible": "$.section", "action": {"section": "$.section"}},
             {"action": {"navigate": "album", "params": {"id": "$.id"}}}
           ]
-        },
-        {
-          "type": "card",
-          "title": "New album",
-          "blocks": [
-            {"type": "form",
-             "fields": [{"key": "name", "label": "Name", "kind": "text", "placeholder": "Holidays", "required": true}],
-             "submit": {"label": "Create album",
-                        "action": {"route": "albums", "body": {"name": "$form.name"}, "then": {"navigate": "album", "params": {"id": "$.id"}}}}}
-          ]
-        },
-        {"type": "button", "label": "Recycle bin", "style": "secondary", "action": {"navigate": "trash"}},
-        {"type": "button", "label": "Phone backup", "style": "secondary", "action": {"navigate": "backup"}},
-        {"type": "button", "label": "Settings", "style": "secondary", "action": {"navigate": "settings"}}
+        }
       ]
     },
     "backup": {
@@ -299,9 +297,18 @@
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary"},
         {"type": "text", "style": "caption", "text": "$.description", "visible": "$.description"},
-        {"type": "button", "label": "Add photos", "style": "primary", "visible": "$.editable",
-         "action": {"pick": {"capability": "media.gallery", "multiple": true, "title": "Add to album"},
-                    "route": "albums/{$params.id}/photos", "body": {"items": "$value"}, "then": "refresh"}},
+        {"type": "actions", "visible": "$.editable", "blocks": [
+          {"type": "button", "label": "Add photos", "style": "primary",
+           "action": {"pick": {"capability": "media.gallery", "multiple": true, "title": "Add to album"},
+                      "route": "albums/{$params.id}/photos", "body": {"items": "$value"}, "then": "refresh"}},
+          {"type": "dropdown", "label": "Album", "blocks": [
+            {"type": "form",
+             "fields": [{"key": "name", "label": "Name", "kind": "text", "value": "$.name", "required": true}],
+             "submit": {"label": "Rename", "action": {"route": "albums/{$params.id}", "body": {"name": "$form.name"}, "then": "refresh"}}},
+            {"type": "button", "label": "Delete album", "style": "danger",
+             "action": {"route": "albums/{$params.id}/delete", "confirm": "Delete this album? The photos in it stay in your library.", "then": "back"}}
+          ]}
+        ]},
         {
           "type": "media-grid",
           "id": "album",
@@ -354,18 +361,6 @@
                "action": {"route": "trash/{$.id}", "confirm": "Move the selected items to the recycle bin? They can be restored from there.", "then": "refresh"}}
             ]
           }
-        },
-        {
-          "type": "card",
-          "title": "Album",
-          "visible": "$.editable",
-          "blocks": [
-            {"type": "form",
-             "fields": [{"key": "name", "label": "Name", "kind": "text", "value": "$.name", "required": true}],
-             "submit": {"label": "Rename", "action": {"route": "albums/{$params.id}", "body": {"name": "$form.name"}, "then": "refresh"}}},
-            {"type": "button", "label": "Delete album", "style": "danger",
-             "action": {"route": "albums/{$params.id}/delete", "confirm": "Delete this album? The photos in it stay in your library.", "then": "back"}}
-          ]
         }
       ]
     },

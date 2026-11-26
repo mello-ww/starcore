@@ -725,7 +725,7 @@ class _Validator:
         for index, block in enumerate(blocks):
             self.check_block(f"{where}[{index}]", block, depth)
 
-    def check_block(self, where: str, block, depth: int):
+    def check_block(self, where: str, block, depth: int, in_row: bool = False):
         if not isinstance(block, dict):
             self.error(where, "must be an object")
             return
@@ -778,6 +778,10 @@ class _Validator:
             self.check_blocks(f"{where}.blocks", block["blocks"], depth + 1)
         elif kind == "card" and "blocks" in block:
             self.error(f"{where}.blocks", "must be a list")
+        elif kind == "actions":
+            self.check_actions_row(where, block, depth)
+        elif kind == "dropdown":
+            self.check_dropdown(where, block, depth, in_row)
         elif kind == "image":
             self.check_image(where, block)
         elif kind == "media-list":
@@ -922,6 +926,43 @@ class _Validator:
             if not is_binding(items):
                 self.error(f"{where}.more", "needs `items` bound to the page's data")
             self.check_more(f"{where}.more", block["more"])
+
+    def check_actions_row(self, where: str, block: dict, depth: int):
+        """{type: actions, blocks} (1.2, change 11): a page's actions on one line, buttons and
+        dropdowns only."""
+        blocks = block.get("blocks")
+        if not isinstance(blocks, list):
+            self.error(f"{where}.blocks", "must be a list")
+            return
+        if not blocks:
+            self.error(f"{where}.blocks", "must hold at least one button or dropdown")
+        if len(blocks) > LIMITS["row_actions"]:
+            self.error(f"{where}.blocks", f"holds at most {LIMITS['row_actions']} actions")
+        if depth + 1 > LIMITS["nesting_depth"]:
+            self.error(f"{where}.blocks", f"blocks can be nested at most {LIMITS['nesting_depth']} deep")
+            return
+        for index, child in enumerate(blocks):
+            if isinstance(child, dict) and child.get("type") not in ("button", "dropdown") \
+                    and child.get("type") in BLOCKS:
+                self.error(f"{where}.blocks[{index}]", "an actions row holds buttons and dropdowns only")
+                continue
+            self.check_block(f"{where}.blocks[{index}]", child, depth + 1, in_row=True)
+
+    def check_dropdown(self, where: str, block: dict, depth: int, in_row: bool):
+        """{type: dropdown, label, blocks, style?} (1.2, change 11): a button of an actions row
+        that opens a panel under itself holding its own blocks."""
+        if not in_row:
+            self.error(where, "a dropdown sits in an actions block")
+        blocks = block.get("blocks")
+        if not isinstance(blocks, list):
+            self.error(f"{where}.blocks", "must be a list")
+            return
+        if not blocks:
+            self.error(f"{where}.blocks", "must hold at least one block")
+        for index, child in enumerate(blocks):
+            if isinstance(child, dict) and child.get("type") in ("actions", "dropdown"):
+                self.error(f"{where}.blocks[{index}]", "a dropdown holds no actions row or dropdown")
+        self.check_blocks(f"{where}.blocks", blocks, depth + 1)
 
     def check_breadcrumb(self, where: str, block: dict):
         """{type: breadcrumb, items, item: {title}, action?} (1.2): the way down to the current

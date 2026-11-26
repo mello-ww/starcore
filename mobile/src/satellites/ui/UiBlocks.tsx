@@ -1,4 +1,4 @@
-import React, {memo, useCallback, useEffect, useReducer, useRef, useState} from 'react';
+import React, {memo, useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react';
 import {ActivityIndicator, Alert, Animated, Clipboard, Image, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {Glyph, useOwnIcons} from '../../components/Glyph';
@@ -257,6 +257,10 @@ function UiBlockView({block, scope, context}: {block: UiBlock; scope: Scope; con
       return <BreadcrumbBlock block={block} scope={scope} context={context} />;
     case 'button':
       return <ButtonBlock block={block} scope={scope} context={context} />;
+    case 'actions':
+      return <ActionsBlock block={block} scope={scope} context={context} />;
+    case 'dropdown':
+      return null; // only drawn by its actions row
     case 'toggle':
       return <ToggleBlock block={block} scope={scope} context={context} />;
     case 'slider':
@@ -1128,6 +1132,80 @@ function ButtonBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
   return <PrimaryButton title={label} variant={block.style === 'primary' ? 'primary' : 'secondary'} loading={busy} onPress={press} />;
 }
 
+/** A page's actions on one line (1.2, change 11): buttons and dropdowns, wrapping where the
+ * screen is narrow. A dropdown opens its panel under the row, one at a time; pressing it again
+ * closes it, and so does an action inside it that succeeded. */
+function ActionsBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const [open, setOpen] = useState<number | null>(null);
+  const panelContext = useMemo<BlockContext>(
+    () => ({
+      ...context,
+      runAction: async (action, actionScope, value, options) => {
+        const done = await context.runAction(action, actionScope, value, options);
+        if (done) {
+          setOpen(null);
+        }
+        return done;
+      },
+    }),
+    [context],
+  );
+  const entries = (Array.isArray(block.blocks) ? block.blocks : [])
+    .map((child: UiBlock, index: number) => ({child, index}))
+    .filter(({child}: {child: UiBlock}) =>
+      (child?.type === 'button' || child?.type === 'dropdown') && isShown(child, scope, context));
+  if (entries.length === 0) {
+    return null;
+  }
+  const panel = entries.find(({child, index}: {child: UiBlock; index: number}) => index === open && child.type === 'dropdown');
+  return (
+    <View style={styles.actions}>
+      <View style={styles.actionsRow}>
+        {entries.map(({child, index}: {child: UiBlock; index: number}) =>
+          child.type === 'dropdown' ? (
+            <DropdownToggle
+              key={child.id ?? `dropdown-${index}`}
+              block={child}
+              scope={scope}
+              open={open === index}
+              onPress={() => setOpen(open === index ? null : index)}
+            />
+          ) : (
+            <ButtonBlock key={child.id ?? `button-${index}`} block={child} scope={scope} context={context} />
+          ),
+        )}
+      </View>
+      {panel && (
+        <Surface style={styles.dropdownPanel}>
+          <UiBlocks blocks={panel.child.blocks} scope={scope} context={panelContext} />
+        </Surface>
+      )}
+    </View>
+  );
+}
+
+function DropdownToggle({block, scope, open, onPress}: {block: UiBlock; scope: Scope; open: boolean; onPress: () => void}) {
+  const {color: accent, onColor} = useAccent();
+  const primary = block.style === 'primary';
+  const danger = block.style === 'danger';
+  const color = primary ? onColor : danger ? palette.danger : palette.text;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{expanded: open}}
+      onPress={onPress}
+      style={({pressed}) => [
+        styles.dropdownToggle,
+        primary ? {backgroundColor: accent} : danger ? styles.dropdownDanger : null,
+        open && !primary && {borderColor: accent},
+        pressed && styles.pressed,
+      ]}>
+      <Text style={[styles.dropdownLabel, {color}]}>{asText(resolve(block.label, scope))}</Text>
+      <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} color={color} />
+    </Pressable>
+  );
+}
+
 function ToggleBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
   const bound = Boolean(resolve(block.value, scope));
   const [value, setValue] = useState(bound);
@@ -1764,6 +1842,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(238, 68, 75, 0.14)',
   },
   dangerLabel: {fontSize: 16, fontWeight: '700', color: palette.danger},
+  actions: {gap: space.md},
+  actionsRow: {flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: space.sm},
+  dropdownToggle: {
+    minHeight: 48,
+    borderRadius: radii.control,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.xs,
+    paddingHorizontal: space.lg,
+    backgroundColor: palette.controlStrong,
+  },
+  dropdownDanger: {backgroundColor: 'rgba(238, 68, 75, 0.14)'},
+  dropdownLabel: {fontSize: 16, fontWeight: '700'},
+  dropdownPanel: {gap: space.md},
   form: {gap: space.md},
   inputField: {gap: space.xs},
   input: {

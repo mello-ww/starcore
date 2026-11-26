@@ -254,6 +254,8 @@ Locked Folder). `status` never extends it.
 | `card` | `blocks` | `title` | a group of blocks (nested at most 4 deep) |
 | `list` | `items`, `item` | `empty`, `action`, `more` (1.2) | rows from an array; `item` maps `title`, `subtitle`, `value`, `icon` and `format` (`{subtitle, value}`) for each one; `more` loads a long list page by page, as a media-grid's does (see "Paging a list" below) |
 | `button` | `label`, `action` | `style`: `primary`, `secondary`, `danger` | runs an action |
+| `actions` (1.2) | `blocks` | | a page's actions on one row: up to 8 `button` and `dropdown` blocks, wrapping where the screen is narrow - see [An actions row](#an-actions-row) |
+| `dropdown` (1.2) | `label`, `blocks` | `style` | a button of an `actions` row that opens a panel of blocks under it (a form, a few buttons); only allowed in an `actions` row |
 | `toggle` | `label`, `value`, `action` | `description` | an on/off switch; the action gets the new value as `$value` |
 | `slider` | `label`, `value`, `min`, `max`, `action` | `step`, `format`, `unit` | a range; the action runs once, on release, with `$value` |
 | `form` | `fields`, `submit` | | inputs (`text`, `number`, `select`, `toggle`, and `rows` (1.2), see "Repeatable rows" below) and a submit action that gets them as `$form` |
@@ -552,6 +554,32 @@ one - so only the lines near the screen are mounted however many rows have loade
 list loads its next page as its own end nears the screen, as on the web. A paged list inside a
 card stays in the page's own scrolling. A provider still keeps its pages small (a few hundred
 rows), as each is one request.
+
+### An actions row
+
+`actions` (1.2, change 11) puts a page's actions on one line, as a header row: going up,
+uploading, creating, managing. It holds only `button` and `dropdown` blocks, at most 8
+(`row_actions`), and wraps where the screen is narrow; a row none of whose actions is shown is
+not drawn. An action that needs no input is a `button`. One that needs a field or a choice
+first is a `dropdown`: a button with a caret that opens a panel under the row, holding any
+blocks but another `actions` row or `dropdown` (a form, a confirmation button, a short text).
+
+```json
+{"type": "actions", "blocks": [
+  {"type": "button", "label": "Up", "visible": "$.parent", "action": {"navigate": "folder", "params": {"path": "$.parent"}}},
+  {"type": "dropdown", "label": "New folder", "blocks": [
+    {"type": "form", "fields": [{"key": "name", "label": "Name", "kind": "text", "required": true}],
+     "submit": {"label": "Create folder", "action": {"route": "mkdir", "body": {"name": "$form.name"}, "then": "refresh"}}}
+  ]}
+]}
+```
+
+Both clients open one panel at a time. Pressing its button again closes it, and so does an
+action inside it that succeeded; one that failed leaves it open with its error. Mission Control
+draws the panel as a floating card under its button, focuses its first field, and also closes
+it on Escape or a press outside it; the panel stays open across a refresh of the page. Android
+draws it as a card under the row, in the page's own scrolling. The button carries the
+expanded state for assistive technology on both.
 
 ## Going back to a page
 

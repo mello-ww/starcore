@@ -259,6 +259,9 @@ describe('File Explorer, drawn from its ui.json by the shared screen', () => {
     it('creates a folder in the one shown, then reloads it', async () => {
       __mocks.act.mockResolvedValue({name: 'New', path: '/home/demo/New'});
       const {tree} = await mount(folderRoute);
+      // the name is asked in the New folder dropdown of the page's actions row
+      expect(tree.root.findAllByType(TextInput)).toEqual([]);
+      await press(tree, 'New folder');
       await act(async () => {
         tree.root.findAllByType(TextInput)[0].props.onChangeText('New');
       });
@@ -269,6 +272,7 @@ describe('File Explorer, drawn from its ui.json by the shared screen', () => {
     it('renames a file, then goes back to its folder', async () => {
       __mocks.act.mockResolvedValue({name: 'renamed.txt', path: '/home/demo/renamed.txt', folder: '/home/demo'});
       const {tree, navigation} = await mount(fileRoute);
+      await press(tree, 'Manage');
       const input = tree.root.findAllByType(TextInput)[0];
       expect(input.props.value).toBe('notes.txt');
       await act(async () => {
@@ -285,6 +289,7 @@ describe('File Explorer, drawn from its ui.json by the shared screen', () => {
         buttons?.find(button => button.style === 'cancel')?.onPress?.();
       });
       const {tree, navigation} = await mount(fileRoute);
+      await press(tree, 'Manage');
       await press(tree, 'Delete this file');
       expect(alert).toHaveBeenCalledWith(expect.stringContaining('cannot be undone'), undefined, expect.any(Array), expect.any(Object));
       expect(__mocks.act).not.toHaveBeenCalled();
@@ -301,9 +306,8 @@ describe('File Explorer, drawn from its ui.json by the shared screen', () => {
       __mocks.read.mockResolvedValue({...FOLDER, path: '/', name: '/', parent: null, at_drive_root: true});
       const {tree} = await mount({params: {...folderRoute.params, params: {path: '/'}}});
       const shown = texts(tree);
-      expect(shown).toContain('Create folder');
-      expect(shown).not.toContain('Rename');
-      expect(shown).not.toContain('Delete this folder');
+      expect(shown).toContain('New folder');
+      expect(shown).not.toContain('This folder');
     });
   });
 
@@ -382,8 +386,9 @@ describe('File Explorer, drawn from its ui.json by the shared screen', () => {
   it('goes back to the locations from a drive root', async () => {
     __mocks.read.mockResolvedValue({...FOLDER, path: '/', name: '/', parent: null, at_drive_root: true});
     const {tree} = await mount({params: {name: 'FileExplorer', page: 'folder', params: {path: '/'}, revision: 'rev1'}});
+    // called Up too: the same way out as from any other folder
     const shown = texts(tree);
-    expect(shown).toContain('All locations');
-    expect(shown).not.toContain('Up');
+    expect(shown).toContain('Up');
+    expect(shown).not.toContain('All locations');
   });
 });
