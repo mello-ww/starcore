@@ -1360,7 +1360,9 @@ function RowsField({field, rows, onChange, context}: {field: any; rows: any; onC
 function SelectField({field, label, value, onChange}: {field: any; label: string; value: any; onChange: (value: any) => void}) {
   const {onColor} = useAccent();
   const options: any[] = field.options ?? [];
-  const {indicator, onItemLayout, selectedBackground} = useSlidingSelection(options.findIndex(option => option.value === value));
+  const {indicator, onItemLayout, selectedBackground} = useSlidingSelection(options.findIndex(option => option.value === value), {
+    track: palette.control,
+  });
   return (
     <View style={styles.inputField}>
       <Text style={styles.label}>{label}</Text>
@@ -1375,7 +1377,7 @@ function SelectField({field, label, value, onChange}: {field: any; label: string
               accessibilityState={{selected}}
               onPress={() => onChange(option.value)}
               onLayout={onItemLayout(index)}
-              style={[styles.option, selectedBackground(selected)]}>
+              style={[styles.option, selectedBackground(selected, index)]}>
               <Text style={[styles.optionLabel, selected && {color: onColor}]}>{asText(option.label)}</Text>
             </Pressable>
           );

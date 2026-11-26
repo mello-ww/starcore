@@ -45,10 +45,20 @@ export function useReducedMotion(): boolean {
  * A row that is drawn again when its selection changes (a page that reloads, another page of
  * the same document) passes `remember`, a key naming the row: the indicator then starts where
  * that row last had it and slides from there.
+ *
+ * A row whose options have a background of their own passes it as `track`, and each option
+ * passes its index to `selectedBackground`: the row then draws those backgrounds itself, under
+ * the indicator, so the accent stays in sight while it passes the other options instead of
+ * slipping behind them.
  */
 export function useSlidingSelection(
   selected: number,
-  {radius = 999, style, remember}: {radius?: number; style?: StyleProp<ViewStyle>; remember?: string} = {},
+  {
+    radius = 999,
+    style,
+    remember,
+    track,
+  }: {radius?: number; style?: StyleProp<ViewStyle>; remember?: string; track?: string} = {},
 ) {
   const {color: accent} = useAccent();
   const reduced = useReducedMotion();
@@ -65,6 +75,8 @@ export function useSlidingSelection(
   const placedRef = useRef(false);
   const shown = useRef<Place | null>(null);
   const moving = useRef(false);
+  // the options' frames as drawn, for the track under the indicator
+  const [laid, setLaid] = useState<Record<number, LayoutRectangle>>({});
 
   const place = useCallback(
     (animated: boolean) => {
@@ -130,17 +142,26 @@ export function useSlidingSelection(
 
   const onItemLayout = useCallback(
     (index: number) => (event: LayoutChangeEvent) => {
-      frames.current[index] = event.nativeEvent.layout;
+      const frame = event.nativeEvent.layout;
+      frames.current[index] = frame;
+      if (track) {
+        setLaid(previous => {
+          const known = previous[index];
+          const same =
+            known && known.x === frame.x && known.y === frame.y && known.width === frame.width && known.height === frame.height;
+          return same ? previous : {...previous, [index]: frame};
+        });
+      }
       if (index === current.current) {
         // the option picked often changes size as it is drawn selected: a move under way
         // heads for its new frame instead of jumping there
         place(moving.current);
       }
     },
-    [place],
+    [place, track],
   );
 
-  const indicator = (
+  const pill = (
     <Animated.View
       pointerEvents="none"
       style={{
@@ -159,8 +180,38 @@ export function useSlidingSelection(
       />
     </Animated.View>
   );
-  const selectedBackground = (active: boolean): ViewStyle | null =>
-    active ? {backgroundColor: placed ? 'transparent' : accent} : null;
+  const indicator = track ? (
+    <>
+      {Object.entries(laid).map(([index, frame]) => (
+        <Animated.View
+          key={`track-${index}`}
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: frame.x,
+            top: frame.y,
+            width: frame.width,
+            height: frame.height,
+            borderRadius: radius,
+            backgroundColor: track,
+          }}
+        />
+      ))}
+      {pill}
+    </>
+  ) : (
+    pill
+  );
+  // an option paints its own background until the row draws it (the indicator, the track)
+  const selectedBackground = (active: boolean, index?: number): ViewStyle | null => {
+    if (active) {
+      return {backgroundColor: placed ? 'transparent' : accent};
+    }
+    if (!track || index === undefined) {
+      return null;
+    }
+    return {backgroundColor: laid[index] ? 'transparent' : track};
+  };
   return {indicator, onItemLayout, selectedBackground};
 }
 

@@ -7,8 +7,8 @@ type Tree = ReturnType<typeof renderer.create>;
 
 // the shared motion: an accent that slides between a row's options, and a panel that appears
 
-function Row({selected, remember}: {selected: number; remember?: string}) {
-  const {indicator, onItemLayout, selectedBackground} = useSlidingSelection(selected, {remember});
+function Row({selected, remember, track}: {selected: number; remember?: string; track?: string}) {
+  const {indicator, onItemLayout, selectedBackground} = useSlidingSelection(selected, {remember, track});
   return (
     <View>
       {indicator}
@@ -17,7 +17,7 @@ function Row({selected, remember}: {selected: number; remember?: string}) {
           key={key}
           testID={`item-${key}`}
           onLayout={onItemLayout(index)}
-          style={selectedBackground(index === selected)}>
+          style={selectedBackground(index === selected, track ? index : undefined)}>
           <Text>{key}</Text>
         </Pressable>
       ))}
@@ -95,6 +95,22 @@ describe('the sliding selection', () => {
     await act(async () => layOut(tree));
     expect(background()).toBe('transparent');
     expect(tree.root.findByProps({testID: 'item-a'}).props.style).toBeNull();
+  });
+
+  it("draws the options' own backgrounds under the indicator when given a track", async () => {
+    let tree!: Tree;
+    await act(async () => {
+      tree = renderer.create(<Row selected={1} track="#222" />);
+    });
+    const background = (key: string) => StyleSheet.flatten(tree.root.findByProps({testID: `item-${key}`}).props.style)?.backgroundColor;
+    // until the row knows where an option is, the option paints its own background
+    expect(background('a')).toBe('#222');
+    await act(async () => layOut(tree));
+    expect(background('a')).toBe('transparent');
+    // the track sits under the indicator: three backgrounds drawn by the row, then the pill
+    const row = tree.root.findByType(View);
+    const drawn = row.props.children[0];
+    expect(drawn.props.children[0]).toHaveLength(3);
   });
 });
 

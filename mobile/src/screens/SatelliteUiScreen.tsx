@@ -1146,6 +1146,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   // (the row is drawn again on each page, so it remembers where the accent was for this document)
   const tabSlide = useSlidingSelection(topLevel ? navigationItems.findIndex(item => item.page === pageId) : -1, {
     remember: `page-tabs:${name}`,
+    track: palette.control,
   });
 
   if (fatal) {
@@ -1263,7 +1264,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
                   onPress={() => go(item.page)}
                   testID={`ui-tab-${item.page}`}
                   onLayout={tabSlide.onItemLayout(index)}
-                  style={[styles.tab, tabSlide.selectedBackground(active)]}>
+                  style={[styles.tab, tabSlide.selectedBackground(active, index)]}>
                   {isIconName(item.icon, document.icons ?? null) && (
                     <Glyph name={item.icon} size={15} color={active ? onColor : palette.text2} />
                   )}

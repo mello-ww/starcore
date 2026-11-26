@@ -19,7 +19,9 @@ export function PillTabs<K extends string>({
   testIDPrefix?: string;
 }) {
   const {onColor: onAccent} = useAccent();
-  const {indicator, onItemLayout, selectedBackground} = useSlidingSelection(items.findIndex(item => item.key === selected));
+  const {indicator, onItemLayout, selectedBackground} = useSlidingSelection(items.findIndex(item => item.key === selected), {
+    track: palette.control,
+  });
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
       {indicator}
@@ -33,7 +35,7 @@ export function PillTabs<K extends string>({
             accessibilityState={{selected: active}}
             testID={`${testIDPrefix}-${item.key}`}
             onLayout={onItemLayout(index)}
-            style={({pressed}) => [styles.tab, selectedBackground(active), pressed && !active && styles.pressed]}>
+            style={({pressed}) => [styles.tab, selectedBackground(active, index), pressed && !active && styles.pressed]}>
             <Text style={[styles.label, active && {color: onAccent}]}>{item.label}</Text>
           </Pressable>
         );
