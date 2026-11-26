@@ -7,6 +7,9 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Music's "Transcodes at once" and density settings take effect.** The transcoder now runs as
+  many conversions at once as the setting says (it always ran two), and Mission Control's
+  player turns compact when Appearance says so (it set an attribute nothing read).
 - **File Explorer says plainly when the server refuses a change.** Creating, renaming,
   deleting, uploading or replacing where StarCore's account has no permission answers "StarCore
   isn't allowed to … 'X'. Its account on the server needs permission there." instead of a raw

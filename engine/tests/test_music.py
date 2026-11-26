@@ -119,6 +119,16 @@ class MusicLibraryTest(unittest.TestCase):
         self.assertEqual(self.library.summary()["tracks"], 0)
         self.assertIsNone(self.library.summary()["last_scan"])
 
+    def test_the_transcoder_follows_the_configuration(self):
+        self.library.configure({"ffmpeg": "/opt/ffmpeg", "transcode_workers": 4, "transcode_cache_mb": 128})
+        self.assertEqual(self.library.transcoder.binary, "/opt/ffmpeg")
+        self.assertEqual(self.library.transcoder.workers, 4)
+        self.assertEqual(self.library.transcoder.cache_bytes, 128 * 1024 * 1024)
+        # four transcodes can run at once, not a fifth
+        slots = self.library.transcoder._slots
+        self.assertTrue(all(slots.acquire(blocking=False) for _ in range(4)))
+        self.assertFalse(slots.acquire(blocking=False))
+
     def test_scanning_indexes_audio_files(self):
         self.write("one.flac", flac())
         self.write("two.wav", wav())

@@ -33,9 +33,23 @@ class Transcoder:
         self.cache_dir = Path(cache_dir)
         self.binary = binary or "ffmpeg"
         self.cache_bytes = max(int(cache_mb or 0), 64) * 1024 * 1024
-        self._slots = BoundedSemaphore(max(int(workers or 1), 1))
+        self._workers = max(int(workers or 1), 1)
+        self._slots = BoundedSemaphore(self._workers)
         self._locks = {}
         self._locks_guard = Lock()
+
+    @property
+    def workers(self) -> int:
+        """How many transcodes run at once; the rest wait their turn."""
+        return self._workers
+
+    @workers.setter
+    def workers(self, count):
+        count = max(int(count or 1), 1)
+        if count != self._workers:
+            # transcodes already running release the slots they took, not the new ones
+            self._workers = count
+            self._slots = BoundedSemaphore(count)
 
     @property
     def executable(self):
@@ -77,12 +91,13 @@ class Transcoder:
             if target.is_file():
                 os.utime(target)
                 return target
-            if not self._slots.acquire(timeout=60):
+            slots = self._slots
+            if not slots.acquire(timeout=60):
                 raise TranscodeError("the server is busy transcoding; try again shortly")
             try:
                 self._run(Path(track_row["path"]), target, plan)
             finally:
-                self._slots.release()
+                slots.release()
         self._evict(keep=target)
         return target
 

@@ -34,7 +34,7 @@ export function apply() {
     const density = session.preference("density", "comfortable");
     for (const node of themed) {
         node.dataset.plTheme = theme;
-        node.dataset.muDensity = density;
+        node.dataset.plDensity = density;
     }
     const mode = accentMode();
     setColour("--pl-accent", "--pl-on-accent", mode.startsWith("#") ? hexToRgb(mode) : null);

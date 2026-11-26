@@ -355,7 +355,17 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 - [x] Its sidebar on Mission Control, as its own page had: a document picks `layout: "sidebar"`
       or the default `"tabs"` (contract change 13), both kept as templates for every
       Satellite. File Explorer and Photos keep the tabs.
-- [ ] A check-up of the settings that are listed but not programmed yet.
+- [x] A check-up of the settings that are listed but not programmed yet. Every setting on
+      the Settings page was traced to the code that reads it. Two did nothing and now work:
+      "Transcodes at once" (`transcode_workers`, never handed to the transcoder) and the
+      Appearance density on Mission Control (`theme.js` set the wrong attribute). The server
+      and Mission Control read all the others. The Android app still ignores a few, listed
+      next.
+- [ ] Music's playback settings the Android app does not apply yet (native audio work in
+      `mobile/src/media/`): gapless playback and crossfade (one player today, so the next
+      track is not lined up), Normalize volume (Mission Control runs a compressor), and the
+      Appearance card's player theme, density, visualizer and accent (Mission Control's player
+      only). Either implement them in the AudioHost or let the page hide them on Android.
 - [ ] Search: a grey bar under the search field. Find whether it is Music's `ui.json` or the
       shared search block, and fix it where it lives.
 

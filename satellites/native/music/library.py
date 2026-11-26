@@ -106,6 +106,7 @@ class MusicLibrary:
         }
         self.transcoder.binary = str(config.get("ffmpeg", "ffmpeg") or "ffmpeg")
         self.transcoder.cache_bytes = max(int(config.get("transcode_cache_mb", 2048) or 64), 64) * 1024 * 1024
+        self.transcoder.workers = config.get("transcode_workers", 2)
 
     def close(self):
         self.db.close()
