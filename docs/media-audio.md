@@ -692,6 +692,23 @@ review of what a document can make the host do (only its own provider, only its 
 Then `preview` goes: the document is the default, and the own interface moves to Developer
 Mode on both clients. The owner validates it on the web and the phone.
 
+*Run so far (26 Nov 2026), on the isolated demo engine (its own checkout and data directory, a
+generated library of 30 tagged FLAC files, a generated account), with the release build on an
+emulator with no screen lock (Android 17, 16 KB pages):*
+- Web: the shared interface draws Home, an album plays in the shared player, and the Download
+  button, the menu's Download and Your Library's Downloads are hidden.
+- Android: Your Library shows Downloads. On an album, Download says "Downloading 6 songs.",
+  then Downloaded, and each row shows its mark. A track's menu says Remove download. The
+  Downloads screen lists the 6 kept songs (3.4 MB, Wi-Fi only, original quality). In airplane
+  mode, with the engine out of reach, Play all plays them from the phone.
+- Review of what a document can make the host do: `play`, `offline`, `sync`, `reloads` and the
+  player's `audio` reach only the document's own Satellite, while it is the provider of the
+  capability, and only its own routes (`isSafeRoute`). Tracks are resolved by id through the
+  provider, never from a URL in the data. One fix: following an `offline` route's `cursor` had no
+  bound, so a route answering a cursor forever kept the app asking. It now stops after 100 pages
+  or a repeated cursor (in A7's commit).
+- Still to do: removing `preview`, and the owner's validation on the web and the phone.
+
 **A10 - remove Music's own interface** (after the owner's validation):
 - `satellites/native/music/mission_control/` (`page.js`, `page.css`, `views/`, `ui/`,
   `styles/`, `api.js`, `store.js`, `router.js`): the Satellite publishes no page.
