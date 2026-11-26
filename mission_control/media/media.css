@@ -63,6 +63,11 @@ body.pl-has-bar .main {
     padding-bottom: calc(var(--pl-bar-height) + var(--pl-bar-inset) * 2);
 }
 
+/* a page's toast rises above the floating player instead of passing under it */
+body.pl-has-bar .ui-notice-slot {
+    bottom: calc(var(--pl-bar-height) + var(--pl-bar-inset) * 2 + 12px);
+}
+
 /* StarCore's rounded language for the player's controls: rows and menus soften, fields and
    selects become pills, small badges round off. Artwork keeps its own corners. */
 .pl-track,

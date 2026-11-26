@@ -7,6 +7,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **File Explorer says plainly when the server refuses a change.** Creating, renaming,
+  deleting, uploading or replacing where StarCore's account has no permission answers "StarCore
+  isn't allowed to … 'X'. Its account on the server needs permission there." instead of a raw
+  "permission denied". On Mission Control a page's toast now rises above the floating player
+  and wraps a long sentence instead of passing under it.
+- **File Explorer names the well-known file types.** A file's Type reads "Windows application",
+  "PDF document", "FLAC audio" and so on for about 150 common extensions, instead of "EXE file".
 - **The main tabs slide like a launcher's home screens.** On Android the tabs are pages side by
   side (`navigation/PagerTabs.tsx`): a sideways swipe drags them with the finger and lets go
   onto the neighbour or back, and a press in the bar slides the next one in. On Mission Control

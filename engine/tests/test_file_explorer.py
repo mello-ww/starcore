@@ -439,6 +439,40 @@ class FileExplorerApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body, content)
 
+    # ---------- a change the system refuses ----------
+
+    def test_a_refused_change_says_so_in_a_sentence(self):
+        # provoked by mock: POSIX bits do not refuse root, nor anyone on Windows
+        from pathlib import Path
+        from unittest.mock import patch
+        (self.directory / "kept.txt").write_text("x", encoding="utf-8")
+        refused = PermissionError(13, "Permission denied")
+        attempts = (
+            ("mkdir", "create a folder in", lambda: self.json_request(
+                self.base("mkdir"), method="POST", payload={"path": str(self.directory), "name": "new"})),
+            ("rename", "rename 'kept.txt'", lambda: self.json_request(
+                self.base("rename"), method="POST",
+                payload={"path": str(self.directory / "kept.txt"), "name": "other.txt"})),
+            ("unlink", "delete 'kept.txt'", lambda: self.json_request(
+                self.base("delete"), method="POST", payload={"path": str(self.directory / "kept.txt")})),
+        )
+        for method, words, attempt in attempts:
+            with self.subTest(method), patch.object(Path, method, side_effect=refused):
+                status, payload = attempt()
+                self.assertEqual(status, 403)
+                self.assertIn(f"StarCore isn't allowed to {words}", payload["error"])
+                self.assertNotIn("permission denied", payload["error"])
+        with patch("builtins.open", side_effect=refused):
+            status, _, body = self.request(
+                self.with_path("upload", self.directory, name="new.txt"), method="POST", raw=b"data")
+        self.assertEqual(status, 403)
+        self.assertIn(b"isn't allowed to upload into", body)
+        with patch.object(Path, "replace", side_effect=refused):
+            status, _, body = self.request(
+                self.with_path("upload", self.directory, name="locked.txt"), method="POST", raw=b"data")
+        self.assertEqual(status, 403)
+        self.assertIn(b"isn't allowed to replace 'locked.txt'", body)
+
     # ---------- upload ----------
 
     def test_a_file_can_be_uploaded(self):

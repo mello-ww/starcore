@@ -753,7 +753,9 @@ button.ui-list-row:hover {
     color: var(--sc-text);
     font: 500 13px/1.4 var(--sc-font-sans);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-    white-space: nowrap;
+    width: max-content;
+    max-width: min(560px, calc(100vw - 32px));
+    text-align: center;
 }
 
 .ui-toast-error {

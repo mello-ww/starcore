@@ -48,6 +48,15 @@ def routes() -> dict:
     }
 
 
+def _refused(what: str, path: Path):
+    """The answer when the system refuses StarCore a change or a read: a sentence a person can
+    act on, naming the place by its name, not a raw "permission denied"."""
+    place = path.name or str(path)
+    return error_response(
+        f"StarCore isn't allowed to {what} '{place}'. Its account on the server needs permission "
+        "there.", status=403)
+
+
 def _stat(path: Path):
     """path.stat(), reported as (status, error_response) - never raises, and
     never masks a permission problem as a plain 'not found' the way
@@ -59,7 +68,7 @@ def _stat(path: Path):
     except NotADirectoryError:
         return None, error_response("a component of that path is not a directory", status=400)
     except PermissionError:
-        return None, error_response(f"permission denied: {path}", status=403)
+        return None, _refused("open", path)
     except OSError as error:
         return None, error_response(f"the path could not be accessed ({error})", status=500)
 
@@ -214,7 +223,7 @@ def _scan_directory(request, raw_path):
         with os.scandir(target) as found:
             listing = list(found)
     except PermissionError:
-        return None, None, None, error_response(f"permission denied: {target}", status=403)
+        return None, None, None, _refused("read the folder", target)
     except OSError as error:
         return None, None, None, error_response(f"the directory could not be read ({error})", status=500)
 
@@ -418,7 +427,7 @@ def upload(request):
                 remaining -= len(chunk)
     except PermissionError:
         partial.unlink(missing_ok=True)
-        return error_response(f"permission denied: {directory}", status=403)
+        return _refused("upload into", directory)
     except OSError as error:
         partial.unlink(missing_ok=True)
         return error_response(f"the upload could not be written ({error})", status=500)
@@ -428,6 +437,10 @@ def upload(request):
 
     try:
         partial.replace(destination)
+    except PermissionError:
+        # the folder takes new files but the one being replaced is locked or read-only
+        partial.unlink(missing_ok=True)
+        return _refused("replace", destination)
     except OSError as error:
         partial.unlink(missing_ok=True)
         return error_response(f"the upload could not be finalized ({error})", status=500)
@@ -468,7 +481,7 @@ def mkdir(request):
     try:
         target.mkdir()
     except PermissionError:
-        return error_response(f"permission denied: {directory}", status=403)
+        return _refused("create a folder in", directory)
     except FileExistsError:
         return error_response(f"'{name}' already exists", status=409)
     except OSError as error:
@@ -506,7 +519,7 @@ def rename(request):
     try:
         source.rename(destination)
     except PermissionError:
-        return error_response(f"permission denied: {source}", status=403)
+        return _refused("rename", source)
     except OSError as error:
         return error_response(f"could not rename ({error})", status=500)
 
@@ -545,7 +558,7 @@ def delete(request):
         else:
             target.unlink()
     except PermissionError:
-        return error_response(f"permission denied: {target}", status=403)
+        return _refused("delete", target)
     except OSError as error:
         return error_response(f"could not delete ({error})", status=500)
 

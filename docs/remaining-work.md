@@ -341,8 +341,11 @@ mechanisms first, since several Satellites use them, then each Satellite's items
       field opening their own drop-down (above); a file's page too (open, download, share,
       and Manage for the rename and delete).
 - [x] "All locations" is called "Up" too when the folder is a drive's root.
-- [ ] A graceful error when the server refuses a change for lack of permission (create,
-      rename, delete, upload), checked on both clients.
+- [x] A graceful error when the server refuses a change for lack of permission (create,
+      rename, delete, upload), checked on both clients. Done in its `api.py` (`_refused`): a 403
+      whose sentence names the place ("StarCore isn't allowed to create a folder in 'X'. Its
+      account on the server needs permission there."), shown as each client's error toast; on
+      Mission Control the toast now rises above the floating player and wraps.
 - [x] On the web only (Mission Control): drop the back button beside the folder name, since
       "up" exists. Done with the page key `back: false` (contract change 12).
 
