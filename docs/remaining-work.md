@@ -302,8 +302,10 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 - [x] **Page width.** On a 1080p screen the web interface stopped at about two thirds of the
       page. Every shared page now uses the whole view, whatever its template (the 880 px
       reading width and the 1400 px cap on every view are gone).
-- [ ] **Accent colour** on the shared controls that still lack it (selected and active states),
-      on both clients.
+- [x] **Accent colour** on the shared controls that still lack it (selected and active states),
+      on both clients: the breadcrumb's current place, a focused field's frame, caret and
+      selection (the app's shared `StarInput`), and a selected option's label on a custom
+      accent.
 - [x] **A header row of actions, each with its own drop-down.** Every action of the page sits
       on one line above the content, instead of a column. An action that needs a text field or
       buttons (a name, a choice) opens a drop-down under the button that was pressed, holding

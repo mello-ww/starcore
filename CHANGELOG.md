@@ -7,6 +7,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **The accent on the shared controls' remaining selected and active states.** The
+  breadcrumb's current place, on both clients; on Android a focused field's frame, caret and
+  selection (`StarInput`, used by forms, the choose sheet and the secret prompt) and a selected
+  option's label on a light or dark custom accent; on the web a field's caret and selection.
 - **A page can say it carries its own way out (UI contract 1.2, contract change 12).** With
   `back: false`, Mission Control draws no Back beside a detail page's title; the Android app
   keeps its own back. File Explorer's folder page uses it, since its Up is in its actions row.

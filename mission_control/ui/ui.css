@@ -525,6 +525,17 @@ button.ui-list-row:hover {
     font: 400 14px/1 var(--sc-font-sans);
 }
 
+/* a field's caret and selection take the accent, as in the app */
+.ui-input,
+.ui-search-input {
+    caret-color: var(--sc-accent);
+}
+
+.ui-input::selection,
+.ui-search-input::selection {
+    background: color-mix(in srgb, var(--sc-accent) 40%, transparent);
+}
+
 .ui-form-error {
     margin: 0;
     color: var(--sc-danger);
@@ -2352,9 +2363,11 @@ button.ui-breadcrumb-item:focus-visible {
     outline-offset: 1px;
 }
 
+/* where the person is: the accent, as every selected state */
 .ui-breadcrumb-here {
     background: var(--sc-card);
-    color: var(--sc-text);
+    color: var(--sc-accent);
+    font-weight: 700;
 }
 
 .ui-breadcrumb-sep {

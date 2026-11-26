@@ -5,6 +5,7 @@ import {Glyph, useOwnIcons} from '../../components/Glyph';
 import {Bars, ChartScale, ColumnChart, Meter, Sparkline} from '../../components/charts';
 import {PrimaryButton} from '../../components/PrimaryButton';
 import {Slider} from '../../components/Slider';
+import {StarInput, useInputAccent} from '../../components/StarInput';
 import {StarSwitch} from '../../components/StarSwitch';
 import {Surface} from '../../components/Surface';
 import {TOUCH_TARGET, tokens, useAccent} from '../../theme';
@@ -450,6 +451,7 @@ export function ListFooter({status, scope, onMore}: {status: ListPagingStatus; s
  * entry but the last runs the block's action; the last is where the person is, and the row
  * starts scrolled to it when the trail is longer than the screen. */
 function BreadcrumbBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const {color: accent} = useAccent();
   const scroller = useRef<ScrollView>(null);
   const items = Array.isArray(block.items) ? block.items : resolve(block.items, scope);
   const trail: any[] = Array.isArray(items) ? items : [];
@@ -476,7 +478,7 @@ function BreadcrumbBlock({block, scope, context}: {block: UiBlock; scope: Scope;
               accessibilityLabel={title}
               accessibilityState={{selected: last}}
               style={({pressed}) => [styles.crumb, last && styles.crumbHere, pressed && {opacity: 0.7}]}>
-              <Text style={[styles.crumbLabel, last && {color: palette.text}]} numberOfLines={1}>{title}</Text>
+              <Text style={[styles.crumbLabel, last && {color: accent, fontWeight: '700'}]} numberOfLines={1}>{title}</Text>
             </Pressable>
           </React.Fragment>
         );
@@ -1352,7 +1354,7 @@ function RowsField({field, rows, onChange, context}: {field: any; rows: any; onC
 }
 
 function FormField({field, value, onChange, context}: {field: any; value: any; onChange: (value: any) => void; context: BlockContext}) {
-  const {color: accent} = useAccent();
+  const {color: accent, onColor} = useAccent();
   const label = `${asText(field.label)}${field.required ? ' *' : ''}`;
   if (field.kind === 'toggle') {
     return (
@@ -1376,7 +1378,7 @@ function FormField({field, value, onChange, context}: {field: any; value: any; o
                 accessibilityState={{selected}}
                 onPress={() => onChange(option.value)}
                 style={[styles.option, selected && {backgroundColor: accent}]}>
-                <Text style={[styles.optionLabel, selected && {color: palette.onAccent}]}>{asText(option.label)}</Text>
+                <Text style={[styles.optionLabel, selected && {color: onColor}]}>{asText(option.label)}</Text>
               </Pressable>
             );
           })}
@@ -1388,7 +1390,7 @@ function FormField({field, value, onChange, context}: {field: any; value: any; o
   return (
     <View style={styles.inputField}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
+      <StarInput
         accessibilityLabel={asText(field.label)}
         style={styles.input}
         value={value === null || value === undefined ? '' : String(value)}
@@ -1605,6 +1607,7 @@ const SEARCH_PAUSE = 300;
 
 function SearchBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
   const {color: accent} = useAccent();
+  const inputAccent = useInputAccent();
   const current = context.pageState?.[block.key];
   const [text, setText] = useState(typeof current === 'string' ? current : '');
   const [focused, setFocused] = useState(false);
@@ -1625,8 +1628,9 @@ function SearchBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
   const placeholder = block.placeholder !== undefined ? asText(resolve(block.placeholder, scope)) : label || 'Search';
   return (
     <View style={[styles.search, focused && {borderColor: accent}]}>
-      <Icon name="search" size={18} color={palette.text3} />
+      <Icon name="search" size={18} color={focused ? accent : palette.text3} />
       <TextInput
+        {...inputAccent}
         value={text}
         onChangeText={value => {
           setText(value);

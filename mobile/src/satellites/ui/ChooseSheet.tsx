@@ -1,8 +1,9 @@
 import React, {useState} from 'react';
-import {Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
+import {Image, Modal, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {Glyph} from '../../components/Glyph';
 import {ModalSafeArea} from '../../components/ModalSafeArea';
 import {PrimaryButton} from '../../components/PrimaryButton';
+import {StarInput} from '../../components/StarInput';
 import {TOUCH_TARGET, tokens} from '../../theme';
 import type {ChooseAnswer, ChooseOffer} from './choose';
 import {Sheet} from './RowMenu';
@@ -55,7 +56,7 @@ export function ChooseSheet({
             )}
             {offer.create && naming && (
               <View style={styles.form}>
-                <TextInput
+                <StarInput
                   value={name}
                   onChangeText={setName}
                   onSubmitEditing={create}

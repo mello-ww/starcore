@@ -1,8 +1,9 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Clipboard, Modal, ScrollView, StyleSheet, Text, TextInput, View} from 'react-native';
+import {Clipboard, Modal, ScrollView, StyleSheet, Text, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {PrimaryButton} from '../../components/PrimaryButton';
 import {SecureWindow} from '../../components/SecureWindow';
+import {StarInput} from '../../components/StarInput';
 import {StarSwitch} from '../../components/StarSwitch';
 import {colors, spacing, tokens, typography, useAccentStyles} from '../../theme';
 import type {SecretAsk} from './secrets';
@@ -60,7 +61,7 @@ export function SecretPrompt({ask, satellite, onDone}: {ask: SecretAsk; satellit
             <Text style={[typography.caption, styles.centerText]}>
               {ask.isNew ? `${who} asks for a new ${words.name}: 4 to 12 digits.` : `${who} asks for your ${words.name} to do this.`}
             </Text>
-            <TextInput
+            <StarInput
               value={value}
               onChangeText={text => setValue(pin ? text.replace(/\D/g, '') : text)}
               placeholder={pin ? 'PIN' : 'Recovery key'}
