@@ -120,6 +120,7 @@ sets, so each client has its own lockout, and treats proxied requests as remote 
 setup and the CLI bridge.
 
 systemd is entirely optional; nothing about running StarCore in a terminal for development requires it.
+Docker is optional too: see [`docker.md`](docker.md).
 
 ### Logs
 

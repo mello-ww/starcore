@@ -1,0 +1,16 @@
+.git
+.gitignore
+graphify-out
+dist
+docs
+examples
+mobile
+**/.venv
+**/__pycache__
+**/*.pyc
+**/node_modules
+**/*.kate-swp
+engine/tests
+engine/data
+# local configuration and state never go into an image
+**/config.toml

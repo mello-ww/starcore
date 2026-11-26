@@ -1,0 +1,17 @@
+# docker compose up --build      (Mission Control on http://<host>:8090)
+services:
+  starcore:
+    build: .
+    image: starcore
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - starcore-data:/data
+      # STARCORE_MEDIA: the host folder holding music/, files/ and photo/ (default ./srv)
+      - ${STARCORE_MEDIA:-./srv}/music:/srv/starcore/music
+      - ${STARCORE_MEDIA:-./srv}/files:/srv/starcore/files
+      - ${STARCORE_MEDIA:-./srv}/photo:/srv/starcore/photo
+
+volumes:
+  starcore-data:
