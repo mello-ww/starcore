@@ -86,10 +86,16 @@ export function slideSelection(row, active, key) {
         const same = flying && sameTarget(last.to, to);
         accent.style.transitionDuration = same ? `${Math.round(flying.remaining)}ms` : "";
         places.set(key, same ? { from: last.from, to, start: last.start } : { from, to, start: now });
+        put(to);
     } else {
+        // a row drawn again with the same option (another part of the page changed) keeps its
+        // accent in place: a new accent would otherwise grow from the row's corner
         places.set(key, { from: to, to, start: now });
+        accent.classList.add("ui-slide-still");
+        put(to);
+        accent.getBoundingClientRect();
+        accent.classList.remove("ui-slide-still");
     }
-    put(to);
     active.classList.add("ui-slid");
     follow(row, accent, active, key);
 }
