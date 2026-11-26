@@ -12,7 +12,9 @@
 #   /opt/starcore/python    uv-managed Python 3.13 (outside any home directory)
 #   /var/lib/starcore       accounts, sessions, audit log, Status history, Photo and Music
 #                           libraries, Locked Folder state (systemd StateDirectory, 0700)
-#   /srv/starcore/music     what Music scans; /srv/starcore/files - what File Explorer browses
+#   $STARCORE_MEDIA         the media (default /srv/starcore; set STARCORE_MEDIA to put it on
+#                           another disk): music/ (what Music scans), files/ (what File Explorer
+#                           browses), photo/ (the Photo library)
 set -euo pipefail
 
 REPO_URL="${STARCORE_REPO:-https://github.com/mello-ww/starcore.git}"
@@ -21,7 +23,7 @@ SERVICE_USER=starcore
 APP=/opt/starcore/app
 PYTHON_DIR=/opt/starcore/python
 DATA=/var/lib/starcore
-MEDIA=/srv/starcore
+MEDIA="${STARCORE_MEDIA:-/srv/starcore}"
 UPDATE=0
 [[ "${1:-}" == "--update" ]] && UPDATE=1
 
@@ -49,7 +51,7 @@ say "directories"
 install -d -o root -g root -m 0755 /opt/starcore
 install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 0755 "$PYTHON_DIR"
 install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 0700 "$DATA"
-install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 0750 "$MEDIA" "$MEDIA/music" "$MEDIA/files"
+install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 0750 "$MEDIA" "$MEDIA/music" "$MEDIA/files" "$MEDIA/photo"
 
 say "code"
 if [[ ! -d "$APP/.git" ]]; then
@@ -82,21 +84,22 @@ ffmpeg -version | head -1
 say "configuration (only files that don't exist yet)"
 # StarCore fills in any missing default on start; these are the values a server needs that
 # differ from a development checkout. Existing config.toml files are left exactly as they are.
-as_service "$APP/engine/.venv/bin/python" - "$APP" <<'PY'
-import shutil, sys
+as_service env MEDIA="$MEDIA" "$APP/engine/.venv/bin/python" - "$APP" <<'PY'
+import os, shutil, sys
 from pathlib import Path
 
 app = Path(sys.argv[1])
+media = os.environ["MEDIA"]
 sys.path.insert(0, str(app / "engine"))
 from starcore.toml_edit import write_value
 
 SETTINGS = {
     # 8080 belongs to Pterodactyl Wings on this host; nginx proxies 443 -> 127.0.0.1:8090
     "engine": {("server", "host"): "127.0.0.1", ("server", "port"): 8090},
-    "satellites/native/photo": {(None, "storage"): "/var/lib/starcore/photo"},
+    "satellites/native/photo": {(None, "storage"): f"{media}/photo"},
     "satellites/native/music": {(None, "storage"): "/var/lib/starcore/music",
-                                (None, "library"): "/srv/starcore/music"},
-    "satellites/native/file_explorer": {(None, "root"): "/srv/starcore/files"},
+                                (None, "library"): f"{media}/music"},
+    "satellites/native/file_explorer": {(None, "root"): f"{media}/files"},
 }
 for folder, values in SETTINGS.items():
     config = app / folder / "config.toml"
@@ -114,6 +117,14 @@ PY
 say "systemd unit"
 install -m 0644 "$APP/deploy/systemd/starcore.service" /etc/systemd/system/starcore.service
 systemctl daemon-reload
+if [[ "$MEDIA" != /srv/starcore ]]; then
+    # the unit only lets StarCore write under /srv/starcore; allow the chosen media folder too
+    install -d /etc/systemd/system/starcore.service.d
+    printf '[Service]
+ReadWritePaths=%s
+' "$MEDIA" > /etc/systemd/system/starcore.service.d/media.conf
+    systemctl daemon-reload
+fi
 systemd-analyze verify /etc/systemd/system/starcore.service || true
 
 say "done - nothing was started"

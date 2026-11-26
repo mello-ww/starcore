@@ -95,8 +95,8 @@ sudo systemctl enable --now starcore
 |---|---|
 | `/opt/starcore/app` | the checkout, owned by the unprivileged `starcore` system user |
 | `/opt/starcore/python` | uv-managed Python 3.13, outside any home directory |
-| `/var/lib/starcore` | accounts, sessions, audit log, Status history, Photo and Music libraries, Locked Folder state (`STARCORE_DATA_DIR`, mode 0700) |
-| `/srv/starcore/music`, `/srv/starcore/files` | what Music scans and File Explorer browses |
+| `/var/lib/starcore` | accounts, sessions, audit log, Status history, Music's index, Locked Folder state (`STARCORE_DATA_DIR`, mode 0700) |
+| `/srv/starcore` (or `$STARCORE_MEDIA`) | the media: `music/` (what Music scans), `files/` (what File Explorer browses), `photo/` (the Photo library) |
 
 The script creates the user, clones over HTTPS, runs `uv sync --frozen --extra thumbnails
 --extra encryption` (naming both extras: a plain `uv sync` removes whichever isn't named),
@@ -104,7 +104,12 @@ installs FFmpeg if missing, writes each `config.toml` that doesn't exist yet wit
 values (Mission Control on `127.0.0.1:8090`, the absolute storage paths above) and installs
 `deploy/systemd/starcore.service`. That unit runs as `starcore`, with the file system read-only
 except the state directory, the checkout's `engine/` and `satellites/` (native and link Satellites, where settings are
-saved) and `/srv/starcore`.
+saved) and the media folder.
+
+To keep the media on another disk, run the script with `STARCORE_MEDIA=/path/to/folder` (the disk
+must be mounted first). The script creates the three sub-folders there and adds a systemd
+drop-in (`starcore.service.d/media.conf`) that lets StarCore write to it. The default stays
+`/srv/starcore`.
 
 Mission Control stays on loopback; `deploy/nginx/starcore-panel.conf` is the HTTPS reverse
 proxy for it (the Certbot-managed lines are kept as Certbot wrote them). Besides proxying it
