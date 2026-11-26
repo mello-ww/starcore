@@ -292,3 +292,25 @@ test("repeat cycles off, all and one, and on a radio between off and one only", 
     assert.deepEqual(["off", "all", "one"].map((mode) => nextRepeat(mode, "radio:track-t1")), ["one", "off", "off"]);
     assert.equal(nextRepeat("off", null), "all");
 });
+
+test("the keyboard shortcuts: wherever something is loaded, never while typing or over a dialog", async () => {
+    const { shortcut } = await import("../media/keyrule.js");
+    const base = { typing: false, blocked: false, hasTrack: true, onBody: true, onButton: false, ownPage: false, fullscreen: false };
+    const press = (key, extra = {}, state = {}) => shortcut({ key, ...extra }, { ...base, ...state });
+    assert.equal(press(" "), "toggle");
+    assert.equal(press(" ", {}, { onButton: true }), null);
+    assert.equal(press("ArrowRight", { shiftKey: true }), "next");
+    assert.equal(press("ArrowLeft"), "back");
+    assert.equal(press("ArrowRight", {}, { onBody: false }), null);
+    assert.equal(press("m"), "mute");
+    assert.equal(press("/"), "search");
+    // typing, a menu or dialog (the media viewer too), a modifier: left to the page
+    assert.equal(press(" ", {}, { typing: true }), null);
+    assert.equal(press(" ", {}, { blocked: true }), null);
+    assert.equal(press("m", { ctrlKey: true }), null);
+    // nothing loaded: only the own page and the full player keep their keys
+    assert.equal(press(" ", {}, { hasTrack: false }), null);
+    assert.equal(press("q", {}, { hasTrack: false, ownPage: true }), "queue");
+    assert.equal(press("l", {}, { hasTrack: false, ownPage: true }), null);
+    assert.equal(press("q", {}, { hasTrack: false, fullscreen: true }), "queue");
+});

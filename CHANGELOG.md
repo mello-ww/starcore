@@ -7,6 +7,9 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **The web player's keyboard shortcuts work on every Mission Control page** while something is
+  loaded (space, arrows, `m`, `l`, `q`, `/`), not only on the audio provider's own page; they stay
+  off while typing, over a menu or dialog, and while the media viewer is open (A8).
 - **A page can play its own Satellite's tracks (UI contract 1.2, contract change 6).** The
   `play` action takes `tracks` (a list in the page's data, or a row's own track) or `route` (one
   of the Satellite's routes answering `tracks`), with `start`, `shuffle`, `queue` (`next` or
