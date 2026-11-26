@@ -194,6 +194,8 @@ export interface UiDocument {
   requires?: {client?: string[]; capabilities?: string[]};
   entry: string;
   navigation?: Array<{page: string; label: string; icon?: string; developer?: boolean}>;
+  /** 1.2 (change 13): where the navigation sits on a wide screen. The app draws tabs whatever it says. */
+  layout?: 'tabs' | 'sidebar';
   /** 1.1: a band above the navigation on top-level pages */
   header?: {source?: UiSource; blocks: UiBlock[]};
   widgets?: UiWidget[];

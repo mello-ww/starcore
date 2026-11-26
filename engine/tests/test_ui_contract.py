@@ -76,7 +76,8 @@ class VocabularyTest(unittest.TestCase):
                            ("file_browser_select", ui_contract.FILE_BROWSER_SELECT),
                            ("action_then", ui_contract.ACTION_THEN), ("methods", ui_contract.METHODS),
                            ("icons", ui_contract.ICONS), ("chart_kinds", ui_contract.CHART_KINDS),
-                           ("column_align", ui_contract.COLUMN_ALIGN), ("page_templates", ui_contract.PAGE_TEMPLATES)):
+                           ("column_align", ui_contract.COLUMN_ALIGN), ("page_templates", ui_contract.PAGE_TEMPLATES),
+                           ("document_layouts", ui_contract.DOCUMENT_LAYOUTS)):
             self.assertEqual(set(self.vocabulary[key]), value, key)
 
     def test_capabilities_and_limits(self):

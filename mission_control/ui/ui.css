@@ -25,6 +25,127 @@
 
 /* ---------- navigation ---------- */
 
+/* a row whose accent slides between its options (ui/motion.js): the accent sits above the
+   options' own backgrounds and below their labels, so it shows as it passes behind a pill */
+.ui-slide-row {
+    position: relative;
+    isolation: isolate;
+}
+
+.ui-tabs.ui-slide-row > .ui-tab > *,
+.ui-segmented.ui-slide-row > .ui-segment {
+    position: relative;
+    z-index: 2;
+}
+
+.ui-slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    border-radius: 999px;
+    background: var(--sc-accent);
+    pointer-events: none;
+    transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), width 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        height 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ui-slide.ui-slide-still {
+    transition: none;
+}
+
+.ui-segmented > .ui-slide {
+    border-radius: 9px;
+}
+
+.ui-slide-row > .ui-slid,
+.ui-slide-row > .ui-slid:hover {
+    background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-slide {
+        transition: none;
+    }
+}
+
+/* a document's sidebar (1.2, change 13): its navigation in a column beside every page, which
+   narrows to its icons, then becomes the tabs row on a narrow view */
+.ui-sidebar-layout {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: var(--sc-space-5, 24px);
+    align-items: start;
+}
+
+.ui-sidebar-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-4);
+    min-width: 0;
+    container-type: inline-size;
+}
+
+.ui-tabs.ui-sidebar {
+    position: sticky;
+    top: var(--sc-space-4);
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 2px;
+    padding: var(--sc-space-2);
+    border-radius: var(--sc-radius-card);
+    background: var(--sc-card);
+}
+
+.ui-sidebar > .ui-tab {
+    justify-content: flex-start;
+    min-height: 40px;
+    background: transparent;
+}
+
+.ui-sidebar > .ui-tab.active {
+    background: var(--sc-accent);
+}
+
+@container (max-width: 900px) {
+    .ui-sidebar-layout {
+        grid-template-columns: 60px minmax(0, 1fr);
+    }
+
+    .ui-sidebar > .ui-tab {
+        justify-content: center;
+        padding: 0;
+    }
+
+    .ui-sidebar > .ui-tab > span {
+        display: none;
+    }
+}
+
+@container (max-width: 620px) {
+    .ui-sidebar-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ui-tabs.ui-sidebar {
+        position: static;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: var(--sc-space-2);
+        padding: 0;
+        background: transparent;
+    }
+
+    .ui-sidebar > .ui-tab {
+        padding: 0 14px;
+        background: var(--sc-control);
+    }
+
+    .ui-sidebar > .ui-tab > span {
+        display: inline;
+    }
+}
+
 .ui-tabs {
     display: flex;
     flex-wrap: wrap;

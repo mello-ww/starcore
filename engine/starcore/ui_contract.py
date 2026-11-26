@@ -72,6 +72,7 @@ ICON_PATH = re.compile(rf"M{_ICON_PAIR}(?:[ML]{_ICON_PAIR}|C{_ICON_PAIR} {_ICON_
 CHART_KINDS = set(VOCABULARY["chart_kinds"])
 COLUMN_ALIGN = set(VOCABULARY["column_align"])
 PAGE_TEMPLATES = set(VOCABULARY["page_templates"])
+DOCUMENT_LAYOUTS = set(VOCABULARY["document_layouts"])
 # what arrived in 1.1: a document declaring 1.0 may not use it, so that a
 # document always says which minor it needs (clients that know only 1.0
 # skip a newer document's unknown blocks; a 1.0 one must not have any)
@@ -313,8 +314,13 @@ class _Validator:
         self.minor = version[1]
 
         known = {"contract", "title", "requires", "entry", "navigation", "pages", "header", "widgets", "preview",
-                 "protected", "icons", "audio"}
+                 "protected", "icons", "audio", "layout"}
         self.unknown_keys("", document, known)
+        if "layout" in document:
+            # 1.2 (change 13): where the navigation sits, tabs above the page or a sidebar
+            self.since("layout", "a document layout", 2)
+            if document["layout"] not in DOCUMENT_LAYOUTS:
+                self.error("layout", f"must be one of {sorted(DOCUMENT_LAYOUTS)}")
         if "icons" in document:
             self.check_icons(document["icons"])
         if "title" in document and not isinstance(document["title"], str):

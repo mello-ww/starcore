@@ -7,6 +7,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **A document can put its navigation in a sidebar (UI contract 1.2, contract change 13).**
+  `layout: "sidebar"` draws a column beside every page on Mission Control, folded to its icons
+  when the page gets narrow and back to tabs when narrower still; `"tabs"` stays the default and
+  the Android app always draws tabs. Music uses the sidebar again, as its own page did.
+- **Animations on Mission Control, as on Android.** The accent slides between a document's tabs,
+  its sidebar's pages and a choice's segments, even though the page is drawn again for the new
+  choice (`mission_control/ui/motion.js`), and stays still under reduced motion.
 - **Animations on Android.** The accent slides between the options of a row instead of
   jumping: pill tabs, a document's page tabs, the segments of a choice and the options of a
   form's select, even when the page draws the row again for the new choice. A page action's

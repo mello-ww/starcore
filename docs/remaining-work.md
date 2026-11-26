@@ -345,6 +345,9 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 **Music (own, unless noted)**
 
 - [x] The overlay hides while a viewer is open (shared, above).
+- [x] Its sidebar on Mission Control, as its own page had: a document picks `layout: "sidebar"`
+      or the default `"tabs"` (contract change 13), both kept as templates for every
+      Satellite. File Explorer and Photos keep the tabs.
 - [ ] A check-up of the settings that are listed but not programmed yet.
 - [ ] Search: a grey bar under the search field. Find whether it is Music's `ui.json` or the
       shared search block, and fix it where it lives.

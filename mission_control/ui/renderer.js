@@ -16,6 +16,7 @@ import {
 import { emptyRow, formBody, formProblem, formValues } from "./forms.js";
 import { canShareFiles, downloadFile, fileName, openFile, shareFile } from "./files.js";
 import { createGallery } from "./gallery.js";
+import { slideSelection } from "./motion.js";
 import { createListPaging } from "./listpaging.js";
 import { icon } from "./icons.js";
 import { createMaps } from "./map.js";
@@ -1807,6 +1808,8 @@ export function mount(context) {
             const wrapper = el("div", "ui-choice");
             const group = el("div", "ui-segmented");
             group.setAttribute("role", "radiogroup");
+            // the accent slides to the segment picked, from where this choice last had it
+            group.dataset.slide = `choice:${block.key}`;
             const label = block.label !== undefined ? text(block.label, scope) : "";
             if (label) {
                 group.setAttribute("aria-label", label);
@@ -2277,14 +2280,21 @@ export function mount(context) {
         return band;
     }
 
-    function renderNavigation() {
+    /** Whether the document puts its navigation in a column beside every page (1.2, change 13). */
+    function hasSidebar() {
+        return state.document.layout === "sidebar" && navigationItems().length >= 2;
+    }
+
+    function renderNavigation(sidebar = false) {
         const items = navigationItems();
         if (items.length < 2) {
             return null;
         }
-        const nav = el("nav", "ui-tabs");
+        const nav = el("nav", sidebar ? "ui-tabs ui-sidebar" : "ui-tabs");
         nav.setAttribute("aria-label", `${state.document.title || satelliteName} pages`);
-        const current = items.some((item) => item.page === state.page) ? state.page : null;
+        // beside a detail page, the sidebar keeps the top-level page it was opened from selected
+        const shown = sidebar && !items.some((item) => item.page === state.page) ? state.topPage : state.page;
+        const current = items.some((item) => item.page === shown) ? shown : null;
         for (const item of items) {
             const tab = el("button", `ui-tab${item.page === current ? " active" : ""}`);
             tab.type = "button";
@@ -2341,13 +2351,28 @@ export function mount(context) {
         const isTopLevel = navigationItems().some((item) => item.page === state.page)
             || state.page === state.document.entry;
         if (isTopLevel) {
+            state.topPage = state.page;
+        }
+        // the page's content goes beside the sidebar when the document has one, else in the root
+        let host = root;
+        let nav = null;
+        if (hasSidebar()) {
+            const frame = el("div", "ui-sidebar-layout");
+            nav = renderNavigation(true);
+            host = el("div", "ui-sidebar-main");
+            frame.append(nav, host);
+            root.appendChild(frame);
+        }
+        if (isTopLevel) {
             const header = renderHeader();
             if (header) {
-                root.appendChild(header);
+                host.appendChild(header);
             }
-            const nav = renderNavigation();
-            if (nav) {
-                root.appendChild(nav);
+            if (!nav) {
+                nav = renderNavigation();
+                if (nav) {
+                    host.appendChild(nav);
+                }
             }
         } else {
             // a detail page: the tabs don't name it, so it gets a title and a way back - unless
@@ -2363,7 +2388,10 @@ export function mount(context) {
             if (page.title !== undefined && state.data) {
                 head.appendChild(el("h2", "ui-page-title", text(page.title, scope)));
             }
-            root.appendChild(head);
+            host.appendChild(head);
+        }
+        if (nav) {
+            slideSelection(nav, nav.querySelector(".ui-tab.active"), `tabs:${satelliteName}`);
         }
         renderNotice();
 
@@ -2375,18 +2403,21 @@ export function mount(context) {
                 : `This page could not be refreshed (${state.dataError}).`;
             const notice = el("p", "ui-stale", `${reason} Showing what StarCore said ${formatValue(seconds, "duration")} ago.`);
             notice.setAttribute("role", "status");
-            root.appendChild(notice);
+            host.appendChild(notice);
         } else if (state.dataError) {
-            root.appendChild(renderFailure());
+            host.appendChild(renderFailure());
             return;
         }
         if (!state.data) {
-            root.appendChild(renderSkeleton(template));
+            host.appendChild(renderSkeleton(template));
             return;
         }
         const body = el("div", `ui-page${state.dataError ? " ui-page-stale" : ""}`);
         renderPageBlocks(page.blocks, scope, body, template);
-        root.appendChild(body);
+        host.appendChild(body);
+        for (const group of body.querySelectorAll(".ui-segmented[data-slide]")) {
+            slideSelection(group, group.querySelector(".ui-segment.active"), group.dataset.slide);
+        }
         markLoading();
         gallery.afterRender();
         if (keep && root.contains(keep.node)) {
