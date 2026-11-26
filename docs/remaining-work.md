@@ -290,6 +290,60 @@ tested on both clients (automated tests, the web and the emulator), each followe
 summary to the owner. An old interface goes only after the owner has validated its
 replacement on the web and on the phone. Tick the boxes here as items are done.
 
+## 7. The owner's review of 2026-11-26
+
+What the owner found when trying the shared interfaces. The rule for each item: what is
+generic (the contract, `mission_control/ui/`, `mobile/src/satellites/ui/`, `mobile/src/components/`)
+names no Satellite; what belongs to one Satellite (its `ui.json`, its Engine code, its icons) stays
+in that Satellite's folder. "Shared" below means the first, "own" the second. Order: the shared
+mechanisms first, since several Satellites use them, then each Satellite's items.
+
+**Shared mechanisms (one change serves several items)**
+
+- [ ] **Page width.** On a 1080p screen the web interface stops at about two thirds of the
+      page. Centre it, or let it fill the width, in the shared page layout (web).
+- [ ] **Accent colour** on the shared controls that still lack it (selected and active states),
+      on both clients.
+- [ ] **A header row of actions with an overflow menu.** The page's actions sit on one line
+      above the content, the less used ones in a drop-down, instead of a column. Most likely a
+      contract change (an `actions` block's `menu`), then both clients and every `ui.json` that
+      has such actions. Used by File Explorer and Photos below.
+- [ ] **A viewer hides the floating player.** While a photo (any media viewer) is full screen,
+      the floating player slides down out of the way, with a restrained animation that respects
+      reduced motion, and comes back after. Both clients, in the shared player and viewer.
+- [ ] **Animations on Android**, where they help: a sliding selector when a pill tab changes
+      (`PillTabs`), and similar transitions in the shared components. Reduced-motion aware.
+- [ ] **Swiping between the app's main tabs** (home, Satellites, console, settings, and config
+      when Developer Mode is on) on Android.
+
+**File Explorer (own, unless noted)**
+
+- [ ] Readable type names for the well-known extensions (`.exe` is a Windows application, and
+      so on), in the Satellite's Engine code and shown as file metadata.
+- [ ] Its header actions (new folder, this folder, upload, up) on one line, with the
+      overflow menu above.
+- [ ] A graceful error when the server refuses a change for lack of permission (create,
+      rename, delete, upload), checked on both clients.
+- [ ] Drop the back button beside the folder name, since "up" exists; "All locations" is
+      called "Up" too when the folder is a root's direct child.
+
+**Music (own, unless noted)**
+
+- [ ] The overlay hides while a viewer is open (shared, above).
+- [ ] A check-up of the settings that are listed but not programmed yet.
+- [ ] Search: a grey bar under the search field. Find whether it is Music's `ui.json` or the
+      shared search block, and fix it where it lives.
+
+**Photos**
+
+- [ ] The album page's buttons on one line, "Create album" in the drop-down (the overflow menu
+      above).
+
+**Status**
+
+- [ ] Rebuild the old interface's graphs on the shared interface (the `chart` block exists since
+      1.1; add what is missing to the contract if needed), and check it on the Android app too.
+
 ## Outside this migration
 
 Tracked in [`roadmap.md`](roadmap.md), not here: what has not been verified (the Python tests
