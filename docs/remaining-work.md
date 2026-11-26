@@ -366,8 +366,8 @@ mechanisms first, since several Satellites use them, then each Satellite's items
       track is not lined up), Normalize volume (Mission Control runs a compressor), and the
       Appearance card's player theme, density, visualizer and accent (Mission Control's player
       only). Either implement them in the AudioHost or let the page hide them on Android.
-- [ ] Search: a grey bar under the search field. Find whether it is Music's `ui.json` or the
-      shared search block, and fix it where it lives.
+- [x] Search: a grey bar under the search field. No longer seen after the earlier changes
+      (checked on the web and the Android emulator); the owner confirmed it is gone.
 
 **Photos**
 
