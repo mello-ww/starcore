@@ -1,5 +1,4 @@
-import {useMemo} from 'react';
-import {PanResponder, PanResponderGestureState} from 'react-native';
+import type {PanResponderGestureState} from 'react-native';
 
 /** What a tab navigator's state looks like to the swipe: its routes in bar order and the current one. */
 export interface TabsState {
@@ -35,30 +34,4 @@ export function swipeTarget(state: TabsState | null | undefined, dx: number, dy:
   }
   const next = state.index + (dx < 0 ? 1 : -1);
   return next >= 0 && next < state.routes.length ? state.routes[next].name : null;
-}
-
-/**
- * Pan handlers for the view around the main tabs: a horizontal swipe anywhere on a screen moves
- * to the neighbouring tab. They only claim a clearly sideways move with one finger, and give it
- * up whenever something else asks, so the screens' own gestures come first.
- */
-export function useTabSwipe(navigation: {current: any}) {
-  return useMemo(
-    () =>
-      PanResponder.create({
-        // asked on the way down, before the screen's own views: a card or a vertical list would
-        // otherwise keep every move. A slider or a drag handle that already holds the touch
-        // refuses to let go, and a native horizontal list starts scrolling before this margin.
-        onMoveShouldSetPanResponderCapture: (_, gesture) => claimsSwipe(gesture),
-        onPanResponderTerminationRequest: () => true,
-        onPanResponderRelease: (_, gesture) => {
-          const tabs = navigation.current;
-          const target = swipeTarget(tabs?.getState?.(), gesture.dx, gesture.dy, gesture.vx);
-          if (target) {
-            tabs.navigate(target);
-          }
-        },
-      }).panHandlers,
-    [navigation],
-  );
 }

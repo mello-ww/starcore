@@ -7,6 +7,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **The main tabs slide like a launcher's home screens.** On Android the tabs are pages side by
+  side (`navigation/PagerTabs.tsx`): a sideways swipe drags them with the finger and lets go
+  onto the neighbour or back, and a press in the bar slides the next one in. On Mission Control
+  a page opened from the sidebar slides in from the side it lies on. Both stay still under
+  reduced motion.
 - **A document can put its navigation in a sidebar (UI contract 1.2, contract change 13).**
   `layout: "sidebar"` draws a column beside every page on Mission Control, folded to its icons
   when the page gets narrow and back to tabs when narrower still; `"tabs"` stays the default and

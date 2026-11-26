@@ -328,6 +328,9 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 - [x] **Swiping between the app's main tabs** (home, Satellites, console, settings, and config
       when Developer Mode is on) on Android. A one-finger sideways swipe that nothing inside
       the screen took (`navigation/tabSwipe.ts`) opens the neighbouring tab, without wrapping.
+      The tabs are pages side by side that the swipe drags with the finger, as a launcher's
+      home screens (`navigation/PagerTabs.tsx`); Mission Control slides a page opened from its
+      sidebar in from the side it lies on.
 
 **File Explorer (own, unless noted)**
 

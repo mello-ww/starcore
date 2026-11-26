@@ -432,6 +432,27 @@ function applyRoute() {
     showRoute();
 }
 
+// The page last shown and its place in the navigation: a new one slides in from the side it
+// lies on, as the Android app's main tabs do (a list drawn again for the same page does not).
+let shownPage = null;
+
+function slidePageIn(section, key, place) {
+    const last = shownPage;
+    shownPage = { key, place };
+    if (!last || last.key === key || !section
+        || window.matchMedia("(prefers-reduced-motion: reduce)").matches || typeof section.animate !== "function") {
+        return;
+    }
+    const side = place >= 0 && last.place >= 0 && place !== last.place ? Math.sign(place - last.place) : 0;
+    section.animate(
+        [
+            { opacity: 0, transform: `translateX(${side * 32}px)` },
+            { opacity: 1, transform: "none" },
+        ],
+        { duration: 280, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+    );
+}
+
 function showRoute() {
     const view = route.name === "satellite" ? "satellite" : route.name;
     document.body.dataset.route = view;
@@ -440,12 +461,18 @@ function showRoute() {
         section.hidden = section.id !== `view-${view}`;
     }
 
-    for (const item of document.querySelectorAll(".nav-item")) {
+    const items = [...document.querySelectorAll(".nav-item")];
+    let place = -1;
+    items.forEach((item, index) => {
         const active = item.dataset.route === route.name
             || (route.name === "satellite" && item.dataset.satellite === route.satellite);
         item.classList.toggle("active", active);
         item.toggleAttribute("aria-current", active);
-    }
+        if (active) {
+            place = index;
+        }
+    });
+    slidePageIn(document.getElementById(`view-${view}`), `${view}/${route.satellite ?? ""}`.toLowerCase(), place);
 
     if (route.name === "satellite") {
         setText("page-eyebrow", "Satellite");

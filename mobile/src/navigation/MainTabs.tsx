@@ -1,4 +1,4 @@
-import {BottomTabBar, createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import {BottomTabBar} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import React, {useCallback, useRef, useState} from 'react';
 import {StyleSheet, View} from 'react-native';
@@ -23,7 +23,7 @@ import {TopBarSlot, TopBarSlotProvider} from '../components/TopBarSlot';
 import {FloatingPlayerInsetProvider} from '../components/FloatingPlayerInset';
 import {MediaSyncScreen} from '../sync/MediaSyncScreen';
 import {DownloadsScreen} from '../media/ui/DownloadsScreen';
-import {useTabSwipe} from './tabSwipe';
+import {createPagerTabNavigator} from './PagerTabs';
 
 export type MainTabParamList = {
   Overview: undefined;
@@ -56,7 +56,7 @@ export type SettingsStackParamList = {
   MediaSync: {satellite?: string; capability?: string} | undefined;
 };
 
-const Tab = createBottomTabNavigator<MainTabParamList>();
+const Tab = createPagerTabNavigator<MainTabParamList>();
 const SatellitesStackNav = createNativeStackNavigator<SatellitesStackParamList>();
 const SettingsStackNav = createNativeStackNavigator<SettingsStackParamList>();
 
@@ -173,14 +173,13 @@ export function MainTabs() {
       tabs.current?.navigate('Satellites', {screen: 'SatelliteUi', params: target, initial: false});
     }
   }, []);
-  // a sideways swipe on a screen moves to the neighbouring tab (tabSwipe.ts)
-  const swipe = useTabSwipe(tabs);
   return (
     <AudioHost openPage={openPage}>
       <TopBarSlotProvider component={AudioDisc}>
       <FloatingPlayerInsetProvider value={playerHeight > 0 ? playerHeight + tokens.space.sm : 0}>
       <View style={styles.fill}>
-      <View style={styles.fill} {...swipe}>
+      {/* the tabs are pages side by side that a sideways swipe drags, as a launcher's home
+          screens (PagerTabs.tsx) */}
       <Tab.Navigator
       tabBar={props => {
         tabs.current = props.navigation;
@@ -205,7 +204,6 @@ export function MainTabs() {
       {developer && <Tab.Screen name="Config" component={ConfigScreen} options={{tabBarIcon: tabIcon('Config')}} />}
       <Tab.Screen name="Settings" component={SettingsStack} options={{tabBarIcon: tabIcon('Settings')}} />
       </Tab.Navigator>
-      </View>
       {/* drawn over the screens rather than inside the tab bar's area, so what is underneath
           shows around its rounded edges */}
       <View
