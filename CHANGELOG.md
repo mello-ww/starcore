@@ -7,6 +7,9 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **The floating player steps aside for a full-screen viewer.** On both clients it sinks out
+  of the way while a media viewer is open and rises again after, without motion when reduced
+  motion is asked for; on the web the pickers do the same.
 - **The accent on the shared controls' remaining selected and active states.** The
   breadcrumb's current place, on both clients; on Android a focused field's frame, caret and
   selection (`StarInput`, used by forms, the choose sheet and the secret prompt) and a selected

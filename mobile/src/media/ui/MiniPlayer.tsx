@@ -1,20 +1,39 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {ActivityIndicator, Animated, Easing, PanResponder, Pressable, StyleSheet, Text, View} from 'react-native';
+import {AccessibilityInfo, ActivityIndicator, Animated, Easing, PanResponder, Pressable, StyleSheet, Text, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {colors, spacing, typography, useAccent} from '../../theme';
 import {useAudioHost, usePlayerState} from '../AudioHost';
 import {Artwork} from './Artwork';
-import {anchors, setPlayerCollapsed, usePlayerCollapsed} from './dock';
+import {anchors, setPlayerCollapsed, usePlayerAside, usePlayerCollapsed} from './dock';
 
 /** A floating bubble above the tab bar on every tab; tap or swipe up opens the full player.
- * The chevron (or a swipe down) puts it away into the top-right disc, which brings it back. */
+ * The chevron (or a swipe down) puts it away into the top-right disc, which brings it back.
+ * It sinks out of the way while a full-screen media viewer is open, and rises again after. */
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    let active = true;
+    Promise.resolve(AccessibilityInfo.isReduceMotionEnabled?.())
+      .then(value => active && setReduced(Boolean(value)))
+      .catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener?.('reduceMotionChanged', value => setReduced(Boolean(value)));
+    return () => {
+      active = false;
+      subscription?.remove?.();
+    };
+  }, []);
+  return reduced;
+}
+
 export function MiniPlayer() {
   const {color: accent, onColor} = useAccent();
   const {player, setFullPlayer, liked, setLiked} = useAudioHost();
   const state = usePlayerState();
   const collapsed = usePlayerCollapsed();
+  const aside = usePlayerAside();
+  const reduced = useReducedMotion();
   const track = state.track;
-  const open = Boolean(track) && !collapsed;
+  const open = Boolean(track) && !collapsed && !aside;
   // stays drawn while it sinks away, so the retract plays before it unmounts
   const [drawn, setDrawn] = useState(open);
   const shown = useRef(new Animated.Value(open ? 1 : 0)).current;
@@ -25,12 +44,12 @@ export function MiniPlayer() {
     }
     Animated.timing(shown, {
       toValue: open ? 1 : 0,
-      duration: open ? 380 : 260,
-      delay: open ? 80 : 0,
+      duration: reduced ? 0 : open ? 380 : 260,
+      delay: open && !reduced ? 80 : 0,
       easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(({finished}) => finished && !open && setDrawn(false));
-  }, [open, shown]);
+  }, [open, reduced, shown]);
   const responder = useMemo(
     () =>
       PanResponder.create({

@@ -23,6 +23,26 @@
     display: none;
 }
 
+/* a full-screen viewer (or picker) is open: the bar sinks out of its way, and rises after */
+.pl-bar {
+    transition: transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 380ms ease-out, visibility 0s;
+}
+
+body.ui-viewer-open .pl-bar {
+    transform: translateY(calc(100% + var(--pl-bar-inset)));
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 260ms cubic-bezier(0.4, 0, 1, 1), opacity 260ms ease-in, visibility 0s 260ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pl-bar,
+    body.ui-viewer-open .pl-bar {
+        transition: none;
+    }
+}
+
 .pl-bar-now {
     display: flex;
     align-items: center;

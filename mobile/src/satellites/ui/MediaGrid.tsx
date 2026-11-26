@@ -15,6 +15,7 @@ import {keptPages} from './offline';
 import {tokens, useAccent} from '../../theme';
 import {formatValue, isIconName, isSafeRoute, isVisible, resolve, resolveTemplate, type Scope, type OwnIcons, type UiAction, type UiBlock} from './contract';
 import type {BlockContext} from './UiBlocks';
+import {holdPlayerAside} from '../../media/ui/dock';
 import {RowMenuSheet} from './RowMenu';
 import {rowMenu, runsHere} from './rows';
 
@@ -1107,6 +1108,8 @@ export function MediaViewer({
   // a zoomed image pans with one finger: the pager's own swipe waits until it is back to size
   const [zoomed, setZoomed] = useState(false);
   const list = useRef<FlatList<Entry>>(null);
+  // the floating player steps out of the way while the viewer is open
+  useEffect(() => holdPlayerAside(), []);
   const found = entries.findIndex(entry => entry.key === key);
   const lastIndex = useRef(Math.max(0, found));
   // the item shown went away (an action removed it): the next one takes its place

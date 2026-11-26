@@ -311,9 +311,11 @@ mechanisms first, since several Satellites use them, then each Satellite's items
       buttons (a name, a choice) opens a drop-down under the button that was pressed, holding
       them. Done as contract change 11 (the `actions` and `dropdown` blocks), on both clients,
       used by File Explorer and Photos below.
-- [ ] **A viewer hides the floating player.** While a photo (any media viewer) is full screen,
+- [x] **A viewer hides the floating player.** While a photo (any media viewer) is full screen,
       the floating player slides down out of the way, with a restrained animation that respects
-      reduced motion, and comes back after. Both clients, in the shared player and viewer.
+      reduced motion, and comes back after. Both clients, in the shared player and viewer: on
+      the web while `body.ui-viewer-open` is set (the viewer and the pickers), on Android
+      while a `MediaViewer` holds the player aside (`holdPlayerAside` in `media/ui/dock.ts`).
 - [ ] **Animations on Android**, where they help: a sliding selector when a pill tab changes
       (`PillTabs`), and similar transitions in the shared components. Reduced-motion aware.
 - [ ] **Swiping between the app's main tabs** (home, Satellites, console, settings, and config
@@ -334,7 +336,7 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 
 **Music (own, unless noted)**
 
-- [ ] The overlay hides while a viewer is open (shared, above).
+- [x] The overlay hides while a viewer is open (shared, above).
 - [ ] A check-up of the settings that are listed but not programmed yet.
 - [ ] Search: a grey bar under the search field. Find whether it is Music's `ui.json` or the
       shared search block, and fix it where it lives.
