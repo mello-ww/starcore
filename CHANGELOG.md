@@ -7,6 +7,9 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Swiping between the app's main tabs on Android.** A sideways swipe on a screen opens the
+  neighbouring tab of the bar (Developer Mode's included), without wrapping past either end; a
+  horizontal list, a slider or a pinch inside the screen keeps its own gesture.
 - **The floating player steps aside for a full-screen viewer.** On both clients it sinks out
   of the way while a media viewer is open and rises again after, without motion when reduced
   motion is asked for; on the web the pickers do the same.

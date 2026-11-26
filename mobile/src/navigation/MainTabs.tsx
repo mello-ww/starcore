@@ -23,6 +23,7 @@ import {TopBarSlot, TopBarSlotProvider} from '../components/TopBarSlot';
 import {FloatingPlayerInsetProvider} from '../components/FloatingPlayerInset';
 import {MediaSyncScreen} from '../sync/MediaSyncScreen';
 import {DownloadsScreen} from '../media/ui/DownloadsScreen';
+import {useTabSwipe} from './tabSwipe';
 
 export type MainTabParamList = {
   Overview: undefined;
@@ -172,11 +173,14 @@ export function MainTabs() {
       tabs.current?.navigate('Satellites', {screen: 'SatelliteUi', params: target, initial: false});
     }
   }, []);
+  // a sideways swipe on a screen moves to the neighbouring tab (tabSwipe.ts)
+  const swipe = useTabSwipe(tabs);
   return (
     <AudioHost openPage={openPage}>
       <TopBarSlotProvider component={AudioDisc}>
       <FloatingPlayerInsetProvider value={playerHeight > 0 ? playerHeight + tokens.space.sm : 0}>
       <View style={styles.fill}>
+      <View style={styles.fill} {...swipe}>
       <Tab.Navigator
       tabBar={props => {
         tabs.current = props.navigation;
@@ -201,6 +205,7 @@ export function MainTabs() {
       {developer && <Tab.Screen name="Config" component={ConfigScreen} options={{tabBarIcon: tabIcon('Config')}} />}
       <Tab.Screen name="Settings" component={SettingsStack} options={{tabBarIcon: tabIcon('Settings')}} />
       </Tab.Navigator>
+      </View>
       {/* drawn over the screens rather than inside the tab bar's area, so what is underneath
           shows around its rounded edges */}
       <View

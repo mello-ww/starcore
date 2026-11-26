@@ -318,8 +318,9 @@ mechanisms first, since several Satellites use them, then each Satellite's items
       while a `MediaViewer` holds the player aside (`holdPlayerAside` in `media/ui/dock.ts`).
 - [ ] **Animations on Android**, where they help: a sliding selector when a pill tab changes
       (`PillTabs`), and similar transitions in the shared components. Reduced-motion aware.
-- [ ] **Swiping between the app's main tabs** (home, Satellites, console, settings, and config
-      when Developer Mode is on) on Android.
+- [x] **Swiping between the app's main tabs** (home, Satellites, console, settings, and config
+      when Developer Mode is on) on Android. A one-finger sideways swipe that nothing inside
+      the screen took (`navigation/tabSwipe.ts`) opens the neighbouring tab, without wrapping.
 
 **File Explorer (own, unless noted)**
 
