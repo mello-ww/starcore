@@ -7,6 +7,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Music opens in its shared interface on both clients (A9).** Its `ui.json` is no longer a
+  preview: Mission Control and the Android app draw it by default, after an end-to-end run on
+  an isolated demo and the owner's validation. The own page and screens stay in Developer Mode
+  until they are removed (A10).
 - **The web player's keyboard shortcuts work on every Mission Control page** while something is
   loaded (space, arrows, `m`, `l`, `q`, `/`), not only on the audio provider's own page; they stay
   off while typing, over a menu or dialog, and while the media viewer is open (A8).

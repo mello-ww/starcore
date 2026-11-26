@@ -707,7 +707,9 @@ emulator with no screen lock (Android 17, 16 KB pages):*
   provider, never from a URL in the data. One fix: following an `offline` route's `cursor` had no
   bound, so a route answering a cursor forever kept the app asking. It now stops after 100 pages
   or a repeated cursor (in A7's commit).
-- Still to do: removing `preview`, and the owner's validation on the web and the phone.
+- **Done (26 Nov 2026).** The owner validated it on the demo, web and emulator. `ui.json` no
+  longer says `preview`: both clients open Music's shared interface by default; the own page and
+  screens stay only in Developer Mode until A10 removes them.
 
 **A10 - remove Music's own interface** (after the owner's validation):
 - `satellites/native/music/mission_control/` (`page.js`, `page.css`, `views/`, `ui/`,

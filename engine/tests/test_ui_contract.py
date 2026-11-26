@@ -390,9 +390,10 @@ class UiApiTest(unittest.TestCase):
         # L8: its only interface, so no longer a preview
         locked = next(item for item in payload["satellites"] if item["name"] == "LockedFolder")
         self.assertNotIn("preview", locked["ui"])
-        # A1: Music's shared pages, a preview beside its own page and screens
+        # A9: Music's shared interface is its default, no longer a preview
         music = next(item for item in payload["satellites"] if item["name"] == "Music")
-        self.assertEqual((music["ui"]["contract"], music["ui"]["preview"]), ("starcore.ui/1.2", True))
+        self.assertEqual(music["ui"]["contract"], "starcore.ui/1.2")
+        self.assertNotIn("preview", music["ui"])
         # a Satellite without a ui.json still has an entry, with no definition
         bare = next(item for item in payload["satellites"] if item["name"] == "Bare")
         self.assertIsNone(bare["ui"])

@@ -221,8 +221,8 @@ and the Android screens against what the contract can draw.
   device), with its Downloads page (A7, change 10).
 - [x] **The web player's keyboard shortcuts** active wherever the host plays, not only on
   Music's page (A8; `mission_control/media/keys.js` looks for `.pl-root`).
-- [ ] **End to end, then the default** (A9): the isolated demo on both clients, a short
-  review, `preview` removed, the owner's validation.
+- [x] **End to end, then the default** (A9): the isolated demo on both clients, a short
+  review, `preview` removed, the owner's validation (2026-11-26).
 - [ ] Then remove Music's `page.js`, `page.css`, `views/`, `ui/`, `mobile/src/music/`,
   `builtins.tsx` and its `DEDICATED_SCREENS` entry, and empty the guard's last exception lists
   (A10).
