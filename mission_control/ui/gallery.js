@@ -55,14 +55,6 @@ function drawGlyph(name, size = 18, own = null) {
     return icon(name, size, own) || el("span");
 }
 
-/** Whether a page holds a collection (a media grid or a map, also inside a card): such a page
- * uses the page's width, like a dashboard, while its other blocks keep a reading width. */
-export function holdsCollection(page) {
-    const holds = (blocks) => (blocks || []).some((block) => block
-        && (block.type === "media-grid" || block.type === "map" || (block.type === "card" && holds(block.blocks))));
-    return Boolean(page) && holds(page.blocks);
-}
-
 /** The action a tile runs: the grid's `action`, else the first `open` entry whose `visible`
  * holds and that `canRun` here (an own action needs an own interface) - or null. */
 export function tileAction(block, scope, canRun) {

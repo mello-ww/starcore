@@ -15,7 +15,7 @@ import {
 } from "./contract.js";
 import { emptyRow, formBody, formProblem, formValues } from "./forms.js";
 import { canShareFiles, downloadFile, fileName, openFile, shareFile } from "./files.js";
-import { createGallery, holdsCollection } from "./gallery.js";
+import { createGallery } from "./gallery.js";
 import { createListPaging } from "./listpaging.js";
 import { icon } from "./icons.js";
 import { createMaps } from "./map.js";
@@ -2222,10 +2222,6 @@ export function mount(context) {
         const keep = active && root.contains(active) && active.classList.contains("ui-search-input")
             ? { node: active, start: active.selectionStart, end: active.selectionEnd } : null;
         root.replaceChildren();
-        // a dashboard, and a page holding a media grid or a map, use the page's width
-        const collection = template !== "dashboard" && holdsCollection(page);
-        root.classList.toggle("ui-wide", template === "dashboard" || collection);
-        root.classList.toggle("ui-collection", collection);
 
         const isTopLevel = navigationItems().some((item) => item.page === state.page)
             || state.page === state.document.entry;
@@ -2343,7 +2339,6 @@ export function mount(context) {
     }
 
     function renderGate(next, why) {
-        root.classList.remove("ui-wide", "ui-collection");
         const box = el("section", "ui-card ui-failure ui-locked");
         box.setAttribute("role", "status");
         const head = el("div", "ui-locked-head");

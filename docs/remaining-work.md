@@ -299,8 +299,9 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 
 **Shared mechanisms (one change serves several items)**
 
-- [ ] **Page width.** On a 1080p screen the web interface stops at about two thirds of the
-      page. It must not: the shared page layout (web) uses the full width.
+- [x] **Page width.** On a 1080p screen the web interface stopped at about two thirds of the
+      page. Every shared page now uses the whole view, whatever its template (the 880 px
+      reading width and the 1400 px cap on every view are gone).
 - [ ] **Accent colour** on the shared controls that still lack it (selected and active states),
       on both clients.
 - [ ] **A header row of actions, each with its own drop-down.** Every action of the page sits

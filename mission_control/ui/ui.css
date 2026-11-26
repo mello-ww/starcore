@@ -7,21 +7,14 @@
     display: flex;
     flex-direction: column;
     gap: var(--sc-space-4);
-    max-width: 880px;
-    /* the layout follows the page's own width, whatever the sidebar takes */
+    /* every page uses the whole width of the view; the layout follows that width, whatever the
+       sidebar takes */
     container-type: inline-size;
 }
 
-/* a dashboard uses the whole page */
-.ui-root.ui-wide {
-    max-width: none;
-}
-
-/* so does a page holding a media grid or a map, for the collection itself; its text, forms and buttons
-   keep the reading width */
-.ui-root.ui-collection > :not(.ui-page),
-.ui-root.ui-collection > .ui-page > :not(.ui-media-grid):not(.ui-map):not(.ui-card:has(.ui-media-grid, .ui-map)) {
-    max-width: 880px;
+/* the unlock card stays a card, not a band across the page */
+.ui-root > .ui-locked {
+    max-width: 560px;
 }
 
 .ui-page {

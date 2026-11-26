@@ -468,8 +468,8 @@ h3 {
     display: none;
 }
 
+/* every view takes the whole width, however wide the screen */
 .view > * {
-    max-width: 1400px;
     animation: rise 180ms ease-out both;
 }
 
