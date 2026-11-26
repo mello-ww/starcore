@@ -52,9 +52,9 @@ jest.mock('react-native-screens', () => {
   };
 });
 
-// react-native-video's native player has nothing to run under Node; Music's
-// provider tests only need the props it is rendered with (see
-// __tests__/musicProvider.test.tsx).
+// react-native-video's native player has nothing to run under Node; the audio
+// host's tests only need the props it is rendered with (see
+// __tests__/audioHost.test.tsx).
 jest.mock('react-native-video', () => {
   const React = require('react');
   const {View} = require('react-native');

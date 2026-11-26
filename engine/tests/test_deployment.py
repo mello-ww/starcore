@@ -80,8 +80,7 @@ class WorkingDirectoryIndependenceTest(unittest.TestCase):
                 self.assertTrue((engine.api.web_root / "index.html").is_file())
 
                 music = engine.registry.get("Music")
-                self.assertTrue(music.assets_path.is_dir())
-                self.assertTrue((music.assets_path / "page.js").is_file())
+                self.assertIsNotNone(music.ui, "a Satellite's ui.json is found from anywhere")
             finally:
                 stop_engine(engine)
         finally:

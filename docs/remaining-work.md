@@ -39,7 +39,7 @@ Clients implement the UI contract and capability protocols, never a Satellite.
 | Status | ✅ its only interface on both clients (1.1) | none |
 | Photos | ✅ its only interface on both clients (1.2) | none: `page.js` and `src/photo/` removed (P3) |
 | File Explorer | ✅ its shared interface alone on both clients (F1-F7): browsing, a file's page (open, download, share), management (new folder, rename, delete) and upload | none: its `page.js` and `page.css` are removed |
-| Music | ◐ the player (the shared audio host on both clients, and `play` for any Satellite) and a preview `ui.json` from A1: album, artist, mix, radio, mood, genre and track pages | web `page.js` with its views (home, library, album, artist, playlist, search, settings, stats); Android `src/music/` (11 screen and tab files), wired by `builtins.tsx` |
+| Music | ✅ its only interface on both clients (1.2, A1-A10): home, search, Your Library, album, artist, playlist, mix, radio and track pages, settings, stats, offline downloads, through the shared audio host | none: its `page.js` and `mobile/src/music/` are removed (A10) |
 | Locked Folder | ✅ its only interface on both clients (1.2, L0-L8): browsing, moves, setup, settings, a forgotten PIN; biometric unlock from the Android app's unlock card | none: its `page.js` and `mobile/src/lockedFolder/` are removed |
 | Docker | – a placeholder with no interface | none |
 
@@ -213,8 +213,7 @@ and the Android screens against what the contract can draw.
   M3U import and export (change 8): `choose` for Add to playlist, a `media-list`'s `reorder`.
 - [x] **The player's additions declared by the document** (A4): its track menu, Add to
   playlist and the links to an album or artist (change 9: `audio`, `reloads`, `follows`).
-  `MUSIC_AUDIO_EXTENSIONS` and `setExtensions` stay for the own interface while it is shown,
-  until A10 removes it.
+  `MUSIC_AUDIO_EXTENSIONS` and `setExtensions` stayed for the own interface until A10.
 - [x] **Settings and equalizer** as forms (A5): Settings, Equalizer, Scan and Duplicates.
 - [x] **Stats and Wrapped** as dashboard pages (A6).
 - [x] **Offline downloads** as a generic client capability (keep a provider's tracks on the
@@ -223,9 +222,9 @@ and the Android screens against what the contract can draw.
   Music's page (A8; `mission_control/media/keys.js` looks for `.pl-root`).
 - [x] **End to end, then the default** (A9): the isolated demo on both clients, a short
   review, `preview` removed, the owner's validation (2026-11-26).
-- [ ] Then remove Music's `page.js`, `page.css`, `views/`, `ui/`, `mobile/src/music/`,
-  `builtins.tsx` and its `DEDICATED_SCREENS` entry, and empty the guard's last exception lists
-  (A10).
+- [x] **Music's own interface removed** (A10): its `page.js`, `page.css`, `views/`, `ui/`,
+  `mobile/src/music/`, `builtins.tsx` and `DEDICATED_SCREENS`. The guard's lists are all empty:
+  `SATELLITE_SPECIFIC`, `KNOWN_COUPLINGS`, `KNOWN_IMPORTS` and `KNOWN_CROSS_SATELLITE`.
 
 ## 6. Leftovers the guard can't see
 

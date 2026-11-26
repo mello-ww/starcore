@@ -16,7 +16,7 @@ import { seekBar } from "./seek.js";
 
 let open = null;
 
-// text that opens a view of the provider's own page, or plain text when it offers none
+// text that opens a view of the provider's interface, or plain text when it offers none
 function jump(text, action) {
     if (!action) {
         return text;
@@ -186,11 +186,10 @@ export async function openFullscreen(tab = "lyrics") {
             badges.append(el("span", "pl-badge pl-badge-plain", `On ${instance.remote.device.name}`));
         }
         titles.replaceChildren(title, line, badges);
-        const add = extension("addToPlaylist");
         const entries = extension("menuEntries");
         // the provider's document's entries (its `audio`), in a menu of their own
         const more = entries ? [iconButton("more", "More", (event) => menu(entries(track), event))] : [];
-        extras.replaceChildren(likeButton("track", track.id), ...(add ? [iconButton("plus", "Add to playlist", () => add([track]))] : []), ...more,
+        extras.replaceChildren(likeButton("track", track.id), ...more,
             button(`${instance.engine.speed}×`, "pl-chip", (event) => speedMenu(event), "Playback speed"),
             iconButton("timer", "Sleep timer", (event) => sleepMenu(event)));
         canvas.hidden = session.preference("visualizer", "off") === "off";

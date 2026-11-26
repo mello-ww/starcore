@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {DownloadManager, type DownloadSettings} from '../src/media/downloads';
 import type {DownloadNative} from '../src/media/native';
 import {playerKeys} from '../src/media/storage';
-import {makeTracks, testLibrary} from './musicFakes';
+import {makeTracks, testLibrary} from './audioFakes';
 
 function fakeNative() {
   const files = new Map<string, number>();

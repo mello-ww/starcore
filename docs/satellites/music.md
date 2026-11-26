@@ -332,21 +332,16 @@ GET  configuration                POST {"key", "value"}
 
 ## Mission Control
 
-The Music page is a full player inside the existing Satellite page contract (`page.js` and
-ES modules beside it, `page.css`): Home, Search, Your Library (playlists, liked songs, albums,
-artists, recently played, folders, genres), album, artist, playlist, mix, radio, mood,
-stats/Wrapped and settings views, a persistent bottom player and a full-screen player with
-lyrics, queue, devices and track details. The audio engine and the bottom bar live outside the
-page's container, so playback continues while browsing other Mission Control pages. Large
-album, artist and song lists are drawn in chunks as they scroll. See
-`satellites/native/music/mission_control/`.
+Music has no page of its own: Mission Control draws its `ui.json` with the shared renderer,
+and plays through the shared player (`mission_control/media/`): a persistent bottom player and
+a full-screen player with lyrics, queue, devices and track details, outside the page, so
+playback continues while browsing other Mission Control pages.
 
-### Shared interface (preview)
+### Shared interface
 
-`ui.json` (UI contract 1.2, `preview: true`) is Music's interface drawn by both clients'
-shared renderers, offered in Developer Mode while Music's own page and screens stay its
-default ([docs/media-audio.md](../media-audio.md), "Music on the shared interface", A1 to
-A10). It has Home, Search and Your Library (A2) and the album, artist, playlist, folder, mix,
+`ui.json` (UI contract 1.2) is Music's only interface, drawn by both clients' shared renderers
+([docs/media-audio.md](../media-audio.md), "Music on the shared interface", A1 to A10; its own
+page and screens were removed in A10). It has Home, Search and Your Library (A2) and the album, artist, playlist, folder, mix,
 radio, mood, genre, search results, Liked Songs and track (credits) pages, and the playlists'
 own (A3): New playlist, New smart playlist, a playlist's details and rules, Import a playlist
 file. Its `audio` section (A4) adds to the client's player while it plays Music: Add to
@@ -381,7 +376,7 @@ equaliser, bass boost, pitch and speed on that player's audio session, and offli
 into app-private storage per server. Music lives under the signed-in server's `AuthProvider`,
 so queues and downloads are per server and the biometric lock hides it like everything else.
 The system notification offers play/pause and seek buttons, not next/previous (a limit of the
-library's service). See `mobile/README.md` and `mobile/src/music/`.
+library's service). See `mobile/README.md` and `mobile/src/media/`.
 
 ## Status
 

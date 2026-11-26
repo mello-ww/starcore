@@ -1,4 +1,4 @@
-"""What Music's shared interface (ui.json, UI contract 1.2) reads beside its own page.
+"""What Music's shared interface (ui.json, UI contract 1.2) reads beside the routes it shares with the player.
 
 Home by section (`home?view=shelves`), Your Library by tab (`library?tab=`), and the rows they
 list: each track with its heart (`liked` and `not_liked`, a pair the document draws as one

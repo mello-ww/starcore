@@ -387,7 +387,7 @@ class SharedPagesTest(MusicApiCase):
         tile = home["continue"]["items"][0]
         self.assertEqual((tile["id"], tile["is_album"], tile["is_mix"]), (album_id, True, False))
         self.assertEqual(tile["mosaic_key"], album_id)
-        self.assertIn("sections", self.call("home")[1])  # Music's own page reads it as before
+        self.assertIn("sections", self.call("home")[1])
 
         idle = self.call("search?q=")[1]
         self.assertTrue(idle["idle"])

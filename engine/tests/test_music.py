@@ -513,14 +513,13 @@ class MusicSatelliteTest(unittest.TestCase):
     def test_the_satellite_is_discovered(self):
         self.assertIsNotNone(self.satellite)
         self.assertEqual(self.satellite.type, "native")
-        self.assertEqual(self.satellite.page, {"module": "page.js", "stylesheet": "page.css"})
+        # its ui.json is its only interface (A10): it publishes no page of its own
+        self.assertIsNone(self.satellite.page)
 
-    def test_page_assets_are_served(self):
-        for asset, expected in (("page.js", "javascript"), ("page.css", "text/css")):
-            status, headers, body = self.request(f"/api/satellites/music/assets/{asset}")
-            self.assertEqual(status, 200)
-            self.assertIn(expected, headers.get("Content-Type", ""))
-            self.assertTrue(body)
+    def test_it_serves_no_page_assets(self):
+        for asset in ("page.js", "page.css"):
+            status, _, _ = self.request(f"/api/satellites/music/assets/{asset}")
+            self.assertEqual(status, 404)
 
     def test_the_state_stays_cheap_and_useful(self):
         state = self.satellite.state(self.engine)

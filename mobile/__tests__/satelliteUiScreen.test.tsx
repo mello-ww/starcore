@@ -216,20 +216,6 @@ describe('SatelliteUiScreen', () => {
     expect(texts(tree)).toContain('This interface needs starcore.ui/2.0; update the app.');
   });
 
-  it("opens the Satellite's own screens at a section, over this one (the own action)", async () => {
-    const document = {
-      contract: 'starcore.ui/1.2',
-      entry: 'home',
-      pages: {home: {blocks: [{type: 'button', label: 'Settings', action: {own: 'settings'}}]}},
-    };
-    __mocks.document.mockResolvedValue({document, revision: 'r', offline: false});
-    // a Satellite this app has its own screens for: they are pushed, with the section
-    const {tree, navigation} = await mount({params: {name: 'Music'}});
-    await press(tree, 'Settings');
-    expect(navigation.push).toHaveBeenCalledWith('MusicHome', {section: 'settings'});
-    expect(__mocks.act).not.toHaveBeenCalled(); // no route runs
-  });
-
   it('hides a control that opens own screens this app does not have, and says so otherwise', async () => {
     const document = {
       contract: 'starcore.ui/1.2',

@@ -1,6 +1,5 @@
 import * as session from "./session.js";
 import { isTyping } from "./dom.js";
-import { extension } from "./extensions.js";
 import { isFullscreenOpen } from "./fullscreen.js";
 import { player } from "./player.js";
 import { shortcut } from "./keyrule.js";
@@ -14,13 +13,8 @@ function blocked() {
         || document.body.classList.contains("ui-viewer-open");
 }
 
-// the page's own search: the hook an own page registers, else the first search block drawn
+// the page's search: the first search block drawn
 function focusSearch() {
-    const hook = extension("focusSearch");
-    if (hook) {
-        hook();
-        return;
-    }
     const input = document.querySelector(".ui-search-input");
     if (input) {
         input.focus();
@@ -41,7 +35,6 @@ export function installKeys(toggleQueue) {
             hasTrack: Boolean(instance.current),
             onBody: target === document.body,
             onButton: Boolean(target && target.tagName === "BUTTON"),
-            ownPage: Boolean(document.querySelector(".pl-root")),
             fullscreen: isFullscreenOpen(),
         });
         if (!action) {

@@ -99,7 +99,7 @@ def playlists(call):
         playlist["line"] = " · ".join(part for part in (
             views.songs(playlist["track_count"] - playlist["unavailable"]), views.length(playlist["duration"]),
             f"{playlist['unavailable']} unavailable" if playlist["unavailable"] else "") if part)
-        # what the player says it plays from, as Music's own page names it
+        # what the player says it plays from, as Music's interface names it
         playlist["context"] = f"playlist:{playlist_id}"
         playlist["regular"] = not playlist["smart"]
         playlist["has_unmatched"] = bool(playlist["unmatched"])
@@ -398,7 +398,7 @@ def mixes(call):
     mix = music.discovery.mix(call.user, mix_id)
     if mix is None:
         return error_response("unknown mix")
-    # what the player says it plays from, and the mix's picture, as Music's own page names them
+    # what the player says it plays from, and the mix's picture, as Music's interface names them
     mix["context"] = f"mix:{mix['id']}"
     mix["mosaic_key"] = mosaic_key(mix.get("mosaic") or [])
     liked = views.liked_tracks(music, call.user)

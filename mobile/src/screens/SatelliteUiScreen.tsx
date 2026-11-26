@@ -26,7 +26,7 @@ import {askSecrets, bodyWithSecrets, revealFrom, type SecretAsk} from '../satell
 import {VirtualMediaGrid} from '../satellites/ui/MediaGrid';
 import {hasPagedList, VirtualListPage} from '../satellites/ui/VirtualListPage';
 import {mergeItem} from '../satellites/ui/rows';
-import {DEDICATED_SCREENS, opensSharedInterface, ownScreen} from './HomeScreen';
+import {opensSharedInterface} from './HomeScreen';
 import {uiPreferences} from '../satellites/ui/preferences';
 import {
   collectionKey, forgetOfflineSatellite, forgetOfflineServer, offlinePlan, offlineStateKeys, OfflineStore, sessionScope,
@@ -77,9 +77,9 @@ function hostedSatellite(satellites: SatelliteSummary[] | null, host: string, wa
   return satellites?.find(other => other.section_of === host && other.name === wanted) ?? null;
 }
 
-/** Whether this app opens a Satellite: its shared interface, or a screen of the app's own for it. */
+/** Whether this app opens a Satellite: it does when the Satellite has a shared interface. */
 function opensHosted(target: SatelliteSummary | null): boolean {
-  return Boolean(target && (opensSharedInterface(target) || ownScreen(target)));
+  return Boolean(target && opensSharedInterface(target));
 }
 
 /**
@@ -703,31 +703,21 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         return runSecureRef.current(action, [scope]);
       }
       if (action.section !== undefined) {
-        // 1.2: a Satellite this one hosts (section_of), pushed over this screen - in its shared
-        // interface, or in a screen of the app's own for it - so Back returns here
+        // 1.2: a Satellite this one hosts (section_of), pushed over this screen in its shared
+        // interface, so Back returns here
         const target = hostedSatellite(satellites, name, resolve(action.section, scoped));
         if (target && opensSharedInterface(target)) {
           navigation.push('SatelliteUi', {name: target.name, revision: target.ui?.revision ?? undefined});
           return true;
         }
-        const hostedScreen = target ? ownScreen(target) : undefined;
-        if (!hostedScreen) {
-          showToast("That isn't available in this app.", true);
-          return false;
-        }
-        (navigation as any).push(hostedScreen.screen, hostedScreen.params);
-        return true;
+        showToast("That isn't available in this app.", true);
+        return false;
       }
       if (action.own !== undefined) {
-        // 1.2: the Satellite's own native screens, at a section they name - pushed over this
-        // one, so Back returns here; they keep their own rules (a PIN, a permission)
-        const screen = DEDICATED_SCREENS[name];
-        if (!screen) {
-          showToast("That isn't available in this app.", true);
-          return false;
-        }
-        (navigation as any).push(screen, {section: String(action.own)});
-        return true;
+        // 1.2: the Satellite's own interface - this app has none for any Satellite, so the
+        // blocks hide such an action (hasOwnScreens) and one that still arrives does nothing
+        showToast("That isn't available in this app.", true);
+        return false;
       }
       if (action.sync !== undefined) {
         // 1.2: the app's own sync screen for this Satellite's provider - pushed over this one;
@@ -1128,7 +1118,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     confirm: confirmAction,
     afterSelection,
     satellite: name,
-    hasOwnScreens: Boolean(DEDICATED_SCREENS[name]),
+    hasOwnScreens: false,
     canRun,
     runSecure: runSecureAction,
     preferences,

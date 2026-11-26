@@ -81,7 +81,7 @@ def albums(call):
     album["line"] = " · ".join(part for part in (
         str(album["year"]) if album.get("year") else "", album["type"].title(), views.songs(len(album["tracks"])),
         views.length(album.get("duration")), views.badge(album.get("quality"))) if part)
-    # what the player says it plays from, as Music's own page names it
+    # what the player says it plays from, as Music's interface names it
     album["context"] = f"album:{album['id']}"
     return ok(album)
 

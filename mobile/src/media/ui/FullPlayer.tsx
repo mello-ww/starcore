@@ -32,26 +32,19 @@ export function FullPlayer() {
   );
 }
 
-const noLinks = (): {album?: (id: string) => void; artist?: (id: string) => void} => ({});
-
 function PlayerBody() {
   const {color: accent, onColor} = useAccent();
   // an active toggle: a soft accent pill behind the accent glyph
   const tint = {backgroundColor: `${accent}29`};
-  const {player, setFullPlayer, liked, setLiked, library, connect, extensions} = useAudioHost();
+  const {player, setFullPlayer, liked, setLiked, library, connect} = useAudioHost();
   const state = usePlayerState();
-  // the provider's own links and track menu, when its native code supplies them
-  const useLinks = extensions.useTrackLinks ?? noLinks;
-  const go = useLinks();
-  const TrackMenu = extensions.TrackMenu;
-  // otherwise what the provider's document adds (its `audio`)
+  // what the provider's document adds (its `audio`): links and a track menu
   const added = useAudioAdditions();
   const panels = (['lyrics', 'queue', 'devices', 'info'] as Panel[]).filter(
     name => (name !== 'lyrics' || library.offers('lyrics')) && (name !== 'devices' || connect),
   );
   const insets = useSafeAreaInsets();
   const [panel, setPanel] = useState<Panel>('artwork');
-  const [actions, setActions] = useState(false);
   const close = () => setFullPlayer(false);
   const responder = useMemo(
     () =>
@@ -69,13 +62,9 @@ function PlayerBody() {
   const playing = remote ? !!remote.state?.playing : state.playing;
   const position = remote ? remote.state?.position ?? 0 : state.position;
   const duration = remote ? remote.state?.duration || track.duration || 0 : state.duration;
-  const open = (to: () => void) => () => {
-    close();
-    to();
-  };
-  const albumLink = go.album ? open(() => go.album!(track.album_id)) : added.link('album', track, track.album_id);
-  const artistLink = go.artist ? open(() => go.artist!(track.artist_id)) : added.link('artist', track, track.artist_id);
-  const showMenu = TrackMenu ? () => setActions(true) : added.hasMenu ? () => added.openMenu(track) : null;
+  const albumLink = added.link('album', track, track.album_id);
+  const artistLink = added.link('artist', track, track.artist_id);
+  const showMenu = added.hasMenu ? () => added.openMenu(track) : null;
 
   return (
     <>
@@ -157,7 +146,6 @@ function PlayerBody() {
           ))}
         </View>
       </View>
-      {actions && TrackMenu && <TrackMenu tracks={[track]} onClose={() => setActions(false)} />}
       {added.overlays}
     </>
   );

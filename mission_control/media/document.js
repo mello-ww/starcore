@@ -3,7 +3,6 @@
 // own in More, the title's and artist's links, and a way to the Satellite's pages, each run
 // with the playing track as $. and no page around it. A navigate opens that page of the
 // Satellite's shared interface wherever the player is. Without `audio`, nothing is added.
-// While the Satellite's own page is shown, its own hooks win (extensions.js).
 //
 // audioHooks and actionRunner are the rules, kept free of the page so they are tested on their
 // own; watchDocument wires them to Mission Control.

@@ -79,8 +79,8 @@ picking up a newer 6.x release.
 
 Audio plays through the shared AudioHost (`src/media/`, see
 `docs/media-audio.md`), which plays from whichever Satellite the capability
-catalog lists as the `audio.library` provider (Music today; its native screens
-stay in `src/music/` and are wired in by `src/satellites/builtins.tsx`). It
+catalog lists as the `audio.library` provider; that Satellite's pages are its
+`ui.json`, drawn by the shared renderer like any other. It
 uses that same `react-native-video` rather than adding
 `react-native-track-player`: one hidden `<Video>` lives in the `AudioHost`
 (mounted around the tab navigator, inside the per-server `AuthProvider`), with `playInBackground` and `showNotificationControls`, so
@@ -199,15 +199,14 @@ from the cache. The rules shared with the Engine and Mission Control are in
 
 Status and Photos open their `ui.json` alone; their screens are retired. The Locked Folder has no screen of its own: its `ui.json` is its only interface. File Explorer has no screen of its own: its `ui.json` is a
 read-only preview, which the app opens (Mission Control keeps File Explorer's
-own page by default). Music keeps its dedicated screens until the shared blocks
-reach parity with them (`docs/remaining-work.md`). A Satellite's icons are its own (UI contract
+own page by default). Music, too, opens only its `ui.json`. A Satellite's icons are its own (UI contract
 1.2: path data the Engine validated from its `icons/` folder, stroked by the native
 `StarCoreGlyph` view through `src/components/Glyph.tsx`), else its `icon_name`.
 
-Code written for one Satellite lives only in its own folder (`src/music/`), wired in by
-`src/satellites/builtins.tsx` and the navigation. Everything else is generic;
-`engine/tests/test_client_modularity.py` lists the couplings left, and that list
-may only shrink.
+The app has no code written for one Satellite: every Satellite opens its `ui.json`,
+and what is specific to it lives in its own folder on the server.
+`engine/tests/test_client_modularity.py` keeps it that way; its exception lists are
+empty and must stay so.
 
 ## Project structure
 

@@ -186,7 +186,7 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] Audio: the lock-screen pause on Android (the 0:00 was the end of the queue; the app now follows a pause or resume made outside it)
 - [x] Audio: the web AudioHost (`mission_control/media/`), started by the shell, playing from the catalog's `audio.library` provider
 - [x] Audio: any Satellite can play through both clients with the UI contract's `play` action (1.2)
-- [ ] Remove `mobile/src/satellites/builtins.tsx` once Music's declarative interface replaces its native screens
+- [x] Remove `mobile/src/satellites/builtins.tsx` once Music's declarative interface replaces its native screens (A10)
 - [ ] Move Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/ui-contract.md`, "Migration")
     - [x] Photos opens in its shared interface by default on both clients (M1-M6 of `docs/photos-parity-audit.md`)
     - [x] Photos' shared interface after the owner's review: whole photo in the viewer, full width, Favorites and the Locked Folder among the folders, tile hearts, download and share, web swipe, Library grouping (M7-M14)

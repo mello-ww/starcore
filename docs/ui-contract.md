@@ -44,8 +44,8 @@ between the shared interface and the Satellite's own page, so a migration can be
 side by side before the old page is retired. Status is the first Satellite to make that
 move (1.1; its page is gone since). Photo follows in 1.2: its document was a **preview** (see
 [The document](#the-document)) until it reached parity, and is now its default interface, with
-its own page and screens kept in Developer Mode until they are retired. Music keeps its
-dedicated, hand-written page and screens until the shared blocks reach parity with them.
+its own page and screens kept in Developer Mode until they were retired. Music followed the
+same path (A1-A10 of `docs/media-audio.md`): its document is its only interface.
 File Explorer's document, a preview until F6, is now its only interface on both clients; its
 `page.js` was retired in F7 (see [Migration](#migration)). Those
 implementations are the behavioural reference for the capabilities still to come, not code

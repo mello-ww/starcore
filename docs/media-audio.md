@@ -711,13 +711,19 @@ emulator with no screen lock (Android 17, 16 KB pages):*
   longer says `preview`: both clients open Music's shared interface by default; the own page and
   screens stay only in Developer Mode until A10 removes them.
 
-**A10 - remove Music's own interface** (after the owner's validation):
+**A10 - remove Music's own interface** (after the owner's validation). **Done (26 Nov 2026):**
+Music's `ui.json` is its only interface on both clients. The design notes above that mention the
+own page, `setExtensions`, `AudioHostExtensions`, `builtins.tsx` or `mobile/src/music/` describe
+the migration as it went; none of them exists any more. What was removed:
 - `satellites/native/music/mission_control/` (`page.js`, `page.css`, `views/`, `ui/`,
   `styles/`, `api.js`, `store.js`, `router.js`): the Satellite publishes no page.
 - `mobile/src/music/` with its tests; `builtins.tsx` (empty by then) and its uses in the
   Satellites stack and `MainTabs.tsx`; `DEDICATED_SCREENS` and the own-screen helpers in
   `HomeScreen.tsx`, `SatellitesListScreen.tsx` and `SatelliteUiScreen.tsx` where nothing else
-  needs them; `mission_control/media/extensions.js` and `AudioHostExtensions`.
+  needs them; the own page's part of `mission_control/media/extensions.js` (it keeps only the
+  hooks built from the document) and `AudioHostExtensions`. The keyboard shortcuts no longer
+  look for the own page (`.pl-root`). The shared player's tests that lived beside the own
+  screens' (queue, player, Connect, downloads, dock, safe areas) stay, renamed `audio*`.
 - `engine/tests/test_client_modularity.py`: `SATELLITE_SPECIFIC` lists no folder,
   `KNOWN_COUPLINGS` loses `HomeScreen.tsx` and `KNOWN_IMPORTS` `builtins.tsx`;
   `KNOWN_CROSS_SATELLITE`'s last entry goes by renaming the type in

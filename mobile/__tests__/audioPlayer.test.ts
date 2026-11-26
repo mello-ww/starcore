@@ -1,6 +1,6 @@
 import {backgroundTimers} from '../src/media/native';
 import {PlayerController} from '../src/media/player';
-import {fakeEffects, makeTracks, manualTimers, preferences, testLibrary} from './musicFakes';
+import {fakeEffects, makeTracks, manualTimers, preferences, testLibrary} from './audioFakes';
 
 function setup(overrides: Partial<ConstructorParameters<typeof PlayerController>[0]> = {}) {
   const timers = manualTimers();

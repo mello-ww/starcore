@@ -1,5 +1,5 @@
 import * as Q from '../src/media/queue';
-import {makeTracks} from './musicFakes';
+import {makeTracks} from './audioFakes';
 
 const seeded = () => {
   let seed = 7;

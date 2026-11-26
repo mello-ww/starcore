@@ -1,6 +1,6 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
-import {Pressable, Text} from 'react-native';
+import {Text} from 'react-native';
 import {SatellitesListScreen} from '../src/screens/SatellitesListScreen';
 
 // Factory-mocked (not auto-mocked) so requiring this module never pulls in
@@ -18,7 +18,6 @@ jest.mock('../src/satellites/api', () => {
 
 import {useAuth} from '../src/auth/AuthContext';
 import {useServers} from '../src/servers/ServersContext';
-import {useDeveloperMode} from '../src/developer/DeveloperModeContext';
 import {getCachedSatellites, setCachedSatellites} from '../src/satellites/cache';
 const {__mocks} = jest.requireMock('../src/satellites/api') as {__mocks: {list: jest.Mock}};
 
@@ -74,35 +73,6 @@ describe('SatellitesListScreen', () => {
 
     expect(texts(tree)).toContain('status');
     expect(texts(tree)).not.toContain('LockedFolder');
-  });
-
-  it('offers nothing for a hosted Satellite on its host’s card, even a preview: its host opens it', async () => {
-    const photo = {...satelliteA, name: 'Music', ui: {contract: 'starcore.ui/1.2', revision: 'p1', error: null, preview: true}};
-    const hosted = {...satelliteB, name: 'Vaulty', section_of: 'Music',
-      ui: {contract: 'starcore.ui/1.2', revision: 'v1', error: null, preview: true}};
-    __mocks.list.mockResolvedValue([photo, hosted]);
-    const pill = (tree: ReturnType<typeof renderer.create>) =>
-      tree.root.findAll((node: any) => node.type === Pressable && node.props.testID === 'shared-preview-Vaulty');
-
-    let tree!: ReturnType<typeof renderer.create>;
-    await act(async () => {
-      tree = renderer.create(<SatellitesListScreen navigation={navigation} route={route} />);
-    });
-    expect(pill(tree)).toHaveLength(0);
-    act(() => tree.unmount());
-
-    (useDeveloperMode as jest.Mock).mockReturnValue({enabled: true});
-    try {
-      await act(async () => {
-        tree = renderer.create(<SatellitesListScreen navigation={navigation} route={route} />);
-      });
-      // not a card of its own, nor a pill on its host's: a hosted Satellite has no screen of the
-      // app's own, so its shared interface is its only one
-      expect(texts(tree)).not.toContain('Container control');
-      expect(pill(tree)).toHaveLength(0);
-    } finally {
-      (useDeveloperMode as jest.Mock).mockReturnValue({enabled: false});
-    }
   });
 
   it('marks a satellite with no interface as such and does not navigate on tap', async () => {
@@ -165,20 +135,6 @@ describe('SatellitesListScreen', () => {
 
     expect(texts(tree)).toEqual(expect.arrayContaining(['status', 'Showing cached data - offline']));
   });
-
-  it('opens the dedicated Music screens for a Music whose server has no ui.json', async () => {
-    const photoSatellite = {...satelliteA, name: 'Music', description: 'Music library'};
-    __mocks.list.mockResolvedValue([photoSatellite]);
-    let tree!: ReturnType<typeof renderer.create>;
-    await act(async () => {
-      tree = renderer.create(<SatellitesListScreen navigation={navigation} route={route} />);
-    });
-
-    act(() => tree.root.findByProps({disabled: false}).props.onPress());
-
-    expect(navigation.navigate).toHaveBeenCalledWith('MusicHome');
-  });
-
 
   it('shows an empty state when the server reports no satellites', async () => {
     __mocks.list.mockResolvedValue([]);

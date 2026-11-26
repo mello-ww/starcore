@@ -4,7 +4,7 @@ import renderer, {act} from 'react-test-renderer';
 import {AudioHost, useAudioHost} from '../src/media/AudioHost';
 import {AudioLibraryClient, resolveAudioProvider, type Catalog} from '../src/media/library';
 import {PlayerController} from '../src/media/player';
-import {fakeEffects, makeTracks, preferences, testProvider} from './musicFakes';
+import {fakeEffects, makeTracks, preferences, testProvider} from './audioFakes';
 
 jest.mock('../src/auth/AuthContext', () => ({useAuth: jest.fn()}));
 jest.mock('../src/servers/ServersContext', () => ({useServers: jest.fn()}));

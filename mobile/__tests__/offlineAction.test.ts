@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {DownloadManager} from '../src/media/downloads';
 import type {DownloadNative} from '../src/media/native';
 import {boundTracks, offlineLabel, offlineState, offlineTracks, runOffline, type OfflineDeps} from '../src/media/offlineAction';
-import {makeTracks, testLibrary} from './musicFakes';
+import {makeTracks, testLibrary} from './audioFakes';
 
 // The offline action (UI contract 1.2, change 10): a page names its own tracks, and the app keeps
 // them through the audio host's DownloadManager - queued, held by the network rule, removed.

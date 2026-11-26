@@ -155,6 +155,12 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Removed
 
+- **Music's own page and screens (A10).** Its `ui.json` is its only interface on both clients:
+  `satellites/native/music/mission_control/` and `mobile/src/music/` are gone, with
+  `builtins.tsx`, the app's dedicated-screen table and its Developer Mode pills, and the hooks an
+  own page gave the shared player (`setExtensions`, `AudioHostExtensions`). The modularity guard's
+  exception lists are all empty.
+
 - **Photos' own Mission Control page and Android screens** (`photo/mission_control/page.js` and
   `page.css`, `mobile/src/photo/`, their routes and tests): its shared interface is now the only
   one on both clients, its settings being forms (P1). The Satellite publishes no page, and the

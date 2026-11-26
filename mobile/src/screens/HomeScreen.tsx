@@ -41,55 +41,10 @@ export function formatUptime(seconds: number): string {
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
-/**
- * Satellites with a native screen of their own. A Satellite's ui.json comes
- * first (the shared SatelliteUiScreen): these are for Satellites without one
- * yet, and for a server older than a Satellite's ui.json. Listed in
- * docs/remaining-work.md, and removed from there.
- */
-export const DEDICATED_SCREENS: Record<string, 'MusicHome'> = {
-  Music: 'MusicHome',
-};
-
-/** A screen of this app's own and the params it opens with. */
-export interface OwnScreen {
-  screen: 'MusicHome';
-  params?: {section: string};
-}
-
-/** The screen of this app's own for a Satellite: its dedicated screen, if it has one. */
-export function ownScreen(satellite: SatelliteSummary): OwnScreen | undefined {
-  const own = DEDICATED_SCREENS[satellite.name];
-  return own ? {screen: own} : undefined;
-}
-
-/**
- * Whether a Satellite opens in its shared interface (its ui.json, SatelliteUiScreen). It does
- * whenever it has one, unless the document is a preview (UI contract 1.2) and this app has a
- * screen of its own for the Satellite: that screen stays the default until the document reaches
- * parity, and Developer Mode offers the shared one beside it.
- */
+/** Whether a Satellite opens in its shared interface (its ui.json, SatelliteUiScreen): whenever
+ * it has one. A Satellite without one has nothing for the app to open. */
 export function opensSharedInterface(satellite: SatelliteSummary): boolean {
-  return Boolean(satellite.ui?.revision) && !(satellite.ui?.preview === true && ownScreen(satellite));
-}
-
-/** A preview document beside the app's own screen for it: what Developer Mode can open. */
-export function hasSharedPreview(satellite: SatelliteSummary): boolean {
-  return Boolean(satellite.ui?.revision) && satellite.ui?.preview === true && Boolean(ownScreen(satellite));
-}
-
-/** Whether tapping a Satellite opens anything: its shared interface, or a screen of this app's own. */
-export function canOpen(satellite: SatelliteSummary): boolean {
-  return Boolean(satellite.ui?.revision) || Boolean(ownScreen(satellite));
-}
-
-/**
- * The reverse: a Satellite that opens in its shared interface and still has a screen of its own
- * in this app, kept until the shared one is validated. Developer Mode can open that screen
- * instead, as Mission Control's Developer Mode can show a Satellite's own page.
- */
-export function ownScreenBeside(satellite: SatelliteSummary): OwnScreen | undefined {
-  return opensSharedInterface(satellite) ? ownScreen(satellite) : undefined;
+  return Boolean(satellite.ui?.revision);
 }
 
 export function alertsFor(satellites: SatelliteSummary[]) {
@@ -153,13 +108,11 @@ export function HomeScreen() {
   };
 
   const open = (satellite: SatelliteSummary, page?: string, pageParams?: Record<string, any>) => {
-    const declarative = opensSharedInterface(satellite);
-    const screen: string | undefined = declarative ? 'SatelliteUi' : DEDICATED_SCREENS[satellite.name];
-    if (!screen) {
+    if (!opensSharedInterface(satellite)) {
       return;
     }
-    const params = declarative ? {name: satellite.name, revision: satellite.ui?.revision, page, params: pageParams} : undefined;
-    navigation.navigate('Satellites', {screen, params, initial: false});
+    const params = {name: satellite.name, revision: satellite.ui?.revision, page, params: pageParams};
+    navigation.navigate('Satellites', {screen: 'SatelliteUi', params, initial: false});
   };
   const online = satellites?.filter(satellite => satellite.status === 'running').length ?? 0;
   // a satellite shown as a section of another gets no card of its own;
@@ -285,7 +238,7 @@ export function HomeScreen() {
             <Text style={[type.body, styles.cardDesc]} numberOfLines={2}>
               {satellite.description}
             </Text>
-            {canOpen(satellite) ? (
+            {opensSharedInterface(satellite) ? (
               <Pressable
                 onPress={() => open(satellite)}
                 accessibilityRole="button"

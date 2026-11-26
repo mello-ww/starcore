@@ -434,7 +434,7 @@ class MusicLibrary:
                                                 "genre", "duration", "has_artwork")}
         tags.update({"format": track.get("format") or "mp3", "artists": [track["artist"]] if track.get("artist") else [],
                      "genres": [track["genre"]] if track.get("genre") else []})
-        status = type("Status", (), {"st_size": track.get("size") or 0, "st_mtime": track.get("mtime") or 0})()
+        status = type("FileStat", (), {"st_size": track.get("size") or 0, "st_mtime": track.get("mtime") or 0})()
         row = scanner._row(path.parent, path, status, tags, track_id)
         row["id"] = track_id
         row["missing"] = int(not path.is_file())

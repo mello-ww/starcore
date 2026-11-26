@@ -25,28 +25,18 @@ import unittest
 REPO = Path(__file__).resolve().parents[2]
 
 # folders of Satellite-specific client code, which may know their own Satellite
-SATELLITE_SPECIFIC = ("mobile/src/music/",)
+SATELLITE_SPECIFIC = ()
 
 # generic code that still names a Satellite: (file, current count) - lower a
 # count, or drop the line, when a coupling goes; never raise one or add a line
-KNOWN_COUPLINGS = {
-    # the dedicated Music screens (the Satellites list reads the same table)
-    "mobile/src/screens/HomeScreen.tsx": 1,
-}
+KNOWN_COUPLINGS = {}
 
 # generic mobile code that imports a Satellite-specific folder: (file, {folder: count}).
 # The composition root is where native Satellite code is wired in. Lower a count when one goes.
-KNOWN_IMPORTS = {
-    # the composition root: Music's native screens
-    "mobile/src/satellites/builtins.tsx": {"mobile/src/music/": 10},
-}
+KNOWN_IMPORTS = {}
 
 # Satellite code naming another Satellite: (file, current count)
-KNOWN_CROSS_SATELLITE = {
-    # not a Satellite reference: a Python type named "Status", matched by the
-    # same pattern
-    "satellites/native/music/library.py": 1,
-}
+KNOWN_CROSS_SATELLITE = {}
 
 
 def satellite_names() -> list:
@@ -214,10 +204,7 @@ class ClientModularityTest(unittest.TestCase):
                  *REPO.glob("mobile/src/components/*.tsx"), REPO / "mobile/src/navigation/MainTabs.tsx"]
         self.assertTrue(any("media" in path.parts for path in files))
         for path in files:
-            found = satellite_imports(path)
-            self.assertNotIn("mobile/src/music/", found, path.relative_to(REPO).as_posix())
-            if "media" in path.parts or "components" in path.parts:
-                self.assertEqual(found, {}, path.relative_to(REPO).as_posix())
+            self.assertEqual(satellite_imports(path), {}, path.relative_to(REPO).as_posix())
 
     def test_satellites_name_no_other_satellite_beyond_the_known_couplings(self):
         names = satellite_names()

@@ -14,14 +14,6 @@ import {PlayerController, type PlayerState} from './player';
 import {deviceId as loadDeviceId, playerKeys, readJson, type SavedQueue, writeJson} from './storage';
 import type {PlaybackPreferences, Track} from './types';
 
-/** What a Satellite's own native code may add to the shared player: a menu for a track
- * (add to a playlist, go to its album...), and links from the full player's title and artist.
- * Passed in once by the app's composition root, never looked up by Satellite name. */
-export interface AudioHostExtensions {
-  TrackMenu?: React.ComponentType<{tracks: Track[]; onClose: () => void}>;
-  useTrackLinks?: () => {album?: (id: string) => void; artist?: (id: string) => void};
-}
-
 export interface AudioHostValue {
   library: AudioLibraryClient;
   /** The resolved provider, or null while the catalog is read or when the server has none. */
@@ -49,16 +41,11 @@ export interface AudioHostValue {
   /** What keeps a Satellite's own tracks on the phone (the offline action, UI contract 1.2):
    * the downloads, only when that Satellite is the provider and this phone can keep files. */
   offlineFor: (satellite: string) => DownloadManager | null;
-  /** The own native code's additions: only while one of its screens is shown, or when the
-   * provider's document adds nothing (its `audio`, below). */
-  extensions: AudioHostExtensions;
   /** What the provider's document adds to the player (UI contract 1.2, its `audio`): null
-   * without one, and while the provider's own screens are shown (their extensions win). */
+   * without one. */
   audio: UiAudio | null;
   /** Opens a page of the provider's shared interface, wherever the player is. */
   openPage: (page: string, params: Record<string, string>) => void;
-  /** Marks one of the provider's own screens as shown; returns the function that unmarks it. */
-  claimOwnInterface: () => () => void;
   /** Reads again what the app keeps of a capability (`reloads`: "audio.session"). */
   reload: (capability: string) => Promise<void>;
   /** Tells `listener` the capability the app itself changed (a like, a preference), so a page
@@ -83,11 +70,9 @@ async function requestNotifications() {
  */
 export function AudioHost({
   children,
-  extensions = {},
   openPage,
 }: {
   children: React.ReactNode;
-  extensions?: AudioHostExtensions;
   /** opens a page of a Satellite's shared interface (the app's navigation) */
   openPage?: (satellite: string, page: string, params: Record<string, string>) => void;
 }) {
@@ -109,7 +94,6 @@ export function AudioHost({
   const [liked, setLikedState] = useState<Set<string>>(new Set());
   const [fullPlayer, setFullPlayer] = useState(false);
   const [audioDoc, setAudioDoc] = useState<UiAudio | null>(null);
-  const [ownShown, setOwnShown] = useState(0);
   const changedListeners = useRef(new Set<(capability: string) => void>());
   const videoRef = useRef<VideoRef>(null);
 
@@ -327,17 +311,6 @@ export function AudioHost({
     };
   }, []);
 
-  const claimOwnInterface = useCallback(() => {
-    let released = false;
-    setOwnShown(count => count + 1);
-    return () => {
-      if (!released) {
-        released = true;
-        setOwnShown(count => count - 1);
-      }
-    };
-  }, []);
-
   const satellite = provider?.satellite ?? null;
   const openProviderPage = useCallback(
     (page: string, params: Record<string, string>) => {
@@ -405,10 +378,8 @@ export function AudioHost({
     playSearch,
     playTracks,
     offlineFor,
-    extensions: ownShown > 0 || !audioDoc ? extensions : {},
-    audio: ownShown > 0 ? null : audioDoc,
+    audio: audioDoc,
     openPage: openProviderPage,
-    claimOwnInterface,
     reload,
     onChanged,
   };
@@ -498,13 +469,6 @@ export function useAudioHost(): AudioHostValue {
     throw new Error('useAudioHost() must be used inside an AudioHost');
   }
   return value;
-}
-
-/** Marks the screen it is called in as one of the provider's own while it is focused: its
- * native extensions then win over what the provider's document adds (AudioHostValue.audio). */
-export function useOwnAudioInterface(focused: boolean) {
-  const claim = useContext(AudioHostContext)?.claimOwnInterface;
-  useEffect(() => (focused && claim ? claim() : undefined), [claim, focused]);
 }
 
 /** The host, or null outside one (a screen rendered on its own, as in tests). */

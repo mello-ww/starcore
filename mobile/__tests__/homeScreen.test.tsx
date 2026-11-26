@@ -34,6 +34,7 @@ const {__navigation} = jest.requireMock('@react-navigation/native') as {__naviga
 const music = {
   name: 'Music', version: '1', author: 'a', description: 'Local music library satellite.', icon: null,
   type: 'native' as const, enabled: true, status: 'running' as const, configurable: true,
+  ui: {contract: 'starcore.ui/1.2', revision: 'r1', error: null},
 };
 const docker = {
   name: 'docker', version: '1', author: 'a', description: 'Containers', icon: null,
@@ -113,7 +114,7 @@ describe('HomeScreen', () => {
     (useAuth as jest.Mock).mockReturnValue({client: clientWith('Ada')});
     const tree = await render();
     act(() => tree.root.findByProps({accessibilityLabel: 'Open Music'}).props.onPress());
-    expect(__navigation.navigate).toHaveBeenCalledWith('Satellites', {screen: 'MusicHome', params: undefined, initial: false});
+    expect(__navigation.navigate).toHaveBeenCalledWith('Satellites', {screen: 'SatelliteUi', params: {name: 'Music', revision: 'r1', page: undefined, params: undefined}, initial: false});
   });
 
   it('shows an error state with a retry when the server is unreachable', async () => {

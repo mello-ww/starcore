@@ -362,6 +362,10 @@ class UiApiTest(unittest.TestCase):
         folder.mkdir()
         (folder / "satellite.toml").write_text(
             'name = "Bare"\nversion = "1.0.0"\nauthor = "tests"\ndescription = "No interface."\n', encoding="utf-8")
+        # no ui.json, but a web page of its own (the page.js mechanism any Satellite may use)
+        (folder / "mission_control").mkdir()
+        (folder / "mission_control" / "page.js").write_text("export function mount() {}\n", encoding="utf-8")
+        (folder / "mission_control" / "page.css").write_text(".bare {}\n", encoding="utf-8")
         add_satellite(cls.engine, folder)
 
     @classmethod
@@ -462,7 +466,7 @@ class UiApiTest(unittest.TestCase):
         self.assertEqual(status, 405)
 
     def test_assets_and_frontend_revalidate_instead_of_redownloading(self):
-        for path in ("/app.js", "/api/satellites/Music/assets/page.css"):
+        for path in ("/app.js", "/api/satellites/Bare/assets/page.css"):
             status, _, headers = request(self.engine, path)
             self.assertEqual(status, 200, path)
             self.assertEqual(headers["Cache-Control"], "no-cache")

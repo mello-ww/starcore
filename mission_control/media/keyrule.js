@@ -1,14 +1,14 @@
 // Which shortcut a key press asks for, kept free of the page so it can be tested alone
 // (mission_control/tests/media.test.mjs). `state`: {typing, blocked, hasTrack, onBody,
-// ownPage, fullscreen} - what the page looks like when the key goes down.
+// onButton, fullscreen} - what the page looks like when the key goes down.
 
 /** The shortcut for this key event, or null when the key is left to the page. */
 export function shortcut(event, state) {
     if (event.ctrlKey || event.metaKey || event.altKey || state.typing || state.blocked) {
         return null;
     }
-    // shortcuts apply wherever the player has something loaded, and on its own page / full player
-    if (!state.hasTrack && !state.ownPage && !state.fullscreen) {
+    // shortcuts apply wherever the player has something loaded, and in the full player
+    if (!state.hasTrack && !state.fullscreen) {
         return null;
     }
     const key = event.key;

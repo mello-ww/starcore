@@ -2,11 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React from 'react';
 import {Modal, StyleSheet} from 'react-native';
 import renderer, {act} from 'react-test-renderer';
-import {MusicProvider, useMusic} from '../src/music/MusicProvider';
+import {AudioHost, useAudioHost} from '../src/media/AudioHost';
 import {FullPlayer} from '../src/media/ui/FullPlayer';
-import {TrackActions} from '../src/music/ui/TrackActions';
 import {TOUCH_TARGET} from '../src/theme';
-import {makeTracks, preferences, testCatalog} from './musicFakes';
+import {makeTracks, preferences, testCatalog} from './audioFakes';
 
 // Insets exist only inside a provider, like a Modal window: the root provider of a non
 // edge-to-edge activity reports none, which is exactly what made the player draw under the
@@ -22,9 +21,6 @@ jest.mock('react-native-safe-area-context', () => {
 });
 jest.mock('../src/auth/AuthContext', () => ({useAuth: jest.fn()}));
 jest.mock('../src/servers/ServersContext', () => ({useServers: jest.fn()}));
-jest.mock('../src/music/ui/navigation', () => ({
-  useMusicNavigation: () => ({album: jest.fn(), artist: jest.fn(), playlist: jest.fn()}),
-}));
 
 import {useAuth} from '../src/auth/AuthContext';
 import {useServers} from '../src/servers/ServersContext';
@@ -47,9 +43,9 @@ function client() {
   };
 }
 
-let music!: ReturnType<typeof useMusic>;
+let host!: ReturnType<typeof useAudioHost>;
 function Probe() {
-  music = useMusic();
+  host = useAudioHost();
   return null;
 }
 
@@ -63,21 +59,21 @@ async function mountPlayer() {
   let tree!: ReturnType<typeof renderer.create>;
   await act(async () => {
     tree = renderer.create(
-      <MusicProvider>
+      <AudioHost>
         <Probe />
         <FullPlayer />
-      </MusicProvider>,
+      </AudioHost>,
     );
   });
   await act(async () => {
-    await music.player.playTracks(makeTracks(2), 0);
-    music.setFullPlayer(true);
+    await host.player.playTracks(makeTracks(2), 0);
+    host.setFullPlayer(true);
   });
   mounted.push(tree);
   return tree;
 }
 
-describe('Music safe areas', () => {
+describe('The shared player safe areas', () => {
   beforeEach(() => AsyncStorage.clear());
   afterEach(() => {
     act(() => mounted.splice(0).forEach(tree => tree.unmount()));
@@ -96,30 +92,12 @@ describe('Music safe areas', () => {
 
   it('gives every player control at least a 48 dp touch target', async () => {
     const tree = await mountPlayer();
-    for (const label of ['Close the player', 'Track options', 'Like', 'Shuffle', 'Previous', 'Next']) {
+    for (const label of ['Close the player', 'Like', 'Shuffle', 'Previous', 'Next']) {
       const style = flat(tree.root.findByProps({accessibilityLabel: label}));
       expect(style.minWidth).toBeGreaterThanOrEqual(TOUCH_TARGET);
       expect(style.minHeight).toBeGreaterThanOrEqual(TOUCH_TARGET);
     }
     const play = flat(tree.root.findAll((node: {props: Record<string, unknown>}) => ['Play', 'Pause'].includes(String(node.props.accessibilityLabel)))[0]);
     expect(play.width).toBeGreaterThanOrEqual(TOUCH_TARGET);
-  });
-
-  it('lifts the track options sheet above the gesture bar', async () => {
-    (useAuth as jest.Mock).mockReturnValue({client: client(), state: {status: 'signed-in', session: {token: 't'}}, locked: false});
-    (useServers as jest.Mock).mockReturnValue({activeServer: {id: 's', baseUrl: 'https://s.test'}});
-    let tree!: ReturnType<typeof renderer.create>;
-    await act(async () => {
-      tree = renderer.create(
-        <MusicProvider>
-          <TrackActions tracks={makeTracks(1)} onClose={() => undefined} />
-        </MusicProvider>,
-      );
-    });
-    mounted.push(tree);
-    const item = tree.root.findAllByProps({accessibilityRole: 'button'})[0];
-    const sheet = item.parent!.parent!;
-    expect(flat(sheet).paddingBottom).toBeGreaterThanOrEqual(30);
-    expect(flat(item).minHeight).toBeGreaterThanOrEqual(TOUCH_TARGET);
   });
 });
