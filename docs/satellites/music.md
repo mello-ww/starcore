@@ -72,13 +72,19 @@ transcode_cache_mb = 2048
 
 All of these are editable through the generic Config modal and Music's own settings view;
 `library` keeps its "Browse…" button. `sources` and `exclude` accept a JSON list, or a string
-separated by `;` from the generic modal. Nothing here waits on a restart.
+separated by `;` from the generic modal, or rows (`[{path}]`, `[{pattern}]`) from a form. A
+POST of `{"values": {...}}` to `configuration` saves several settings at once, after checking
+every one; the shared Settings page sends its forms that way. Nothing here waits on a restart.
 
 Per-listener preferences (theme, accent, density, streaming and cellular quality, transcode
 format, ReplayGain mode, normalisation, crossfade, gapless, equaliser, bass boost, speed,
 pitch, lyric offset, history and discovery switches, queue end behaviour, download network
 and quality, offline cache size, visualiser) live in the database, per account, behind
-`GET/POST preferences`, and are validated server-side (`users.py`).
+`GET/POST preferences`, and are validated server-side (`users.py`). `GET/POST settings` is
+the shared Settings page's answer: the same preferences, plus the accent as `accent_mode` and
+`accent_colour`, the library's totals, the configuration and the listener's devices. An
+`equalizer` sent to either may be one part of it: `enabled`, `preamp`, a `preset` by name
+(which sets its bands) or one `band` (0 to 9) with its `gain` (which makes it `custom`).
 
 The accent preference is `"starcore"` by default: Music uses StarCore's global accent
 (`--sc-accent`, and `--sc-on-accent` for text on it) and follows every change to it live.

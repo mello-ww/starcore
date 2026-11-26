@@ -58,6 +58,23 @@ PREFERENCE_DEFAULTS = {
     "scrobbling": False,
 }
 
+# the equalizer's bands in Hz and its presets, the same as both players' (a page names a preset;
+# the bands it sets are chosen here)
+EQUALIZER_BANDS = (31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000)
+EQUALIZER_PRESETS = {
+    "flat": (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    "bass": (6, 5, 4, 2, 0, 0, 0, 0, 0, 0),
+    "treble": (0, 0, 0, 0, 0, 1, 2, 4, 5, 6),
+    "vocal": (-2, -2, -1, 1, 3, 4, 3, 1, 0, -1),
+    "rock": (4, 3, 2, 0, -1, 0, 2, 3, 4, 4),
+    "electronic": (5, 4, 1, 0, -2, 1, 0, 1, 4, 5),
+    "jazz": (3, 2, 1, 2, -1, -1, 0, 1, 2, 3),
+    "classical": (4, 3, 2, 1, -1, -1, 0, 2, 3, 4),
+    "acoustic": (4, 4, 3, 1, 1, 1, 2, 3, 3, 2),
+    "loudness": (5, 3, 0, 0, -1, 0, -1, 0, 3, 5),
+    "late night": (-2, -1, 0, 1, 2, 2, 1, 0, -2, -3),
+}
+
 PREFERENCE_TYPES = {
     "theme": ("system", "dark", "light"),
     "accent": None,
@@ -102,11 +119,37 @@ class Preferences:
     def update(self, user: str, changes: dict) -> dict:
         if not isinstance(changes, dict):
             raise PreferenceError("preferences must be an object")
+        if isinstance(changes.get("equalizer"), dict):
+            changes = {**changes, "equalizer": merge_equalizer(self.get(user, "equalizer"), changes["equalizer"])}
         validated = {key: validate(key, value) for key, value in changes.items()}
         for key, value in validated.items():
             self.db.execute("INSERT INTO preferences (user, key, value) VALUES (?, ?, ?) ON CONFLICT (user, key) "
                             "DO UPDATE SET value = excluded.value", (user, key, dumps(value)))
         return self.all(user)
+
+
+def merge_equalizer(current: dict, change: dict) -> dict:
+    """A change to the equalizer onto its current value, so a page can send one part of it:
+    `enabled` or `preamp` alone, a `preset` by name (its bands with it, unless `bands` are sent
+    too, as a whole equalizer is), or one `band` (0 to 9) with its `gain`, which makes it custom."""
+    merged = {**(current if isinstance(current, dict) else PREFERENCE_DEFAULTS["equalizer"])}
+    for key in ("enabled", "preamp", "bands"):
+        if key in change:
+            merged[key] = change[key]
+    if "preset" in change:
+        name = str(change["preset"])
+        merged["preset"] = name
+        if "bands" not in change and name in EQUALIZER_PRESETS:
+            merged["bands"] = list(EQUALIZER_PRESETS[name])
+    if "band" in change:
+        band = change["band"]
+        if not isinstance(band, int) or isinstance(band, bool) or not 0 <= band < len(EQUALIZER_BANDS):
+            raise PreferenceError(f"'equalizer.band' must be a band from 0 to {len(EQUALIZER_BANDS) - 1}")
+        bands = list(merged.get("bands") or [0] * len(EQUALIZER_BANDS))
+        bands[band] = change.get("gain", 0)
+        merged["bands"] = bands
+        merged["preset"] = "custom"
+    return merged
 
 
 def validate(key: str, value):

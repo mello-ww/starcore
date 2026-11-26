@@ -632,7 +632,16 @@ hearts `follows` it. The repeat rule for a radio is `mission_control/media/repea
   document, none without one, a `reloads` re-reads the preferences), Jest for the Android host;
   both clients, from Music's pages and from another Satellite's.
 
-**A5 - settings.** Music's Settings page as forms, toggles and sliders with `reloads`; the
+**A5 - settings.** **Done.** A Settings tab (`settings`, one answer for the whole page:
+the preferences at its top level, `accent_mode` and `accent_colour`, the library's totals, the
+configuration with its lists as rows, the devices with the one asking marked `this`), an
+`equalizer` page (a POST to `settings` with `{equalizer: {preset}}` or `{equalizer: {band,
+gain}}` changes only that part, `users.merge_equalizer`), a `scan` page
+(`scan?view=shared`, refreshed every 2 s, Scan now and Cancel) and a `duplicates` page
+(`duplicates?view=shared`, a heading per likely group, the best copy marked). The library's
+folders and the scanning settings are forms that POST `configuration` with `{values}`, all
+checked before any is saved. Home's empty state opens Settings. As planned:
+Music's Settings page as forms, toggles and sliders with `reloads`; the
 equalizer page; the library's settings with `rows`; the scan page refreshing every 2 s with
 Cancel; duplicates; devices (S: `connect/forget`). Tests: Music's engine tests for the
 preference keys and the configuration; a setting changed on the page heard at once, on both

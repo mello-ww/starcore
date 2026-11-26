@@ -117,6 +117,11 @@ class History:
             "by_day": [{"day": row[0], "plays": row[1], "minutes": round((row[2] or 0) / 60)} for row in days],
         }
 
+    def first_year(self, user: str):
+        """The year of the listener's first counted play, or None before any."""
+        first = self.db.value("SELECT MIN(played_at) FROM plays WHERE user = ? AND completed = 1", (user,))
+        return int(str(first)[:4]) if first else None
+
     def wrapped(self, user: str, year: int) -> dict:
         start, end = f"{year:04d}-01-01", f"{year + 1:04d}-01-01"
         stats = self.stats(user, start, end, limit=5)

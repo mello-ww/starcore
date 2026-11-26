@@ -762,6 +762,108 @@ class ConnectTest(MusicApiCase):
         self.assertEqual(self.call("connect/register", {"device_id": "x"})[0], 400)
 
 
+class SettingsPageTest(MusicApiCase):
+    """What Music's shared Settings, Equalizer, Scan and Duplicates pages read and send (A5)."""
+
+    def setUp(self):
+        super().setUp()
+        # a saved setting goes to this test's own config.toml, never Music's real one
+        path, data = self.satellite.config.path, dict(self.satellite.config.data)
+        self.satellite.config.path = self.directory / "config.toml"
+        self.satellite.config.path.write_text('enabled = true\n', encoding="utf-8")
+
+        def restore():
+            self.satellite.config.path = path
+            self.satellite.config.data.clear()
+            self.satellite.config.data.update(data)
+        self.addCleanup(restore)
+
+    def test_the_settings_page_reads_preferences_library_configuration_and_devices(self):
+        self.fill()
+        self.satellite.config.data["exclude"] = ["*/Podcasts/*"]
+        self.call("connect/register", {"device_id": "browser-0101", "name": "Laptop", "kind": "web"})
+        self.call("connect/register", {"device_id": "phone-000101", "name": "Phone", "kind": "mobile"},
+                  token=self.engine.auth.create_session("alice"))
+        status, page = self.call("settings")
+        self.assertEqual(status, 200, page)
+        self.assertEqual((page["theme"], page["gapless"], page["accent_mode"]), ("system", True, "starcore"))
+        self.assertEqual(page["library"]["tracks"], 3)
+        self.assertEqual(page["config"]["library"], str(self.source))
+        self.assertEqual(page["config"]["exclude"], [{"pattern": "*/Podcasts/*"}])
+        self.assertEqual((page["transcoding"], page["transcoding_label"]), (False, "Unavailable"))
+        devices = {device["name"]: device for device in page["devices"]}
+        self.assertTrue(devices["Laptop"]["this"])
+        self.assertFalse(devices["Laptop"]["forgettable"])
+        self.assertTrue(devices["Laptop"]["line"].startswith("This device"))
+        self.assertTrue(devices["Phone"]["forgettable"])
+
+    def test_the_accent_is_sent_as_a_mode_and_a_colour(self):
+        page = self.call("settings", {"accent_mode": "custom", "accent_colour": "#12ab9f", "theme": "dark"})[1]
+        self.assertEqual((page["accent"], page["accent_mode"], page["accent_colour"], page["theme"]),
+                         ("#12ab9f", "custom", "#12ab9f", "dark"))
+        page = self.call("settings", {"accent_mode": "artwork", "accent_colour": "#12ab9f"})[1]
+        self.assertEqual((page["accent"], page["accent_mode"], page["accent_colour"]), ("artwork", "artwork", ""))
+        self.assertEqual(self.call("settings", {"accent_mode": "custom", "accent_colour": "red"})[0], 400)
+        self.assertEqual(self.call("preferences")[1]["accent"], "artwork")
+
+    def test_the_equalizer_takes_one_part_at_a_time(self):
+        equalizer = lambda change: self.call("settings", {"equalizer": change})[1]["equalizer"]
+        self.assertTrue(equalizer({"enabled": True})["enabled"])
+        rock = equalizer({"preset": "rock"})
+        users = module("users")
+        self.assertEqual((rock["preset"], rock["bands"], rock["enabled"]),
+                         ("rock", list(users.EQUALIZER_PRESETS["rock"]), True))
+        tuned = equalizer({"band": 2, "gain": -3.5})
+        self.assertEqual((tuned["preset"], tuned["bands"][2], tuned["bands"][0]), ("custom", -3.5, 4))
+        self.assertEqual(equalizer({"preamp": 30})["preamp"], 12)
+        self.assertEqual(self.call("settings", {"equalizer": {"band": 10, "gain": 1}})[0], 400)
+        self.assertEqual(self.call("settings", {"equalizer": {"band": True, "gain": 1}})[0], 400)
+        # a whole equalizer, as Music's own pages send it, keeps its own bands under a preset's name
+        whole = equalizer({"enabled": False, "preset": "rock", "bands": [1] * 10, "preamp": 0})
+        self.assertEqual(whole["bands"], [1] * 10)
+
+    def test_a_form_saves_several_settings_or_none(self):
+        other = self.directory / "other"
+        status, saved = self.call("configuration", {"values": {
+            "sources": [{"path": str(other)}], "exclude": [{"pattern": "*/Podcasts/*"}], "min_duration": "30"}})
+        self.assertEqual(status, 200, saved)
+        self.assertEqual(saved["message"], "Saved.")
+        self.assertEqual(self.satellite.config.get("sources"), [str(other)])
+        self.assertEqual(self.satellite.config.get("exclude"), ["*/Podcasts/*"])
+        self.assertEqual(self.satellite.config.get("min_duration"), 30)
+        status, refused = self.call("configuration", {"values": {"min_duration": 5, "sources": [{"path": "relative"}]}})
+        self.assertEqual(status, 400, refused)
+        self.assertEqual(self.satellite.config.get("min_duration"), 30)
+        self.assertEqual(self.call("configuration", {"values": {"nothing": 1}})[0], 400)
+        self.assertEqual(self.call("configuration", {"values": {}})[0], 400)
+        self.assertEqual(self.call("configuration", {"key": "min_duration", "value": 0})[0], 200)
+
+    def test_the_scan_page_and_duplicates(self):
+        self.assertEqual(self.call("scan?view=shared")[1]["line"], "Never scanned.")
+        self.fill()
+        (self.source / "copy").mkdir()
+        # the same song on another release, in a lesser quality
+        (self.source / "copy" / "one.opus").write_bytes(media.opus(
+            {"TITLE": "One", "ARTIST": "Lumen", "ALBUM": "Live"}, seconds=180))
+        (self.source / "broken.flac").write_bytes(b"not audio")
+        self.call("scan", {})
+        scan = self.call("scan?view=shared")[1]
+        self.assertTrue(scan["idle"])
+        self.assertFalse(scan["running"])
+        self.assertIsInstance(scan["last_scan"], int)
+        self.assertIn("files", scan["line"])
+        self.assertEqual(scan["error"], "")
+        self.assertEqual([entry["file"].endswith("broken.flac") for entry in scan["failed"]], [True])
+        self.assertTrue(self.call("scan?view=shared", {"cancel": True})[1]["idle"])
+
+        duplicates = self.call("duplicates?view=shared")[1]
+        self.assertEqual(duplicates["context"], "library:duplicates")
+        self.assertTrue(duplicates["has_tracks"])
+        self.assertEqual({track["group"] for track in duplicates["tracks"]}, {"1. One"})
+        self.assertEqual(sum(track["album_line"].startswith("Best copy") for track in duplicates["tracks"]), 1)
+        self.assertIn("Nothing is ever deleted", duplicates["summary"])
+
+
 class OpenInstallTest(MusicApiCase):
     """Before an account exists the Core is open by design; Music then keeps one local listener."""
     bootstrap = False

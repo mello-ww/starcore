@@ -1,5 +1,5 @@
 {
- "_about": "Music's shared interface (UI contract 1.2), a preview beside Music's own page and screens (docs/media-audio.md). A1: an album, an artist, a mix, a radio station, a mood, a genre and a track's credits, each played through the client's audio host with the play action's tracks or route. A2: Home (its sections as shelves and track rows), Search (recent searches and genres while empty, then the results, with a quality filter) and Your Library (one choice for its seven tabs, each filtered and sorted on the server, Liked Songs paged), a folder's page with its breadcrumb; every track row has its heart, marks the track playing and has its menu, every album, artist, mix and playlist tile its own. A3: playlists - Add to playlist in every track's menu (the choose action, which also creates one), a playlist's page with its details, cover, export and deletion, a regular playlist's songs reordered by dragging and removed from their menu, a smart playlist's rules edited as rows, new playlists, and a playlist file imported, with what it named that the library lacks. A4: what the player adds while it plays Music (`audio`: its More menu, the title's and artist's links, Open Music), a like on a page reaching the player at once (`reloads`) and the pages with hearts following a like in the player (`follows`). It binds to Music's routes (views.py shapes the rows); pictures of mixes, moods and genres come from artwork/mosaic, a playlist's from playlists/<id>/picture.",
+ "_about": "Music's shared interface (UI contract 1.2), a preview beside Music's own page and screens (docs/media-audio.md). A1: an album, an artist, a mix, a radio station, a mood, a genre and a track's credits, each played through the client's audio host with the play action's tracks or route. A2: Home (its sections as shelves and track rows), Search (recent searches and genres while empty, then the results, with a quality filter) and Your Library (one choice for its seven tabs, each filtered and sorted on the server, Liked Songs paged), a folder's page with its breadcrumb; every track row has its heart, marks the track playing and has its menu, every album, artist, mix and playlist tile its own. A3: playlists - Add to playlist in every track's menu (the choose action, which also creates one), a playlist's page with its details, cover, export and deletion, a regular playlist's songs reordered by dragging and removed from their menu, a smart playlist's rules edited as rows, new playlists, and a playlist file imported, with what it named that the library lacks. A4: what the player adds while it plays Music (`audio`: its More menu, the title's and artist's links, Open Music), a like on a page reaching the player at once (`reloads`) and the pages with hearts following a like in the player (`follows`). A5: a Settings tab (the library's folders as rows, scanning in Developer Mode, playback, streaming quality, appearance, privacy, devices), the equalizer, a scan page refreshed every 2 seconds with Cancel, and duplicates. It binds to Music's routes (views.py shapes the rows); pictures of mixes, moods and genres come from artwork/mosaic, a playlist's from playlists/<id>/picture.",
  "contract": "starcore.ui/1.2",
  "title": "Music",
  "preview": true,
@@ -27,6 +27,11 @@
    "page": "library",
    "label": "Your Library",
    "icon": "layers"
+  },
+  {
+   "page": "settings",
+   "label": "Settings",
+   "icon": "settings"
   }
  ],
  "pages": {
@@ -43,6 +48,15 @@
      "type": "text",
      "visible": "$.empty",
      "text": "Your library is empty. Add a music folder in Music's settings and scan it."
+    },
+    {
+     "type": "button",
+     "label": "Open settings",
+     "style": "primary",
+     "visible": "$.empty",
+     "action": {
+      "navigate": "settings"
+     }
     },
     {
      "type": "heading",
@@ -8892,6 +8906,1350 @@
        "format": "integer"
       }
      ]
+    }
+   ]
+  },
+  "settings": {
+   "title": "Settings",
+   "source": {
+    "route": "settings"
+   },
+   "blocks": [
+    {
+     "type": "card",
+     "title": "Library",
+     "blocks": [
+      {
+       "type": "field",
+       "label": "Tracks",
+       "value": "$.library.tracks",
+       "format": "integer"
+      },
+      {
+       "type": "field",
+       "label": "Albums",
+       "value": "$.library.albums",
+       "format": "integer"
+      },
+      {
+       "type": "field",
+       "label": "Artists",
+       "value": "$.library.artists",
+       "format": "integer"
+      },
+      {
+       "type": "field",
+       "label": "Size",
+       "value": "$.library.size_bytes",
+       "format": "bytes"
+      },
+      {
+       "type": "field",
+       "label": "Missing files",
+       "value": "$.library.missing",
+       "format": "integer"
+      },
+      {
+       "type": "form",
+       "fields": [
+        {
+         "key": "library",
+         "label": "Music folder",
+         "kind": "text",
+         "value": "$.config.library",
+         "placeholder": "~/Music"
+        },
+        {
+         "key": "sources",
+         "label": "Other music folders",
+         "kind": "rows",
+         "add": "Add a folder",
+         "value": "$.config.sources",
+         "fields": [
+          {
+           "key": "path",
+           "label": "Folder",
+           "kind": "text",
+           "placeholder": "/absolute/path",
+           "required": true
+          }
+         ]
+        }
+       ],
+       "submit": {
+        "label": "Save folders",
+        "action": {
+         "route": "configuration",
+         "method": "POST",
+         "body": {
+          "values": {
+           "library": "$form.library",
+           "sources": "$form.sources"
+          }
+         },
+         "then": "refresh"
+        }
+       }
+      },
+      {
+       "type": "button",
+       "label": "Scan the library",
+       "style": "primary",
+       "action": {
+        "navigate": "scan"
+       }
+      },
+      {
+       "type": "button",
+       "label": "Duplicates",
+       "style": "secondary",
+       "action": {
+        "navigate": "duplicates"
+       }
+      },
+      {
+       "type": "form",
+       "developer": true,
+       "fields": [
+        {
+         "key": "exclude",
+         "label": "Never index",
+         "kind": "rows",
+         "add": "Add a pattern",
+         "value": "$.config.exclude",
+         "fields": [
+          {
+           "key": "pattern",
+           "label": "Pattern",
+           "kind": "text",
+           "placeholder": "*/Podcasts/*",
+           "required": true
+          }
+         ]
+        },
+        {
+         "key": "min_duration",
+         "label": "Skip audio shorter than (seconds)",
+         "kind": "number",
+         "value": "$.config.min_duration"
+        },
+        {
+         "key": "missing_metadata",
+         "label": "Untagged files",
+         "kind": "select",
+         "value": "$.config.missing_metadata",
+         "options": [
+          {
+           "value": "filename",
+           "label": "Named from the file"
+          },
+          {
+           "value": "folders",
+           "label": "Read from the folders"
+          }
+         ]
+        },
+        {
+         "key": "scan_interval",
+         "label": "Rescan every (minutes, 0 for never)",
+         "kind": "number",
+         "value": "$.config.scan_interval"
+        },
+        {
+         "key": "ffmpeg",
+         "label": "FFmpeg",
+         "kind": "text",
+         "value": "$.config.ffmpeg"
+        },
+        {
+         "key": "transcode_workers",
+         "label": "Transcodes at once",
+         "kind": "number",
+         "value": "$.config.transcode_workers"
+        },
+        {
+         "key": "transcode_cache_mb",
+         "label": "Transcode cache (MB)",
+         "kind": "number",
+         "value": "$.config.transcode_cache_mb"
+        }
+       ],
+       "submit": {
+        "label": "Save scanning",
+        "action": {
+         "route": "configuration",
+         "method": "POST",
+         "body": {
+          "values": {
+           "exclude": "$form.exclude",
+           "min_duration": "$form.min_duration",
+           "missing_metadata": "$form.missing_metadata",
+           "scan_interval": "$form.scan_interval",
+           "ffmpeg": "$form.ffmpeg",
+           "transcode_workers": "$form.transcode_workers",
+           "transcode_cache_mb": "$form.transcode_cache_mb"
+          }
+         },
+         "then": "refresh"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "card",
+     "title": "Playback",
+     "blocks": [
+      {
+       "type": "toggle",
+       "label": "Gapless playback",
+       "value": "$.gapless",
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "gapless": "$value"
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "description": "No silence between tracks of one album."
+      },
+      {
+       "type": "slider",
+       "label": "Crossfade",
+       "value": "$.crossfade",
+       "min": 0,
+       "max": 12,
+       "step": 1,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "crossfade": "$value"
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "s"
+      },
+      {
+       "type": "toggle",
+       "label": "Normalize volume",
+       "value": "$.normalize",
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "normalize": "$value"
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       }
+      },
+      {
+       "type": "form",
+       "fields": [
+        {
+         "key": "replaygain",
+         "label": "Volume levelling",
+         "kind": "select",
+         "value": "$.replaygain",
+         "options": [
+          {
+           "value": "off",
+           "label": "Off"
+          },
+          {
+           "value": "track",
+           "label": "Per track"
+          },
+          {
+           "value": "album",
+           "label": "Per album"
+          }
+         ]
+        },
+        {
+         "key": "queue_end",
+         "label": "When the queue ends",
+         "kind": "select",
+         "value": "$.queue_end",
+         "options": [
+          {
+           "value": "stop",
+           "label": "Stop"
+          },
+          {
+           "value": "repeat",
+           "label": "Repeat"
+          },
+          {
+           "value": "autoplay",
+           "label": "Keep playing similar songs"
+          }
+         ]
+        }
+       ],
+       "submit": {
+        "label": "Save",
+        "action": {
+         "route": "settings",
+         "method": "POST",
+         "body": {
+          "replaygain": "$form.replaygain",
+          "queue_end": "$form.queue_end"
+         },
+         "then": "refresh",
+         "reloads": "audio.session"
+        }
+       }
+      },
+      {
+       "type": "slider",
+       "label": "Speed",
+       "value": "$.speed",
+       "min": 0.5,
+       "max": 2,
+       "step": 0.05,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "speed": "$value"
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "x"
+      },
+      {
+       "type": "toggle",
+       "label": "Keep the pitch when the speed changes",
+       "value": "$.preserve_pitch",
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "preserve_pitch": "$value"
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       }
+      },
+      {
+       "type": "slider",
+       "label": "Pitch",
+       "value": "$.pitch",
+       "min": -12,
+       "max": 12,
+       "step": 1,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "pitch": "$value"
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "semitones"
+      },
+      {
+       "type": "button",
+       "label": "Equalizer",
+       "style": "secondary",
+       "action": {
+        "navigate": "equalizer"
+       }
+      }
+     ]
+    },
+    {
+     "type": "card",
+     "title": "Streaming quality",
+     "blocks": [
+      {
+       "type": "field",
+       "label": "Transcoding",
+       "value": "$.transcoding_label"
+      },
+      {
+       "type": "text",
+       "style": "caption",
+       "visible": "$.no_transcoding",
+       "text": "FFmpeg isn't available on the server, so every track streams in its original quality."
+      },
+      {
+       "type": "form",
+       "fields": [
+        {
+         "key": "streaming_quality",
+         "label": "On Wi-Fi",
+         "kind": "select",
+         "value": "$.streaming_quality",
+         "options": [
+          {
+           "value": "original",
+           "label": "Original"
+          },
+          {
+           "value": "high",
+           "label": "High (320 kbps)"
+          },
+          {
+           "value": "normal",
+           "label": "Normal (160 kbps)"
+          },
+          {
+           "value": "low",
+           "label": "Low (96 kbps)"
+          }
+         ]
+        },
+        {
+         "key": "cellular_quality",
+         "label": "On mobile data",
+         "kind": "select",
+         "value": "$.cellular_quality",
+         "options": [
+          {
+           "value": "original",
+           "label": "Original"
+          },
+          {
+           "value": "high",
+           "label": "High (320 kbps)"
+          },
+          {
+           "value": "normal",
+           "label": "Normal (160 kbps)"
+          },
+          {
+           "value": "low",
+           "label": "Low (96 kbps)"
+          }
+         ]
+        }
+       ],
+       "submit": {
+        "label": "Save",
+        "action": {
+         "route": "settings",
+         "method": "POST",
+         "body": {
+          "streaming_quality": "$form.streaming_quality",
+          "cellular_quality": "$form.cellular_quality"
+         },
+         "then": "refresh",
+         "reloads": "audio.session"
+        }
+       }
+      },
+      {
+       "type": "form",
+       "fields": [
+        {
+         "key": "transcode_format",
+         "label": "Transcoding format",
+         "kind": "select",
+         "value": "$.transcode_format",
+         "options": [
+          {
+           "value": "opus",
+           "label": "Opus"
+          },
+          {
+           "value": "aac",
+           "label": "AAC"
+          },
+          {
+           "value": "mp3",
+           "label": "MP3"
+          }
+         ]
+        }
+       ],
+       "submit": {
+        "label": "Save",
+        "action": {
+         "route": "settings",
+         "method": "POST",
+         "body": {
+          "transcode_format": "$form.transcode_format"
+         },
+         "then": "refresh",
+         "reloads": "audio.session"
+        }
+       },
+       "developer": true
+      }
+     ]
+    },
+    {
+     "type": "card",
+     "title": "Appearance",
+     "blocks": [
+      {
+       "type": "form",
+       "fields": [
+        {
+         "key": "theme",
+         "label": "Theme",
+         "kind": "select",
+         "value": "$.theme",
+         "options": [
+          {
+           "value": "system",
+           "label": "System"
+          },
+          {
+           "value": "dark",
+           "label": "Dark"
+          },
+          {
+           "value": "light",
+           "label": "Light"
+          }
+         ]
+        },
+        {
+         "key": "density",
+         "label": "Density",
+         "kind": "select",
+         "value": "$.density",
+         "options": [
+          {
+           "value": "comfortable",
+           "label": "Comfortable"
+          },
+          {
+           "value": "compact",
+           "label": "Compact"
+          }
+         ]
+        },
+        {
+         "key": "visualizer",
+         "label": "Visualizer",
+         "kind": "select",
+         "value": "$.visualizer",
+         "options": [
+          {
+           "value": "off",
+           "label": "Off"
+          },
+          {
+           "value": "bars",
+           "label": "Bars"
+          },
+          {
+           "value": "wave",
+           "label": "Wave"
+          }
+         ]
+        }
+       ],
+       "submit": {
+        "label": "Save",
+        "action": {
+         "route": "settings",
+         "method": "POST",
+         "body": {
+          "theme": "$form.theme",
+          "density": "$form.density",
+          "visualizer": "$form.visualizer"
+         },
+         "then": "refresh",
+         "reloads": "audio.session"
+        }
+       }
+      },
+      {
+       "type": "form",
+       "fields": [
+        {
+         "key": "accent_mode",
+         "label": "Accent colour",
+         "kind": "select",
+         "value": "$.accent_mode",
+         "options": [
+          {
+           "value": "starcore",
+           "label": "StarCore's accent"
+          },
+          {
+           "value": "artwork",
+           "label": "From the cover"
+          },
+          {
+           "value": "custom",
+           "label": "A colour of my own"
+          }
+         ]
+        },
+        {
+         "key": "accent_colour",
+         "label": "Colour (#rrggbb, for a colour of your own)",
+         "kind": "text",
+         "value": "$.accent_colour",
+         "placeholder": "#1db954"
+        }
+       ],
+       "submit": {
+        "label": "Save",
+        "action": {
+         "route": "settings",
+         "method": "POST",
+         "body": {
+          "accent_mode": "$form.accent_mode",
+          "accent_colour": "$form.accent_colour"
+         },
+         "then": "refresh",
+         "reloads": "audio.session"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "card",
+     "title": "Privacy",
+     "blocks": [
+      {
+       "type": "toggle",
+       "label": "Keep a listening history",
+       "value": "$.history_enabled",
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "history_enabled": "$value"
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "description": "Stats, Wrapped and Recently played use it. It never leaves the server."
+      },
+      {
+       "type": "toggle",
+       "label": "Recommendations",
+       "value": "$.discovery_enabled",
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "discovery_enabled": "$value"
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "description": "Mixes and radio built from what you play."
+      },
+      {
+       "type": "text",
+       "style": "caption",
+       "text": "Scrobbling to an outside service isn't installed: nothing you play is sent anywhere."
+      },
+      {
+       "type": "button",
+       "label": "Clear listening history",
+       "style": "danger",
+       "action": {
+        "route": "history/clear",
+        "method": "POST",
+        "body": {},
+        "confirm": "Clear your whole listening history? Stats and Wrapped start again from nothing.",
+        "then": "refresh"
+       }
+      }
+     ]
+    },
+    {
+     "type": "card",
+     "title": "Devices",
+     "blocks": [
+      {
+       "type": "media-list",
+       "items": "$.devices",
+       "empty": "No device has played music yet.",
+       "item": {
+        "title": "$.name",
+        "subtitle": "$.line",
+        "meta": "$.last_seen",
+        "format": {
+         "meta": "relative"
+        },
+        "key": "$.id"
+       },
+       "menu": [
+        {
+         "label": "Forget",
+         "icon": "trash-2",
+         "visible": "$.forgettable",
+         "action": {
+          "route": "connect/forget",
+          "method": "POST",
+          "body": {
+           "target": "$.id"
+          },
+          "confirm": "Forget this device? It shows up again the next time it plays.",
+          "then": "refresh"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "equalizer": {
+   "title": "Equalizer",
+   "source": {
+    "route": "settings"
+   },
+   "blocks": [
+    {
+     "type": "toggle",
+     "label": "Equalizer",
+     "value": "$.equalizer.enabled",
+     "action": {
+      "route": "settings",
+      "method": "POST",
+      "body": {
+       "equalizer": {
+        "enabled": "$value"
+       }
+      },
+      "then": "refresh",
+      "reloads": "audio.session"
+     }
+    },
+    {
+     "type": "form",
+     "fields": [
+      {
+       "key": "preset",
+       "label": "Preset",
+       "kind": "select",
+       "value": "$.equalizer.preset",
+       "options": [
+        {
+         "value": "flat",
+         "label": "Flat"
+        },
+        {
+         "value": "bass",
+         "label": "Bass"
+        },
+        {
+         "value": "treble",
+         "label": "Treble"
+        },
+        {
+         "value": "vocal",
+         "label": "Vocal"
+        },
+        {
+         "value": "rock",
+         "label": "Rock"
+        },
+        {
+         "value": "electronic",
+         "label": "Electronic"
+        },
+        {
+         "value": "jazz",
+         "label": "Jazz"
+        },
+        {
+         "value": "classical",
+         "label": "Classical"
+        },
+        {
+         "value": "acoustic",
+         "label": "Acoustic"
+        },
+        {
+         "value": "loudness",
+         "label": "Loudness"
+        },
+        {
+         "value": "late night",
+         "label": "Late night"
+        },
+        {
+         "value": "custom",
+         "label": "Custom"
+        }
+       ]
+      }
+     ],
+     "submit": {
+      "label": "Apply preset",
+      "action": {
+       "route": "settings",
+       "method": "POST",
+       "body": {
+        "equalizer": {
+         "preset": "$form.preset"
+        }
+       },
+       "then": "refresh",
+       "reloads": "audio.session"
+      }
+     }
+    },
+    {
+     "type": "card",
+     "title": "Bands",
+     "blocks": [
+      {
+       "type": "slider",
+       "label": "31 Hz",
+       "value": "$.equalizer.bands.0",
+       "min": -12,
+       "max": 12,
+       "step": 0.5,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "equalizer": {
+          "band": 0,
+          "gain": "$value"
+         }
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "dB"
+      },
+      {
+       "type": "slider",
+       "label": "62 Hz",
+       "value": "$.equalizer.bands.1",
+       "min": -12,
+       "max": 12,
+       "step": 0.5,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "equalizer": {
+          "band": 1,
+          "gain": "$value"
+         }
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "dB"
+      },
+      {
+       "type": "slider",
+       "label": "125 Hz",
+       "value": "$.equalizer.bands.2",
+       "min": -12,
+       "max": 12,
+       "step": 0.5,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "equalizer": {
+          "band": 2,
+          "gain": "$value"
+         }
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "dB"
+      },
+      {
+       "type": "slider",
+       "label": "250 Hz",
+       "value": "$.equalizer.bands.3",
+       "min": -12,
+       "max": 12,
+       "step": 0.5,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "equalizer": {
+          "band": 3,
+          "gain": "$value"
+         }
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "dB"
+      },
+      {
+       "type": "slider",
+       "label": "500 Hz",
+       "value": "$.equalizer.bands.4",
+       "min": -12,
+       "max": 12,
+       "step": 0.5,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "equalizer": {
+          "band": 4,
+          "gain": "$value"
+         }
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "dB"
+      },
+      {
+       "type": "slider",
+       "label": "1 kHz",
+       "value": "$.equalizer.bands.5",
+       "min": -12,
+       "max": 12,
+       "step": 0.5,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "equalizer": {
+          "band": 5,
+          "gain": "$value"
+         }
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "dB"
+      },
+      {
+       "type": "slider",
+       "label": "2 kHz",
+       "value": "$.equalizer.bands.6",
+       "min": -12,
+       "max": 12,
+       "step": 0.5,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "equalizer": {
+          "band": 6,
+          "gain": "$value"
+         }
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "dB"
+      },
+      {
+       "type": "slider",
+       "label": "4 kHz",
+       "value": "$.equalizer.bands.7",
+       "min": -12,
+       "max": 12,
+       "step": 0.5,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "equalizer": {
+          "band": 7,
+          "gain": "$value"
+         }
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "dB"
+      },
+      {
+       "type": "slider",
+       "label": "8 kHz",
+       "value": "$.equalizer.bands.8",
+       "min": -12,
+       "max": 12,
+       "step": 0.5,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "equalizer": {
+          "band": 8,
+          "gain": "$value"
+         }
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "dB"
+      },
+      {
+       "type": "slider",
+       "label": "16 kHz",
+       "value": "$.equalizer.bands.9",
+       "min": -12,
+       "max": 12,
+       "step": 0.5,
+       "action": {
+        "route": "settings",
+        "method": "POST",
+        "body": {
+         "equalizer": {
+          "band": 9,
+          "gain": "$value"
+         }
+        },
+        "then": "refresh",
+        "reloads": "audio.session"
+       },
+       "unit": "dB"
+      }
+     ]
+    },
+    {
+     "type": "slider",
+     "label": "Preamp",
+     "value": "$.equalizer.preamp",
+     "min": -12,
+     "max": 12,
+     "step": 0.5,
+     "action": {
+      "route": "settings",
+      "method": "POST",
+      "body": {
+       "equalizer": {
+        "preamp": "$value"
+       }
+      },
+      "then": "refresh",
+      "reloads": "audio.session"
+     },
+     "unit": "dB"
+    },
+    {
+     "type": "slider",
+     "label": "Bass boost",
+     "value": "$.bass_boost",
+     "min": 0,
+     "max": 12,
+     "step": 0.5,
+     "action": {
+      "route": "settings",
+      "method": "POST",
+      "body": {
+       "bass_boost": "$value"
+      },
+      "then": "refresh",
+      "reloads": "audio.session"
+     },
+     "unit": "dB"
+    }
+   ]
+  },
+  "scan": {
+   "title": "Scan the library",
+   "source": {
+    "route": "scan?view=shared",
+    "refresh": 2
+   },
+   "blocks": [
+    {
+     "type": "status",
+     "label": "Scanning",
+     "tone": "warn",
+     "visible": "$.running"
+    },
+    {
+     "type": "text",
+     "text": "$.line"
+    },
+    {
+     "type": "text",
+     "style": "mono",
+     "visible": "$.current",
+     "text": "$.current"
+    },
+    {
+     "type": "field",
+     "label": "Last scan",
+     "value": "$.last_scan",
+     "format": "datetime",
+     "visible": "$.idle"
+    },
+    {
+     "type": "text",
+     "style": "caption",
+     "visible": "$.error",
+     "text": "$.error"
+    },
+    {
+     "type": "button",
+     "label": "Scan now",
+     "style": "primary",
+     "visible": "$.idle",
+     "action": {
+      "route": "scan?view=shared",
+      "method": "POST",
+      "body": {
+       "background": true
+      },
+      "then": "refresh"
+     }
+    },
+    {
+     "type": "button",
+     "label": "Cancel",
+     "style": "secondary",
+     "visible": "$.running",
+     "action": {
+      "route": "scan?view=shared",
+      "method": "POST",
+      "body": {
+       "cancel": true
+      },
+      "then": "refresh"
+     }
+    },
+    {
+     "type": "heading",
+     "text": "$.failed_line",
+     "visible": "$.failed_line"
+    },
+    {
+     "type": "list",
+     "items": "$.failed",
+     "item": {
+      "title": "$.file",
+      "subtitle": "$.reason"
+     }
+    }
+   ]
+  },
+  "duplicates": {
+   "title": "Duplicates",
+   "source": {
+    "route": "duplicates?view=shared"
+   },
+   "follows": [
+    "audio.session"
+   ],
+   "blocks": [
+    {
+     "type": "text",
+     "style": "caption",
+     "text": "$.summary"
+    },
+    {
+     "type": "media-list",
+     "items": "$.tracks",
+     "item": {
+      "title": "$.title",
+      "subtitle": "$.album_line",
+      "meta": "$.duration",
+      "format": {
+       "meta": "duration"
+      },
+      "audio": "$.id",
+      "key": "$.id",
+      "group": "$.group"
+     },
+     "action": {
+      "play": {
+       "tracks": "$page.tracks",
+       "start": "$.id",
+       "context": "$page.context"
+      }
+     },
+     "quick": [
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "reloads": "audio.session",
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "style": "primary",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "reloads": "audio.session",
+        "then": "update"
+       }
+      }
+     ],
+     "menu": [
+      {
+       "label": "Play next",
+       "icon": "play",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "next"
+        }
+       }
+      },
+      {
+       "label": "Add to queue",
+       "icon": "list",
+       "action": {
+        "play": {
+         "tracks": [
+          "$"
+         ],
+         "queue": "end"
+        }
+       }
+      },
+      {
+       "label": "Add to Liked Songs",
+       "icon": "heart",
+       "visible": "$.not_liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": true
+        },
+        "reloads": "audio.session",
+        "then": "update"
+       }
+      },
+      {
+       "label": "Remove from Liked Songs",
+       "icon": "heart",
+       "visible": "$.liked",
+       "action": {
+        "route": "favorites",
+        "method": "POST",
+        "body": {
+         "kind": "track",
+         "id": "$.id",
+         "liked": false
+        },
+        "reloads": "audio.session",
+        "then": "update"
+       }
+      },
+      {
+       "label": "Start radio",
+       "icon": "activity",
+       "action": {
+        "play": {
+         "route": "radio/track/{$.id}"
+        }
+       }
+      },
+      {
+       "label": "Go to album",
+       "icon": "music",
+       "visible": "$.album_id",
+       "action": {
+        "navigate": "album",
+        "params": {
+         "id": "$.album_id"
+        }
+       }
+      },
+      {
+       "label": "Go to artist",
+       "icon": "star",
+       "visible": "$.artist_id",
+       "action": {
+        "navigate": "artist",
+        "params": {
+         "id": "$.artist_id"
+        }
+       }
+      },
+      {
+       "label": "Add to playlist",
+       "icon": "plus",
+       "action": {
+        "choose": {
+         "source": "playlists?editable=1",
+         "items": "$.playlists",
+         "title": "Add to playlist",
+         "empty": "No playlists yet.",
+         "item": {
+          "title": "$.name",
+          "subtitle": "$.line",
+          "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+         },
+         "create": {
+          "label": "New playlist",
+          "field": "Playlist name",
+          "route": "playlists",
+          "body": {
+           "name": "$value",
+           "tracks": [
+            "$.id"
+           ]
+          }
+         }
+        },
+        "route": "playlists/{$value.id}/add",
+        "body": {
+         "tracks": [
+          "$.id"
+         ],
+         "ask": true
+        },
+        "conflict": {
+         "confirm": "This song is already in this playlist. Add it again?",
+         "route": "playlists/{$value.id}/add",
+         "body": {
+          "tracks": [
+           "$.id"
+          ],
+          "allow_duplicates": true
+         }
+        }
+       }
+      },
+      {
+       "label": "Credits",
+       "icon": "info",
+       "action": {
+        "navigate": "track",
+        "params": {
+         "id": "$.id"
+        }
+       }
+      }
+     ],
+     "empty": "No likely duplicates."
     }
    ]
   }

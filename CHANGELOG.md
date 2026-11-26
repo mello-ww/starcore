@@ -57,6 +57,15 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 - **Music's player additions on the shared interface (a preview, milestone A4).** Add to
   playlist, Start radio, Go to album, Go to artist, Credits and Open Music in the player's
   menu; a heart on a page turns the player's over at once, and the reverse.
+- **Music's Settings on the shared interface (a preview, milestone A5).** A Settings tab with
+  the library's folders (as rows), scanning (in Developer Mode), playback, streaming quality,
+  appearance, privacy and devices (Forget); an Equalizer page (presets, ten bands, preamp, bass
+  boost); a Scan page that follows a running scan every 2 seconds and can cancel it, with the
+  files it couldn't read; and a Duplicates page grouping likely copies, the best one marked.
+  Each control saves at once and reaches the player (`reloads`). Music's `settings` route
+  answers the whole page, takes the accent as a mode and a colour, and an equalizer change one
+  part at a time (a preset, one band); its `configuration` route saves a form's `values`
+  together, all checked before any is saved.
 
 - **Satellites ship their own icons (UI contract 1.2, contract change 5).** A Satellite lists
   them in its `satellite.toml` (`[icons]`, each with a shared icon as fallback) and puts them

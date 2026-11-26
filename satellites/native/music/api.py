@@ -28,6 +28,7 @@ def routes() -> dict:
         "stats": routes_listener.stats,
         "wrapped": routes_listener.wrapped,
         "preferences": routes_listener.preferences,
+        "settings": routes_listener.settings,
         "home": routes_listener.home,
         "mixes": routes_listener.mixes,
         "radio": routes_listener.radio,
@@ -52,10 +53,12 @@ def configuration_route(request):
 
     body = request.body or {}
     key, value = body.get("key"), body.get("value")
-    if not isinstance(key, str):
-        return error_response("'key' must be a string", status=400)
-
     try:
+        if "values" in body:
+            # several settings from one form, all checked before any is saved
+            return json_response(configuration.update_many(request.satellite, body.get("values")))
+        if not isinstance(key, str):
+            return error_response("'key' must be a string", status=400)
         return json_response(configuration.update(request.satellite, key, value))
     except configuration.ConfigurationError as error:
         return error_response(str(error), status=400)

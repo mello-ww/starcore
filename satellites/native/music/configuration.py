@@ -51,7 +51,9 @@ def _as_list(value) -> list:
         value = LIST_SEPARATOR.split(value)
     if not isinstance(value, list):
         raise ConfigurationError("expected a list")
-    return [str(item).strip() for item in value if str(item).strip()]
+    # a form's repeatable rows send objects: a folder's `path`, a pattern's `pattern`
+    value = [item.get("path", item.get("pattern")) if isinstance(item, dict) else item for item in value]
+    return [str(item).strip() for item in value if item is not None and str(item).strip()]
 
 
 def _validate_sources(value) -> list:
@@ -207,4 +209,17 @@ def update(satellite, key: str, value) -> dict:
 
     result = describe(satellite)
     result["note"] = note
+    return result
+
+
+def update_many(satellite, values: dict) -> dict:
+    """Several settings from one form: every value is checked before any is saved."""
+    if not isinstance(values, dict) or not values:
+        raise ConfigurationError("'values' must be an object of settings")
+    saved = {key: validate(key, value) for key, value in values.items()}
+    for key, value in saved.items():
+        satellite.config.set(key, value)
+    result = describe(satellite)
+    result["note"] = "Saved. It applies to the next scan or stream."
+    result["message"] = "Saved."
     return result

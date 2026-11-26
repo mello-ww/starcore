@@ -165,7 +165,10 @@ def folders(call):
 
 @route("GET")
 def duplicates(call):
-    return ok(call.music.catalog.duplicates())
+    found = call.music.catalog.duplicates()
+    if call.query.get("view") == "shared":
+        return ok(views.duplicates(found, views.liked_tracks(call.music, call.user)))
+    return ok(found)
 
 
 @route("GET", "POST")
@@ -241,11 +244,12 @@ def lyrics(call):
 @route("GET", "POST")
 def scan(call):
     music = call.music
+    shared = call.query.get("view") == "shared"
     if call.method == "GET":
-        return ok(music.scan_status())
+        return ok(views.scan(music.scan_status()) if shared else music.scan_status())
     if call.body.get("cancel"):
         music.cancel_scan()
-        return ok(music.scan_status())
+        return ok(views.scan(music.scan_status()) if shared else music.scan_status())
     source = call.body.get("source")
     if source is not None and not isinstance(source, str):
         return error_response("'source' must be a path to a directory on this machine", status=400)

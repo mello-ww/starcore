@@ -6,7 +6,7 @@ import secrets
 
 from starcore.api.response import error_response, file_response, json_response
 
-from . import views
+from . import configuration, views
 from .history import year_now
 from .playlists import parse_m3u
 from .routes_catalog import image_type, mosaic_key
@@ -331,13 +331,31 @@ def stats(call):
     start = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds") if days else None
     payload = call.music.history.stats(call.user, start, limit=call.integer("limit", 10, 1, 50))
     payload["library"] = call.music.summary()
+    if call.query.get("view") == "shared":
+        return ok(views.stats(call.music, call.user, payload, days, year_now()))
     return ok(payload)
 
 
 @route("GET")
 def wrapped(call):
     year = call.integer("year", year_now(), 1970, 9999)
-    return ok(call.music.history.wrapped(call.user, year))
+    payload = call.music.history.wrapped(call.user, year)
+    if call.query.get("view") == "shared":
+        first = call.music.history.first_year(call.user)
+        return ok(views.wrapped(call.music, call.user, payload, year_now(), first))
+    return ok(payload)
+
+
+@route("GET", "POST")
+def settings(call):
+    """Music's Settings page as the shared interface reads it; a POST changes preferences (the
+    accent as a mode and a colour) and answers the page again."""
+    music = call.music
+    if call.method == "POST":
+        music.preferences.update(call.user, views.accent_change(call.body))
+    request = call.request
+    config = {key: configuration.value_of(request.satellite, key) for key in configuration.SETTINGS}
+    return ok(views.settings(music, call.user, call.session, config, music.transcoder.available))
 
 
 @route("GET", "POST")

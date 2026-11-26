@@ -5,9 +5,11 @@ list: each track with its heart (`liked` and `not_liked`, a pair the document dr
 toggle), its quality badge and the line under its title as text, and its position in the list.
 A long list is never sent whole: it comes a page at a time (`cursor`), and the audio host asks
 for the tracks at chosen positions (`positions`) to shuffle it, or for the list from a row on
-(`from`) to play it from there (docs/media-audio.md, A2).
+(`from`) to play it from there (docs/media-audio.md, A2). Settings, the scan and duplicates
+(A5), Stats and Wrapped (A6) are shaped here too, so each page binds plain values.
 """
 
+from datetime import datetime
 from pathlib import Path
 
 from . import grouping
@@ -406,5 +408,188 @@ def search(music, user: str, answer: dict, liked: set) -> dict:
     answer["has_recent"] = bool(answer["recent"])
     answer["browse"] = music.catalog.genres()[:24] if answer["idle"] else []
     answer["context"] = "search:" + (grouping.normalize(query).replace(" ", "-")[:60] or "all")
+    return answer
+
+
+# ---------- Settings (A5) ----------
+
+ACCENTS = ("starcore", "artwork")
+SCAN_FAILURES = 50
+DUPLICATE_GROUPS = 50
+
+
+def epoch(stamp):
+    """An ISO time as the epoch seconds the document's date formats take, or None."""
+    if not stamp:
+        return None
+    try:
+        return int(datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp())
+    except ValueError:
+        return None
+
+
+def settings(music, user: str, session: str, config: dict, transcoding: bool) -> dict:
+    """The Settings page in one answer: the listener's preferences at the top level (so each
+    control binds `$.<key>`), the accent as a mode and a colour, the library's totals, the
+    server's configuration as form values (lists as rows), and the listener's devices, each
+    saying whether it is the one asking and so can't be forgotten from here."""
+    answer = music.preferences.all(user)
+    accent = str(answer.get("accent") or "starcore")
+    answer["accent_mode"] = accent if accent in ACCENTS else "custom"
+    answer["accent_colour"] = "" if accent in ACCENTS else accent
+    summary = music.summary()
+    answer["library"] = {key: summary[key] for key in ("tracks", "albums", "artists", "duration", "size_bytes",
+                                                       "lossless", "hires", "missing")}
+    answer["transcoding"] = bool(transcoding)
+    answer["no_transcoding"] = not transcoding
+    answer["transcoding_label"] = "Available" if transcoding else "Unavailable"
+    answer["config"] = {**config, "sources": [{"path": path} for path in config.get("sources") or []],
+                        "exclude": [{"pattern": pattern} for pattern in config.get("exclude") or []]}
+    answer["devices"] = devices(music, user, session)
+    answer["has_devices"] = bool(answer["devices"])
+    return answer
+
+
+def accent_change(body: dict) -> dict:
+    """The accent from a form's mode and colour: a custom mode stores the colour (checked as
+    #rrggbb by the preferences), the others store the mode itself."""
+    changes = {key: value for key, value in body.items() if key not in ("accent_mode", "accent_colour")}
+    if "accent_mode" in body:
+        mode = body.get("accent_mode")
+        changes["accent"] = str(body.get("accent_colour") or "").strip() if mode == "custom" else mode
+    return changes
+
+
+def devices(music, user: str, session: str) -> list:
+    here = {row[0] for row in music.db.all("SELECT device_id FROM devices WHERE user = ? AND session_id = ?",
+                                           (user, session or ""))} if session else set()
+    rows = []
+    for device in music.connect.devices(user):
+        this = device["id"] in here
+        state = "This device" if this else "Online" if device["online"] else "Offline"
+        rows.append({"id": device["id"], "name": device["name"] or "Unnamed device",
+                     "line": " · ".join(part for part in (state, (device.get("kind") or "").capitalize()) if part),
+                     "last_seen": int(device["last_seen"] or 0) or None, "this": this, "forgettable": not this})
+    return rows
+
+
+def scan(status: dict) -> dict:
+    """The scan as its page shows it: running or idle, one line of what it did or is doing,
+    the files it couldn't read and its error (a cancel is not one)."""
+    answer = {"running": bool(status.get("running")), "idle": not status.get("running"),
+              "last_scan": epoch(status.get("last_scan"))}
+    progress, last = status.get("progress"), status.get("last")
+    if answer["running"]:
+        line = "Scanning…"
+        if progress:
+            line = (f"Scanning… {progress.get('found', 0):,} files checked, {progress.get('added', 0):,} new, "
+                    f"{progress.get('updated', 0):,} updated")
+        answer["line"] = line
+        answer["current"] = (progress or {}).get("current") or ""
+    elif last:
+        answer["line"] = (f"{last.get('found', 0):,} files, {last.get('added', 0):,} added, "
+                          f"{last.get('updated', 0):,} updated, {last.get('removed', 0):,} missing, "
+                          f"{last.get('duplicates', 0):,} duplicates.")
+        answer["current"] = ""
+    else:
+        answer["line"] = "Never scanned."
+        answer["current"] = ""
+    failed = (last or {}).get("failed") or [] if not answer["running"] else []
+    answer["failed"] = [{"file": str(entry.get("file") or ""), "reason": str(entry.get("reason") or "")}
+                        for entry in failed[:SCAN_FAILURES] if isinstance(entry, dict)]
+    answer["failed_line"] = f"{len(failed):,} unreadable files" + (
+        f", the first {SCAN_FAILURES} below" if len(failed) > SCAN_FAILURES else "") if failed else ""
+    error = status.get("error")
+    answer["error"] = error if error and error != "cancelled" else ""
+    return answer
+
+
+def duplicates(found: dict, liked: set) -> dict:
+    """Duplicates as one list of tracks, each likely group under its own heading, the best copy
+    first and saying so. Byte-identical copies are counted only: the scan indexed them once."""
+    tracks = []
+    for number, group in enumerate(found.get("likely", [])[:DUPLICATE_GROUPS], start=1):
+        heading = f"{number}. {group['tracks'][0].get('title') or 'Untitled'}"
+        for track in group["tracks"]:
+            row = track_row(track, liked, len(tracks))
+            row["group"] = heading
+            if track["id"] == group["best"]:
+                row["album_line"] = " · ".join(part for part in ("Best copy", row["album_line"]) if part)
+            tracks.append(row)
+    identical, likely = len(found.get("identical", [])), len(found.get("likely", []))
+    return {"tracks": tracks, "context": "library:duplicates", "has_tracks": bool(tracks),
+            "summary": (f"{songs(identical)} with identical copies elsewhere on disk (indexed once), "
+                        f"{likely:,} likely duplicate group{'' if likely == 1 else 's'} across releases. "
+                        "Nothing is ever deleted.")}
+
+
+# ---------- Stats and Wrapped (A6) ----------
+
+RANGES = (7, 30, 90, 365, 0)
+
+
+def plays(count: int) -> str:
+    return f"{count:,} play" + ("" if count == 1 else "s")
+
+
+def _rankings(music, answer: dict, liked: set) -> None:
+    """The rankings as rows: songs as track rows (with their plays as `meta`), artists and albums
+    with their artwork, genres by name."""
+    tracks = []
+    for entry in answer.get("top_tracks", []):
+        if entry.get("track"):
+            row = track_row(entry["track"], liked, len(tracks))
+            row["plays_line"] = plays(entry["plays"])
+            tracks.append(row)
+    answer["top_songs"] = tracks
+    artists = {artist["id"]: artist for artist in music.catalog.artists_by_id(
+        [entry["id"] for entry in answer.get("top_artists", []) if entry.get("id")])}
+    for entry in answer.get("top_artists", []):
+        entry["name"] = entry.get("name") or "Unknown artist"
+        entry["line"] = f"{entry.get('minutes', 0):,} min · {plays(entry.get('plays', 0))}"
+        entry["artwork"] = (artists.get(entry.get("id")) or {}).get("artwork") or ""
+    for entry in answer.get("top_albums", []):
+        entry["album"] = entry.get("album") or "Unknown album"
+        entry["line"] = " · ".join(part for part in (entry.get("artist") or "", plays(entry.get("plays", 0))) if part)
+    for entry in answer.get("top_genres", []):
+        entry["line"] = plays(entry.get("plays", 0))
+    answer["has_plays"] = bool(answer.get("plays"))
+    answer["no_plays"] = not answer["has_plays"]
+
+
+def stats(music, user: str, answer: dict, days: int, year: int) -> dict:
+    """Stats as the dashboard reads them: the range it covers, the rankings as rows, plays by
+    hour as plain numbers for a bars chart, and the way to this year's Wrapped."""
+    _rankings(music, answer, liked_tracks(music, user))
+    answer["days"] = days
+    answer["range"] = f"Last {days} days" if days else "All time"
+    answer["context"] = "library:stats"
+    answer["wrapped_year"] = year
+    answer["wrapped_label"] = f"{year} Wrapped"
+    return answer
+
+
+def wrapped(music, user: str, answer: dict, current_year: int, first_year) -> dict:
+    """Wrapped for one year: its rankings as rows, its tiles as text, and the years before and
+    after it that have a Wrapped (`previous`, `next`), from the first year with a play to this one."""
+    year = answer["year"]
+    _rankings(music, answer, liked_tracks(music, user))
+    answer["previous"] = year - 1 if first_year is not None and year - 1 >= first_year else None
+    answer["next"] = year + 1 if year + 1 <= current_year else None
+    answer["previous_label"] = str(year - 1)
+    answer["next_label"] = str(year + 1)
+    answer["title"] = f"{year} Wrapped"
+    answer["streak_line"] = f"{answer.get('longest_streak', 0):,} day" + ("" if answer.get("longest_streak") == 1 else "s")
+    peak = answer.get("peak_hour")
+    answer["peak_line"] = f"{peak}:00" if peak is not None else "—"
+    busiest = answer.get("busiest_day")
+    answer["busiest_line"] = f"{busiest['day']} ({busiest['minutes']:,} min)" if busiest else "—"
+    discovered = {artist["id"]: artist for artist in music.catalog.artists_by_id(
+        [entry["id"] for entry in answer.get("new_artists", []) if entry.get("id")])}
+    for entry in answer.get("new_artists", []):
+        entry["line"] = f"First played {str(entry.get('first_play') or '')[:10]}"
+        entry["artwork"] = (discovered.get(entry["id"]) or {}).get("artwork") or ""
+    answer["play_label"] = f"Play your top songs of {year}"
+    answer["context"] = f"mix:wrapped-{year}"
     return answer
 
