@@ -327,8 +327,8 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 - [x] "All locations" is called "Up" too when the folder is a drive's root.
 - [ ] A graceful error when the server refuses a change for lack of permission (create,
       rename, delete, upload), checked on both clients.
-- [ ] On the web only (Mission Control): drop the back button beside the folder name, since
-      "up" exists.
+- [x] On the web only (Mission Control): drop the back button beside the folder name, since
+      "up" exists. Done with the page key `back: false` (contract change 12).
 
 **Music (own, unless noted)**
 

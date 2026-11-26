@@ -136,7 +136,11 @@ A **page** has `blocks` and optionally:
 - `follows` (1.2, change 9): Satellite capabilities whose state the client keeps, so far only
   `audio.session` (its likes and preferences). When the client itself changes that state
   elsewhere (a like in the player), the page loads its sources again. The document's own
-  Satellite must provide the capability.
+  Satellite must provide the capability;
+- `back` (1.2, change 12): `false` when a detail page carries its own way out (an Up action in
+  its `actions` row, a breadcrumb), so Mission Control leaves out the Back it draws beside the
+  page's title. The Android app keeps its header's back and the system's, which are how a
+  person leaves any pushed screen there.
 
 While a page is visible, its sources refresh on their own; a hidden browser tab or an app in
 the background polls nothing. When a refresh fails, the page keeps what it last showed,

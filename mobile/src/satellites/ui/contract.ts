@@ -162,6 +162,9 @@ export interface UiPage {
   /** 1.2 (change 9): its sources load again when the app changes that state itself (a like in
    * the player). */
   follows?: string[];
+  /** 1.2 (change 12): false when the page carries its own way out. Only Mission Control's Back
+   * beside a detail page's title honours it; the app keeps its header's back and the system's. */
+  back?: boolean;
   blocks: UiBlock[];
 }
 

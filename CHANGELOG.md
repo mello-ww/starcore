@@ -7,6 +7,9 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **A page can say it carries its own way out (UI contract 1.2, contract change 12).** With
+  `back: false`, Mission Control draws no Back beside a detail page's title; the Android app
+  keeps its own back. File Explorer's folder page uses it, since its Up is in its actions row.
 - **A page's actions on one row, with drop-downs (UI contract 1.2, contract change 11).** The
   `actions` block holds up to 8 buttons and `dropdown`s on one line that wraps; a dropdown opens
   a panel under its button with the fields or buttons it needs, one at a time, closed again by

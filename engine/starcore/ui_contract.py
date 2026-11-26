@@ -624,7 +624,13 @@ class _Validator:
             self.error(where, "must be an object")
             return
         self.unknown_keys(where, page, {"title", "params", "source", "sources", "state", "template", "blocks", "offline",
-                                        "follows"})
+                                        "follows", "back"})
+        if "back" in page:
+            # 1.2 (change 12): false when the page carries its own way out (an Up action), so a
+            # client that adds a Back beside a detail page's title leaves it out
+            self.since(f"{where}.back", "page back", 2)
+            if not isinstance(page["back"], bool):
+                self.error(f"{where}.back", "must be true or false")
         if "follows" in page:
             # 1.2: the page's sources load again when the client changes that state itself
             self.since(f"{where}.follows", "page follows", 2)

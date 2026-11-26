@@ -2350,13 +2350,16 @@ export function mount(context) {
                 root.appendChild(nav);
             }
         } else {
-            // a detail page: the tabs don't name it, so it gets a title and a way back
+            // a detail page: the tabs don't name it, so it gets a title and a way back - unless
+            // it carries its own way out (`back: false`, 1.2 change 12), such as an Up action
             const head = el("div", "ui-page-head");
-            const back = el("button", "sc-icon-button sc-icon-button-quiet ui-back", "‹ Back");
-            back.type = "button";
-            // the forgot page leads back to the unlock, not through the history
-            back.addEventListener("click", () => (gate && gate.state() === "forgot" ? gate.check() : goBack()));
-            head.appendChild(back);
+            if (page.back !== false) {
+                const back = el("button", "sc-icon-button sc-icon-button-quiet ui-back", "‹ Back");
+                back.type = "button";
+                // the forgot page leads back to the unlock, not through the history
+                back.addEventListener("click", () => (gate && gate.state() === "forgot" ? gate.check() : goBack()));
+                head.appendChild(back);
+            }
             if (page.title !== undefined && state.data) {
                 head.appendChild(el("h2", "ui-page-title", text(page.title, scope)));
             }

@@ -19,6 +19,7 @@
     },
     "folder": {
       "title": "$.name",
+      "back": false,
       "params": ["path"],
       "source": {"route": "view/folder?path={$params.path}"},
       "blocks": [

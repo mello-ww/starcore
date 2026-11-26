@@ -347,9 +347,9 @@
     },
     {
       "name": "actions-row",
-      "_why": "1.2 (change 11): a page's actions on one line; a dropdown opens a panel under its button holding a form.",
+      "_why": "1.2 (change 11): a page's actions on one line; a dropdown opens a panel under its button holding a form. The page carries its own way out, so it asks for no Back (change 12).",
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {
-        "home": {"source": {"route": "place"}, "blocks": [
+        "home": {"source": {"route": "place"}, "back": false, "blocks": [
           {"type": "actions", "blocks": [{"type": "button", "label": "Up", "action": {"navigate": "home"}}, {"type": "dropdown", "label": "New folder", "style": "primary", "blocks": [{"type": "form", "fields": [{"key": "name", "label": "Name", "kind": "text", "required": true}], "submit": {"label": "Create", "action": {"route": "mkdir", "body": {"name": "$form.name"}, "then": "refresh"}}}]}]}
         ]}}}
     },
@@ -397,6 +397,8 @@
     {"name": "dropdown-outside-actions", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "dropdown", "label": "New", "blocks": [{"type": "text", "text": "Hi"}]}]}}}, "error": "actions"},
     {"name": "actions-row-with-text", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "actions", "blocks": [{"type": "text", "text": "Hi"}]}]}}}, "error": "buttons and dropdowns"},
     {"name": "dropdown-in-dropdown", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "actions", "blocks": [{"type": "dropdown", "label": "A", "blocks": [{"type": "actions", "blocks": [{"type": "button", "label": "B", "action": {"navigate": "home"}}]}]}]}]}}}, "error": "no actions row"},
+    {"name": "page-back-not-boolean", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"back": "no", "blocks": []}}}, "error": "true or false"},
+    {"name": "page-back-in-1-1", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"back": false, "blocks": []}}}, "error": "1.2"},
     {"name": "actions-in-1-1", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [{"type": "actions", "blocks": [{"type": "button", "label": "B", "action": {"navigate": "home"}}]}]}}}, "error": "1.2"},
     {"name": "breadcrumb-in-1-1", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [{"type": "breadcrumb", "items": "$.crumbs", "item": {"title": "$.name"}}]}}}, "error": "1.2"},
     {
