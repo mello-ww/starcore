@@ -29,7 +29,7 @@ export function runsHere(
   if (context.canRun) {
     return context.canRun(action);
   }
-  const needs = action.secure || ['download', 'share', 'upload', 'section', 'sync'].some(key => (action as any)[key] !== undefined);
+  const needs = action.secure || ['download', 'share', 'upload', 'section', 'sync', 'offline'].some(key => (action as any)[key] !== undefined);
   return !needs;
 }
 
@@ -73,6 +73,15 @@ export function groupOf(block: UiBlock, scope: Scope, format: (value: unknown) =
 
 /** Whether a row is the track playing now: its `item.audio` binding against the host's current
  * track id (null when nothing plays, or it plays from another Satellite). */
+/** Whether a row with `item.audio` is one of the tracks kept on this phone (change 10). */
+export function isKeptRow(block: UiBlock, scope: Scope, keeper: {isDownloaded(id: string): boolean} | null | undefined): boolean {
+  if (!keeper || !block.item || block.item.audio === undefined) {
+    return false;
+  }
+  const id = resolve(block.item.audio, scope);
+  return id !== null && id !== undefined && id !== '' && keeper.isDownloaded(String(id));
+}
+
 export function isPlayingRow(block: UiBlock, scope: Scope, playing: string | null | undefined): boolean {
   if (!playing || !block.item || block.item.audio === undefined) {
     return false;

@@ -45,9 +45,9 @@ export const CAPABILITY_VERSIONS = { "files.browse": [1], "audio.library": [1], 
 // what a protected document (1.2) may name, and the operations its gate (ui/vault.js) calls
 export const PROTECTED_CAPABILITIES = { "media.vault": ["status", "unlock", "lock", "keep"] };
 // what the sync action (1.2) opens: {Satellite capability: the client capability that is the
-// client's own sync screen}. A browser can't back a device up in the background, so Mission
-// Control offers none of them and hides the control
-export const SYNC_CAPABILITIES = { "media.sync": "device.media-sync" };
+// client's own sync screen}. A browser can't back a device up in the background, nor keep
+// tracks on the device, so Mission Control offers none of them and hides the control
+export const SYNC_CAPABILITIES = { "media.sync": "device.media-sync", "audio.library": "media.audio-offline" };
 
 const RESERVED_SEGMENTS = new Set(["assets", "enable", "disable", "reload", "ui"]);
 const FIRST_SEGMENT = /^[A-Za-z0-9_-]+$/;

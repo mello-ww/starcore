@@ -352,8 +352,8 @@ Legend, as in [the Photos audit](photos-parity-audit.md):
 | 33 | Stats: a range (7, 30, 90, 365 days, all), minutes, plays, songs, library tiles; top songs, artists, albums, genres; plays by hour | ✅ | ✗ | ✅ `dashboard`, `metric`, `media-list`, `chart` (`bars`) | – | J+S | P1 |
 | 34 | Wrapped: a year, its personality, tiles, top songs, artists, genres, artists discovered, Play your top songs, the previous and next years | ✅ | ✗ | ◐ | Play needs C6; the years come as the answer's `previous` and `next`. | C6, J+S | P1 |
 | 35 | Credits and file info (tags, file, format) | ✅ dialog | ✗ | ✅ a `track` detail page of `field`s | The resolved stream's plan stays in the full player's Info tab. | J | P1 |
-| 36 | Offline downloads: an album or a playlist, a song from its menu, Remove download, a downloaded mark | n/a | ✅ | ✗ | Keeping a provider's tracks on the device is the client's: the document names tracks, the client owns the storage and the control's state. | C10 | P0 (Android) |
-| 37 | Downloads page: jobs and progress, kept songs with size and quality, removal; download quality, network, storage limit | n/a | ✅ | ✗ | A screen of the client's own, like the phone sync's. | C10 | P0 (Android) |
+| 36 | Offline downloads: an album or a playlist, a song from its menu, Remove download, a downloaded mark | n/a | ✅ | ✅ C10 (Android) | Keeping a provider's tracks on the device is the client's: the document names tracks, the client owns the storage and the control's state. | C10 | P0 (Android) |
+| 37 | Downloads page: jobs and progress, kept songs with size and quality, removal; download quality, network, storage limit | n/a | ✅ | ✅ C10 (Android) | A screen of the client's own, like the phone sync's. | C10 | P0 (Android) |
 | 38 | The player's track menu (More in the full player) | ✅ registered | ✅ `TrackMenu` | ✅ `audio.menu` (A4) | The provider's document declares it. | C9 | P0 |
 | 39 | The player's title and artist links, Add to playlist, Open library | ✅ registered | ◐ album and artist | ✅ `audio.album`, `artist`, `library` (A4) | As #38. | C9 | P0 |
 | 40 | A like in the player shows on the page, and the reverse | ✅ shared store | ✅ shared context | ✅ `follows` and `reloads` (A4) | A page follows the session's likes and preferences. | C9 (`follows`) | P1 |
@@ -483,7 +483,7 @@ fixtures in `contracts/ui/fixtures/`, both renderers, every `ui.json` it affects
 - `follows` on a page: `"follows": ["audio.session"]`. The page's sources load again when the
   client changes that state itself (a like in the player, a preference from the full player).
 
-**Change 10 - keeping tracks on the device.** A client capability `media.audio-offline`, on
+**Change 10 - keeping tracks on the device.** **Done** (A7). A client capability `media.audio-offline`, on
 Android only (a browser keeps nothing).
 
 - The action `{"offline": {"tracks": "$.tracks"}}` (or `route`, or `["$"]`, as in change 6)
@@ -659,7 +659,17 @@ Two `dashboard` pages: the range as a `choice`, metrics, rankings
 as `media-list`s, plays by hour as a `bars` chart; Wrapped by year, with Play your top songs
 (change 6). Tests: Music's engine tests for `wrapped`'s `previous` and `next`; both clients.
 
-**A7 - offline downloads.**
+**A7 - offline downloads.** **Done.** The Engine checks the `offline` action (one source,
+nothing else, not in a selection or the player's menu, only with `audio.library`), with ten
+fixtures. The app's code is generic: `mobile/src/media/offlineAction.ts` (bind or page the
+tracks, the label, run: queue, held by the network rule, confirm and remove), the Downloads
+screen in `mobile/src/media/ui/DownloadsScreen.tsx` (Music's own screen re-exports it until
+A10), opened as `AudioDownloads` by the `audio.library` sync target, and `useKeeper` for the
+rows' kept mark and the button's state. `downloads.ts` is unchanged, so the copies on a phone
+stay. Music has Download after Shuffle on album, playlist, mix and Liked Songs (a route over
+the liked list), Download in the track menus (not in a regular playlist's own rows, whose menu
+already has ten entries), and Downloads in Your Library's Playlists. Airplane mode on the
+emulator is checked in A9. As planned:
 - Contract: change 10 (`media.audio-offline`, the `offline` action, the `sync_capabilities`
   entry) in the Engine, the fixtures and the app: the Downloads screen and the control move
   from `mobile/src/music/screens/DownloadsScreen.tsx` and `ui/TrackActions.tsx` to generic code

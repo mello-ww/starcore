@@ -438,7 +438,7 @@ class _Validator:
         if not isinstance(action, dict):
             return
         kinds = {"navigate", "play", "choose"}
-        others = {"own", "secure", "section", "sync", "download", "share", "upload", "pick", "secrets", "reveal"}
+        others = {"own", "secure", "section", "sync", "offline", "download", "share", "upload", "pick", "secrets", "reveal"}
         if not kinds & set(action) and others & set(action):
             self.error(where, f"the player runs navigate, play, choose or a route action, not {sorted(others & set(action))[0]}")
         if "then" in action:
@@ -1331,6 +1331,9 @@ class _Validator:
         if "play" in action:
             self.check_play(where, action)
             return
+        if "offline" in action:
+            self.check_offline_action(where, action)
+            return
         if "own" in action:
             self.check_own(where, action)
             return
@@ -1657,20 +1660,7 @@ class _Validator:
             self.check_values(f"{where}.play.search", play["search"])
             return
         self.unknown_keys(f"{where}.play", play, {source, "start", "shuffle", "queue", "context"})
-        if source == "tracks":
-            tracks = play["tracks"]
-            if isinstance(tracks, list):
-                if not tracks or len(tracks) > LIMITS["play_tracks"] or not all(is_binding(item) for item in tracks):
-                    self.error(f"{where}.play.tracks", f"must be a binding, or a list of 1 to {LIMITS['play_tracks']} bindings")
-                else:
-                    for index, item in enumerate(tracks):
-                        self.check_binding(f"{where}.play.tracks[{index}]", item)
-            elif is_binding(tracks):
-                self.check_binding(f"{where}.play.tracks", tracks)
-            else:
-                self.error(f"{where}.play.tracks", "must be a binding, or a list of bindings")
-        else:
-            self.check_route(f"{where}.play.route", play["route"])
+        self.check_track_source(f"{where}.play", play, source)
         if "start" in play:
             if not is_binding(play["start"]):
                 self.error(f"{where}.play.start", "must bind a track id")
@@ -1695,6 +1685,45 @@ class _Validator:
             self.error(f"{where}.play", "plays one list: not in a selection")
         if self.provides is not None and AUDIO_LIBRARY not in self.provides:
             self.error(f"{where}.play", f"plays the Satellite's own tracks, and it provides no {AUDIO_LIBRARY}")
+
+    def check_track_source(self, where: str, spec: dict, source: str):
+        """A play's or an offline's tracks: `tracks` (a binding to a list of the page's tracks, or
+        a list of bindings to single ones) or `route` (a GET of the Satellite's own route)."""
+        if source == "tracks":
+            tracks = spec["tracks"]
+            if isinstance(tracks, list):
+                if not tracks or len(tracks) > LIMITS["play_tracks"] or not all(is_binding(item) for item in tracks):
+                    self.error(f"{where}.tracks", f"must be a binding, or a list of 1 to {LIMITS['play_tracks']} bindings")
+                else:
+                    for index, item in enumerate(tracks):
+                        self.check_binding(f"{where}.tracks[{index}]", item)
+            elif is_binding(tracks):
+                self.check_binding(f"{where}.tracks", tracks)
+            else:
+                self.error(f"{where}.tracks", "must be a binding, or a list of bindings")
+        else:
+            self.check_route(f"{where}.route", spec["route"])
+
+    def check_offline_action(self, where: str, action: dict):
+        """{offline: {tracks | route}} (1.2, change 10): the client keeps those tracks of the
+        document's own Satellite, which must provide audio.library, on the device (its
+        media.audio-offline), at the listener's download quality, network rule and storage limit.
+        `tracks` and `route` are a play's. The control's label and state are the client's
+        (Download, Downloading 3 of 12, Downloaded with Remove download): the document supplies no
+        path, URL or storage setting. A client without it hides the control."""
+        self.since(f"{where}.offline", "the offline action", 2)
+        self.unknown_keys(where, action, {"offline"})
+        offline = action["offline"]
+        sources = [key for key in ("tracks", "route") if isinstance(offline, dict) and key in offline]
+        if len(sources) != 1:
+            self.error(f"{where}.offline", "must be {tracks} or {route}, exactly one of them")
+            return
+        self.unknown_keys(f"{where}.offline", offline, {sources[0]})
+        self.check_track_source(f"{where}.offline", offline, sources[0])
+        if self.in_selection:
+            self.error(f"{where}.offline", "keeps one list: not in a selection")
+        if self.provides is not None and AUDIO_LIBRARY not in self.provides:
+            self.error(f"{where}.offline", f"keeps the Satellite's own tracks, and it provides no {AUDIO_LIBRARY}")
 
     def check_own(self, where: str, action: dict):
         """{own: section} (1.2): the client opens the Satellite's own interface - its page.js on

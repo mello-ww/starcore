@@ -46,6 +46,9 @@ export interface AudioHostValue {
   /** Plays tracks a Satellite's own page hands over (the play action with tracks or route):
    * only that Satellite's, and only when it is the provider; resolves with how many it took. */
   playTracks: (satellite: string, tracks: unknown, options?: HandOverOptions) => Promise<number>;
+  /** What keeps a Satellite's own tracks on the phone (the offline action, UI contract 1.2):
+   * the downloads, only when that Satellite is the provider and this phone can keep files. */
+  offlineFor: (satellite: string) => DownloadManager | null;
   /** The own native code's additions: only while one of its screens is shown, or when the
    * provider's document adds nothing (its `audio`, below). */
   extensions: AudioHostExtensions;
@@ -377,6 +380,11 @@ export function AudioHost({
     [library, player],
   );
 
+  const offlineFor = useCallback(
+    (satellite: string) => (downloads.supported && provider?.satellite === satellite ? downloads : null),
+    [downloads, provider],
+  );
+
   const value: AudioHostValue = {
     library,
     provider,
@@ -396,6 +404,7 @@ export function AudioHost({
     resolveTracks,
     playSearch,
     playTracks,
+    offlineFor,
     extensions: ownShown > 0 || !audioDoc ? extensions : {},
     audio: ownShown > 0 ? null : audioDoc,
     openPage: openProviderPage,

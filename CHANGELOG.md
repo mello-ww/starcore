@@ -74,6 +74,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   plays by hour, top songs that play from the list, top artists, albums and genres, and the
   library's totals. Wrapped for a year: its tiles, rankings and new artists, Play your top
   songs, and the years before and after it that have one.
+- **Offline downloads on the shared interface (UI contract 1.2, contract change 10, milestone
+  A7).** A document's `offline` action keeps its own tracks on the phone (a list, a row's
+  track, or a route's pages); the label is the app's (Download, Downloading 3 of 12,
+  Downloaded, Remove download), kept rows show a mark, and `{"sync": {"capability":
+  "audio.library"}}` opens the app's Downloads screen, now generic. Mission Control hides both.
+  Music's preview has Download on its album, playlist, mix and Liked Songs pages and in its
+  track menus, and Downloads in Your Library. The downloads already on a phone stay.
 
 - **Satellites ship their own icons (UI contract 1.2, contract change 5).** A Satellite lists
   them in its `satellite.toml` (`[icons]`, each with a shared icon as fallback) and puts them

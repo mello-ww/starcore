@@ -34,7 +34,8 @@ import {
   type GridPages, type OfflineEntry,
 } from '../satellites/ui/offline';
 import {runSecure, secureRunner, type GrantRequest, type SecurePrompt, type SecurePromptProps} from '../satellites/ui/secure';
-import {SYNC_SCREEN, syncTarget} from '../satellites/ui/sync';
+import {SYNC_SCREENS, syncTarget} from '../satellites/ui/sync';
+import {runOffline} from '../media/offlineAction';
 import {VaultApi} from '../vault/api';
 import {attachGate, createVaultGate, protectedProvider, type GateAttachment, type GateState} from '../vault/gate';
 import {VAULT_GRANT_PROMPT} from '../vault/VaultGrantPrompt';
@@ -736,7 +737,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           showToast("That isn't available in this app.", true);
           return false;
         }
-        (navigation as any).push(SYNC_SCREEN, {satellite: target.provider.satellite, capability: target.capability});
+        (navigation as any).push(SYNC_SCREENS[target.capability], {satellite: target.provider.satellite, capability: target.capability});
         return true;
       }
       if (action.download !== undefined || action.share !== undefined) {
@@ -807,6 +808,21 @@ export function SatelliteUiScreen({route, navigation}: Props) {
           loadData(); // show what's actually true now
         }
         return result.uploaded.length > 0;
+      }
+      if (action.offline !== undefined) {
+        // 1.2 (change 10): kept on this phone by the audio host's downloads, only when this
+        // Satellite is the audio.library provider; the document names tracks and nothing else
+        const keeper = audio?.offlineFor(name);
+        if (!keeper || !action.offline || typeof action.offline !== 'object') {
+          showToast("That isn't available in this app.", true);
+          return false;
+        }
+        return runOffline(action.offline as any, scoped, {
+          load: offlineRoute => api.read(name, offlineRoute),
+          keeper,
+          confirm: (title, button, message) => confirmAction(title, button, message),
+          notify: (message, error) => showToast(message, error),
+        });
       }
       if (action.play) {
         // 1.2: played by the app's audio host, from whichever Satellite provides audio.library
@@ -1063,8 +1079,9 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         (typeof action.section === 'string' && action.section.startsWith('$')) ||
         opensHosted(hostedSatellite(satellites, name, action.section))) &&
       (!action?.secure || Boolean(secureRunner(action, providers, name, SECURE_PROMPTS))) &&
-      (action?.sync === undefined || Boolean(syncTarget(action, providers, name))),
-    [providers, name, gated, satellites],
+      (action?.sync === undefined || Boolean(syncTarget(action, providers, name))) &&
+      (action?.offline === undefined || Boolean(audio?.offlineFor(name))),
+    [providers, name, gated, satellites, audio],
   );
 
   // the picker reads the provider's routes, and loads its thumbnails, with this session

@@ -4,7 +4,7 @@ const {readFileSync} = require('fs') as {readFileSync: (path: string, encoding: 
 const {join} = require('path') as {join: (...parts: string[]) => string};
 
 import {CLIENT_CAPABILITIES} from '../src/satellites/ui/contract';
-import {SYNC_CAPABILITIES, SYNC_VERSIONS, syncProvider, syncTarget} from '../src/satellites/ui/sync';
+import {SYNC_CAPABILITIES, SYNC_SCREENS, SYNC_VERSIONS, syncProvider, syncTarget} from '../src/satellites/ui/sync';
 
 // The sync action (UI contract 1.2): it opens the app's own sync screen for the document's own
 // Satellite, and only where the app has that screen (media.sync v1, src/sync/).
@@ -24,9 +24,19 @@ describe('the sync action', () => {
     }
   });
 
-  it('has the sync screen for media.sync v1', () => {
+  it('has the sync screen for media.sync v1, and the Downloads screen for audio.library v1', () => {
     expect(CLIENT_CAPABILITIES.has('device.media-sync')).toBe(true);
-    expect(SYNC_VERSIONS).toEqual({'media.sync': [1]});
+    expect(CLIENT_CAPABILITIES.has('media.audio-offline')).toBe(true);
+    expect(SYNC_VERSIONS).toEqual({'media.sync': [1], 'audio.library': [1]});
+    expect(Object.keys(SYNC_SCREENS).sort()).toEqual(Object.keys(SYNC_CAPABILITIES).sort());
+  });
+
+  it("opens the Downloads screen only for the document's own audio.library provider", () => {
+    const library = {satellite: 'Gallery', version: 1, enabled: true, operations: {track: 'tracks'}};
+    const downloads = {sync: {capability: 'audio.library'}};
+    expect(syncTarget(downloads, {'audio.library': [library]}, 'Gallery')).toEqual({provider: library, capability: 'audio.library'});
+    expect(syncTarget(downloads, {'audio.library': [library]}, 'Elsewhere')).toBeNull();
+    expect(SYNC_SCREENS['audio.library']).toBe('AudioDownloads');
   });
 
   describe('without the sync screen', () => {

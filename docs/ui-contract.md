@@ -735,6 +735,24 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
     tracks costs a page, not the list. A row of a paged list plays the list from itself with
     `from=` (its position): the answer counts from there. The Satellite owns these parameters'
     meaning; the host only passes them back.
+- **`offline`** (1.2, change 10), on its own: `{"offline": {"tracks": "$.tracks"}}` keeps those
+  tracks of the document's own Satellite on the device, through the client's own downloads,
+  at the listener's download quality, network rule and storage limit.
+  - Exactly one of `tracks` (a binding to a list, or a list of up to 50 bindings, `["$"]` for a
+    row's own track) or `route` (a GET of one of the Satellite's own routes answering `tracks`,
+    whose `cursor` pages the client follows, up to 2,000 tracks), as `play`'s. Nothing else: no
+    path, URL, quality or storage setting.
+  - The document's Satellite must provide `audio.library` (checked at load), and the client
+    keeps only the tracks of its own audio host's provider.
+  - The control's label and state are the client's, whatever the document's `label`:
+    Download, Downloading 3 of 12, Downloaded; pressed when everything is kept, it asks, then
+    removes them. A menu entry says Download, Downloading… or Remove download. A `route`'s
+    tracks are known only once pressed, so until then its button says Download.
+  - A row with `item.audio` shows a mark when its track is kept.
+  - Needs the client capability `media.audio-offline`: the app's. Mission Control keeps
+    nothing and hides the control, and says so as a notice if it runs from elsewhere.
+  - Not in a selection, nor in the player's `audio.menu`; a row's or a tile's `menu` and
+    `quick` may use it.
 - **`pick`** (1.2), with a `route`: the person chooses media through the client's own media
   picker, then the route runs with what was chosen as `$value`.
 
@@ -793,7 +811,9 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
 - **`sync`** (1.2), on its own: `{"sync": {"capability": "media.sync"}}` opens the **client's own
   sync screen** for the document's own provider of that capability, and nothing else.
   - The vocabulary's `sync_capabilities` names which screen: `media.sync` opens
-    `device.media-sync`, the client's background backup of the device's media.
+    `device.media-sync`, the client's background backup of the device's media, and
+    `audio.library` (change 10) opens `media.audio-offline`, the tracks the client keeps on the
+    device (jobs, progress, kept songs with their size, removal, the download settings).
   - The document's own Satellite must provide the capability (checked at load, from its
     manifest); the client takes its enabled provider from the catalog, never another
     Satellite's.

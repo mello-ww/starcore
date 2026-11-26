@@ -183,11 +183,12 @@ export function mount(context) {
     // the media-grid block and its viewer (1.2), which keep their own state across renders
     // whether an action's control is drawn here: a secure action only where it can run, an own
     // action only where this Satellite has an own interface, a section only where the host can
-    // open it, a sync only where this client has that sync screen (never so far), and share only
-    // where this browser can hand a file to the system share sheet - never in a protected
-    // document, which shares nothing
+    // open it, a sync only where this client has that sync screen (never so far), never an
+    // offline (a browser keeps no tracks), and share only where this browser can hand a file to
+    // the system share sheet - never in a protected document, which shares nothing
     function canRun(action) {
         return !action || ((action.own === undefined || Boolean(own))
+            && action.offline === undefined
             && (action.section === undefined || canOpenSection(action.section))
             && (action.sync === undefined || canOpenSync(action))
             && (action.share === undefined || (!isProtected() && canShareFiles(globalThis.navigator)))
@@ -818,6 +819,11 @@ export function mount(context) {
                 return false;
             }
             return true;
+        }
+        if (action.offline !== undefined) {
+            // 1.2: tracks kept on the device - a browser keeps none, so the control is hidden
+            setNotice("That isn't available in Mission Control.", "error");
+            return false;
         }
         if (action.sync !== undefined) {
             // 1.2: the client's own sync screen - a browser has none, so the control is hidden

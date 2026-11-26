@@ -23,6 +23,7 @@ import {BUILTIN_AUDIO, BUILTIN_SCREENS, type BuiltinScreenParams} from '../satel
 import {TopBarSlot, TopBarSlotProvider} from '../components/TopBarSlot';
 import {FloatingPlayerInsetProvider} from '../components/FloatingPlayerInset';
 import {MediaSyncScreen} from '../sync/MediaSyncScreen';
+import {DownloadsScreen} from '../media/ui/DownloadsScreen';
 
 export type MainTabParamList = {
   Overview: undefined;
@@ -42,6 +43,9 @@ export type SatellitesStackParamList = {
   /** The app's own sync screen (client capability device.media-sync), opened by a document's
    * sync action for that document's provider. */
   MediaSync: {satellite?: string; capability?: string} | undefined;
+  /** The tracks kept on the phone (client capability media.audio-offline), opened by a
+   * document's sync action for its audio.library provider. */
+  AudioDownloads: {satellite?: string; capability?: string} | undefined;
 } & BuiltinScreenParams;
 
 export type SettingsStackParamList = {
@@ -84,6 +88,7 @@ function SatellitesStack() {
       <SatellitesStackNav.Screen name="SatellitesList" component={SatellitesListScreen} options={{title: 'Satellites', headerShown: false}} />
       <SatellitesStackNav.Screen name="SatelliteUi" component={SatelliteUiScreen} />
       <SatellitesStackNav.Screen name="MediaSync" component={MediaSyncScreen} options={{title: 'Phone backup'}} />
+      <SatellitesStackNav.Screen name="AudioDownloads" component={DownloadsScreen} options={{title: 'Downloads'}} />
       {BUILTIN_SCREENS.map(screen => (
         <SatellitesStackNav.Screen key={screen.name} name={screen.name} component={screen.component}
           options={screen.title !== undefined ? {title: screen.title} : undefined} />

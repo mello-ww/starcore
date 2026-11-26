@@ -329,6 +329,17 @@
        }
       },
       {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -1105,6 +1116,17 @@
        }
       },
       {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -1316,6 +1338,17 @@
           ],
           "allow_duplicates": true
          }
+        }
+       }
+      },
+      {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
         }
        }
       },
@@ -1995,6 +2028,17 @@
        }
       },
       {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -2566,6 +2610,17 @@
           ],
           "allow_duplicates": true
          }
+        }
+       }
+      },
+      {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
         }
        }
       },
@@ -2876,6 +2931,17 @@
        }
       },
       {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -3451,6 +3517,17 @@
        }
       },
       {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -3644,6 +3721,17 @@
      }
     },
     {
+     "type": "button",
+     "label": "Downloads",
+     "style": "secondary",
+     "visible": "$.showing.playlists",
+     "action": {
+      "sync": {
+       "capability": "audio.library"
+      }
+     }
+    },
+    {
      "type": "choice",
      "key": "liked_sort",
      "label": "Sort by",
@@ -3692,6 +3780,17 @@
       "play": {
        "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}",
        "shuffle": true
+      }
+     },
+     "visible": "$.showing.liked"
+    },
+    {
+     "type": "button",
+     "label": "Download",
+     "style": "secondary",
+     "action": {
+      "offline": {
+       "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}"
       }
      },
      "visible": "$.showing.liked"
@@ -3881,6 +3980,17 @@
           ],
           "allow_duplicates": true
          }
+        }
+       }
+      },
+      {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
         }
        }
       },
@@ -4411,6 +4521,17 @@
        }
       },
       {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -4527,6 +4648,16 @@
       "play": {
        "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}",
        "shuffle": true
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Download",
+     "style": "secondary",
+     "action": {
+      "offline": {
+       "route": "library?tab=liked&liked_sort={$state.liked_sort}&q={$state.q}"
       }
      }
     },
@@ -4719,6 +4850,17 @@
        }
       },
       {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -4790,6 +4932,16 @@
        "tracks": "$.tracks",
        "context": "$.context",
        "shuffle": true
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Download",
+     "style": "secondary",
+     "action": {
+      "offline": {
+       "tracks": "$.tracks"
       }
      }
     },
@@ -5333,6 +5485,17 @@
           ],
           "allow_duplicates": true
          }
+        }
+       }
+      },
+      {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
         }
        }
       },
@@ -6258,6 +6421,17 @@
        }
       },
       {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -6331,6 +6505,16 @@
        "tracks": "$.tracks",
        "context": "$.context",
        "shuffle": true
+      }
+     }
+    },
+    {
+     "type": "button",
+     "label": "Download",
+     "style": "secondary",
+     "action": {
+      "offline": {
+       "tracks": "$.tracks"
       }
      }
     },
@@ -6597,6 +6781,17 @@
           ],
           "allow_duplicates": true
          }
+        }
+       }
+      },
+      {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
         }
        }
       },
@@ -7090,6 +7285,17 @@
           ],
           "allow_duplicates": true
          }
+        }
+       }
+      },
+      {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
         }
        }
       },
@@ -7622,6 +7828,16 @@
      }
     },
     {
+     "type": "button",
+     "label": "Download",
+     "style": "secondary",
+     "action": {
+      "offline": {
+       "tracks": "$.tracks"
+      }
+     }
+    },
+    {
      "type": "media-list",
      "items": "$.tracks",
      "empty": "No songs.",
@@ -7808,6 +8024,17 @@
           ],
           "allow_duplicates": true
          }
+        }
+       }
+      },
+      {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
         }
        }
       },
@@ -8062,6 +8289,17 @@
        }
       },
       {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -8308,6 +8546,17 @@
           ],
           "allow_duplicates": true
          }
+        }
+       }
+      },
+      {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
         }
        }
       },
@@ -8722,6 +8971,17 @@
           ],
           "allow_duplicates": true
          }
+        }
+       }
+      },
+      {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
         }
        }
       },
@@ -10244,6 +10504,17 @@
        }
       },
       {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
+        }
+       }
+      },
+      {
        "label": "Credits",
        "icon": "info",
        "action": {
@@ -10527,6 +10798,17 @@
           ],
           "allow_duplicates": true
          }
+        }
+       }
+      },
+      {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
         }
        }
       },
@@ -10945,6 +11227,17 @@
           ],
           "allow_duplicates": true
          }
+        }
+       }
+      },
+      {
+       "label": "Download",
+       "icon": "download",
+       "action": {
+        "offline": {
+         "tracks": [
+          "$"
+         ]
         }
        }
       },

@@ -2,13 +2,14 @@ import {CLIENT_CAPABILITIES, type CapabilityProvider, type Providers} from './co
 
 /** What the sync action (1.2) opens: {Satellite capability: the client capability that is this
  * app's own sync screen for it}. Kept equal to the vocabulary's sync_capabilities. */
-export const SYNC_CAPABILITIES: Record<string, string> = {'media.sync': 'device.media-sync'};
+export const SYNC_CAPABILITIES: Record<string, string> = {'media.sync': 'device.media-sync', 'audio.library': 'media.audio-offline'};
 
 /** The protocol versions of each sync capability this app's sync screen speaks. */
-export const SYNC_VERSIONS: Record<string, number[]> = {'media.sync': [1]};
+export const SYNC_VERSIONS: Record<string, number[]> = {'media.sync': [1], 'audio.library': [1]};
 
-/** The screen the sync action pushes, with {satellite, capability}. */
-export const SYNC_SCREEN = 'MediaSync';
+/** The screen the sync action pushes for each capability, with {satellite, capability}: the
+ * phone backup, and the tracks kept on the phone (Downloads). */
+export const SYNC_SCREENS: Record<string, string> = {'media.sync': 'MediaSync', 'audio.library': 'AudioDownloads'};
 
 /** Where a sync action ({sync: {capability}}) leads in this app: the document's own Satellite as
  * the capability's enabled provider, in a version the sync screen speaks, and the client

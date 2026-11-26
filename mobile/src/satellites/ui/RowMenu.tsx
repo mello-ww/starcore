@@ -1,9 +1,10 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useReducer, useState} from 'react';
 import {Modal, Pressable, ScrollView, StyleSheet, Text} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Glyph} from '../../components/Glyph';
 import {ModalSafeArea} from '../../components/ModalSafeArea';
 import {useOptionalAudioHost} from '../../media/AudioHost';
+import type {DownloadManager} from '../../media/downloads';
 import {TOUCH_TARGET, tokens} from '../../theme';
 import {resolve, type Scope} from './contract';
 import type {RowEntry} from './rows';
@@ -97,6 +98,29 @@ export function usePlayingId(satellite: string | undefined, watch = true): strin
     return player.subscribe(state => setId(idOf(state)));
   }, [player]);
   return id;
+}
+
+/**
+ * What keeps the Satellite's own tracks on this phone (the audio host's downloads, change 10), or
+ * null - when it isn't the audio.library provider, or the phone keeps nothing. The caller draws
+ * again whenever what is kept changes, so a list marks its kept rows and a Download control shows
+ * its state. `watch` false subscribes to nothing.
+ */
+export function useKeeper(satellite: string | undefined, watch = true): DownloadManager | null {
+  const host = useOptionalAudioHost();
+  const keeper = watch && satellite && host ? host.offlineFor(satellite) : null;
+  const [, bump] = useReducer((value: number) => value + 1, 0);
+  useEffect(() => {
+    if (!keeper) {
+      return undefined;
+    }
+    keeper.ready().then(bump);
+    const stop = keeper.subscribe(bump);
+    return () => {
+      stop();
+    };
+  }, [keeper]);
+  return keeper;
 }
 
 function idOf(state: any): string | null {

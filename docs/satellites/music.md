@@ -356,7 +356,10 @@ title's and artist's links. The hearts `reloads` the session, and the pages with
 (Liked Songs paged, so shuffling 10,000 songs costs one page). Every track row has a heart and
 a 9-entry menu (Play next, Add to queue, Add to playlist, like, radio, album, artist, credits),
 and a playlist's own rows add Remove from this playlist and can be dragged into another order;
-album, artist, mix and playlist tiles have their own. The answers they bind to come from `views.py` and carry
+album, artist, mix and playlist tiles have their own. On the app (A7, change 10) the track
+menus add Download, album, playlist, mix and Liked Songs pages a Download button, kept songs
+show a mark, and Your Library's Playlists link to the app's own Downloads screen; Mission
+Control hides them. The answers they bind to come from `views.py` and carry
 `context`, what the player reports it plays from, `mosaic_key`, the picture of a mix, a mood
 or a genre (`artwork/mosaic/<key>`), and the rows' own fields: `liked`/`not_liked`, `line`,
 `album_line`, `badge` (a quality), `position` in a paged list and `disc_label`.

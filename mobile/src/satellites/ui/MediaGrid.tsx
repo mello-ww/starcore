@@ -1073,7 +1073,7 @@ function canRun(context: BlockContext, action: any): boolean {
   if (action?.own !== undefined && !context.hasOwnScreens) {
     return false;  // an own action only where the app has the Satellite's own screens
   }
-  const opens = action?.section !== undefined || action?.sync !== undefined;
+  const opens = action?.section !== undefined || action?.sync !== undefined || action?.offline !== undefined;
   return (!action?.secure && !opens) || Boolean(context.canRun?.(action));
 }
 

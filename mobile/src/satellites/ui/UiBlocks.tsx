@@ -13,8 +13,10 @@ import {ActionPill, MediaGridBlock} from './MediaGrid';
 import {emptyRow, formBody, formProblem, formValues} from './forms';
 import {createListPaging, rowKey, type ListPagingStatus} from './listPaging';
 import {moveItem, shiftFor, targetIndex} from './reorder';
-import {RowMenuSheet, usePlayingId} from './RowMenu';
-import {groupOf, isPlayingRow, rowMenu, rowQuick, runsHere, type RowEntry} from './rows';
+import {RowMenuSheet, useKeeper, usePlayingId} from './RowMenu';
+import {groupOf, isKeptRow, isPlayingRow, rowMenu, rowQuick, runsHere, type RowEntry} from './rows';
+import {boundTracks, offlineLabel, offlineState} from '../../media/offlineAction';
+import type {DownloadManager} from '../../media/downloads';
 import {useImageSource} from './memoryImages';
 import {
   BLOCK_TYPES, findProvider, formatValue, isIconName, isSafeRoute, isVisible, resolve, resolveTemplate, toneOf,
@@ -664,6 +666,7 @@ interface ReorderControl {
  */
 function ReorderRows({block, rows, scope, context}: {block: UiBlock; rows: any[]; scope: Scope; context: BlockContext}) {
   const playing = usePlayingId(context.satellite, block.item?.audio !== undefined);
+  const keeper = useKeeper(context.satellite, block.item?.audio !== undefined || hasOffline(block));
   const keys = mediaRowKeys(block, rows, scope);
   const [, redraw] = useReducer((value: number) => value + 1, 0);
   const [drag, setDrag] = useState<{from: number; target: number} | null>(null);
@@ -747,6 +750,8 @@ function ReorderRows({block, rows, scope, context}: {block: UiBlock; rows: any[]
               scope={scope}
               context={context}
               playing={isPlayingRow(block, itemScope, playing)}
+              kept={isKeptRow(block, itemScope, keeper)}
+              keeper={keeper}
               handle={<ReorderHandle index={index} count={rows.length} title={title} control={control} />}
             />
           </Animated.View>
@@ -805,6 +810,7 @@ function ReorderHandle({
  * the audio host plays marked (`item.audio`). */
 function MediaRows({block, rows, scope, context}: {block: UiBlock; rows: any[]; scope: Scope; context: BlockContext}) {
   const playing = usePlayingId(context.satellite, block.item?.audio !== undefined);
+  const keeper = useKeeper(context.satellite, block.item?.audio !== undefined || hasOffline(block));
   const keys = mediaRowKeys(block, rows, scope);
   const out: React.ReactNode[] = [];
   let label = '';
@@ -823,6 +829,8 @@ function MediaRows({block, rows, scope, context}: {block: UiBlock; rows: any[]; 
         scope={scope}
         context={context}
         playing={isPlayingRow(block, itemScope, playing)}
+        kept={isKeptRow(block, itemScope, keeper)}
+        keeper={keeper}
       />,
     );
   });
@@ -862,8 +870,14 @@ export function MediaGroupHeading({label}: {label: string}) {
  */
 export const MediaRow = memo(
   function MediaRow({
-    block, item, scope, context, playing, handle,
-  }: {block: UiBlock; item: any; scope: Scope; context: BlockContext; playing: boolean; handle?: React.ReactNode}) {
+    block, item, scope, context, playing, kept = false, keeper = null, handle,
+  }: {
+    block: UiBlock; item: any; scope: Scope; context: BlockContext; playing: boolean;
+    /** one of the tracks kept on this phone (`item.audio`, change 10) */
+    kept?: boolean;
+    keeper?: DownloadManager | null;
+    handle?: React.ReactNode;
+  }) {
     const [, redraw] = useReducer((value: number) => value + 1, 0);
     const [menuOpen, setMenuOpen] = useState(false);
     const {color: accent} = useAccent();
@@ -874,7 +888,12 @@ export const MediaRow = memo(
     const itemScope = {...scope, data: item};
     const runs = (action: UiAction) => runsHere(action, context);
     const quick = rowQuick(block, itemScope, runs);
-    const menu = rowMenu(block, itemScope, runs);
+    // an offline entry's label is the app's own: Download, Downloading… or Remove download
+    const menu = rowMenu(block, itemScope, runs).map(entry =>
+      entry.action.offline !== undefined
+        ? {...entry, label: offlineLabel(keeper ? offlineState(keeper, boundTracks(entry.action.offline, itemScope) ?? []) : null, true)}
+        : entry,
+    );
     const run = (action: UiAction | undefined) => context.runAction(action, itemScope, undefined, {update: redraw});
     const title = asText(resolve(block.item?.title, itemScope));
     const subtitle = block.item?.subtitle !== undefined ? resolve(block.item.subtitle, itemScope) : undefined;
@@ -897,8 +916,13 @@ export const MediaRow = memo(
           <Text style={[styles.rowTitle, playing && {color: accent}]} numberOfLines={1}>
             {title}
           </Text>
-          {subtitle !== undefined && subtitle !== null && subtitle !== '' && (
-            <Text style={type.caption} numberOfLines={1}>{formatValue(subtitle, formats.subtitle)}</Text>
+          {(kept || (subtitle !== undefined && subtitle !== null && subtitle !== '')) && (
+            <View style={styles.rowSubtitle}>
+              {kept && <Icon name="arrow-down-circle" size={12} color={palette.textIcon} accessibilityLabel="Downloaded" testID="media-row-kept" />}
+              {subtitle !== undefined && subtitle !== null && subtitle !== '' && (
+                <Text style={[type.caption, styles.rowSubtitleText]} numberOfLines={1}>{formatValue(subtitle, formats.subtitle)}</Text>
+              )}
+            </View>
           )}
         </View>
         {meta !== undefined && meta !== null && meta !== '' && <Text style={type.caption}>{formatValue(meta, formats.meta)}</Text>}
@@ -968,6 +992,8 @@ export const MediaRow = memo(
     before.block === after.block &&
     before.item === after.item &&
     before.playing === after.playing &&
+    before.kept === after.kept &&
+    before.keeper === after.keeper &&
     before.handle === after.handle &&
     before.context.runAction === after.context.runAction &&
     before.context.canRun === after.context.canRun &&
@@ -1031,8 +1057,44 @@ function Row({
   );
 }
 
+/** Whether a media-list's row menu keeps tracks on the phone (an offline entry). */
+function hasOffline(block: UiBlock): boolean {
+  return Array.isArray(block.menu) && block.menu.some((entry: any) => entry?.action?.offline !== undefined);
+}
+
+/** The offline action's button (change 10): its label and state are the app's - Download,
+ * Downloading 3 of 12, Downloaded (pressed, it offers Remove download). A route's tracks are
+ * known only once pressed, so until then it says Download. */
+function OfflineButton({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const [busy, setBusy] = useState(false);
+  const keeper = useKeeper(context.satellite);
+  const tracks = boundTracks(block.action?.offline, scope);
+  const state = keeper && tracks ? offlineState(keeper, tracks) : null;
+  const downloading = Boolean(state && state.downloading > 0);
+  const press = async () => {
+    setBusy(true);
+    try {
+      await context.runAction(block.action, scope);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <PrimaryButton
+      title={offlineLabel(state)}
+      variant={block.style === 'primary' ? 'primary' : 'secondary'}
+      loading={busy}
+      disabled={downloading}
+      onPress={press}
+    />
+  );
+}
+
 function ButtonBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
   const [busy, setBusy] = useState(false);
+  if (block.action?.offline !== undefined) {
+    return context.canRun?.(block.action) ? <OfflineButton block={block} scope={scope} context={context} /> : null;
+  }
   if (block.action?.own !== undefined && !context.hasOwnScreens) {
     return null; // opens native screens this app doesn't have for the Satellite
   }
@@ -1659,6 +1721,8 @@ const styles = StyleSheet.create({
     backgroundColor: palette.control,
   },
   rowMain: {flex: 1, minWidth: 0, gap: 2},
+  rowSubtitle: {flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0},
+  rowSubtitleText: {flexShrink: 1},
   mediaRow: {minHeight: 64},
   mediaRowActions: {paddingRight: space.xs, gap: 0},
   mediaRowOpen: {flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: space.md, alignSelf: 'stretch'},

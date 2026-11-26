@@ -217,7 +217,7 @@ and the Android screens against what the contract can draw.
   until A10 removes it.
 - [x] **Settings and equalizer** as forms (A5): Settings, Equalizer, Scan and Duplicates.
 - [x] **Stats and Wrapped** as dashboard pages (A6).
-- [ ] **Offline downloads** as a generic client capability (keep a provider's tracks on the
+- [x] **Offline downloads** as a generic client capability (keep a provider's tracks on the
   device), with its Downloads page (A7, change 10).
 - [x] **The web player's keyboard shortcuts** active wherever the host plays, not only on
   Music's page (A8; `mission_control/media/keys.js` looks for `.pl-root`).

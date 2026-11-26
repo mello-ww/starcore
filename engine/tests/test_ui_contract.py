@@ -151,6 +151,17 @@ class DocumentFixturesTest(unittest.TestCase):
         search = next(case["document"] for case in fixture("documents.json")["valid"] if case["name"] == "play-action")
         self.assertEqual(ui_contract.validate(search, {}), [])
 
+    def test_keeping_tracks_keeps_only_the_satellites_own_library(self):
+        # known only at load, from the Satellite's manifest: the client keeps tracks it resolves
+        # through the document's own Satellite, and its Downloads screen is that provider's
+        document = next(case["document"] for case in fixture("documents.json")["valid"] if case["name"] == "offline-action")
+        audio = {"audio.library": {"version": 1, "operations": {"search": "search", "track": "tracks",
+                                                                "resolve": "playback", "artwork": "artwork"}}}
+        self.assertEqual(ui_contract.validate(document, audio), [])
+        errors = ui_contract.validate(document, {"media.gallery": {"version": 1, "operations": {"list": "media"}}})
+        self.assertTrue(any("offline" in error and "audio.library" in error for error in errors), errors)
+        self.assertTrue(any("sync" in error and "audio.library" in error for error in errors), errors)
+
     def test_the_player_section_and_reloads_need_the_satellites_own_audio_capabilities(self):
         # known only at load, from the Satellite's manifest: the host adds `audio` while it plays
         # the document's own Satellite, and `reloads` and `follows` name that Satellite's session
@@ -170,7 +181,8 @@ class DocumentFixturesTest(unittest.TestCase):
             self.assertIn(name, ui_contract.SATELLITE_CAPABILITIES)
 
     def test_every_sync_capability_opens_a_reserved_client_capability(self):
-        self.assertEqual(ui_contract.SYNC_CAPABILITIES, {"media.sync": "device.media-sync"})
+        self.assertEqual(ui_contract.SYNC_CAPABILITIES, {"media.sync": "device.media-sync",
+                                                         "audio.library": "media.audio-offline"})
         for name, client in ui_contract.SYNC_CAPABILITIES.items():
             self.assertIn(name, ui_contract.SATELLITE_CAPABILITIES)
             self.assertIn(client, ui_contract.VOCABULARY["client_capabilities"]["reserved"])
