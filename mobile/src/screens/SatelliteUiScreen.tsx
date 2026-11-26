@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {Glyph, GlyphIcons} from '../components/Glyph';
+import {useSlidingSelection} from '../components/motion';
 import {useAuth} from '../auth/AuthContext';
 import {useDeveloperMode} from '../developer/DeveloperModeContext';
 import {useAppActive} from '../hooks/useAppActive';
@@ -1141,6 +1142,11 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     await Promise.all([loadData(), loadHeader(), ...Object.keys(page?.sources ?? {}).map(loadSource)]);
     setRefreshing(false);
   };
+  // the accent slides between the document's top-level pages as one is picked
+  // (the row is drawn again on each page, so it remembers where the accent was for this document)
+  const tabSlide = useSlidingSelection(topLevel ? navigationItems.findIndex(item => item.page === pageId) : -1, {
+    remember: `page-tabs:${name}`,
+  });
 
   if (fatal) {
     return (
@@ -1246,7 +1252,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         )}
         {tabs.length > 1 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-            {tabs.map(item => {
+            {tabSlide.indicator}
+            {tabs.map((item, index) => {
               const active = item.page === pageId;
               return (
                 <Pressable
@@ -1255,7 +1262,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
                   accessibilityState={{selected: active}}
                   onPress={() => go(item.page)}
                   testID={`ui-tab-${item.page}`}
-                  style={[styles.tab, active && {backgroundColor: accent}]}>
+                  onLayout={tabSlide.onItemLayout(index)}
+                  style={[styles.tab, tabSlide.selectedBackground(active)]}>
                   {isIconName(item.icon, document.icons ?? null) && (
                     <Glyph name={item.icon} size={15} color={active ? onColor : palette.text2} />
                   )}

@@ -1,11 +1,12 @@
 import React from 'react';
 import {Pressable, ScrollView, StyleSheet, Text} from 'react-native';
 import {tokens, useAccent} from '../theme';
+import {useSlidingSelection} from './motion';
 
 const {palette, space, type} = tokens;
 
-/** A row of pill tabs: the selected one is filled with the accent. Any screen with a few
- * sections can use it. */
+/** A row of pill tabs: the selected one is filled with the accent, which slides from tab to
+ * tab (useSlidingSelection). Any screen with a few sections can use it. */
 export function PillTabs<K extends string>({
   items,
   selected,
@@ -17,10 +18,12 @@ export function PillTabs<K extends string>({
   onSelect: (key: K) => void;
   testIDPrefix?: string;
 }) {
-  const {color: accent, onColor: onAccent} = useAccent();
+  const {onColor: onAccent} = useAccent();
+  const {indicator, onItemLayout, selectedBackground} = useSlidingSelection(items.findIndex(item => item.key === selected));
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-      {items.map(item => {
+      {indicator}
+      {items.map((item, index) => {
         const active = item.key === selected;
         return (
           <Pressable
@@ -29,7 +32,8 @@ export function PillTabs<K extends string>({
             accessibilityRole="tab"
             accessibilityState={{selected: active}}
             testID={`${testIDPrefix}-${item.key}`}
-            style={({pressed}) => [styles.tab, active && {backgroundColor: accent}, pressed && !active && styles.pressed]}>
+            onLayout={onItemLayout(index)}
+            style={({pressed}) => [styles.tab, selectedBackground(active), pressed && !active && styles.pressed]}>
             <Text style={[styles.label, active && {color: onAccent}]}>{item.label}</Text>
           </Pressable>
         );

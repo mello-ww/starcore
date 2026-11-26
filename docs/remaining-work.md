@@ -316,8 +316,15 @@ mechanisms first, since several Satellites use them, then each Satellite's items
       reduced motion, and comes back after. Both clients, in the shared player and viewer: on
       the web while `body.ui-viewer-open` is set (the viewer and the pickers), on Android
       while a `MediaViewer` holds the player aside (`holdPlayerAside` in `media/ui/dock.ts`).
-- [ ] **Animations on Android**, where they help: a sliding selector when a pill tab changes
+- [x] **Animations on Android**, where they help: a sliding selector when a pill tab changes
       (`PillTabs`), and similar transitions in the shared components. Reduced-motion aware.
+      Done in `mobile/src/components/motion.tsx`: `useSlidingSelection` slides an accent pill
+      behind the selected option (its position on the native driver, so a page loading at the
+      same moment cannot stall it) for `PillTabs`, a document's page tabs, the `choice` block's
+      segments and a form's `select` options; a row drawn again for the new selection passes
+      `remember` and slides from where its accent last came to rest. `Reveal` fades a
+      drop-down's panel in. `useReducedMotion` is shared (the floating player and the media
+      grid use it too); under reduced motion everything moves without animating.
 - [x] **Swiping between the app's main tabs** (home, Satellites, console, settings, and config
       when Developer Mode is on) on Android. A one-finger sideways swipe that nothing inside
       the screen took (`navigation/tabSwipe.ts`) opens the neighbouring tab, without wrapping.

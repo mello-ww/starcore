@@ -1,6 +1,6 @@
 import React, {memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState} from 'react';
 import {
-  AccessibilityInfo, ActivityIndicator, Animated, FlatList, Image, Modal, Pressable, ScrollView, StatusBar, StyleSheet,
+  ActivityIndicator, Animated, FlatList, Image, Modal, Pressable, ScrollView, StatusBar, StyleSheet,
   Text, useWindowDimensions, View,
 } from 'react-native';
 import {GestureDetector, GestureHandlerRootView, type GestureType} from 'react-native-gesture-handler';
@@ -10,6 +10,7 @@ import Video from 'react-native-video';
 import {usePinchColumnsGesture} from '../../components/pinchColumns';
 import {SecureWindow} from '../../components/SecureWindow';
 import {ZoomableImage} from '../../components/ZoomableImage';
+import {useReducedMotion} from '../../components/motion';
 import {MemoryImages, useImageSource} from './memoryImages';
 import {keptPages} from './offline';
 import {tokens, useAccent} from '../../theme';
@@ -140,22 +141,6 @@ export function gridColumns(width: number, size: string): number {
 
 const present = (value: unknown) => value !== null && value !== undefined && value !== '';
 const asText = (value: unknown) => (present(value) ? String(value) : '');
-
-function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    let active = true;
-    Promise.resolve(AccessibilityInfo.isReduceMotionEnabled?.())
-      .then(value => active && setReduced(Boolean(value)))
-      .catch(() => {});
-    const subscription = AccessibilityInfo.addEventListener?.('reduceMotionChanged', value => setReduced(Boolean(value)));
-    return () => {
-      active = false;
-      subscription?.remove?.();
-    };
-  }, []);
-  return reduced;
-}
 
 interface Entry {
   item: any;

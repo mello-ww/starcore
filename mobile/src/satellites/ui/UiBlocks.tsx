@@ -6,6 +6,7 @@ import {Bars, ChartScale, ColumnChart, Meter, Sparkline} from '../../components/
 import {PrimaryButton} from '../../components/PrimaryButton';
 import {Slider} from '../../components/Slider';
 import {StarInput, useInputAccent} from '../../components/StarInput';
+import {Reveal, useSlidingSelection} from '../../components/motion';
 import {StarSwitch} from '../../components/StarSwitch';
 import {Surface} from '../../components/Surface';
 import {TOUCH_TARGET, tokens, useAccent} from '../../theme';
@@ -1178,9 +1179,11 @@ function ActionsBlock({block, scope, context}: {block: UiBlock; scope: Scope; co
         )}
       </View>
       {panel && (
-        <Surface style={styles.dropdownPanel}>
-          <UiBlocks blocks={panel.child.blocks} scope={scope} context={panelContext} />
-        </Surface>
+        <Reveal key={panel.index}>
+          <Surface style={styles.dropdownPanel}>
+            <UiBlocks blocks={panel.child.blocks} scope={scope} context={panelContext} />
+          </Surface>
+        </Reveal>
       )}
     </View>
   );
@@ -1353,8 +1356,36 @@ function RowsField({field, rows, onChange, context}: {field: any; rows: any; onC
   );
 }
 
+/** A select's options as pills; the accent slides to the one picked (useSlidingSelection). */
+function SelectField({field, label, value, onChange}: {field: any; label: string; value: any; onChange: (value: any) => void}) {
+  const {onColor} = useAccent();
+  const options: any[] = field.options ?? [];
+  const {indicator, onItemLayout, selectedBackground} = useSlidingSelection(options.findIndex(option => option.value === value));
+  return (
+    <View style={styles.inputField}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.options}>
+        {indicator}
+        {options.map((option: any, index: number) => {
+          const selected = option.value === value;
+          return (
+            <Pressable
+              key={String(option.value)}
+              accessibilityRole="radio"
+              accessibilityState={{selected}}
+              onPress={() => onChange(option.value)}
+              onLayout={onItemLayout(index)}
+              style={[styles.option, selectedBackground(selected)]}>
+              <Text style={[styles.optionLabel, selected && {color: onColor}]}>{asText(option.label)}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function FormField({field, value, onChange, context}: {field: any; value: any; onChange: (value: any) => void; context: BlockContext}) {
-  const {color: accent, onColor} = useAccent();
   const label = `${asText(field.label)}${field.required ? ' *' : ''}`;
   if (field.kind === 'toggle') {
     return (
@@ -1365,26 +1396,7 @@ function FormField({field, value, onChange, context}: {field: any; value: any; o
     );
   }
   if (field.kind === 'select') {
-    return (
-      <View style={styles.inputField}>
-        <Text style={styles.label}>{label}</Text>
-        <View style={styles.options}>
-          {(field.options ?? []).map((option: any) => {
-            const selected = option.value === value;
-            return (
-              <Pressable
-                key={String(option.value)}
-                accessibilityRole="radio"
-                accessibilityState={{selected}}
-                onPress={() => onChange(option.value)}
-                style={[styles.option, selected && {backgroundColor: accent}]}>
-                <Text style={[styles.optionLabel, selected && {color: onColor}]}>{asText(option.label)}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-    );
+    return <SelectField field={field} label={label} value={value} onChange={onChange} />;
   }
   const numeric = field.kind === 'number';
   return (
@@ -1662,8 +1674,15 @@ function SearchBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
 }
 
 function ChoiceBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
-  const {color: accent, onColor} = useAccent();
+  const {onColor} = useAccent();
   const current = context.pageState?.[block.key];
+  const options: any[] = Array.isArray(block.options) ? block.options : [];
+  // the accent slides to the segment picked; the page may draw the row again for the new choice,
+  // so it remembers where it was
+  const {indicator, onItemLayout, selectedBackground} = useSlidingSelection(
+    options.findIndex(option => option.value === current),
+    {radius: radii.control - 3, remember: `choice:${block.key}`},
+  );
   const label = block.label !== undefined ? asText(resolve(block.label, scope)) : '';
   return (
     // Like the web's segmented control: the segments share the width when they fit, and the
@@ -1675,7 +1694,8 @@ function ChoiceBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
       contentContainerStyle={styles.segments}
       accessibilityRole="radiogroup"
       accessibilityLabel={label || undefined}>
-      {(Array.isArray(block.options) ? block.options : []).map((option: any) => {
+      {indicator}
+      {options.map((option: any, index: number) => {
         const selected = option.value === current;
         const text = asText(resolve(option.label, scope));
         return (
@@ -1686,7 +1706,8 @@ function ChoiceBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
             accessibilityState={{selected}}
             accessibilityLabel={text}
             testID={`ui-choice-${String(option.value)}`}
-            style={[styles.segment, selected && {backgroundColor: accent}]}>
+            onLayout={onItemLayout(index)}
+            style={[styles.segment, selectedBackground(selected)]}>
             <Text numberOfLines={1} style={[styles.segmentLabel, selected && {color: onColor, fontWeight: '700'}]}>
               {text}
             </Text>

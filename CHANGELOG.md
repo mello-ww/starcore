@@ -7,6 +7,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Animations on Android.** The accent slides between the options of a row instead of
+  jumping: pill tabs, a document's page tabs, the segments of a choice and the options of a
+  form's select, even when the page draws the row again for the new choice. A page action's
+  drop-down panel fades in. All of it is shared (`mobile/src/components/motion.tsx`) and stays
+  still when the system asks for reduced motion.
 - **Swiping between the app's main tabs on Android.** A sideways swipe on a screen opens the
   neighbouring tab of the bar (Developer Mode's included), without wrapping past either end; a
   horizontal list, a slider or a pinch inside the screen keeps its own gesture.

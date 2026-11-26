@@ -1,30 +1,15 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {AccessibilityInfo, ActivityIndicator, Animated, Easing, PanResponder, Pressable, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, Animated, Easing, PanResponder, Pressable, StyleSheet, Text, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {colors, spacing, typography, useAccent} from '../../theme';
 import {useAudioHost, usePlayerState} from '../AudioHost';
 import {Artwork} from './Artwork';
+import {useReducedMotion} from '../../components/motion';
 import {anchors, setPlayerCollapsed, usePlayerAside, usePlayerCollapsed} from './dock';
 
 /** A floating bubble above the tab bar on every tab; tap or swipe up opens the full player.
  * The chevron (or a swipe down) puts it away into the top-right disc, which brings it back.
  * It sinks out of the way while a full-screen media viewer is open, and rises again after. */
-function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    let active = true;
-    Promise.resolve(AccessibilityInfo.isReduceMotionEnabled?.())
-      .then(value => active && setReduced(Boolean(value)))
-      .catch(() => {});
-    const subscription = AccessibilityInfo.addEventListener?.('reduceMotionChanged', value => setReduced(Boolean(value)));
-    return () => {
-      active = false;
-      subscription?.remove?.();
-    };
-  }, []);
-  return reduced;
-}
-
 export function MiniPlayer() {
   const {color: accent, onColor} = useAccent();
   const {player, setFullPlayer, liked, setLiked} = useAudioHost();
