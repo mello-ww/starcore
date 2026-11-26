@@ -621,7 +621,7 @@ class StatusEngineTest(unittest.TestCase):
         self.assertIsNotNone(definition)
         self.assertIsNone(definition.error)
         document = definition.document
-        self.assertEqual(document["contract"], "starcore.ui/1.1")
+        self.assertEqual(document["contract"], "starcore.ui/1.2")
         routes = set(self.satellite.routes)
         def walk(value):
             if isinstance(value, dict):

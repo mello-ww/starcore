@@ -7,6 +7,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Status's interface is back, with its graphs.** Since the Satellite icons its document still
+  declared UI contract 1.1, which icons need 1.2 for, so the Engine refused it and both clients
+  showed no interface. It now declares 1.2, a test loads every shipped `ui.json` together with
+  its manifest's icons and capabilities, and Mission Control's overview tiles draw their usage
+  meters full width again (they were squeezed to nothing).
 - **Music's "Transcodes at once" and density settings take effect.** The transcoder now runs as
   many conversions at once as the setting says (it always ran two), and Mission Control's
   player turns compact when Appearance says so (it set an attribute nothing read).

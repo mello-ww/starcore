@@ -329,6 +329,22 @@ class ShippedManifestsTest(unittest.TestCase):
             manifest = tomllib.loads(path.read_text(encoding="utf-8"))
             self.assertIn(manifest.get("icon_name"), ui_contract.ICONS, path)
 
+    def test_every_shipped_interface_loads_as_the_engine_serves_it(self):
+        """Each shipped ui.json validates together with its manifest's [icons] and [provides],
+        as the Engine loads it: a document rejected there offers no interface at all."""
+        import tomllib
+        from starcore import icons
+        for path in [*REPO.glob("satellites/*/*/satellite.toml"), SHOWCASE / "satellite.toml"]:
+            folder = path.parent
+            if not (folder / ui_contract.UI_FILENAME).is_file():
+                continue
+            manifest = tomllib.loads(path.read_text(encoding="utf-8"))
+            own, problems = icons.load_icons(folder, manifest.get("icons"))
+            self.assertEqual(problems, [], folder.name)
+            provides, _ = ui_contract.normalise_provides(manifest.get("provides"))
+            with self.subTest(folder.name):
+                ui_contract.load(folder / ui_contract.UI_FILENAME, provides, own)
+
     def test_every_declared_operation_is_one_of_the_providers_routes(self):
         """A shipped Satellite's [provides] maps each operation to a route its api.py
         really serves (the Engine only checks the shape: it never imports code to load

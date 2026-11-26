@@ -887,6 +887,8 @@ button.ui-list-row:hover {
 .ui-tiles > .ui-metric {
     display: flex;
     flex-direction: column;
+    /* the metric's own baseline alignment would shrink its meter to nothing in a column */
+    align-items: stretch;
     gap: 4px;
     min-height: 140px;
     padding: 16px 18px;

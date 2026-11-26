@@ -377,8 +377,13 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 
 **Status**
 
-- [ ] Rebuild the old interface's graphs on the shared interface (the `chart` block exists since
+- [x] Rebuild the old interface's graphs on the shared interface (the `chart` block exists since
       1.1; add what is missing to the contract if needed), and check it on the Android app too.
+      Nothing was missing from the contract: the overview's tiles carry a meter and a trend, and
+      every chart of the old page is a `chart` block with its "Show values" table. Checking it
+      found the interface rejected since the Satellite icons (its document still said 1.1, so
+      neither client showed it) and the tiles' meters drawn zero wide on Mission Control; both
+      are fixed, and a test now loads every shipped `ui.json` with its manifest's icons.
 
 ## Outside this migration
 
