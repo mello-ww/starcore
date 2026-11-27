@@ -604,10 +604,6 @@
     background: var(--sc-bg);
 }
 
-.sc-themed .auth-overlay .starfield {
-    display: none;
-}
-
 .sc-themed .auth-card {
     gap: 14px;
     max-width: 360px;

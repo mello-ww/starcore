@@ -26,7 +26,7 @@ A persistent sidebar divides Mission Control into the Core and the Satellites or
 
 The Core section holds the pages that belong to StarCore itself:
 
-- **Overview** - whether the Core is running, uptime, the number of loaded Satellites (split by type), the number of registered commands, the engine name and the address Mission Control is served from, alongside a map of the Satellites in orbit around the Core. Each Satellite in the orbit map is drawn from its generic `status` (see "Satellite status and icons" below); hovering or focusing one shows its name and status (`"Photo — running"`), and reduced-motion preferences are respected the same way they are everywhere else in Mission Control.
+- **Overview** (Home) - whether the Core is running, its uptime, how many Satellites are online and how many commands are registered, every Satellite's widgets (its `ui.json` `widgets`), and a card for each Satellite drawn from its generic `status` (see "Satellite status and icons" below).
 - **Satellites** - a card for every loaded Satellite: its own icon (or a generic fallback), name, version, author, description, type, status badge and the CLI commands it contributes
 - **Console** - a web equivalent of the terminal CLI: it lists the available commands, lets a user enter and run one, and shows its output. It executes commands through the same command registry as the terminal, so behavior is identical either way. Its topbar also carries the Stop and Restart controls described in "Stopping and restarting StarCore" below.
 - **Configuration** - view the current `[server]` settings and change them, with the same validation and "restart required" honesty as the CLI's `config` command. See "Configuration" below.
