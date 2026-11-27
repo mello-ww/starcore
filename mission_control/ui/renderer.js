@@ -1241,6 +1241,9 @@ export function mount(context) {
         return holder;
     }
 
+    // a field's value longer than this takes the whole width of its group (Android: WIDE_FIELD)
+    const WIDE_FIELD = 24;
+
     // consecutive fields form one group, which a wide card lays out as a grid of facts
     function renderBlocks(blocks, scope, container) {
         let fields = null;
@@ -1507,10 +1510,12 @@ export function mount(context) {
             : el("p", `ui-text ui-text-${block.style || "body"}`, text(block.text, scope))),
 
         field: (block, scope) => {
-            const row = el("div", "ui-field");
+            const shown = formatValue(resolve(block.value, scope), block.format, block.unit);
+            // a long value (a path, a sentence) takes a line of its own instead of wrapping
+            // in a narrow column beside the others
+            const row = el("div", String(shown).length > WIDE_FIELD ? "ui-field is-wide" : "ui-field");
             row.appendChild(el("span", "ui-field-label", text(block.label, scope)));
-            const value = el("span", `ui-field-value ui-tone-${toneOf(resolve(block.tone, scope))}`,
-                formatValue(resolve(block.value, scope), block.format, block.unit));
+            const value = el("span", `ui-field-value ui-tone-${toneOf(resolve(block.tone, scope))}`, shown);
             const detail = block.detail !== undefined ? text(block.detail, scope) : "";
             if (detail) {
                 value.appendChild(el("small", "ui-field-detail", detail));

@@ -171,7 +171,8 @@ class FileExplorerViewTest(unittest.TestCase):
 
     def test_a_well_known_extension_has_a_readable_type(self):
         for name, kind in (("setup.EXE", "Windows application"), ("report.pdf", "PDF document"),
-                           ("song.flac", "FLAC audio"), ("data.xyz", "XYZ file")):
+                           ("song.flac", "FLAC audio"), ("clip.mp4", "MP4 video"), ("Track.M4A", "M4A audio"),
+                           ("scan.bmp", "BMP image"), ("data.xyz", "XYZ file")):
             (self.directory / name).write_bytes(b"x")
             self.assertEqual(self.file(self.directory / name)[1]["kind"], kind, name)
 

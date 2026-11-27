@@ -396,6 +396,25 @@ mechanisms first, since several Satellites use them, then each Satellite's items
       neither client showed it) and the tiles' meters drawn zero wide on Mission Control; both
       are fixed, and a test now loads every shipped `ui.json` with its manifest's icons.
 
+## 8. Open with, Show in folder (asked on 2026-11-27)
+
+Linking Satellites without coupling them: File Explorer's file page lists what can open a
+file ("Opens with"), Photos opens images and videos, Music plays sounds (directly when they
+are outside its library, and they can still go in a playlist), and Photos and Music show an
+item's file in File Explorer. The audit and the plan: [`open-with-audit.md`](open-with-audit.md).
+
+- [ ] O1 contract change 16: the `files.open` capability, the `openers` block, the `open-with`
+      and `reveal` actions, on the Engine and both clients.
+- [ ] O2 File Explorer: `stat` and `reveal`, "Opens with" on the file page.
+- [ ] O3 Photos: open by path, its page for a file outside the library, Show in folder.
+- [ ] O4 Music: open by path, external tracks (direct playback, playlists), Show in folder.
+- [ ] O5 security review of O1 to O4.
+- [ ] O6 runs on the web demo and the emulator, docs, a new APK.
+- [x] File Explorer names media types the way a desktop file manager does ("MP4 video",
+      "M4A audio", "BMP image"), and a long field value (a folder's path) takes a line of its
+      own on both clients instead of wrapping in a narrow column and pushing the other values
+      down.
+
 ## Outside this migration
 
 Tracked in [`roadmap.md`](roadmap.md), not here: what has not been verified (the Python tests

@@ -306,16 +306,22 @@ function InlineField({block, scope}: {block: UiBlock; scope: Scope}) {
   return <Text style={type.caption}>{`${asText(resolve(block.label, scope))} ${value}${detail ? ` · ${detail}` : ''}`}</Text>;
 }
 
+// a field's value longer than this sits under its label, across the whole width, instead of
+// wrapping in the narrow space beside it (the web: WIDE_FIELD)
+const WIDE_FIELD = 24;
+
 function FieldBlock({block, scope}: {block: UiBlock; scope: Scope}) {
   const detail = block.detail !== undefined ? asText(resolve(block.detail, scope)) : '';
+  const shown = formatValue(resolve(block.value, scope), block.format, block.unit);
+  const wide = String(shown).length > WIDE_FIELD;
   return (
-    <View style={styles.field}>
+    <View style={wide ? styles.fieldWide : styles.field} testID={wide ? 'field-wide' : undefined}>
       <Text style={styles.label}>{asText(resolve(block.label, scope))}</Text>
-      <View style={styles.fieldValue}>
-        <Text style={[styles.value, {color: TONE_COLORS[toneOf(resolve(block.tone, scope))]}]} selectable>
-          {formatValue(resolve(block.value, scope), block.format, block.unit)}
+      <View style={wide ? styles.fieldValueWide : styles.fieldValue}>
+        <Text style={[styles.value, wide && styles.valueWide, {color: TONE_COLORS[toneOf(resolve(block.tone, scope))]}]} selectable>
+          {shown}
         </Text>
-        {detail ? <Text style={styles.detail}>{detail}</Text> : null}
+        {detail ? <Text style={[styles.detail, wide && styles.valueWide]}>{detail}</Text> : null}
       </View>
     </View>
   );
@@ -1804,6 +1810,9 @@ const styles = StyleSheet.create({
   eyebrow: {marginTop: space.xs},
   metricValue: {...type.title, fontSize: 20},
   field: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: space.md},
+  fieldWide: {gap: 2},
+  fieldValueWide: {alignItems: 'flex-start', gap: 2},
+  valueWide: {textAlign: 'left'},
   metric: {gap: space.sm},
   tiles: {flexDirection: 'row', flexWrap: 'wrap', gap: space.md},
   tile: {

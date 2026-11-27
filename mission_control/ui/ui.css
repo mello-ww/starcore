@@ -242,6 +242,7 @@
     .ui-fields .ui-field {
         flex-direction: column;
         align-items: flex-start;
+        justify-content: flex-start;
         gap: 4px;
     }
 
@@ -253,6 +254,22 @@
     .ui-fields .ui-field-value {
         text-align: left;
     }
+
+    .ui-fields .ui-field.is-wide {
+        grid-column: 1 / -1;
+    }
+}
+
+/* a long value sits under its label, across the whole width */
+.ui-field.is-wide {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 4px;
+}
+
+.ui-field.is-wide .ui-field-value {
+    text-align: left;
 }
 
 .ui-heading {
@@ -792,7 +809,10 @@ button.ui-list-row:hover {
 }
 
 /* a field in the header reads as one line: "Updated 12s ago · Sampling every 5 s" */
-.ui-header-main .ui-field {
+.ui-header-main .ui-field,
+.ui-header-main .ui-field.is-wide {
+    flex-direction: row;
+    align-items: baseline;
     justify-content: flex-start;
     gap: 6px;
 }

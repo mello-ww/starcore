@@ -7,6 +7,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **File Explorer names media types like a desktop file manager, and a long path keeps its
+  line.** A picture, a sound or a video reads as its extension and what it is ("MP4 video",
+  "M4A audio", "BMP image"), with more video and audio extensions known. On both clients a
+  field whose value is long (a file's folder) sits under its label across the whole width,
+  instead of wrapping in a narrow column; on Mission Control the other values no longer drop to
+  the bottom of a tall row. The plan for Open with and Show in folder between Satellites is in
+  `docs/open-with-audit.md`.
 - **Photos' optional points.** Select all in a grid's selection, and Unfavorite on many
   photos at once; Remove from album on a selection (in an album of one's own); the recycle bin
   as a tile beside the folders, and a sentence when there are no phone folders or albums yet;

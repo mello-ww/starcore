@@ -140,8 +140,10 @@ PICTURES = {".png": "PNG image", ".jpg": "JPEG image", ".jpeg": "JPEG image", ".
 PREVIEW_LIMIT = 20 * 1024 * 1024
 
 
-# what the well-known extensions are, in words, for a file's Type; any other shows its
-# extension ("XYZ file")
+# what the well-known extensions are, in words, for a file's Type, the way a desktop file
+# manager names them: a picture, a sound or a video is its extension and what it is ("MP4
+# video"), anything else what it is ("Windows application"); any other shows its extension
+# ("XYZ file")
 KINDS = {
     # applications and scripts
     ".exe": "Windows application", ".msi": "Windows installer", ".bat": "Windows batch script",
@@ -168,17 +170,22 @@ KINDS = {
     ".zip": "ZIP archive", ".rar": "RAR archive", ".7z": "7-Zip archive", ".tar": "TAR archive",
     ".gz": "Gzip archive", ".tgz": "Gzip archive", ".bz2": "Bzip2 archive", ".xz": "XZ archive",
     # pictures the file page does not preview
-    ".bmp": "Bitmap image", ".tif": "TIFF image", ".tiff": "TIFF image", ".svg": "SVG image",
-    ".heic": "HEIC image", ".heif": "HEIF image", ".avif": "AVIF image", ".ico": "Icon",
-    ".raw": "Camera raw image", ".dng": "Camera raw image", ".cr2": "Camera raw image",
-    ".nef": "Camera raw image", ".arw": "Camera raw image", ".psd": "Photoshop image",
+    ".bmp": "BMP image", ".tif": "TIFF image", ".tiff": "TIFF image", ".svg": "SVG image",
+    ".heic": "HEIC image", ".heif": "HEIF image", ".avif": "AVIF image", ".jfif": "JPEG image",
+    ".ico": "Icon", ".raw": "RAW image", ".dng": "DNG image", ".cr2": "CR2 image",
+    ".cr3": "CR3 image", ".nef": "NEF image", ".arw": "ARW image", ".psd": "Photoshop image",
     # sound
-    ".mp3": "MP3 audio", ".flac": "FLAC audio", ".wav": "WAV audio", ".ogg": "Ogg audio",
-    ".opus": "Opus audio", ".m4a": "MPEG-4 audio", ".aac": "AAC audio", ".wma": "Windows Media audio",
-    ".aiff": "AIFF audio", ".mid": "MIDI file", ".m3u": "Playlist", ".m3u8": "Playlist",
+    ".mp3": "MP3 audio", ".flac": "FLAC audio", ".wav": "WAV audio", ".ogg": "OGG audio",
+    ".oga": "OGG audio", ".opus": "Opus audio", ".m4a": "M4A audio", ".aac": "AAC audio",
+    ".wma": "WMA audio", ".aiff": "AIFF audio", ".aif": "AIFF audio", ".alac": "ALAC audio",
+    ".ape": "APE audio", ".wv": "WavPack audio", ".mid": "MIDI file", ".midi": "MIDI file",
+    ".m3u": "Playlist", ".m3u8": "Playlist", ".pls": "Playlist", ".cue": "Cue sheet",
     # video
-    ".mp4": "MPEG-4 video", ".mkv": "Matroska video", ".mov": "QuickTime video", ".avi": "AVI video",
-    ".webm": "WebM video", ".wmv": "Windows Media video", ".m4v": "MPEG-4 video", ".srt": "Subtitles",
+    ".mp4": "MP4 video", ".mkv": "MKV video", ".mov": "MOV video", ".avi": "AVI video",
+    ".webm": "WebM video", ".wmv": "WMV video", ".m4v": "M4V video", ".mpg": "MPEG video",
+    ".mpeg": "MPEG video", ".3gp": "3GP video", ".flv": "FLV video", ".m2ts": "M2TS video",
+    ".mts": "MTS video", ".vob": "VOB video", ".srt": "Subtitles", ".ass": "Subtitles",
+    ".vtt": "Subtitles",
     # fonts
     ".ttf": "TrueType font", ".otf": "OpenType font", ".woff": "Web font", ".woff2": "Web font",
     # other
