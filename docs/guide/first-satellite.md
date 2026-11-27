@@ -95,9 +95,10 @@ page.
 
 ## 4. Try it
 
-Start StarCore (`uv run python -m starcore` in `engine/`) and open Mission Control. Hello is
-listed with the other Satellites; open it and press **Say hello**. The Android app shows the
-same page, drawn natively, the next time it refreshes its Satellites.
+Start StarCore (`uv run python -m starcore` in `engine/`), or restart it if it was running: a
+new Satellite folder is loaded at startup. Open Mission Control: Hello is listed with the
+other Satellites; open it and press **Say hello**. The Android app shows the same page, drawn
+natively, the next time it refreshes its Satellites.
 
 After an edit, reload the Satellite without restarting StarCore, from the CLI or with its
 reload button in Mission Control's Developer Mode:

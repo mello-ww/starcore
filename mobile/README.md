@@ -15,9 +15,10 @@ Mobile UI  ->  Existing StarCore API  ->  StarCore Engine  ->  Satellites
   app lock.
 - Home, Satellites, Settings, and in Developer Mode the Console and Config tabs.
 - Every Satellite that ships a `ui.json`, drawn by the shared renderer (see "Satellite
-  interfaces" below): Status, Photos, and File Explorer's read-only preview, the app's file
-  browser.
-- The shared audio player (`src/media/`), and Music's native library screens.
+  interfaces" below): Status, Photos, the Locked Folder, Music and File Explorer. The app has
+  no screen written for one Satellite.
+- The shared audio player (`src/media/`), which plays any Satellite that provides the
+  `audio.library` capability, with offline downloads.
 - The phone's background backup (`src/sync/` and the Kotlin `sync` package), client
   capability `device.media-sync`: any server's `media.sync` provider, reached from a
   document's `sync` action or Settings' "Phone backup" (`docs/archive/photos-parity-audit.md`).
