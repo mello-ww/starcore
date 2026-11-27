@@ -364,6 +364,32 @@ class FileExplorerApiTest(unittest.TestCase):
         from importlib import import_module
         return import_module("satellites.native.file_explorer.paths").list_roots()
 
+    # ---------- stat and locate (files.browse, for other Satellites) ----------
+
+    def test_stat_describes_one_file_or_folder(self):
+        (self.directory / "song.mp3").write_bytes(b"abc")
+        status, payload = self.json_request(self.with_path("stat", self.directory / "song.mp3"))
+        self.assertEqual(status, 200)
+        self.assertEqual((payload["name"], payload["type"], payload["size"]), ("song.mp3", "file", 3))
+        self.assertEqual(payload["path"], str(self.directory / "song.mp3"))
+        status, payload = self.json_request(self.with_path("stat", self.directory))
+        self.assertEqual((status, payload["type"], payload["size"]), (200, "dir", None))
+
+    def test_locate_names_the_folder_page_and_selects_a_file(self):
+        (self.directory / "a b.jpg").write_bytes(b"x")
+        status, payload = self.json_request(self.with_path("locate", self.directory / "a b.jpg"))
+        self.assertEqual(status, 200)
+        self.assertEqual(payload, {"page": "folder", "params": {"path": str(self.directory), "select": "a b.jpg"}})
+        status, payload = self.json_request(self.with_path("locate", self.directory))
+        self.assertEqual(payload, {"page": "folder", "params": {"path": str(self.directory)}})
+
+    def test_stat_and_locate_refuse_what_content_refuses(self):
+        for route in ("stat", "locate"):
+            self.assertEqual(self.request(self.with_path(route, self.directory / "missing.txt"))[0], 404)
+            self.assertEqual(self.request(self.with_path(route, "relative/file.txt"))[0], 400)
+            self.assertEqual(self.request(self.with_path(route, ""))[0], 400)
+            self.assertEqual(self.request(self.base(route), "POST", {"path": str(self.directory)})[0], 405)
+
     # ---------- download ----------
 
     def test_a_file_can_be_downloaded(self):

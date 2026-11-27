@@ -39,7 +39,12 @@ satellites/native/file_explorer/
 ```
 
 It provides the `files.browse` capability (`list` → `entries`), which any interface's
-file-browser block and Mission Control's folder picker use without naming this Satellite.
+file-browser block and Mission Control's folder picker use without naming this Satellite. Two
+more operations are for other Satellites (change 16, `docs/open-with-audit.md`): `stat?path=`
+(one file or folder the session may browse) and `locate?path=` (the folder page that shows a
+path, `{"page": "folder", "params": {"path", "select"}}`). Both run the same guard as `content`:
+the roots, and the Locked Folder's areas. The file page ends its details with the "Opens with"
+line (the `openers` block), one link per Satellite that opens the file.
 
 ## Previous web page
 

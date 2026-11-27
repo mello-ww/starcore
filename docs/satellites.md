@@ -185,7 +185,7 @@ A Satellite can provide a service that other Satellites' interfaces use without 
 ```toml
 [provides."files.browse"]
 version = 1
-operations = { list = "entries" }
+operations = { list = "entries", locate = "locate", stat = "stat" }
 ```
 
 Each operation maps to one of its own routes. The Engine lists providers in

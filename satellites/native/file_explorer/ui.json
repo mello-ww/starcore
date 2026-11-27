@@ -77,6 +77,7 @@
           {"type": "field", "label": "Type", "value": "$.kind"},
           {"type": "field", "label": "Folder", "value": "$.folder"}
         ]},
+        {"type": "openers", "path": "$.path", "label": "Opens with"},
         {"type": "actions", "blocks": [
           {"type": "button", "label": "Open", "style": "primary",
            "action": {"download": "content?path={$params.path}", "name": "$.name", "open": true}},

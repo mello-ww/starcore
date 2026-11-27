@@ -7,6 +7,10 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **File Explorer answers `stat` and `locate` and shows "Opens with".** Other Satellites can ask
+  it, through `files.browse`, about one path the session may browse and which of its pages shows
+  it, behind the same guard as its content (its roots and the Locked Folder). Its file page ends
+  with the "Opens with" line, which fills in as Satellites declare `files.open`.
 - **Opens with, Show in folder: the contract (UI contract 1.2 change 16).** A Satellite can say
   which files it opens: `[provides."files.open"]` with `types` (image, video, audio, from a
   shared table), optional `extensions` and a `label`, checked by the Engine and published in the

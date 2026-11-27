@@ -460,7 +460,7 @@ class UiApiTest(unittest.TestCase):
         self.assertEqual(entry["ui"], {"contract": "starcore.ui/1.0", "revision": self.showcase.ui.revision,
                                        "error": None})
         explorer = next(item for item in payload["satellites"] if item["name"] == "FileExplorer")
-        self.assertEqual(explorer["provides"]["files.browse"]["operations"], {"list": "entries"})
+        self.assertEqual(explorer["provides"]["files.browse"]["operations"], {"list": "entries", "locate": "locate", "stat": "stat"})
         self.assertNotIn("preview", explorer["ui"])  # F6: its default interface on every client
         # L8: its only interface, so no longer a preview
         locked = next(item for item in payload["satellites"] if item["name"] == "LockedFolder")
@@ -504,7 +504,7 @@ class UiApiTest(unittest.TestCase):
         self.assertEqual(payload["contract"]["majors"], [1])
         providers = payload["capabilities"]["files.browse"]
         self.assertEqual(providers[0]["satellite"], "FileExplorer")
-        self.assertEqual(providers[0]["operations"], {"list": "entries"})
+        self.assertEqual(providers[0]["operations"], {"list": "entries", "locate": "locate", "stat": "stat"})
         self.assertEqual(payload["contract"]["capabilities"]["audio.library"], [1])
         self.assertEqual(payload["contract"]["capabilities"]["audio.session"], [1])
         session = payload["capabilities"]["audio.session"]

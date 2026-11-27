@@ -406,7 +406,7 @@ item's file in File Explorer. The audit and the plan: [`open-with-audit.md`](ope
 - [x] O1 contract change 16: the `files.open` capability (types, extensions, label), the
       `openers` block and the `locate` action (Show in folder; `reveal` was taken), on the
       Engine, the vocabulary, the fixtures and both clients.
-- [ ] O2 File Explorer: `stat` and `locate`, "Opens with" on the file page.
+- [x] O2 File Explorer: `stat` and `locate`, "Opens with" on the file page.
 - [ ] O3 Photos: open by path, its page for a file outside the library, Show in folder.
 - [ ] O4 Music: open by path, external tracks (direct playback, playlists), Show in folder.
 - [ ] O5 security review of O1 to O4.

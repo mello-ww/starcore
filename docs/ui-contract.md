@@ -1121,7 +1121,7 @@ A Satellite declares the capabilities it provides in its `satellite.toml`:
 ```toml
 [provides."files.browse"]
 version = 1
-operations = { list = "entries" }
+operations = { list = "entries", locate = "locate", stat = "stat" }
 ```
 
 Each operation maps to one of the Satellite's own routes. The Engine checks the declaration

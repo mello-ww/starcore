@@ -171,3 +171,13 @@ a playlist going `missing`.
   pushes the provider's shared interface. Both hide the line, and the `locate` control, when
   nothing can serve them.
 - **Fixtures**: one valid document using both, seven refused ones.
+
+## What O2 built
+
+- File Explorer's `files.browse` gains `stat` and `locate` (`api.py`), behind the guard of
+  `content` (`paths.resolve_path`, then `protection.guard`): a path outside its roots, a protected
+  one, a missing one or a relative one answers as `content` does (400, 403, 404), and a file
+  answers the folder page with `select` set to its name. The folder page does not read `select`
+  yet; it is only carried in the answer.
+- Its file page ends with the `openers` block ("Opens with"). Nothing shows there until a
+  Satellite provides `files.open` (O3, O4).

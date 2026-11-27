@@ -325,6 +325,19 @@ class LockedFolderApiTest(unittest.TestCase):
         status = self.fe_content(str(self.vault / "secret.txt"))
         self.assertEqual(status, 403)
 
+    def test_stat_and_locate_refuse_the_locked_vault_and_serve_it_once_unlocked(self):
+        # what other Satellites ask before they open a path (change 16) goes through the same guard
+        self.configure_vault()
+        secret = str(self.vault / "secret.txt")
+        for route in ("stat", "locate"):
+            status, _ = self.json_request(f"/api/satellites/FileExplorer/{route}?path={secret}")
+            self.assertEqual(status, 403, route)
+        self.set_pin("1234")
+        self.unlock("1234")
+        for route in ("stat", "locate"):
+            status, _ = self.json_request(f"/api/satellites/FileExplorer/{route}?path={secret}")
+            self.assertEqual(status, 200, route)
+
     def test_the_parent_listing_flags_the_vault_as_locked_but_still_shows_it(self):
         self.configure_vault()
         status, payload = self.fe_entries(str(self.vault.parent))

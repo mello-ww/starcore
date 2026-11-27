@@ -39,6 +39,9 @@ def routes() -> dict:
     return {
         "entries": entries,
         "content": content,
+        # for other Satellites, through the files.browse capability (satellite.toml)
+        "stat": stat,
+        "locate": locate,
         "upload": upload,
         "mkdir": mkdir,
         "rename": rename,
@@ -90,6 +93,60 @@ def entries(request):
         "entries": items,
         "storage": _disk_usage(target),
     })
+
+
+def _guarded_target(request):
+    """The path of `?path=` as (target, its status, None), or (None, None, an error response)
+    when it is malformed, protected, missing or unreadable: the one check `stat` and `locate`
+    share with `content`, so a Satellite asking on a user's behalf learns nothing the user
+    could not browse to."""
+    try:
+        target = paths.resolve_path(request.query.get("path", ""))
+    except paths.PathError as error:
+        return None, None, error_response(str(error), status=400)
+    blocked = protection.guard(request, target)
+    if blocked is not None:
+        return None, None, blocked
+    status, failure = _stat(target)
+    if failure is not None:
+        return None, None, failure
+    return target, status, None
+
+
+def stat(request):
+    """stat?path=: one file or folder the session may browse (files.browse's `stat`), or the
+    error `content` would give. Other Satellites ask it before they touch a path."""
+    if request.method != "GET":
+        return error_response("only GET is supported here", status=405)
+    target, status, failure = _guarded_target(request)
+    if failure is not None:
+        return failure
+    if not (S_ISREG(status.st_mode) or S_ISDIR(status.st_mode)):
+        return error_response("that path is neither a file nor a folder", status=400)
+    is_dir = S_ISDIR(status.st_mode)
+    return json_response({
+        "name": target.name or str(target),
+        "path": str(target),
+        "type": "dir" if is_dir else "file",
+        "size": None if is_dir else status.st_size,
+        "modified": datetime.fromtimestamp(status.st_mtime, tz=timezone.utc).isoformat(timespec="seconds"),
+    })
+
+
+def locate(request):
+    """locate?path=: which of this interface's pages shows a path (files.browse's `locate`):
+    the folder page of a file's folder with the file named in `select`, or of the folder
+    itself."""
+    if request.method != "GET":
+        return error_response("only GET is supported here", status=405)
+    target, status, failure = _guarded_target(request)
+    if failure is not None:
+        return failure
+    if S_ISDIR(status.st_mode):
+        return json_response({"page": "folder", "params": {"path": str(target)}})
+    if not S_ISREG(status.st_mode):
+        return error_response("that path is neither a file nor a folder", status=400)
+    return json_response({"page": "folder", "params": {"path": str(target.parent), "select": target.name}})
 
 
 def view(request):
