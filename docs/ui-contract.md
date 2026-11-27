@@ -597,6 +597,30 @@ it on Escape or a press outside it; the panel stays open across a refresh of the
 draws it as a card under the row, in the page's own scrolling. The button carries the
 expanded state for assistive technology on both.
 
+### Opens with
+
+`openers` (1.2, change 16) is the line of Satellites that open a file:
+
+```json
+{"type": "openers", "path": "$.path", "label": "Opens with"}
+```
+
+```toml
+[provides."files.open"]
+version = 1
+operations = { open = "open" }
+types = ["image", "video"]
+label = "Pictures"
+```
+
+The client takes the extension at the end of `path` and keeps the enabled `files.open`
+providers of the catalog whose `extensions`, or else their `types`' lists in the vocabulary's
+`file_kinds`, hold it. It draws `label` (the client's "Opens with" without one), then one pill
+per provider, named by its `label` or else its Satellite's name. None, and the block is not
+drawn. A pill runs that provider's `open` with `{"path": ...}` and opens the page it answers, as
+`locate` does (see "Actions"). A `404` is a notice. The block is never in a protected document:
+a locked file's path goes to no other Satellite.
+
 ## Going back to a page
 
 Both clients (no contract change): going back to a page restores where the person was - its
@@ -857,6 +881,16 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
   - A literal name the client can't open (not a section of this Satellite, or nothing it can
     draw) hides the control. A binding is checked when pressed, and says so as a notice.
   - Not in a selection or a tile's quick actions.
+- **`locate`** (1.2, change 16), on its own: `{"locate": "$.path"}` shows the folder holding a
+  path, in whichever Satellite provides `files.browse` with its optional `locate` operation.
+  - The client asks that provider `GET locate?path=` with its own session, and opens the page
+    it answers, `{page, params}`, in the provider's shared interface: its route
+    (`#/satellite/<name>/<page>?<params>`) on the web, a screen pushed over this one on Android,
+    so Back returns here. The answer's `page` must be a page id and every param a string, or the
+    client refuses it; the client never builds the other Satellite's page by itself.
+  - A provider that refuses the path (a `404`: outside its roots, protected, not this user's)
+    is a notice. With no provider offering `locate`, the control is hidden.
+  - Not in a protected document, a selection, a tile's quick actions or the player's menu.
 - **`sync`** (1.2), on its own: `{"sync": {"capability": "media.sync"}}` opens the **client's own
   sync screen** for the document's own provider of that capability, and nothing else.
   - The vocabulary's `sync_capabilities` names which screen: `media.sync` opens
@@ -1109,6 +1143,14 @@ says so in place, and a document that `requires` it is not opened.
 | `media.vault` | 1 | `status`, `unlock` (`for` asks for a single-use grant for one move; without it, an unlock of this session that ends after `idle_seconds` without use), `lock`, `move_in` (`{items: [reference], grant?}`); optional `keep` (`POST` -> `{expires_at}`, restarts the idle time), `biometric` (`challenge {key_id, for?}`: the purpose is fixed with the challenge, never beside the signature) and, for the server alone, `sealed` (`GET /<sha256>` -> `{sealed}`, asked of every provider by `starcore.capabilities.sealed`) - see "Moves from a shared interface" in [the Locked Folder](satellites/locked_folder.md) | none: the `secure` action and protected documents use it, through each client's own unlock prompt. It has no operation that lists or reads what it holds |
 | `files.protected` | 1 | `check`: `GET ?path=<absolute path>[&tree=1]` -> `{protected, open, message?}`: whether the path is in a protected area (with `tree=1`, or contains one), and whether this session may reach it now - see "Every Satellite asks the Engine" in [the Locked Folder](satellites/locked_folder.md) | none: server-side only, and `check` refuses a client's request (`403`). The Engine asks every provider, enabled or not (`starcore.capabilities.protection`), before File Explorer, Photo or Music touch a path; a provider that fails keeps the path closed |
 | `media.sync` | 1 | `status` (`GET ?device=` -> `{accepts, max_bytes, chunk_bytes, device}`), `check` (`POST {items: [{sha256, size}]}`, at most 500 -> `{known, wanted}`), `upload` (`GET /<sha256>` -> `{offset}`; `POST /<sha256>?offset=&size=&name=&folder=&taken=` with raw bytes -> `{offset}`, or at the last byte `{status, id, offset}`); optional `devices` (`GET` -> `{devices}`). `"device_credentials": true`: the Engine issues a credential that reaches only these routes - see "Phone backup" in [Photo](satellites/photo.md) | none; the `sync` action opens the client's own sync screen for it (`device.media-sync`, the Android app's, `mobile/src/sync/`) |
+
+| `files.open` | 1 | `open`: `POST {path}` -> `{page, params}`, the provider's page showing that file, `404` when it can't open it or the user may not read it. The provider also declares `types` (required: kinds from the vocabulary's `file_kinds`, `image`, `video`, `audio`), `extensions` (optional, in place of the kinds' lists: a dot and 1 to 10 lower-case letters or digits, at most 64) and `label` (optional, 1 to 40 characters), which the catalog publishes with it | `openers` (change 16). Any number of Satellites may provide it |
+
+`files.browse` also has two optional operations (change 16): `locate` (`GET ?path=` ->
+`{page, params}`, the provider's page for the folder holding it, which the `locate` action
+opens) and `stat` (`GET ?path=` -> one entry the session may browse, `404` otherwise), which a
+`files.open` provider asks, through the Engine and with the user's own session, before it opens
+a path a client sent. The path is never trusted as sent.
 
 A capability's operations are required unless the vocabulary lists them under
 `optional_operations`. An operation the version doesn't define is a problem too, so a typo

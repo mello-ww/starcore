@@ -77,6 +77,8 @@ def describe_capabilities(engine) -> dict:
                 "version": entry["version"],
                 "operations": entry["operations"],
                 "enabled": satellite.enabled,
+                # what a files.open provider opens, and how a client names it (change 16)
+                **{key: entry[key] for key in ("types", "extensions", "label") if key in entry},
             })
     return registry
 

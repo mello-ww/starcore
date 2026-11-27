@@ -128,8 +128,14 @@ FORMATS_1_1 = set(SINCE_1_1["formats"])
 # (POST /api/auth/devices).
 SATELLITE_CAPABILITIES = {name: {"versions": set(spec["versions"]), "operations": set(spec["operations"]),
                                  "optional": set(spec.get("optional_operations", {})),
-                                 "device_credentials": spec.get("device_credentials") is True}
+                                 "device_credentials": spec.get("device_credentials") is True,
+                                 "declares": set(spec.get("declares", {}))}
                           for name, spec in VOCABULARY["satellite_capabilities"].items()}
+# what a files.open provider's types cover (change 16): {kind: extensions}
+FILE_KINDS = {kind: tuple(extensions) for kind, extensions in VOCABULARY["file_kinds"].items()
+              if not kind.startswith("_")}
+FILE_EXTENSION = re.compile(r"\.[a-z0-9]{1,10}")
+OPENER_LABEL_LIMIT = 40
 # the shared block bound to each capability
 CAPABILITY_BLOCKS = {"file-browser": "files.browse"}
 LIMITS = dict(VOCABULARY["limits"])
@@ -448,7 +454,8 @@ class _Validator:
         if not isinstance(action, dict):
             return
         kinds = {"navigate", "play", "choose"}
-        others = {"own", "secure", "section", "sync", "offline", "download", "share", "upload", "pick", "secrets", "reveal"}
+        others = {"own", "secure", "section", "sync", "offline", "download", "share", "upload", "pick", "secrets", "reveal",
+                  "locate"}
         if not kinds & set(action) and others & set(action):
             self.error(where, f"the player runs navigate, play, choose or a route action, not {sorted(others & set(action))[0]}")
         if "then" in action:
@@ -831,6 +838,8 @@ class _Validator:
             self.check_list(where, block)
         elif kind == "breadcrumb":
             self.check_breadcrumb(where, block)
+        elif kind == "openers":
+            self.check_openers(where, block)
         elif kind == "form":
             self.check_form(where, block)
         elif kind == "chart":
@@ -1017,6 +1026,26 @@ class _Validator:
             self.error(f"{where}.item", "needs 'title'")
         else:
             self.check_text(f"{where}.item.title", item["title"])
+
+    def check_openers(self, where: str, block: dict):
+        """{type: openers, path, label?} (1.2, change 16): the Satellites that open the file at
+        `path`, from the catalog's files.open providers whose extensions hold its own, one link
+        each. Never in a protected document: a locked file's path goes to no other Satellite."""
+        self.check_text(f"{where}.path", block.get("path"))
+        if self.protected:
+            self.error(where, "a protected document hands no path to another Satellite")
+
+    def check_locate(self, where: str, action: dict):
+        """{locate: path} (1.2, change 16): the client asks files.browse's locate for the path and
+        opens the folder page it answers. One place at a time, and never from a protected
+        document."""
+        self.since(f"{where}.locate", "the locate action", 2)
+        self.unknown_keys(where, action, {"locate"})
+        self.check_text(f"{where}.locate", action["locate"])
+        if self.in_bulk:
+            self.error(f"{where}.locate", "opens one folder: not in a selection or a tile's quick actions")
+        if self.protected:
+            self.error(f"{where}.locate", "a protected document hands no path to another Satellite")
 
     def check_media_options(self, where: str, block: dict):
         """size, shape and fit, shared by image and media-list: fixed words, never bindings,
@@ -1436,6 +1465,9 @@ class _Validator:
             return
         if "section" in action:
             self.check_section(where, action)
+            return
+        if "locate" in action:
+            self.check_locate(where, action)
             return
         if "sync" in action:
             self.check_sync(where, action)
@@ -1992,11 +2024,41 @@ def normalise_provides(provides) -> tuple:
             unknown = set(operations) - known["operations"] - known["optional"]
             if unknown:
                 found.append(f"provides.{name} has operations version {version} doesn't define: {sorted(unknown)}")
+        declared = {}
+        if known and known["declares"] and not found:
+            declared = _declared(name, entry, found)
         if found:
             problems.extend(found)
         else:
-            normalised[name] = {"version": version, "operations": dict(operations)}
+            normalised[name] = {"version": version, "operations": dict(operations), **declared}
     return normalised, problems
+
+
+def _declared(name: str, entry: dict, found: list) -> dict:
+    """What a files.open provider says it opens (change 16): its types, from FILE_KINDS, its
+    extensions (in place of the types' lists) and its label - as the catalog publishes them."""
+    declared = {}
+    types = entry.get("types")
+    if (not isinstance(types, list) or not types or not all(isinstance(kind, str) for kind in types)
+            or set(types) - set(FILE_KINDS) or len(set(types)) != len(types)):
+        found.append(f"provides.{name}.types must be a list of {sorted(FILE_KINDS)}")
+    else:
+        declared["types"] = list(types)
+    if "extensions" in entry:
+        extensions = entry["extensions"]
+        limit = LIMITS["opener_extensions"]
+        if (not isinstance(extensions, list) or not extensions or len(extensions) > limit
+                or not all(isinstance(ext, str) and FILE_EXTENSION.fullmatch(ext) for ext in extensions)):
+            found.append(f"provides.{name}.extensions must be 1 to {limit} extensions such as \".jpg\" (lower case)")
+        else:
+            declared["extensions"] = sorted(set(extensions))
+    if "label" in entry:
+        label = entry["label"]
+        if not isinstance(label, str) or not label.strip() or len(label) > OPENER_LABEL_LIMIT:
+            found.append(f"provides.{name}.label must be 1 to {OPENER_LABEL_LIMIT} characters")
+        else:
+            declared["label"] = label.strip()
+    return declared
 
 
 def contract_info() -> dict:

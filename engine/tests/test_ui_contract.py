@@ -266,6 +266,60 @@ class ProvidesTest(unittest.TestCase):
             self.assertEqual(provides, {}, broken)
             self.assertTrue(problems, broken)
 
+    def test_a_files_open_provider_says_what_it_opens(self):
+        provides, problems = ui_contract.normalise_provides({"files.open": {
+            "version": 1, "operations": {"open": "open"}, "types": ["image", "video"],
+            "extensions": [".png", ".jpg", ".png"], "label": " Pictures "}})
+        self.assertEqual(problems, [])
+        self.assertEqual(provides["files.open"], {"version": 1, "operations": {"open": "open"},
+                                                  "types": ["image", "video"], "extensions": [".jpg", ".png"],
+                                                  "label": "Pictures"})
+        provides, problems = ui_contract.normalise_provides({"files.open": {
+            "version": 1, "operations": {"open": "open"}, "types": ["audio"]}})
+        self.assertEqual(provides["files.open"], {"version": 1, "operations": {"open": "open"}, "types": ["audio"]})
+        # every kind covers extensions in the shared table, lower case, a dot first
+        for kind, extensions in ui_contract.FILE_KINDS.items():
+            self.assertTrue(extensions, kind)
+            for extension in extensions:
+                self.assertRegex(extension, ui_contract.FILE_EXTENSION)
+
+    def test_a_broken_files_open_provider_is_left_out(self):
+        opener = {"version": 1, "operations": {"open": "open"}, "types": ["image"]}
+        for broken in ({**opener, "types": []},
+                       {**opener, "types": ["image", "spreadsheet"]},
+                       {**opener, "types": "image"},
+                       {key: value for key, value in opener.items() if key != "types"},
+                       {**opener, "extensions": ["jpg"]},
+                       {**opener, "extensions": [".JPG"]},
+                       {**opener, "extensions": [".a/b"]},
+                       {**opener, "extensions": [f".e{index}" for index in range(65)]},
+                       {**opener, "label": ""},
+                       {**opener, "label": "x" * 41},
+                       {**opener, "operations": {}}):
+            provides, problems = ui_contract.normalise_provides({"files.open": broken})
+            self.assertEqual(provides, {}, broken)
+            self.assertTrue(problems, broken)
+
+    def test_the_catalog_publishes_what_an_opener_opens(self):
+        from types import SimpleNamespace
+        from starcore.api.payloads import describe_capabilities
+        provides, _ = ui_contract.normalise_provides({
+            "files.open": {"version": 1, "operations": {"open": "open"}, "types": ["audio"], "label": "Player"},
+            "files.browse": {"version": 1, "operations": {"list": "entries"}}})
+        satellite = SimpleNamespace(manifest=SimpleNamespace(name="Opener", provides=provides), enabled=True)
+        engine = SimpleNamespace(registry=SimpleNamespace(all=lambda: [satellite]))
+        catalog = describe_capabilities(engine)
+        self.assertEqual(catalog["files.open"], [{"satellite": "Opener", "version": 1, "operations": {"open": "open"},
+                                                  "enabled": True, "types": ["audio"], "label": "Player"}])
+        self.assertEqual(set(catalog["files.browse"][0]), {"satellite", "version", "operations", "enabled"})
+
+    def test_files_browse_may_offer_locate_and_stat(self):
+        operations = {"list": "entries", "locate": "locate", "stat": "stat"}
+        provides, problems = ui_contract.normalise_provides({"files.browse": {"version": 1, "operations": operations}})
+        self.assertEqual(problems, [])
+        self.assertEqual(provides["files.browse"]["operations"], operations)
+        self.assertNotIn("types", provides["files.browse"])
+
     AUDIO = {"search": "search", "track": "tracks", "resolve": "playback", "artwork": "artwork"}
 
     def test_audio_library_needs_its_four_operations_and_may_offer_lyrics(self):

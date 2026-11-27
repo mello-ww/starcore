@@ -15,7 +15,7 @@ export const BLOCK_TYPES = new Set([
   // 1.1
   'chart', 'table', 'choice', 'status', 'code',
   // 1.2
-  'image', 'media-list', 'media-grid', 'search', 'map', 'breadcrumb', 'actions', 'dropdown',
+  'image', 'media-list', 'media-grid', 'search', 'map', 'breadcrumb', 'actions', 'dropdown', 'openers',
 ]);
 export const FORMATS = new Set([
   'text', 'number', 'integer', 'percent', 'bytes', 'duration',
@@ -54,7 +54,15 @@ export function servesBlock(block: {requires?: unknown} | null | undefined): boo
   return names.every(name => typeof name === 'string' && CLIENT_CAPABILITIES.has(name));
 }
 /** Satellite capabilities this app has a shared block for, and the protocol versions it speaks. */
-export const CAPABILITY_VERSIONS: Record<string, number[]> = {'files.browse': [1], 'audio.library': [1], 'media.gallery': [1], 'media.vault': [1]};
+export const CAPABILITY_VERSIONS: Record<string, number[]> = {
+  'files.browse': [1], 'files.open': [1], 'audio.library': [1], 'media.gallery': [1], 'media.vault': [1],
+};
+/** What a files.open provider's types cover (1.2, change 16), as the shared vocabulary's file_kinds. */
+export const FILE_KINDS: Record<string, string[]> = {
+  image: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic', '.heif', '.avif', '.tif', '.tiff'],
+  video: ['.mp4', '.m4v', '.mov', '.mkv', '.webm', '.avi'],
+  audio: ['.mp3', '.flac', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.wav', '.wma', '.aif', '.aiff', '.alac'],
+};
 /** What a protected document (1.2) may name, and the operations its gate (src/vault/gate.ts)
  * calls. */
 export const PROTECTED_CAPABILITIES: Record<string, string[]> = {'media.vault': ['status', 'unlock', 'lock', 'keep']};
@@ -99,6 +107,8 @@ export interface UiAction {
   pick?: {capability: string; kinds?: string[]; multiple?: boolean; title?: Json};
   /** 1.2: open the Satellite's own native screens at a section they name ("settings"). */
   own?: string;
+  /** 1.2 (change 16): show the folder holding this path, through files.browse's locate. */
+  locate?: Json;
   /** 1.2: a file from one of the Satellite's own routes, saved to Downloads (download) or handed
    * to the system share sheet (share), named `name`; a download with `open` opens it in the
    * phone's own viewer instead. */
@@ -226,6 +236,11 @@ export interface CapabilityProvider {
   version: number;
   operations: Record<string, string>;
   enabled: boolean;
+  /** A files.open provider (change 16): the kinds and extensions it opens, and its name in an
+   * openers line. */
+  types?: string[];
+  extensions?: string[];
+  label?: string;
 }
 
 export type Providers = Record<string, CapabilityProvider[]>;
@@ -366,6 +381,56 @@ export function findProvider(providers: Providers | null | undefined, name: stri
   const versions = CAPABILITY_VERSIONS[name] ?? [];
   const candidates = providers?.[name] ?? [];
   return candidates.find(entry => entry.enabled && versions.includes(entry.version)) ?? null;
+}
+
+/** ".jpg" for "/a/b/Beach.JPG"; "" for a name without one (or a dot file). */
+export function fileExtension(path: unknown): string {
+  if (typeof path !== 'string') {
+    return '';
+  }
+  const fileName = path.split(/[\\/]/).pop() ?? '';
+  const dot = fileName.lastIndexOf('.');
+  return dot > 0 ? fileName.slice(dot).toLowerCase() : '';
+}
+
+/** The enabled files.open providers (1.2, change 16) that open the file at `path`: those whose
+ * extensions, else their types' file_kinds, hold its extension - in the catalog's order. */
+export function openersFor(providers: Providers | null | undefined, path: unknown): CapabilityProvider[] {
+  const extension = fileExtension(path);
+  if (!extension) {
+    return [];
+  }
+  const versions = CAPABILITY_VERSIONS['files.open'];
+  return (providers?.['files.open'] ?? []).filter(entry => {
+    if (!entry || !entry.enabled || !versions.includes(entry.version) || typeof entry.operations?.open !== 'string') {
+      return false;
+    }
+    const opens = Array.isArray(entry.extensions)
+      ? entry.extensions
+      : (Array.isArray(entry.types) ? entry.types : []).flatMap(kind => FILE_KINDS[kind] ?? []);
+    return opens.includes(extension);
+  });
+}
+
+/** The files.browse provider that can show a path's folder (the locate action, change 16). */
+export function locateProvider(providers: Providers | null | undefined): CapabilityProvider | null {
+  const provider = findProvider(providers, 'files.browse');
+  return provider && typeof provider.operations?.locate === 'string' ? provider : null;
+}
+
+const OPENED_PAGE = /^[a-z][a-z0-9_-]{0,47}$/;
+
+/** What an opener or locate answered, {page, params} - null unless page is a page id and every
+ * param a string (change 16): the app never opens anything else. */
+export function openedPage(answer: any): {page: string; params: Record<string, string>} | null {
+  if (!answer || typeof answer !== 'object' || typeof answer.page !== 'string' || !OPENED_PAGE.test(answer.page)) {
+    return null;
+  }
+  const params = answer.params === undefined ? {} : answer.params;
+  if (!params || typeof params !== 'object' || Array.isArray(params) || !Object.values(params).every(value => typeof value === 'string')) {
+    return null;
+  }
+  return {page: answer.page, params: {...params}};
 }
 
 export function missingRequirements(

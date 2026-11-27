@@ -11,7 +11,7 @@
 import { createChart, meter, sparkline } from "./charts.js";
 import {
     BLOCK_TYPES, canOpenSync, checkDocument, findProvider, formatValue, isSafeRoute, isVisible, servesBlock,
-    missingRequirements, resolve, resolveTemplate, toneOf,
+    locateProvider, missingRequirements, openedSection, openersFor, resolve, resolveTemplate, toneOf,
 } from "./contract.js";
 import { emptyRow, formBody, formProblem, formValues } from "./forms.js";
 import { canShareFiles, downloadFile, fileName, openFile, shareFile } from "./files.js";
@@ -139,6 +139,9 @@ export function mount(context) {
     // the section action (1.2): another Satellite this one hosts (section_of), which the host
     // opens; null when the host can't, and the action's controls hide
     const sections = context.sections && typeof context.sections.open === "function" ? context.sections : null;
+    // another Satellite's shared interface (1.2, change 16), where an opener or locate's answer
+    // leads; null when the host can't open one, and the openers line and locate controls hide
+    const satellites = context.satellites && typeof context.satellites.open === "function" ? context.satellites : null;
     // the hash of one of this interface's sections - beneath its host's when it is a hosted one
     const hashFor = typeof context.hash === "function" ? context.hash
         : (section) => `#/satellite/${encodeURIComponent(satelliteName)}/${section}`;
@@ -191,9 +194,39 @@ export function mount(context) {
         return !action || ((action.own === undefined || Boolean(own))
             && action.offline === undefined
             && (action.section === undefined || canOpenSection(action.section))
+            && (action.locate === undefined || (Boolean(satellites) && !isProtected() && Boolean(locateProvider(capabilities()))))
             && (action.sync === undefined || canOpenSync(action))
             && (action.share === undefined || (!isProtected() && canShareFiles(globalThis.navigator)))
             && (!action.secure || Boolean(secureProvider(action, state.catalog && state.catalog.capabilities, satelliteName))));
+    }
+
+    function capabilities() {
+        return (state.catalog && state.catalog.capabilities) || null;
+    }
+
+    // change 16: run a provider's operation on a path, then open the page it answers in that
+    // provider's shared interface - never a page the answer doesn't name properly
+    async function openProvided(provider, route, path, method) {
+        const base = `/api/satellites/${encodeURIComponent(provider.satellite)}/${route}`;
+        let answer;
+        try {
+            answer = method === "GET"
+                ? await requestJson(`${base}?${new URLSearchParams({ path })}`)
+                : await requestJson(base, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ path }),
+                });
+        } catch (error) {
+            setNotice(error.status === 404 ? "That file can't be opened there." : error.message, "error");
+            return false;
+        }
+        const section = openedSection(answer);
+        if (!section || !satellites || !satellites.open(provider.satellite, section)) {
+            setNotice("That isn't available in Mission Control.", "error");
+            return false;
+        }
+        return true;
     }
 
     function isProtected() {
@@ -829,6 +862,16 @@ export function mount(context) {
                 return false;
             }
             return true;
+        }
+        if (action.locate !== undefined) {
+            // 1.2, change 16: the folder holding a path, in whichever Satellite browses files
+            const path = resolve(action.locate, bindings);
+            const provider = locateProvider(capabilities());
+            if (!provider || isProtected() || typeof path !== "string" || !path) {
+                setNotice("That isn't available in Mission Control.", "error");
+                return false;
+            }
+            return openProvided(provider, provider.operations.locate, path, "GET");
         }
         if (action.offline !== undefined) {
             // 1.2: tracks kept on the device - a browser keeps none, so the control is hidden
@@ -1587,6 +1630,34 @@ export function mount(context) {
             // the current place stays in view when the trail is longer than the row
             requestAnimationFrame(() => { nav.scrollLeft = nav.scrollWidth; });
             return nav;
+        },
+
+        // The Satellites that open this file (change 16): one link per files.open provider whose
+        // extensions hold the file's, each opening the page that provider answers for it
+        openers: (block, scope) => {
+            const path = text(block.path, scope);
+            const found = satellites && !isProtected() ? openersFor(capabilities(), path) : [];
+            if (!found.length) {
+                return null;
+            }
+            const line = el("div", "ui-openers");
+            line.appendChild(el("span", "ui-openers-label", block.label !== undefined ? text(block.label, scope) : "Opens with"));
+            const links = el("div", "ui-openers-links");
+            for (const provider of found) {
+                const link = el("button", "ui-pill ui-opener", provider.label || provider.satellite);
+                link.type = "button";
+                link.addEventListener("click", async () => {
+                    link.disabled = true;
+                    try {
+                        await openProvided(provider, provider.operations.open, path, "POST");
+                    } finally {
+                        link.disabled = false;
+                    }
+                });
+                links.appendChild(link);
+            }
+            line.appendChild(links);
+            return line;
         },
 
         image: (block, scope) => {

@@ -28,6 +28,45 @@ test("the vocabulary is the shared one", () => {
     for (const client of Object.values(sync)) {
         assert.ok(vocabulary.client_capabilities.reserved.includes(client), client);
     }
+    const kinds = Object.fromEntries(Object.entries(vocabulary.file_kinds).filter(([name]) => !name.startsWith("_")));
+    assert.deepEqual(contract.FILE_KINDS, kinds);
+});
+
+test("openers (change 16): the enabled files.open providers whose extensions hold the file's", () => {
+    const opener = (satellite, extra) => ({ satellite, version: 1, enabled: true, operations: { open: "open" }, ...extra });
+    const providers = {
+        "files.open": [
+            opener("Pictures", { types: ["image", "video"], label: "Pictures" }),
+            opener("Player", { types: ["audio"] }),
+            opener("Raw", { types: ["image"], extensions: [".cr2"] }),
+            opener("Off", { types: ["image"], enabled: false }),
+            opener("Future", { types: ["image"], version: 2 }),
+            opener("Broken", { types: ["image"], operations: {} }),
+        ],
+    };
+    const names = (path) => contract.openersFor(providers, path).map((entry) => entry.satellite);
+    assert.deepEqual(names("/data/Holiday/Beach.JPG"), ["Pictures"]);
+    assert.deepEqual(names("C:\Music\song.flac"), ["Player"]);
+    assert.deepEqual(names("/data/raw/IMG_1.cr2"), ["Raw"]);
+    assert.deepEqual(names("/data/notes.txt"), []);
+    assert.deepEqual(names("/data/.jpg"), []);
+    assert.deepEqual(names("/data/no-extension"), []);
+    assert.deepEqual(contract.openersFor({}, "/a.jpg"), []);
+    assert.equal(contract.fileExtension("/a/b.tar.GZ"), ".gz");
+});
+
+test("an opener's or locate's answer opens only a page of the provider, with string params", () => {
+    assert.equal(contract.openedSection({ page: "folder", params: { path: "/data/a b", select: "x.jpg" } }),
+        "folder?path=%2Fdata%2Fa+b&select=x.jpg");
+    assert.equal(contract.openedSection({ page: "viewer" }), "viewer");
+    for (const answer of [null, {}, { page: "../x" }, { page: "Folder" }, { page: "folder", params: { path: 3 } },
+        { page: "folder", params: ["x"] }, { page: "#/satellite/Other" }]) {
+        assert.equal(contract.openedSection(answer), null, JSON.stringify(answer));
+    }
+    const browse = (operations) => ({ "files.browse": [{ satellite: "Files", version: 1, enabled: true, operations }] });
+    assert.equal(contract.locateProvider(browse({ list: "entries", locate: "locate" })).satellite, "Files");
+    assert.equal(contract.locateProvider(browse({ list: "entries" })), null);
+    assert.equal(contract.locateProvider(null), null);
 });
 
 test("a sync action opens only a sync screen this client has", () => {

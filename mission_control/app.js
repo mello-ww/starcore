@@ -1276,6 +1276,18 @@ async function mountSatellitePage(routed) {
                     return true;
                 },
             },
+            // another Satellite's shared interface at one of its sections (UI contract 1.2, change
+            // 16: the page a files.open or files.browse provider answered); false when it has none
+            satellites: {
+                open: (name, inner) => {
+                    const target = findSatellite(name);
+                    if (!target || target.name !== name || !hasUiDocument(target)) {
+                        return false;
+                    }
+                    location.hash = `${satelliteHash(target)}/${inner}`;
+                    return true;
+                },
+            },
             // Developer Mode, for code that must react to it - see "Developer Mode" above
             developer: developerContext,
             api: {

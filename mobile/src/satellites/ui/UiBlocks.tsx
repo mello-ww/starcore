@@ -21,8 +21,8 @@ import {boundTracks, offlineLabel, offlineState} from '../../media/offlineAction
 import type {DownloadManager} from '../../media/downloads';
 import {useImageSource} from './memoryImages';
 import {
-  BLOCK_TYPES, findProvider, formatValue, isIconName, isSafeRoute, isVisible, resolve, resolveTemplate, servesBlock, toneOf,
-  type Providers, type Scope, type UiAction, type UiBlock,
+  BLOCK_TYPES, findProvider, formatValue, isIconName, isSafeRoute, isVisible, openersFor, resolve, resolveTemplate, servesBlock,
+  toneOf, type CapabilityProvider, type Providers, type Scope, type UiAction, type UiBlock,
 } from './contract';
 import type {UiPreferences} from './preferences';
 import type {GridPages} from './offline';
@@ -52,6 +52,9 @@ export interface BlockContext {
     value?: unknown,
     options?: {quiet?: boolean; update?: () => void},
   ) => Promise<boolean>;
+  /** 1.2 (change 16): runs a files.open provider's open on a path and pushes the page it
+   * answers; absent where nothing can be opened (an openers line is then left out). */
+  openWith?: (provider: CapabilityProvider, path: string) => Promise<boolean>;
   /** Reads one operation of a capability provider - another Satellite's route. */
   readCapability: (satellite: string, route: string) => Promise<any>;
   /** An image from one of the Satellite's own routes, with this session (1.2's image and
@@ -257,6 +260,8 @@ function UiBlockView({block, scope, context}: {block: UiBlock; scope: Scope; con
       return <ListBlock block={block} scope={scope} context={context} />;
     case 'breadcrumb':
       return <BreadcrumbBlock block={block} scope={scope} context={context} />;
+    case 'openers':
+      return <OpenersBlock block={block} scope={scope} context={context} />;
     case 'button':
       return <ButtonBlock block={block} scope={scope} context={context} />;
     case 'actions':
@@ -491,6 +496,42 @@ function BreadcrumbBlock({block, scope, context}: {block: UiBlock; scope: Scope;
         );
       })}
     </ScrollView>
+  );
+}
+
+/** The Satellites that open this file (1.2, change 16): its label, then one pill per files.open
+ * provider whose extensions hold the file's, each pushing the page that provider answers. None,
+ * and nothing is drawn. */
+function OpenersBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const path = asText(resolve(block.path, scope));
+  const openWith = context.openWith;
+  const found = openWith ? openersFor(context.providers, path) : [];
+  if (!openWith || !found.length) {
+    return null;
+  }
+  return (
+    <View style={styles.openers} testID="openers">
+      <Text style={type.caption}>{block.label !== undefined ? asText(resolve(block.label, scope)) : 'Opens with'}</Text>
+      <View style={styles.openerLinks}>
+        {found.map(provider => (
+          <ActionPill
+            key={provider.satellite}
+            entry={{label: provider.label || provider.satellite}}
+            scope={scope}
+            disabled={busy !== null}
+            onPress={async () => {
+              setBusy(provider.satellite);
+              try {
+                await openWith(provider, path);
+              } finally {
+                setBusy(null);
+              }
+            }}
+          />
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -1957,6 +1998,8 @@ const styles = StyleSheet.create({
     backgroundColor: palette.control,
   },
   crumbs: {flexDirection: 'row', alignItems: 'center', gap: 2},
+  openers: {gap: space.sm},
+  openerLinks: {flexDirection: 'row', flexWrap: 'wrap', gap: space.sm},
   crumb: {minHeight: TOUCH_TARGET - 8, justifyContent: 'center', paddingHorizontal: space.md, borderRadius: 999},
   crumbHere: {backgroundColor: palette.card},
   crumbLabel: {...type.caption, color: palette.text2},

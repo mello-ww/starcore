@@ -13,8 +13,8 @@ import {useAppActive} from '../hooks/useAppActive';
 import {useServers} from '../servers/ServersContext';
 import {UiApi} from '../satellites/ui/api';
 import {
-  findProvider, formatValue, isIconName, isSafeRoute, isVisible, missingRequirements, resolve, resolveTemplate, servesBlock,
-  type CapabilityProvider, type Providers, type Scope, type UiAction, type UiDocument, type UiSource,
+  findProvider, formatValue, isIconName, isSafeRoute, isVisible, locateProvider, missingRequirements, openedPage, resolve,
+  resolveTemplate, servesBlock, type CapabilityProvider, type Providers, type Scope, type UiAction, type UiDocument, type UiSource,
 } from '../satellites/ui/contract';
 import {SatellitesApi} from '../satellites/api';
 import type {SatelliteSummary} from '../satellites/types';
@@ -683,6 +683,39 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     [audio, go, loadData, navigation, showToast, store],
   );
 
+  // change 16: runs a provider's operation on a path, then pushes the page it answers in that
+  // provider's shared interface over this screen, so Back returns here - never a page the
+  // answer doesn't name properly, nor a Satellite without a shared interface
+  const openProvided = useCallback(
+    async (provider: CapabilityProvider, route: string, path: string, method: 'GET' | 'POST'): Promise<boolean> => {
+      let answer: any;
+      try {
+        answer = method === 'GET'
+          ? await api.act(provider.satellite, `${route}?path=${encodeURIComponent(path)}`, 'GET', null)
+          : await api.act(provider.satellite, route, 'POST', {path});
+      } catch (err: any) {
+        showToast(err?.status === 404 ? "That file can't be opened there." : err?.message ?? 'That action failed.', true);
+        return false;
+      }
+      const opened = openedPage(answer);
+      const target = (satellites ?? []).find(satellite => satellite.name === provider.satellite);
+      if (!opened || !target || !opensSharedInterface(target)) {
+        showToast("That isn't available in this app.", true);
+        return false;
+      }
+      navigation.push('SatelliteUi', {
+        name: target.name, page: opened.page, params: opened.params, revision: target.ui?.revision ?? undefined,
+      });
+      return true;
+    },
+    [api, satellites, navigation, showToast],
+  );
+  const openWith = useCallback(
+    (provider: CapabilityProvider, path: string) =>
+      gated ? Promise.resolve(false) : openProvided(provider, provider.operations.open, path, 'POST'),
+    [gated, openProvided],
+  );
+
   const runAction = useCallback(
     async (
       action: UiAction | undefined,
@@ -713,6 +746,16 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         }
         showToast("That isn't available in this app.", true);
         return false;
+      }
+      if (action.locate !== undefined) {
+        // 1.2, change 16: the folder holding a path, in whichever Satellite browses files
+        const path = resolve(action.locate, scoped);
+        const provider = locateProvider(providers);
+        if (!provider || gated || typeof path !== 'string' || !path) {
+          showToast("That isn't available in this app.", true);
+          return false;
+        }
+        return openProvided(provider, provider.operations.locate, path, 'GET');
       }
       if (action.own !== undefined) {
         // 1.2: the Satellite's own interface - this app has none for any Satellite, so the
@@ -995,7 +1038,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
       }
       return finish(result);
     },
-    [api, name, go, loadData, navigation, showToast, audio, providers, store, mediaSource, satellites, recheck, document, finishAction],
+    [api, name, go, loadData, navigation, showToast, audio, providers, store, mediaSource, satellites, recheck, document, finishAction, gated, openProvided],
   );
 
   /** The secure action (1.2) on these items: one request, and one prompt when the session
@@ -1071,7 +1114,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         opensHosted(hostedSatellite(satellites, name, action.section))) &&
       (!action?.secure || Boolean(secureRunner(action, providers, name, SECURE_PROMPTS))) &&
       (action?.sync === undefined || Boolean(syncTarget(action, providers, name))) &&
-      (action?.offline === undefined || Boolean(audio?.offlineFor(name))),
+      (action?.offline === undefined || Boolean(audio?.offlineFor(name))) &&
+      (action?.locate === undefined || (!gated && Boolean(locateProvider(providers)))),
     [providers, name, gated, satellites, audio],
   );
 
@@ -1112,6 +1156,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
     providers,
     runAction,
     readCapability: (satellite, capabilityRoute) => api.read(satellite, capabilityRoute),
+    openWith: gated ? undefined : openWith,
     mediaSource,
     load: loadOwn,
     onNearEnd,

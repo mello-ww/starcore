@@ -28,6 +28,8 @@ describe('UI contract (shared fixtures)', () => {
     for (const name of Object.keys(contract.CAPABILITY_VERSIONS)) {
       expect(vocabulary.satellite_capabilities[name]).toBeTruthy();
     }
+    const kinds = Object.fromEntries(Object.entries(vocabulary.file_kinds).filter(([kind]) => !kind.startsWith('_')));
+    expect(contract.FILE_KINDS).toEqual(kinds);
   });
 
   it('every shared icon is a glyph this app can draw', () => {

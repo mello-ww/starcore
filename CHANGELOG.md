@@ -7,6 +7,15 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Opens with, Show in folder: the contract (UI contract 1.2 change 16).** A Satellite can say
+  which files it opens: `[provides."files.open"]` with `types` (image, video, audio, from a
+  shared table), optional `extensions` and a `label`, checked by the Engine and published in the
+  catalog. A new `openers` block lists, for one file, the Satellites that open it, each a pill
+  that asks that Satellite which of its pages shows the file and opens it there; the new
+  `locate` action shows a path's folder through `files.browse`'s new optional `locate`. Neither
+  is in a protected document, and a client opens only a page id with string params. Mission
+  Control and the Android app both draw them; no Satellite uses them yet (O2 to O4 of
+  `docs/open-with-audit.md`).
 - **A choice's accent really slides, and the thumbnail size slides too.** On Mission Control the
   picked segment of a choice (Photos' Month, Camera, All) painted its own fixed accent at once
   and faded it out while the sliding one was still on its way, which read as a stutter; it now
