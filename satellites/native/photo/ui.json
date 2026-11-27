@@ -60,6 +60,7 @@
                "action": {"route": "albums/favorites/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}},
               {"label": "Download", "icon": "download", "action": {"download": "originals/{$.id}", "name": "$.title"}},
               {"label": "Share", "icon": "share-2", "action": {"share": "originals/{$.id}", "name": "$.title"}},
+              {"label": "Show in folder", "icon": "folder", "visible": "$.folder", "action": {"locate": "$.folder"}},
               {"label": "Move to Locked Folder", "icon": "lock",
                "action": {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id", "confirm": "Move this to the Locked Folder? It leaves Photos and stays behind your PIN.", "then": "refresh"}},
               {"label": "Move to bin", "icon": "trash-2", "style": "danger",
@@ -133,6 +134,7 @@
                "action": {"route": "albums/favorites/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}},
               {"label": "Download", "icon": "download", "action": {"download": "originals/{$.id}", "name": "$.title"}},
               {"label": "Share", "icon": "share-2", "action": {"share": "originals/{$.id}", "name": "$.title"}},
+              {"label": "Show in folder", "icon": "folder", "visible": "$.folder", "action": {"locate": "$.folder"}},
               {"label": "Move to Locked Folder", "icon": "lock",
                "action": {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id", "confirm": "Move this to the Locked Folder? It leaves Photos and stays behind your PIN.", "then": "refresh"}},
               {"label": "Move to bin", "icon": "trash-2", "style": "danger",
@@ -181,6 +183,7 @@
                "action": {"route": "albums/favorites/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}},
               {"label": "Download", "icon": "download", "action": {"download": "originals/{$.id}", "name": "$.title"}},
               {"label": "Share", "icon": "share-2", "action": {"share": "originals/{$.id}", "name": "$.title"}},
+              {"label": "Show in folder", "icon": "folder", "visible": "$.folder", "action": {"locate": "$.folder"}},
               {"label": "Move to Locked Folder", "icon": "lock",
                "action": {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id", "confirm": "Move this to the Locked Folder? It leaves Photos and stays behind your PIN.", "then": "refresh"}},
               {"label": "Move to bin", "icon": "trash-2", "style": "danger",
@@ -351,6 +354,7 @@
                "action": {"route": "albums/favorites/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}},
               {"label": "Download", "icon": "download", "action": {"download": "originals/{$.id}", "name": "$.title"}},
               {"label": "Share", "icon": "share-2", "action": {"share": "originals/{$.id}", "name": "$.title"}},
+              {"label": "Show in folder", "icon": "folder", "visible": "$.folder", "action": {"locate": "$.folder"}},
               {"label": "Remove from album", "icon": "x", "visible": "$.removable",
                "action": {"route": "albums/{$params.id}/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}},
               {"label": "Move to Locked Folder", "icon": "lock",
@@ -442,6 +446,29 @@
             ]
           }
         }
+      ]
+    },
+    "file": {
+      "title": "$.name",
+      "params": ["path"],
+      "source": {"route": "gallery/file?path={$params.path}"},
+      "blocks": [
+        {"type": "image", "visible": "$.is_image", "src": "file/content?path={$params.path}", "alt": "$.name",
+         "size": "full", "shape": "wide", "fit": "contain"},
+        {"type": "media-grid", "visible": "$.is_video", "items": "$.videos", "size": "large",
+         "item": {"image": "file/content?path={$.key}", "key": "$.key", "kind": "$.kind", "title": "$.title"},
+         "viewer": {"image": "file/content?path={$.key}", "video": "file/content?path={$.key}", "title": "$.title",
+                    "fields": [{"label": "Size", "value": "$.size", "format": "bytes"}]}},
+        {"type": "card", "blocks": [
+          {"type": "field", "label": "Size", "value": "$.size", "format": "bytes"},
+          {"type": "field", "label": "Folder", "value": "$.folder"},
+          {"type": "field", "label": "Library", "value": "$.library_note"}
+        ]},
+        {"type": "actions", "blocks": [
+          {"type": "button", "label": "Add to library", "style": "primary", "visible": "$.can_add",
+           "action": {"route": "file/add", "body": {"path": "$params.path"}, "then": "refresh"}},
+          {"type": "button", "label": "Show in folder", "style": "secondary", "action": {"locate": "$params.path"}}
+        ]}
       ]
     }
   }

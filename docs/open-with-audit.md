@@ -181,3 +181,16 @@ a playlist going `missing`.
   yet; it is only carried in the answer.
 - Its file page ends with the `openers` block ("Opens with"). Nothing shows there until a
   Satellite provides `files.open` (O3, O4).
+
+## What O3 built
+
+- `files.browse` gains a third optional operation, `content`, because a Satellite can only ask
+  a provider for what it declares: Photos shows a file from it once `stat` has passed.
+- Photos (`opening.py`): `open` (the `file` page for a supported file the session may browse,
+  404 otherwise), `gallery/file`, `file/content` (the bytes, served inline with Photos' own
+  content type, never as a download) and `file/add`. A path in the library is recognised by its
+  name and size (and its folder, when the item remembers one), not by reading the file.
+- The library's viewers (library, search, albums, map) gain **Show in folder** (`locate` on the
+  item's `folder`), hidden when there is none.
+- Not done: opening the gallery's own viewer on a library item (the `file` page shows it and
+  says it is in the library).

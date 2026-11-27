@@ -104,7 +104,7 @@ there is none. See [UI contract](ui-contract.md) for all three.
   "contract": {"name": "starcore.ui", "version": "1.0", "majors": [1], "capabilities": {"files.browse": [1]}},
   "revision": "e0628e6a610cf53b",
   "capabilities": {
-    "files.browse": [{"satellite": "FileExplorer", "version": 1, "operations": {"list": "entries", "locate": "locate", "stat": "stat"}, "enabled": true}]
+    "files.browse": [{"satellite": "FileExplorer", "version": 1, "operations": {"list": "entries", "content": "content", "locate": "locate", "stat": "stat"}, "enabled": true}]
   },
   "pending": []
 }

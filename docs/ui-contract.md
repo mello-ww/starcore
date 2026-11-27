@@ -1121,7 +1121,7 @@ A Satellite declares the capabilities it provides in its `satellite.toml`:
 ```toml
 [provides."files.browse"]
 version = 1
-operations = { list = "entries", locate = "locate", stat = "stat" }
+operations = { list = "entries", content = "content", locate = "locate", stat = "stat" }
 ```
 
 Each operation maps to one of the Satellite's own routes. The Engine checks the declaration
@@ -1146,7 +1146,8 @@ says so in place, and a document that `requires` it is not opened.
 
 | `files.open` | 1 | `open`: `POST {path}` -> `{page, params}`, the provider's page showing that file, `404` when it can't open it or the user may not read it. The provider also declares `types` (required: kinds from the vocabulary's `file_kinds`, `image`, `video`, `audio`), `extensions` (optional, in place of the kinds' lists: a dot and 1 to 10 lower-case letters or digits, at most 64) and `label` (optional, 1 to 40 characters), which the catalog publishes with it | `openers` (change 16). Any number of Satellites may provide it |
 
-`files.browse` also has two optional operations (change 16): `locate` (`GET ?path=` ->
+`files.browse` also has three optional operations (change 16): `content` (`GET ?path=` -> the
+file itself, what a `files.open` provider shows a file from once `stat` has passed), `locate` (`GET ?path=` ->
 `{page, params}`, the provider's page for the folder holding it, which the `locate` action
 opens) and `stat` (`GET ?path=` -> one entry the session may browse, `404` otherwise), which a
 `files.open` provider asks, through the Engine and with the user's own session, before it opens

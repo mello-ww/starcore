@@ -23,3 +23,12 @@ operations = { list = "media", thumbnail = "thumbnails", resolve = "media/resolv
 [provides."media.sync"]
 version = 1
 operations = { status = "backup/status", check = "backup/check", upload = "backup/upload", devices = "backup/devices" }
+
+# the files it opens by their path, from another interface's "Opens with" (opening.py): a path is
+# only ever read through whichever Satellite provides files.browse, with the user's session
+[provides."files.open"]
+version = 1
+operations = { open = "open" }
+types = ["image", "video"]
+extensions = [".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".3gp"]
+label = "Photos"

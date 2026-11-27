@@ -407,7 +407,7 @@ item's file in File Explorer. The audit and the plan: [`open-with-audit.md`](ope
       `openers` block and the `locate` action (Show in folder; `reveal` was taken), on the
       Engine, the vocabulary, the fixtures and both clients.
 - [x] O2 File Explorer: `stat` and `locate`, "Opens with" on the file page.
-- [ ] O3 Photos: open by path, its page for a file outside the library, Show in folder.
+- [x] O3 Photos: open by path, its page for a file outside the library, Show in folder.
 - [ ] O4 Music: open by path, external tracks (direct playback, playlists), Show in folder.
 - [ ] O5 security review of O1 to O4.
 - [ ] O6 runs on the web demo and the emulator, docs, a new APK.

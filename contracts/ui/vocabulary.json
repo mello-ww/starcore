@@ -98,6 +98,7 @@
       },
       "optional_operations": {
         "locate": "GET ?path=<absolute path> -> {page, params}: the provider's own page showing the folder that holds that file or folder, with it selected; 404 when this session may not browse it. What the locate action (change 16) asks",
+        "content": "GET ?path=<absolute path> -> the file's bytes (a file response); 404 when this session may not browse it. What a files.open provider shows a file from, once stat has passed, so no Satellite reads a path itself",
         "stat": "GET ?path=<absolute path> -> {path, name, type: dir|file, size, modified}: one entry this session may browse; 404 otherwise. What a files.open provider asks, through the Engine with the user's session, before it opens a path a client sent"
       }
     },

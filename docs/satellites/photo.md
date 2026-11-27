@@ -550,3 +550,18 @@ either client (Mission Control, mobile).
 Config button, Photo's own topbar Config button, or `photo config trash_retention_days <days>`
 from the CLI - and, like `photo_directory`, it has no running listener to restart, so a change
 takes effect the next time the bin is listed or purged.
+
+## Opening a file by its path
+
+Photos provides `files.open` (`types` image and video, the extensions it can show, label
+"Photos"): another interface's "Opens with" line (File Explorer's file page) opens a picture
+or a video here. `POST open {path}` answers the `file` page of its interface. The path is
+never read by Photos itself: `opening.py` asks whichever Satellite provides `files.browse`,
+through the Engine and with the user's session, for `stat` (is it a file this session may
+browse?) and then `content`, so that Satellite's roots and the protected areas apply as when
+the user browses; anything else is a 404. The `file` page (`gallery/file?path=`) shows the
+picture (or the video, in the shared viewer), whether the library holds a file of that name and
+size, **Add to library** (`POST file/add`, the same checks as an import, which brings the item
+back from the recycle bin if it was there) and **Show in folder**. The library's viewers carry
+**Show in folder** too (`locate`, on the item's source folder, shown only for an item that has
+one).

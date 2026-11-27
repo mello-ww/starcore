@@ -3,7 +3,7 @@
 from starcore.api.response import error_response, file_response, json_response
 
 from . import albums as albums_module
-from . import backup, configuration, gallery, handover
+from . import backup, configuration, gallery, handover, opening
 from .albums import AlbumError, AlbumNotFound, albums
 from .library import PhotoImportError, PhotoNotFound, library
 from .private_media import policy
@@ -30,12 +30,24 @@ def routes() -> dict:
         "gallery": gallery_route,
         # the media.gallery capability's list (see satellite.toml): what a media picker offers
         "media": media_route,
+        # the files.open capability (opening.py): a file by its path, as "Opens with" asks
+        "open": opening.open_route,
+        "file": file_route,
         # the media.sync capability (backup.py): a device's one-way backup into the library
         "backup": backup.route,
         # naming a route "configuration" is the whole contract with the Core's
         # generic satellite configuration mechanism - see docs/satellites.md
         "configuration": configuration_route,
     }
+
+
+def file_route(request):
+    """The `file` page's own routes (opening.py): file/content?path= and file/add."""
+    if request.path == ("content",):
+        return opening.content(request)
+    if request.path == ("add",):
+        return opening.add(request)
+    return error_response(f"unknown endpoint 'file/{'/'.join(request.path)}'")
 
 
 def gallery_route(request):
@@ -58,6 +70,8 @@ def gallery_route(request):
         if path == ("search",):
             return json_response(gallery.search_view(request.satellite, request.query.get("q"), request.query.get("kind"),
                                                      limit, cursor))
+        if path == ("file",):
+            return opening.file_view(request)
         if path == ("import",):
             return json_response(gallery.import_view(request.satellite))
         if path == ("settings",):

@@ -314,7 +314,7 @@ class ProvidesTest(unittest.TestCase):
         self.assertEqual(set(catalog["files.browse"][0]), {"satellite", "version", "operations", "enabled"})
 
     def test_files_browse_may_offer_locate_and_stat(self):
-        operations = {"list": "entries", "locate": "locate", "stat": "stat"}
+        operations = {"list": "entries", "content": "content", "locate": "locate", "stat": "stat"}
         provides, problems = ui_contract.normalise_provides({"files.browse": {"version": 1, "operations": operations}})
         self.assertEqual(problems, [])
         self.assertEqual(provides["files.browse"]["operations"], operations)
@@ -460,7 +460,7 @@ class UiApiTest(unittest.TestCase):
         self.assertEqual(entry["ui"], {"contract": "starcore.ui/1.0", "revision": self.showcase.ui.revision,
                                        "error": None})
         explorer = next(item for item in payload["satellites"] if item["name"] == "FileExplorer")
-        self.assertEqual(explorer["provides"]["files.browse"]["operations"], {"list": "entries", "locate": "locate", "stat": "stat"})
+        self.assertEqual(explorer["provides"]["files.browse"]["operations"], {"list": "entries", "content": "content", "locate": "locate", "stat": "stat"})
         self.assertNotIn("preview", explorer["ui"])  # F6: its default interface on every client
         # L8: its only interface, so no longer a preview
         locked = next(item for item in payload["satellites"] if item["name"] == "LockedFolder")
@@ -504,7 +504,7 @@ class UiApiTest(unittest.TestCase):
         self.assertEqual(payload["contract"]["majors"], [1])
         providers = payload["capabilities"]["files.browse"]
         self.assertEqual(providers[0]["satellite"], "FileExplorer")
-        self.assertEqual(providers[0]["operations"], {"list": "entries", "locate": "locate", "stat": "stat"})
+        self.assertEqual(providers[0]["operations"], {"list": "entries", "content": "content", "locate": "locate", "stat": "stat"})
         self.assertEqual(payload["contract"]["capabilities"]["audio.library"], [1])
         self.assertEqual(payload["contract"]["capabilities"]["audio.session"], [1])
         session = payload["capabilities"]["audio.session"]

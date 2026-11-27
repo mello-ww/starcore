@@ -7,6 +7,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Photos opens a file by its path.** It declares `files.open` for pictures and videos, so File
+  Explorer's "Opens with" offers it: a `file` page shows the picture or the video, whether the
+  library holds it, **Add to library** and **Show in folder**. Photos never reads the path itself;
+  it asks the browsing Satellite (`stat`, then `content`, a new optional operation of
+  `files.browse`) with the user's session. Its viewers gain **Show in folder** too.
 - **File Explorer answers `stat` and `locate` and shows "Opens with".** Other Satellites can ask
   it, through `files.browse`, about one path the session may browse and which of its pages shows
   it, behind the same guard as its content (its roots and the Locked Folder). Its file page ends

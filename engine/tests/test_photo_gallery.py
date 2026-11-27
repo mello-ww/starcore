@@ -138,7 +138,7 @@ class PhotoUiDocumentTest(unittest.TestCase):
                         self.assertEqual({key: entry["action"][key] for key in move}, move)
                         self.assertEqual(set(entry["action"]) - {"secure", "item", "confirm", "then"}, set())
         self.assertEqual(found, {"library": (1, 1), "search": (1, 0), "map": (1, 0), "albums": (0, 0),
-                                 "album": (1, 1), "trash": (0, 0)})
+                                 "album": (1, 1), "trash": (0, 0), "file": (0, 0)})
 
     def test_every_photo_viewer_downloads_and_shares_the_original(self):
         found = {}

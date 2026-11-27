@@ -172,6 +172,10 @@ def _keep_modified(path: Path, modified):
         os.utime(path, (seconds, seconds))
 
 
+def digest(path: Path) -> str:
+    return _digest(path)
+
+
 def _digest(path: Path) -> str:
     hasher = hashlib.sha256()
     with open(path, "rb") as source:
