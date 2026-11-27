@@ -8,25 +8,27 @@ planned. What was implemented but not verified is under "Not verified yet".
 
 ## Current state
 
-At 2026-11-12 (`9c79049`), on top of the 0.1.0-alpha.1 release and the stable checkpoint
+At 2026-11-27 (`347d7dd`), on top of the 0.1.0-alpha.1 release and the stable checkpoint
 `checkpoint-2026-11-02` (the StarCore design-language redesign). The test runs recorded at
 each step until then are in this file's history (`git log -p docs/roadmap.md`).
 
-- **UI contract 1.2** (not released yet) is in progress: media blocks and the shared viewer,
-  `search`, `map`, `play`, `pick`, `own`, `secure`, `download`, `share`, offline pages and
-  `preview` (`docs/ui-contract.md`).
-- **Status** (1.1) and **Photos** (1.2) open their shared interface by default on both clients.
-- **File Explorer** opens in its shared interface by default on both clients (browsing, a file's
-  page, management and upload; `docs/file-explorer-migration.md`, F1-F6). Its own `page.js` and
-  `page.css` are retired (F7).
-- **Music** plays through the shared audio host on both clients, and keeps its own library
-  screens. The **Locked Folder** keeps its own screens; photos move into it from the shared
-  interface through `media.vault`.
-- What is left before no client code names a Satellite: `docs/remaining-work.md`.
+- **UI contract 1.2** (`starcore.ui/1.2`) is complete and ships with the first release after the
+  Alpha; until then it is marked "not released yet" (`docs/ui-contract.md`). It added media
+  blocks and the shared viewer, `search` and `map`, `play`, `pick`, `own`, `secure`, `download`
+  and `share`, offline pages, the actions row, templates and capabilities; changes 1 to 17 are
+  listed there.
+- **Every Satellite is on its shared interface on both clients** (Status, File Explorer, Photos,
+  the Locked Folder, Music): no Satellite has client code of its own, and the modularity guard's
+  exception lists are empty (`docs/remaining-work.md`). Music plays through the shared audio
+  host, with gapless playback on Android; Photos' phone backup, the Locked Folder's
+  management and "Open with" / "Show in folder" between Satellites are done.
+- What is left before release 1 is in `docs/remaining-work.md` and the sections below:
+  verification on a physical phone and on Linux, a dependency audit, then the release itself
+  (`docs/releasing.md`).
 
 ### Not verified yet
 
-- The Python tests skipped on Windows (4 at `9c79049`: permission denials, symlink cases - among
+- The Python tests skipped on Windows (51 at `347d7dd`, among them: permission denials, symlink cases - among
   them the Locked Folder check that a symlink into the vault stays blocked while locked - and
   FFmpeg video thumbnails): run them on Linux before relying on those behaviours.
 - A physical Android phone: biometric unlock and grants, background playback, the
@@ -44,13 +46,14 @@ each step until then are in this file's history (`git log -p docs/roadmap.md`).
   `mobile/src/theme/tokens.ts`), five accent presets that apply live on web and Android,
   one shared switch and one shared Settings gear on both, and a personalised Home
   ("Welcome back, <username>").
-- **Mission Control**: every page and dialog on the tokens; Music runs as a full-height app
-  with a fixed sidebar, a persistent mini-player and its own scrolling content, falling back
-  to page scrolling on phone widths.
+- **Mission Control**: every page and dialog on the tokens; every Satellite is drawn by the
+  shared renderer (Music with its sidebar layout), with a persistent shared player.
 - **Android app**: multiple servers, sign-in, per-server biometric app lock, Home, Satellites,
-  Console, Config and Settings tabs, and native Music and Photos screens.
-- **Locked Folder in Photos**: a tab of Photos on web and Android instead of a satellite of
-  its own; verified moves to and from Photos; private media kept out of Photos' imports,
+  Console, Config and Settings tabs, swiping between tabs, and every Satellite on the shared
+  renderer.
+- **Locked Folder**: its own shared interface on both clients (browse, view, move out, setup,
+  recovery, PIN, encryption, location); Photos lists it among its folders. Verified moves to
+  and from Photos; private media kept out of Photos' imports,
   sync, albums and caches; optional, server-verified biometric unlock on Android. See
   `docs/satellites/locked_folder.md`.
 - **Locked Folder encryption at rest** (opt-in, with the `encryption` extra): AES-256-GCM in
@@ -148,9 +151,9 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [ ] Signal Bus
 - [x] UI contract 1.0: validated `ui.json`, revisions and ETags, the capability catalog, metadata-only rediscovery (`docs/ui-contract.md`)
 - [x] UI contract 1.1: `chart`, `table`, `choice`, `status`, `code`, the `dashboard` template, page state and sources, Home widgets, dates in formats
-- [ ] UI contract 1.2 (not released yet): media blocks and the shared viewer, `search` and `map`, `play`, `pick`, `own`, `secure`, `download` and `share`, offline pages, `preview`
-- [ ] UI contract next: templates, discovered sections
-- [ ] Retire every Satellite-specific interface (`docs/remaining-work.md`)
+- [x] UI contract 1.2 (ships with release 1): media blocks and the shared viewer, `search` and `map`, `play`, `pick`, `own`, `secure`, `download` and `share`, offline pages, `preview`
+- [x] UI contract next: templates, discovered sections
+- [x] Retire every Satellite-specific interface (`docs/remaining-work.md`)
 
 ## Mission Control
 
@@ -179,7 +182,7 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] Audio: the web AudioHost (`mission_control/media/`), started by the shell, playing from the catalog's `audio.library` provider
 - [x] Audio: any Satellite can play through both clients with the UI contract's `play` action (1.2)
 - [x] Remove `mobile/src/satellites/builtins.tsx` once Music's declarative interface replaces its native screens (A10)
-- [ ] Move Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/ui-contract.md`, "Migration")
+- [x] Move Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/ui-contract.md`, "Migration")
     - [x] Photos opens in its shared interface by default on both clients (M1-M6 of `docs/photos-parity-audit.md`)
     - [x] Photos' shared interface after the owner's review: whole photo in the viewer, full width, Favorites and the Locked Folder among the folders, tile hearts, download and share, web swipe, Library grouping (M7-M14)
     - [x] Retire Photo's own page and screens once the shared interface is validated
@@ -188,10 +191,10 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
         - [x] F2-F5: list paging, the file page (download, share, open), management, upload
         - [x] F6-F7: shared by default, then retire its own page
     - [x] The Locked Folder through `media.vault`, its only interface on both clients (R3 of `docs/remaining-work.md`)
-    - [ ] Music on `ui.json` (R4 of `docs/remaining-work.md`)
+    - [x] Music on `ui.json` (R4 of `docs/remaining-work.md`)
 - [ ] Light theme (after the stable release)
 - [x] Icons instead of text glyphs for the remaining Music controls
-- [ ] Audio playback validated on a real device
+- [ ] Audio playback validated on a real device (release 1)
 
 ## Native Satellites
 
@@ -218,8 +221,8 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] Photos
     - [x] Library indexing, thumbnails, albums, favorites, map, recycle bin
     - [x] Source-path mapping into physical albums
-    - [ ] Phone sync: the old one is removed (S0), its new form is S1 to S5 of `remaining-work.md`
-- [ ] Music
+    - [x] Phone sync: the old one is removed (S0), its new form is S1 to S5 of `remaining-work.md` (only the owner's phone, S4, is left)
+- [x] Music
     - [x] SQLite catalog with migrations, stable track identities, incremental and scheduled scans
     - [x] FLAC, MP3, WAV, M4A (AAC/ALAC), Ogg Vorbis and Opus metadata, credits, ReplayGain, quality
     - [x] Authenticated range streaming, optional FFmpeg transcoding to a bounded cache

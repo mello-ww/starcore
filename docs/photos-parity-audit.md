@@ -431,9 +431,9 @@ configuration.
   holds them. The credential travels in a header.
 - Over plain HTTP the credential and the media can be read on the way, and an answer can be
   forged (a forged "known" keeps a file from being sent). The screen says so; HTTPS is the fix.
-- The Engine's auth store is not locked against concurrent writes, and session tokens are kept
-  as they are (device credentials are hashed): both are older than the sync and are listed
-  for the stabilisation stage (`docs/roadmap.md`, "Security").
+- The Engine's auth store was not locked against concurrent writes, and session tokens were
+  kept as they were (device credentials were hashed): both were older than the sync, and are
+  fixed since (`docs/roadmap.md`, "Security").
 
 ### Decisions for the owner
 
