@@ -502,8 +502,8 @@ Nothing changes in how either client works: both list and fetch files through th
 routes, and the server decrypts as it sends. Web: video seeks with Range requests; responses
 are `no-store`. Android: images are fetched into memory (the shared screen's), videos stream with
 the session token, `FLAG_SECURE` stays on, and relocking is unchanged. The phone shows an
-"encrypted" note and a "needs attention" state naming the problem; recovery and encryption
-itself are done in Mission Control. Biometric unlock is unchanged - it never needed the PIN,
+"encrypted" note and a "needs attention" state naming the problem; setup, recovery, the PIN,
+encryption and the location are on its shared pages, as on the web. Biometric unlock is unchanged - it never needed the PIN,
 and a recovery reset removes enrollments like a PIN change.
 
 ### Verified, and not

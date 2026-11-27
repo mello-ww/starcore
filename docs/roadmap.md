@@ -62,11 +62,6 @@ each step until then are in this file's history (`git log -p docs/roadmap.md`).
 ### Known limitations
 
 - The Android app has no light theme (web Music has one).
-- Android Music still draws some controls (♥/♡, shuffle, repeat, transport) as text glyphs,
-  not icons; some phones render them as emoji.
-- The Android Config tab keeps a sliders icon, so it does not look identical to Settings.
-- Mission Control still carries hidden legacy markup and styles from the previous design
-  (the starfield and asteroid belt in `index.html`, their rules in `style.css`).
 - Locked Folder encryption is server-side: it protects copies of the vault, backups and (on
   Windows) a stolen disk, not a compromised server. On Linux/macOS the server key is a plain
   0600 file, so a disk holding both the vault and StarCore's data directory needs full-disk
@@ -78,9 +73,6 @@ each step until then are in this file's history (`git log -p docs/roadmap.md`).
   lost (reinstall, new machine, Windows password reset by an administrator).
 - Unlocks are in memory, so a restart locks every session (deliberately).
 - Without Pillow on the server, Locked Folder (like Photos) shows originals as thumbnails.
-- The Locked Folder location, encryption, the recovery key and PIN changes are managed from
-  Mission Control only; the Android app can create the PIN and shows problems, but doesn't
-  pick the folder or recover.
 - The Signal Bus is not implemented yet (`engine/starcore/signals.py` is empty).
 - Space Mode does not exist yet. Developer Mode is a visibility preference only (see
   docs/satellites.md).
@@ -198,7 +190,7 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
     - [x] The Locked Folder through `media.vault`, its only interface on both clients (R3 of `docs/remaining-work.md`)
     - [ ] Music on `ui.json` (R4 of `docs/remaining-work.md`)
 - [ ] Light theme (after the stable release)
-- [ ] Icons instead of text glyphs for the remaining Music controls
+- [x] Icons instead of text glyphs for the remaining Music controls
 - [ ] Audio playback validated on a real device
 
 ## Native Satellites

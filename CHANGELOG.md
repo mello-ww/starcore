@@ -226,6 +226,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Changed
 
+- **The Android Config tab takes StarCore's settings gear**, the one Mission Control's
+  Configuration shows, instead of a sliders icon.
+- **Mission Control drops the previous design's leftovers**: the hidden starfield markup of the
+  sign-in overlay, the orbital map's rules and the starfield layers on the active nav item and
+  primary buttons, none of which any page drew any more.
 - **Music's player draws icons, not characters.** The Android player's chevron, menu, queue
   arrows, device kinds, liked and downloaded marks and the artwork and lyrics placeholders are
   Feather icons; Mission Control's empty lyric line draws a note icon.

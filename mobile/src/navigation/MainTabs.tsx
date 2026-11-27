@@ -127,17 +127,14 @@ function SettingsStack() {
   );
 }
 
-// One Feather icon name per tab - "polish the 5 main mobile nav icons"
-// without restructuring navigation, per the task brief. Feather was chosen
-// (over Ionicons/MaterialIcons/etc, all bundled with react-native-vector-
-// icons) purely for a consistent, thin-stroke look that matches Mission
-// Control's own thin-line SVG icon set (see mission_control/page.js's
-// RENAME_ICON/DELETE_ICON/etc, all stroke-only outlines).
+// One Feather icon name per tab: thin strokes, like Mission Control's sidebar. The server's
+// Configuration (Config) and the app's Settings both take StarCore's one settings gear, the one
+// Mission Control's Configuration shows (.sc-gear).
 const TAB_ICONS: Record<keyof MainTabParamList, string> = {
   Overview: 'home',
   Satellites: 'radio',
   Console: 'terminal',
-  Config: 'sliders',
+  Config: SETTINGS_ICON,
   Settings: SETTINGS_ICON,
 };
 
