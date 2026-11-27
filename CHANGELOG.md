@@ -227,7 +227,7 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 ### Changed
 
 - **The Android Config tab takes StarCore's settings gear**, the one Mission Control's
-  Configuration shows, instead of a sliders icon.
+  Configuration shows, and the app's Settings tab takes sliders, so the two tabs differ.
 - **Mission Control drops the previous design's leftovers**: the hidden starfield markup of the
   sign-in overlay, the orbital map's rules and the starfield layers on the active nav item and
   primary buttons, none of which any page drew any more.

@@ -3,7 +3,7 @@ import {Pressable, StyleSheet} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import {colors} from '../theme';
 
-/** StarCore's one Settings glyph: Feather's gear, also used by the Settings tab and Mission Control. */
+/** StarCore's settings gear: Feather's, also used by the Config tab and Mission Control's Configuration. */
 export const SETTINGS_ICON = 'settings';
 
 /** The gear that opens a screen's settings - neutral, with a full 44pt touch target. */

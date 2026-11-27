@@ -128,14 +128,14 @@ function SettingsStack() {
 }
 
 // One Feather icon name per tab: thin strokes, like Mission Control's sidebar. The server's
-// Configuration (Config) and the app's Settings both take StarCore's one settings gear, the one
-// Mission Control's Configuration shows (.sc-gear).
+// Configuration (Config) takes StarCore's settings gear, the one Mission Control's Configuration
+// shows (.sc-gear); the app's own Settings take sliders, so the two never look alike.
 const TAB_ICONS: Record<keyof MainTabParamList, string> = {
   Overview: 'home',
   Satellites: 'radio',
   Console: 'terminal',
   Config: SETTINGS_ICON,
-  Settings: SETTINGS_ICON,
+  Settings: 'sliders',
 };
 
 function tabIcon(name: keyof MainTabParamList) {
