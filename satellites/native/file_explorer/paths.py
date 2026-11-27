@@ -13,6 +13,7 @@ clean responses instead of ever letting one crash the request.
 from pathlib import Path
 import os
 import string
+import sys
 
 
 class PathError(Exception):
@@ -61,6 +62,65 @@ def resolve_path(raw: str) -> Path:
         return candidate.resolve(strict=False)
     except (OSError, RuntimeError) as error:
         raise PathError(f"the path could not be resolved ({error})")
+
+
+# filesystems that are real storage (a disk, a partition or a network share), as opposed to
+# the virtual ones (proc, tmpfs, overlay...) a Linux system also mounts
+DISK_FILESYSTEMS = {"ext2", "ext3", "ext4", "xfs", "btrfs", "zfs", "f2fs", "jfs", "reiserfs", "vfat",
+                    "exfat", "ntfs", "ntfs3", "fuseblk", "hfsplus", "apfs", "nfs", "nfs4", "cifs",
+                    "smb3", "smbfs", "fuse.sshfs", "9p"}
+
+
+def _unescape_mount(path: str) -> str:
+    """/proc/mounts writes spaces, tabs and backslashes in a mount point as octal."""
+    return (path.replace("\\040", " ").replace("\\011", "\t")
+            .replace("\\012", "\n").replace("\\134", "\\"))
+
+
+def mounts() -> list:
+    """The mounted disks on Linux as (mount point, device, filesystem), one per device: the
+    shallowest mount point wins, so a bind mount of a disk elsewhere does not list it twice.
+    Empty anywhere /proc/self/mounts is not readable (Windows, macOS)."""
+    if not sys.platform.startswith("linux"):
+        return []
+    try:
+        text = Path("/proc/self/mounts").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    best = {}
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        device, mount, filesystem = parts[0], _unescape_mount(parts[1]), parts[2]
+        if filesystem not in DISK_FILESYSTEMS or device.startswith("/dev/loop"):
+            continue
+        known = best.get(device)
+        if known is None or len(Path(mount).parts) < len(Path(known[0]).parts):
+            best[device] = (mount, device, filesystem)
+    return sorted(best.values(), key=lambda item: item[0])
+
+
+def list_locations() -> list:
+    """What the home page offers: the roots, plus on Linux every mounted disk with its mount
+    point (the way a server's own storage page lists them). Browsing is not confined to
+    these: they are shortcuts to where each disk is mounted."""
+    roots = list_roots()
+    found = list(roots)
+    taken = {str(root) for root in roots}
+    for mount, _device, _filesystem in mounts():
+        if mount not in taken and Path(mount).is_dir():
+            taken.add(mount)
+            found.append(Path(mount))
+    return found
+
+
+def mount_label(path: Path) -> str:
+    """"ext4 on /dev/sdb1" for a mount point, "" for anything else."""
+    for mount, device, filesystem in mounts():
+        if mount == str(path):
+            return f"{filesystem} on {device}"
+    return ""
 
 
 def is_filesystem_root(path: Path) -> bool:

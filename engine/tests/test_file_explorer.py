@@ -102,7 +102,39 @@ class FileExplorerApiTest(unittest.TestCase):
             for name in names:
                 self.assertRegex(name, r"^[A-Za-z]:\\$")
         else:
-            self.assertEqual(names, ["/"])
+            self.assertEqual(names[0], "/")
+            self.assertEqual(len(names), len(set(names)))
+
+    def test_the_locations_list_each_mounted_disk_once_with_its_mount_point(self):
+        from importlib import import_module
+        from unittest.mock import patch
+
+        fe_paths = import_module("satellites.native.file_explorer.paths")
+        table = "\n".join([
+            "/dev/sda1 / ext4 rw 0 0",
+            "proc /proc proc rw 0 0",
+            "tmpfs /run tmpfs rw 0 0",
+            "/dev/loop3 /snap/core squashfs ro 0 0",
+            "/dev/sdb1 /srv/data ext4 rw 0 0",
+            "/dev/sdb1 /srv/starcore/files/data ext4 rw 0 0",
+            "/dev/sdc1 /srv/my\\040disk ntfs3 rw 0 0",
+            "",
+        ])
+        with patch.object(fe_paths.sys, "platform", "linux"), \
+                patch.object(fe_paths.Path, "read_text", return_value=table):
+            found = fe_paths.mounts()
+        self.assertEqual([item[:2] for item in found],
+                         [("/", "/dev/sda1"), ("/srv/data", "/dev/sdb1"), ("/srv/my disk", "/dev/sdc1")])
+        self.assertEqual(found[1][2], "ext4")
+
+    def test_there_are_no_mounts_off_linux(self):
+        from importlib import import_module
+        from unittest.mock import patch
+
+        fe_paths = import_module("satellites.native.file_explorer.paths")
+        with patch.object(fe_paths.sys, "platform", "win32"):
+            self.assertEqual(fe_paths.mounts(), [])
+            self.assertEqual(fe_paths.mount_label(Path("/")), "")
 
     # ---------- storage dashboard (Part 4/7 of the "Home Storage
     # Visualization" block) - per-root/per-directory disk usage, and the
@@ -167,7 +199,7 @@ class FileExplorerApiTest(unittest.TestCase):
         # a mounted junction) - _machine_storage() must count that volume's
         # capacity exactly once, not twice
         duplicate_roots = [self.directory, self.directory.parent]
-        with patch.object(fe_paths, "list_roots", return_value=duplicate_roots):
+        with patch.object(fe_paths, "list_locations", return_value=duplicate_roots):
             status, payload = self.json_request(self.base("entries"))
         self.assertEqual(status, 200)
         machine = payload["machine"]

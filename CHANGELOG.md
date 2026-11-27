@@ -5,6 +5,12 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ## Unreleased
 
+### Added
+
+- **File Explorer's home page lists every mounted disk on Linux**, each with its mount point,
+  filesystem, device and free space, like a server's own storage page; before, it showed only
+  "/" as a single drive. Browsing was never confined to those: they are shortcuts.
+
 ### Fixed
 
 - `deploy/linux/install.sh` with `STARCORE_MEDIA` set to another folder: the service now

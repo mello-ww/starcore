@@ -51,7 +51,8 @@ def locations_view(listing: dict) -> dict:
     drives = [{
         "path": entry["name"],
         "title": entry["name"],
-        "summary": _storage_summary(entry.get("storage")),
+        "summary": " - ".join(part for part in (entry.get("device"), _storage_summary(entry.get("storage")))
+                              if part),
         "used_percent": _used_percent(entry.get("storage")),
     } for entry in listing["entries"]]
     machine = listing.get("machine")

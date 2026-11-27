@@ -399,9 +399,9 @@ def _roots_listing() -> dict:
     see _machine_storage()). Neither changes what browsing into a root does;
     both are additive fields an older frontend would simply ignore.
     """
-    roots = paths.list_roots()
+    roots = paths.list_locations()
     items = [{"name": str(root), "type": "dir", "size": None, "modified": None,
-              "storage": _disk_usage(root)}
+              "storage": _disk_usage(root), "device": paths.mount_label(root)}
              for root in roots]
     return {"path": "", "parent": None, "entries": items, "storage": None,
             "machine": _machine_storage(roots)}
