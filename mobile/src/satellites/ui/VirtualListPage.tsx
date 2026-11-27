@@ -5,7 +5,7 @@ import {
   isShown, ListFooter, ListRow, MediaGroupHeading, mediaGroup, MediaRow, mediaRowKeys, UiBlocks, type BlockContext,
 } from './UiBlocks';
 import {createListPaging, type ListPaging} from './listPaging';
-import {resolve, type Scope, type UiBlock} from './contract';
+import {isSelectedRow, resolve, type Scope, type UiBlock} from './contract';
 import {usePlayingId} from './RowMenu';
 import {isPlayingRow} from './rows';
 
@@ -139,6 +139,20 @@ export function VirtualListPage({
   useEffect(() => {
     restoring.forEach(next);
   });
+  // the row the page was opened on (change 17): scrolled to once, not again at each redraw
+  const listRef = useRef<FlatList<PageEntry>>(null);
+  const revealed = useRef('');
+  const selectedIndex = entries.findIndex(
+    entry => entry.kind === 'row' && entry.block.type === 'list' && isSelectedRow(entry.block, {...scope, data: entry.item}),
+  );
+  const selectedKey = selectedIndex >= 0 ? entries[selectedIndex].key : '';
+  useEffect(() => {
+    if (!selectedKey || revealed.current === selectedKey) {
+      return;
+    }
+    revealed.current = selectedKey;
+    listRef.current?.scrollToIndex({index: selectedIndex, viewPosition: 0.5, animated: false});
+  }, [selectedKey, selectedIndex]);
 
   const renderItem = ({item: entry}: {item: PageEntry}) => {
     let content: React.ReactNode;
@@ -168,6 +182,7 @@ export function VirtualListPage({
   };
   return (
     <FlatList
+      ref={listRef}
       testID="ui-list-page"
       data={entries}
       extraData={playing}
@@ -185,6 +200,11 @@ export function VirtualListPage({
       contentContainerStyle={contentContainerStyle}
       ListHeaderComponent={header}
       ListFooterComponent={footer}
+      onScrollToIndexFailed={info => {
+        // a row not laid out yet: near it first, then to it
+        listRef.current?.scrollToOffset({offset: info.averageItemLength * info.index, animated: false});
+        setTimeout(() => listRef.current?.scrollToIndex({index: info.index, viewPosition: 0.5, animated: false}), 50);
+      }}
     />
   );
 }

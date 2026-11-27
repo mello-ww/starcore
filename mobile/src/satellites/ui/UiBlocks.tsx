@@ -21,7 +21,7 @@ import {boundTracks, offlineLabel, offlineState} from '../../media/offlineAction
 import type {DownloadManager} from '../../media/downloads';
 import {useImageSource} from './memoryImages';
 import {
-  BLOCK_TYPES, findProvider, formatValue, isIconName, isSafeRoute, isVisible, openersFor, resolve, resolveTemplate, servesBlock,
+  BLOCK_TYPES, findProvider, formatValue, isIconName, isSafeRoute, isSelectedRow, isVisible, openersFor, resolve, resolveTemplate, servesBlock,
   toneOf, type CapabilityProvider, type Providers, type Scope, type UiAction, type UiBlock,
 } from './contract';
 import type {UiPreferences} from './preferences';
@@ -408,6 +408,7 @@ export const ListRow = memo(
       <Row
         icon={isIconName(iconName, own) ? iconName : undefined}
         tone={block.item?.tone !== undefined ? resolve(block.item.tone, itemScope) : undefined}
+        selected={isSelectedRow(block, itemScope)}
         title={title}
         subtitle={subtitle !== undefined && subtitle !== null && subtitle !== '' ? formatValue(subtitle, formats.subtitle) : undefined}
         value={block.item?.value !== undefined ? formatValue(resolve(block.item.value, itemScope), formats.value) : undefined}
@@ -1076,15 +1077,17 @@ function QuickButton({entry, scope, accent, onPress}: {entry: RowEntry; scope: S
 }
 
 function Row({
-  icon, tone, title, subtitle, value, onPress,
-}: {icon?: string; tone?: unknown; title: string; subtitle?: string; value?: string; onPress?: () => void}) {
+  icon, tone, selected = false, title, subtitle, value, onPress,
+}: {icon?: string; tone?: unknown; selected?: boolean; title: string; subtitle?: string; value?: string; onPress?: () => void}) {
   const {color: accent} = useAccent();
+  // the row the page was opened on (change 17): the accent, as a selected state
+  const marked = selected ? [styles.rowSelected, {borderColor: accent}] : null;
   const content = (
     <>
       {tone !== undefined && <Dot tone={tone} />}
       {icon && <Glyph name={icon} size={18} color={accent} />}
       <View style={styles.rowMain}>
-        <Text style={styles.rowTitle} numberOfLines={tone !== undefined ? 2 : 1}>
+        <Text style={[styles.rowTitle, selected && {color: accent}]} numberOfLines={tone !== undefined ? 2 : 1}>
           {title}
         </Text>
         {subtitle !== undefined && (
@@ -1099,13 +1102,22 @@ function Row({
   );
   if (!onPress) {
     return (
-      <View style={styles.row} accessible={tone !== undefined} accessibilityLabel={[title, subtitle, value].filter(Boolean).join('. ')}>
+      <View
+        style={[styles.row, marked]}
+        accessible={tone !== undefined || selected}
+        accessibilityState={selected ? {selected: true} : undefined}
+        accessibilityLabel={[title, subtitle, value].filter(Boolean).join('. ')}>
         {content}
       </View>
     );
   }
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={({pressed}) => [styles.row, pressed && styles.pressed]}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={selected ? {selected: true} : undefined}
+      onPress={onPress}
+      style={({pressed}) => [styles.row, marked, pressed && styles.pressed]}>
       {content}
     </Pressable>
   );
@@ -1887,6 +1899,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.control,
     backgroundColor: palette.control,
   },
+  rowSelected: {borderWidth: 1},
   rowMain: {flex: 1, minWidth: 0, gap: 2},
   rowSubtitle: {flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0},
   rowSubtitleText: {flexShrink: 1},

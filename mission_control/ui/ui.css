@@ -434,6 +434,15 @@ button.ui-list-row:hover {
     background: #25262c;
 }
 
+/* the row the page was opened on (change 17): the accent, as a selected state */
+.ui-list-row.is-selected {
+    box-shadow: inset 0 0 0 1px var(--sc-accent);
+}
+
+.ui-list-row.is-selected .ui-list-title {
+    color: var(--sc-accent);
+}
+
 .ui-list-icon {
     display: inline-flex;
     flex: none;

@@ -418,6 +418,12 @@ export function locateProvider(providers: Providers | null | undefined): Capabil
   return provider && typeof provider.operations?.locate === 'string' ? provider : null;
 }
 
+/** Whether a list's row is the one its page was opened on (`item.selected`, change 17): the
+ * row is marked with the accent and the page scrolls to it. */
+export function isSelectedRow(block: UiBlock | undefined, itemScope: Scope): boolean {
+  return block?.item?.selected !== undefined && Boolean(resolve(block.item.selected, itemScope));
+}
+
 /** Whether a document opens another Satellite's shared interface - a section action (1.2), or
  * the openers block or locate action (change 16) - so the screen needs the list of Satellites
  * to find the one it pushes. */

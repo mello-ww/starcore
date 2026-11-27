@@ -946,11 +946,19 @@ class _Validator:
         if not isinstance(item, dict):
             self.error(f"{where}.item", "must be an object")
             return
-        self.unknown_keys(f"{where}.item", item, {"title", "subtitle", "value", "format", "icon", "tone"})
+        self.unknown_keys(f"{where}.item", item, {"title", "subtitle", "value", "format", "icon", "tone", "selected"})
         if "tone" in item:
             self.since(f"{where}.item.tone", "a list item's tone")
             if item["tone"] not in TONES:
                 self.check_binding(f"{where}.item.tone", item["tone"], required=True, choices=TONES)
+        if "selected" in item:
+            # 1.2, change 17: the row a page was opened on (a file Show in folder points at),
+            # marked with the accent and scrolled to
+            self.since(f"{where}.item.selected", "a list item's selected", 2)
+            if is_binding(item["selected"]):
+                self.check_binding(f"{where}.item.selected", item["selected"])
+            else:
+                self.error(f"{where}.item.selected", "must be a binding to the row's own value ($.)")
         if "title" not in item:
             self.error(f"{where}.item", "needs 'title'")
         for key in ("title", "subtitle", "value"):

@@ -257,7 +257,7 @@ Locked Folder). `status` never extends it.
 | `field` | `label`, `value` | `format`, `unit`, `tone` | a label and its value |
 | `metric` | `label`, `value` | `format`, `unit`, `max`, `tone` | a prominent value, with a bar when `max` is set |
 | `card` | `blocks` | `title` | a group of blocks (nested at most 4 deep) |
-| `list` | `items`, `item` | `empty`, `action`, `more` (1.2) | rows from an array; `item` maps `title`, `subtitle`, `value`, `icon` and `format` (`{subtitle, value}`) for each one; `more` loads a long list page by page, as a media-grid's does (see "Paging a list" below) |
+| `list` | `items`, `item` | `empty`, `action`, `more` (1.2) | rows from an array; `item` maps `title`, `subtitle`, `value`, `icon` and `format` (`{subtitle, value}`) for each one; `more` loads a long list page by page, as a media-grid's does (see "Paging a list" below); `selected` (1.2, change 17), a binding to the row's own value, marks the row the page was opened on with the accent (a selected state for screen readers) and scrolls the page to it once |
 | `button` | `label`, `action` | `style`: `primary`, `secondary`, `danger` | runs an action |
 | `actions` (1.2) | `blocks` | | a page's actions on one row: up to 8 `button` and `dropdown` blocks, wrapping where the screen is narrow - see [An actions row](#an-actions-row) |
 | `dropdown` (1.2) | `label`, `blocks` | `style` | a button of an `actions` row that opens a panel of blocks under it (a form, a few buttons); only allowed in an `actions` row |
@@ -888,6 +888,9 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
     (`#/satellite/<name>/<page>?<params>`) on the web, a screen pushed over this one on Android,
     so Back returns here. The answer's `page` must be a page id and every param a string, or the
     client refuses it; the client never builds the other Satellite's page by itself.
+  - The answer may carry a param the page does not require (File Explorer's `select`, the
+    file's name): a route reads it as `{$params.select}`, empty when absent, and the page can
+    mark that row with a list item's `selected` (change 17).
   - A provider that refuses the path (a `404`: outside its roots, protected, not this user's)
     is a notice. With no provider offering `locate`, the control is hidden.
   - Not in a protected document, a selection, a tile's quick actions or the player's menu.

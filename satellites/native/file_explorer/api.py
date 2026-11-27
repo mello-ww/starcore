@@ -173,9 +173,10 @@ MAX_PAGE_SIZE = 500
 
 
 def _folder_view(request):
-    """view/folder?path=[&part=folders|files&cursor=&limit=]: without `part`, the first page of
-    the folder's folders and the first page of its files; with it, the page of that part after
-    `cursor` (the last name the previous page held). Only the rows of the page are examined."""
+    """view/folder?path=[&part=folders|files&cursor=&limit=&select=]: without `part`, the first
+    page of the folder's folders and the first page of its files; with it, the page of that part
+    after `cursor` (the last name the previous page held). Only the rows of the page are examined.
+    `select` names the row to mark (`selected`): the file `locate` answered for."""
     part = request.query.get("part", "")
     if part not in ("", "folders", "files"):
         return error_response("'part' must be folders or files", status=400)
@@ -201,7 +202,7 @@ def _folder_view(request):
         target, paths.parent_of(target), _describe(request, target, shown),
         _disk_usage(target) if part == "" else None,
         folders_next=following.get("folders"), files_next=following.get("files"),
-        totals=(len(folders), len(files))))
+        totals=(len(folders), len(files)), select=request.query.get("select", "")))
 
 
 def _file_view(request):

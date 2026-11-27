@@ -80,18 +80,20 @@ def _crumbs(target: Path) -> list:
 
 
 def folder_view(target: Path, parent, items: list, storage, folders_next=None, files_next=None,
-                totals=None) -> dict:
+                totals=None, select: str = "") -> dict:
     """One folder: its folders, then its files, and the way back up. `parent`
     is paths.parent_of(target): "" at a drive's root, where up is the list of
     locations. `items` may be one page of each; `folders_next` and
     `files_next` are then the cursors of the next pages (None at the end), and
-    `totals` (folders, files) count the whole folder."""
+    `totals` (folders, files) count the whole folder. The row named `select` is `selected`
+    (the page marks it): the one Show in folder points at."""
     folders, files = [], []
     for item in items:
         row = {
             "name": item["name"],
             "path": str(target / item["name"]),
             "modified": _epoch(item.get("modified")),
+            "selected": bool(select) and item["name"] == select,
         }
         if item["type"] == "dir":
             row["icon"] = "lock" if item.get("locked") else "folder"

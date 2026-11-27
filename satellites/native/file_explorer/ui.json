@@ -21,7 +21,7 @@
       "title": "$.name",
       "back": false,
       "params": ["path"],
-      "source": {"route": "view/folder?path={$params.path}"},
+      "source": {"route": "view/folder?path={$params.path}&select={$params.select}"},
       "blocks": [
         {"type": "breadcrumb", "items": "$.crumbs", "item": {"title": "$.name"},
          "action": {"navigate": "folder", "params": {"path": "$.path"}}},
@@ -54,11 +54,11 @@
         ]},
         {"type": "text", "style": "caption", "text": "This folder is empty.", "visible": "$.empty"},
         {"type": "list", "id": "folders", "visible": "$.has_folders", "items": "$.folders",
-         "item": {"title": "$.name", "subtitle": "$.subtitle", "format": {"subtitle": "datetime"}, "icon": "$.icon"},
+         "item": {"title": "$.name", "subtitle": "$.subtitle", "format": {"subtitle": "datetime"}, "icon": "$.icon", "selected": "$.selected"},
          "action": {"navigate": "folder", "params": {"path": "$.path"}},
          "more": {"route": "view/folder?path={$params.path}&part=folders&cursor={$value}", "cursor": "$.folders_next"}},
         {"type": "list", "id": "files", "visible": "$.has_files", "items": "$.files",
-         "item": {"title": "$.name", "subtitle": "$.modified", "value": "$.size", "format": {"subtitle": "datetime", "value": "bytes"}, "icon": "$.icon"},
+         "item": {"title": "$.name", "subtitle": "$.modified", "value": "$.size", "format": {"subtitle": "datetime", "value": "bytes"}, "icon": "$.icon", "selected": "$.selected"},
          "action": {"navigate": "file", "params": {"path": "$.path"}},
          "more": {"route": "view/folder?path={$params.path}&part=files&cursor={$value}", "cursor": "$.files_next"}},
         {"type": "text", "style": "caption", "text": "$.storage", "visible": "$.storage"}

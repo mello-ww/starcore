@@ -2,7 +2,7 @@ import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import {UiBlocks, type BlockContext} from '../src/satellites/ui/UiBlocks';
 import {
-  fileExtension, locateProvider, openedPage, openersFor, opensOtherSatellites, type Providers, type UiBlock,
+  fileExtension, isSelectedRow, locateProvider, openedPage, openersFor, opensOtherSatellites, type Providers, type UiBlock,
 } from '../src/satellites/ui/contract';
 
 // change 16: the Satellites that open a file, from the catalog's files.open providers
@@ -98,5 +98,29 @@ describe('openers (change 16)', () => {
   it('draws nothing when no provider opens the file, or nothing can be opened here', () => {
     expect(draw(context(jest.fn()), '/data/notes.txt').toJSON()).toBeNull();
     expect(draw(context(undefined), '/data/Beach.jpg').toJSON()).toBeNull();
+  });
+});
+
+describe('a list\'s selected row (change 17)', () => {
+  it('marks the row the page was opened on, and only that one', () => {
+    const list: UiBlock = {
+      type: 'list', items: '$.files', item: {title: '$.name', selected: '$.selected'},
+      action: {navigate: 'file', params: {path: '$.path'}},
+    };
+    const files = [{name: 'a.jpg', selected: false}, {name: 'b.jpg', selected: true}, {name: 'c.jpg'}];
+    let tree!: ReturnType<typeof renderer.create>;
+    act(() => {
+      tree = renderer.create(
+        <UiBlocks blocks={[list]} scope={{data: {files}, page: {files}, params: {}}}
+          context={{developer: false, providers: {}, runAction: jest.fn(async () => true), readCapability: jest.fn(), forms: {}, setEditing: () => {}}} />,
+      );
+    });
+    const selected = tree.root
+      .findAll((node: any) => typeof node.type === 'string' && node.props.accessibilityState?.selected)
+      .map((node: any) => node.props.accessibilityLabel);
+    expect(selected).toEqual(['b.jpg']);
+    expect(isSelectedRow(list, {data: files[1], page: {}, params: {}})).toBe(true);
+    expect(isSelectedRow(list, {data: files[2], page: {}, params: {}})).toBe(false);
+    expect(isSelectedRow({type: 'list', items: [], item: {title: '$.name'}}, {data: files[1], page: {}, params: {}})).toBe(false);
   });
 });

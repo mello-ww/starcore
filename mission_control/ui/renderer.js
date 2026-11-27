@@ -420,6 +420,9 @@ export function mount(context) {
 
     // ---------- lists ----------
 
+    // the selected row (change 17) the page last scrolled to, so a redraw does not scroll again
+    let revealedRow = "";
+
     function listRow(block, item, scope) {
         const formats = (block.item && block.item.format) || {};
         const itemScope = { ...scope, data: item };
@@ -451,6 +454,20 @@ export function mount(context) {
         }
         if (block.action) {
             row.appendChild(el("span", "ui-list-chevron", "›"));
+        }
+        if (block.item.selected !== undefined && resolve(block.item.selected, itemScope)) {
+            // 1.2, change 17: the row the page was opened on, marked and brought into view once
+            row.classList.add("is-selected");
+            row.setAttribute("aria-current", "true");
+            const key = `${JSON.stringify(scope.params || {})}|${row.textContent}`;
+            if (key !== revealedRow) {
+                revealedRow = key;
+                requestAnimationFrame(() => {
+                    if (row.isConnected) {
+                        row.scrollIntoView({ block: "center" });
+                    }
+                });
+            }
         }
         return row;
     }

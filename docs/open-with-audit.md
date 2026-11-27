@@ -179,8 +179,8 @@ a playlist going `missing`.
 - File Explorer's `files.browse` gains `stat` and `locate` (`api.py`), behind the guard of
   `content` (`paths.resolve_path`, then `protection.guard`): a path outside its roots, a protected
   one, a missing one or a relative one answers as `content` does (400, 403, 404), and a file
-  answers the folder page with `select` set to its name. The folder page does not read `select`
-  yet; it is only carried in the answer.
+  answers the folder page with `select` set to its name. The folder page marks that row since
+  change 17 (see "What O6 found").
 - Its file page ends with the `openers` block ("Opens with"). Nothing shows there until a
   Satellite provides `files.open` (O3, O4).
 
@@ -314,5 +314,8 @@ Held as designed: a locked file is "not here" to Music and Photos; once the area
 refuses it (403) and Photos shows it with "In a protected area", without Add to library, and
 refuses `file/add` (403).
 
-Still open: the folder page that Show in folder opens does not mark the file named in `select`
-(see "What O2 built").
+Then, asked by the owner: **the folder page marks the file Show in folder points at** (UI
+contract change 17). A `list` item maps `selected`, a binding to the row's own value; both
+clients draw that row with the accent (a selected state for screen readers) and scroll to it once.
+File Explorer's `view/folder` takes `select` and sets `selected` on the row of that name. Only
+the rows of the first page are looked at: a file past the first 200 of a folder is not marked.

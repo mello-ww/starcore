@@ -121,7 +121,7 @@ describe('File Explorer, drawn from its ui.json by the shared screen', () => {
     const {tree, navigation} = await mount({
       params: {name: 'FileExplorer', page: 'folder', params: {path: '/home/demo'}, revision: 'rev1'},
     });
-    expect(__mocks.read).toHaveBeenCalledWith('FileExplorer', 'view/folder?path=%2Fhome%2Fdemo');
+    expect(__mocks.read).toHaveBeenCalledWith('FileExplorer', 'view/folder?path=%2Fhome%2Fdemo&select=');
     expect(navigation.setOptions).toHaveBeenLastCalledWith({title: 'demo'});
     const shown = texts(tree);
     expect(shown).toEqual(expect.arrayContaining(['/', 'home', 'demo', '2 folders, 1 file', 'Documents', 'vault', 'Locked', 'notes.txt', '1.5 KB']));

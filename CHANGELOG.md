@@ -7,6 +7,9 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Show in folder marks the file (UI contract 1.2 change 17).** A `list` item can map `selected`;
+  both clients draw that row with the accent and scroll to it once. File Explorer's folder page
+  marks the file `locate` named, so Show in folder from Photos or Music lands on it.
 - **Opens with and Show in folder, run on both clients (O6).** On Android an opener or a
   Show in folder did nothing but "That isn't available in this app.": the screen fetched the
   list of Satellites only for a document with a section action. It now does for `openers` and

@@ -383,6 +383,19 @@ class FileExplorerApiTest(unittest.TestCase):
         status, payload = self.json_request(self.with_path("locate", self.directory))
         self.assertEqual(payload, {"page": "folder", "params": {"path": str(self.directory)}})
 
+    def test_the_folder_page_marks_the_row_locate_selects(self):
+        (self.directory / "a b.jpg").write_bytes(b"x")
+        (self.directory / "other.jpg").write_bytes(b"y")
+        (self.directory / "sub").mkdir()
+        status, payload = self.json_request(self.with_path("view/folder", self.directory, select="a b.jpg"))
+        self.assertEqual(status, 200)
+        self.assertEqual({row["name"]: row["selected"] for row in payload["files"]}, {"a b.jpg": True, "other.jpg": False})
+        self.assertEqual([row["selected"] for row in payload["folders"]], [False])
+        # without select (or an empty one, as a route with no such param sends) nothing is marked
+        for query in ({}, {"select": ""}):
+            status, payload = self.json_request(self.with_path("view/folder", self.directory, **query))
+            self.assertFalse(any(row["selected"] for row in payload["files"] + payload["folders"]))
+
     def test_stat_and_locate_refuse_what_content_refuses(self):
         for route in ("stat", "locate"):
             self.assertEqual(self.request(self.with_path(route, self.directory / "missing.txt"))[0], 404)
