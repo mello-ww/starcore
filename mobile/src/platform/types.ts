@@ -93,7 +93,7 @@ export interface BiometricSigner {
 }
 
 /** A human-readable label for StarCore's "Active sessions" list
- * (`device_name` in `AuthStore.create_session` - see docs/api.md). Best
+ * (`device_name` in `AuthStore.create_session` - see docs/reference/api.md). Best
  * effort and never security-sensitive - worst case it's a generic label
  * the account owner can't immediately place, not a vulnerability. */
 export interface DeviceInfo {

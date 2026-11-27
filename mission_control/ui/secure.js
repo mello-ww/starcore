@@ -9,7 +9,7 @@
 //   exactly these items, not an unlock: nothing opens, so nothing has to be locked again, and a
 //   tab closed half way leaves at most a grant that expires by itself.
 // - The PIN is held only while its request is sent: never stored, logged, or kept in page state.
-// See docs/ui-contract.md ("secure").
+// See docs/reference/ui-contract.md ("secure").
 
 import { findProvider } from "./contract.js";
 import { icon } from "./icons.js";

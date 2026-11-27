@@ -14,7 +14,7 @@
 //   for LEAVE_GRACE_SECONDS (long enough to open a file in another tab).
 // - The PIN is held only while its request is sent: never stored, logged, or kept in page state.
 // No DOM here beyond what the caller passes in, so contracts/ui/tests can run it.
-// See docs/ui-contract.md ("protected").
+// See docs/reference/ui-contract.md ("protected").
 
 import { CAPABILITY_VERSIONS, PROTECTED_CAPABILITIES } from "./contract.js";
 

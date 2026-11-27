@@ -17,7 +17,7 @@ const {__mocks} = jest.requireMock('../src/satellites/ui/api') as {
 };
 
 // File Explorer's real document (satellites/native/file_explorer/ui.json, F1 of
-// docs/file-explorer-migration.md) and answers shaped like its view routes (views.py):
+// docs/archive/file-explorer-migration.md) and answers shaped like its view routes (views.py):
 // the shared screen has no idea what File Explorer is
 declare const __dirname: string;
 const {readFileSync} = require('fs') as {readFileSync: (path: string, encoding: string) => string};

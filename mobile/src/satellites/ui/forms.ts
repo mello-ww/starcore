@@ -1,5 +1,5 @@
 /**
- * A form block's values (UI contract, docs/ui-contract.md "Blocks"): what each field starts with,
+ * A form block's values (UI contract, docs/reference/ui-contract.md "Blocks"): what each field starts with,
  * an empty row of a `rows` field (1.2), and what keeps a submit from going out. Pure, the same
  * rules as Mission Control's ui/forms.js; UiBlocks draws the inputs.
  */

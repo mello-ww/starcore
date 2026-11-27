@@ -2,7 +2,7 @@
  * StarCore UI contract 1.1 - this app's side of the shared rules: bindings,
  * route templates, route safety, formats and compatibility. Pure functions,
  * tested against the same fixtures (contracts/ui/) as the Engine and
- * Mission Control - see docs/ui-contract.md. Nothing here ever evaluates
+ * Mission Control - see docs/reference/ui-contract.md. Nothing here ever evaluates
  * code from a document.
  */
 
@@ -636,7 +636,7 @@ export interface FormatOptions {
   now?: number;
 }
 
-/** A value as display text - see "Formats" in docs/ui-contract.md. */
+/** A value as display text - see "Formats" in docs/reference/ui-contract.md. */
 export function formatValue(value: unknown, format: string = 'text', unit?: string, options: FormatOptions = {}): string {
   let text: string;
   if (value === null || value === undefined) {

@@ -11,7 +11,7 @@ import {colors, spacing, typography, useAccentStyles} from '../theme';
  * mobile source code" in the task brief, and src/config.ts. An address
  * with or without `http://`/`https://` is accepted (see
  * src/servers/testConnection.ts) - a LAN-only StarCore is plain HTTP by
- * default per docs/deployment.md.
+ * default per docs/guide/deployment.md.
  *
  * Used two ways: as the second step of first-run onboarding (see
  * navigation/OnboardingNavigator.tsx, which now handles that case as its

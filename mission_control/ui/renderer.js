@@ -1,4 +1,4 @@
-// Mission Control's renderer for StarCore UI contract 1.1 (docs/ui-contract.md).
+// Mission Control's renderer for StarCore UI contract 1.1 (docs/reference/ui-contract.md).
 //
 // Mounted exactly like a Satellite's own mission_control/page.js - same
 // mount(context) and cleanup - for any Satellite that ships a ui.json

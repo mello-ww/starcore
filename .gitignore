@@ -31,14 +31,14 @@ _claude_*.txt
 # Satellite storage - Photo's and Music's own library data, and the Locked
 # Folder's PIN hash when explicitly configured to live inside the checkout
 # rather than StarCore's application-data directory (the default location
-# for a fresh install - see docs/deployment.md, "Runtime data location").
+# for a fresh install - see docs/guide/deployment.md, "Runtime data location").
 # Kept as a defensive backstop either way: this should normally be empty by
 # default, not something relied on to keep secrets out of Git.
 satellites/*/*/data/
 
 # Credentials, sessions and TLS material - never committed. By default none
 # of this lives inside the checkout at all any more (see runtime_paths.py
-# and docs/deployment.md), but engine/data/ is kept ignored as a backstop for
+# and docs/guide/deployment.md), but engine/data/ is kept ignored as a backstop for
 # the historical location (pre-migration, or if migration ever fails and
 # falls back to it) and for any advanced setup that points STARCORE_DATA_DIR
 # back inside the checkout on purpose.
@@ -57,7 +57,7 @@ engine/data/
 # see test_gitignore.py) is the schema/shipped-defaults a future StarCore
 # version adds a new setting to, read once to fill in anything this
 # installation's own config.toml is missing, and never overwritten by it.
-# See docs/deployment.md, "Keeping configuration up to date". An existing
+# See docs/guide/deployment.md, "Keeping configuration up to date". An existing
 # checkout that already has these tracked from before this exists needs one
 # `git rm --cached` to stop tracking them - see that same section for the
 # exact command.

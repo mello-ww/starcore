@@ -1,7 +1,7 @@
 // The audio library Mission Control's shared player plays from: whichever Satellite the
 // capability catalog (GET /api/catalog) lists first as an enabled audio.library v1 provider,
 // with the same Satellite's audio.session v1 when it declares one. Nothing here names a
-// Satellite: every URL is built from the provider's catalog entry (docs/media-audio.md).
+// Satellite: every URL is built from the provider's catalog entry (docs/reference/media-audio.md).
 
 export const AUDIO_LIBRARY = "audio.library";
 export const AUDIO_SESSION = "audio.session";

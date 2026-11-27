@@ -114,7 +114,7 @@ def describe(configuration: "Configuration") -> list:
 class Configuration:
     def __init__(self, config_path: Path, defaults_path: Path = None):
         """`defaults_path` is the config.default.toml shipped next to this
-        config.toml (see docs/deployment.md, "Keeping configuration up to
+        config.toml (see docs/guide/deployment.md, "Keeping configuration up to
         date") - optional, and None by default, so anything that constructs
         a Configuration directly with just a path (every test that isn't
         going through StarCore itself) keeps behaving exactly as it always
@@ -148,7 +148,7 @@ class Configuration:
         added = reconcile(self.config_path, self.config_data, defaults)
         for section, key in added:
             print(f"[INFO]: added new configuration default '{section}.{key}' to {self.config_path} "
-                  f"- see docs/deployment.md, \"Keeping configuration up to date\".")
+                  f"- see docs/guide/deployment.md, \"Keeping configuration up to date\".")
         return added
 
     def get(self, key, default=None):

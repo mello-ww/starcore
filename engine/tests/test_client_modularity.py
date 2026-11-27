@@ -4,7 +4,7 @@ A guard over the *generic* client code - Mission Control's shell and shared
 renderer, the Android app outside its Satellite-specific folders - that
 fails when it names a Satellite. The couplings that predate UI contract 1.0
 are listed with their current counts: the list may only shrink, as each is
-migrated (docs/ui-contract.md, "Migration"). A new Satellite must never need
+migrated (docs/reference/ui-contract.md, "Migration"). A new Satellite must never need
 an entry here.
 
 The same applies between Satellites: one Satellite's code naming another is
@@ -199,7 +199,7 @@ class ClientModularityTest(unittest.TestCase):
                                 f"{path.relative_to(REPO).as_posix()} imports {target}")
 
     def test_the_audio_host_and_shared_layout_import_no_satellite_folder(self):
-        """The shared player and the shell around it stay Satellite-agnostic (docs/media-audio.md)."""
+        """The shared player and the shell around it stay Satellite-agnostic (docs/reference/media-audio.md)."""
         files = [*REPO.glob("mobile/src/media/**/*.ts"), *REPO.glob("mobile/src/media/**/*.tsx"),
                  *REPO.glob("mobile/src/components/*.tsx"), REPO / "mobile/src/navigation/MainTabs.tsx"]
         self.assertTrue(any("media" in path.parts for path in files))

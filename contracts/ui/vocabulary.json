@@ -1,7 +1,7 @@
 {
   "contract": "starcore.ui",
   "version": "1.2",
-  "description": "The closed vocabulary of StarCore UI contract v1.1 - see docs/ui-contract.md. The Engine (engine/starcore/ui_contract.py), Mission Control (mission_control/ui/contract.js) and the Android app (mobile/src/satellites/ui/contract.ts) each test that they implement exactly this list. 1.1 only adds to 1.0: every 1.0 document is a valid 1.1 document.",
+  "description": "The closed vocabulary of StarCore UI contract v1.1 - see docs/reference/ui-contract.md. The Engine (engine/starcore/ui_contract.py), Mission Control (mission_control/ui/contract.js) and the Android app (mobile/src/satellites/ui/contract.ts) each test that they implement exactly this list. 1.1 only adds to 1.0: every 1.0 document is a valid 1.1 document.",
   "blocks": {
     "heading": {"required": ["text"], "optional": []},
     "text": {"required": ["text"], "optional": ["style"]},
@@ -125,7 +125,7 @@
       "optional_operations": {
         "lyrics": "GET /<id>?language= -> synced lines or plain text"
       },
-      "_note": "Track: {id, title, artist, album, album_id, duration, has_artwork, quality: {label, lossless, hires}}; providers may add keys. See docs/media-audio.md."
+      "_note": "Track: {id, title, artist, album, album_id, duration, has_artwork, quality: {label, lossless, hires}}; providers may add keys. See docs/reference/media-audio.md."
     },
     "media.gallery": {
       "versions": [1],
@@ -154,7 +154,7 @@
         "stream": "GET /<id>?quality=&format= -> the audio, answering Range requests; used when resolve can't plan a stream",
         "connect": "StarCore Connect under this route: POST register, state, command, transfer; GET devices, events"
       },
-      "_note": "A provider's playback session beside its audio.library, from the same Satellite. QueueState: {tracks: [id], order, position, shuffle, repeat, seconds, context}. See docs/media-audio.md."
+      "_note": "A provider's playback session beside its audio.library, from the same Satellite. QueueState: {tracks: [id], order, position, shuffle, repeat, seconds, context}. See docs/reference/media-audio.md."
     },
     "media.vault": {
       "versions": [1],
@@ -203,7 +203,7 @@
     "audio.session": "the audio host's preferences and likes"
   },
   "client_capabilities": {
-    "_note": "Device features a client may offer a document beyond rendering blocks. media.audio (the shared audio host, docs/media-audio.md) is what the play action needs, media.picker the pick action's; secure.screen, a window that can't be captured, is the Android app's (it applies it to every protected document); device.media-sync, the client's own background backup of the device's media to a media.sync provider (the Android app's), is what the sync action opens; media.audio-offline, tracks kept on the device (the Android app's), is what the offline action needs and what the sync action opens for audio.library; media.audio-gapless, media.audio-crossfade, media.audio-theme, media.audio-density and media.audio-visualizer are what the audio host applies of its provider's preferences (no silence between tracks, a fade from one track into the next, the player's own light or dark theme, its compact density, a visualizer in the full player), named by a block's requires (Mission Control's); the rest are reserved names no client claims yet. A document that requires one a client doesn't offer is shown as needing a newer app.",
+    "_note": "Device features a client may offer a document beyond rendering blocks. media.audio (the shared audio host, docs/reference/media-audio.md) is what the play action needs, media.picker the pick action's; secure.screen, a window that can't be captured, is the Android app's (it applies it to every protected document); device.media-sync, the client's own background backup of the device's media to a media.sync provider (the Android app's), is what the sync action opens; media.audio-offline, tracks kept on the device (the Android app's), is what the offline action needs and what the sync action opens for audio.library; media.audio-gapless, media.audio-crossfade, media.audio-theme, media.audio-density and media.audio-visualizer are what the audio host applies of its provider's preferences (no silence between tracks, a fade from one track into the next, the player's own light or dark theme, its compact density, a visualizer in the full player), named by a block's requires (Mission Control's); the rest are reserved names no client claims yet. A document that requires one a client doesn't offer is shown as needing a newer app.",
     "reserved": ["device.biometrics", "device.media-sync", "media.audio", "media.audio-crossfade", "media.audio-density", "media.audio-gapless", "media.audio-offline", "media.audio-theme", "media.audio-visualizer", "media.picker", "secure.screen"]
   },
   "limits": {

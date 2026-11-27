@@ -9,7 +9,7 @@ const {join} = require('path') as {join: (...parts: string[]) => string};
  * This app's contract module against the shared fixtures in contracts/ui/ -
  * the same ones the Engine (engine/tests/test_ui_contract.py) and Mission
  * Control (contracts/ui/tests/web.test.mjs) are checked against, so the two
- * renderers can't drift apart. See docs/ui-contract.md.
+ * renderers can't drift apart. See docs/reference/ui-contract.md.
  */
 const CONTRACT = join(__dirname, '..', '..', 'contracts', 'ui');
 const load = (name: string) => JSON.parse(readFileSync(join(CONTRACT, 'fixtures', name), 'utf-8'));

@@ -1,4 +1,4 @@
-// Mission Control's audio host (the media.audio capability, docs/media-audio.md): started by
+// Mission Control's audio host (the media.audio capability, docs/reference/media-audio.md): started by
 // the shell once signed in, so the player, its saved queue and the top-bar disc are there on
 // every page, before any Satellite's page has loaded. It plays from whichever Satellite the
 // catalog lists as the audio.library provider, and offers what that provider's audio.session

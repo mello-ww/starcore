@@ -55,7 +55,7 @@ class StarCore:
         # config.toml, regardless of which config_path was given - a test
         # passing its own temp config_path still reconciles against the real
         # shipped defaults, exactly as a real install would (see
-        # docs/deployment.md, "Keeping configuration up to date")
+        # docs/guide/deployment.md, "Keeping configuration up to date")
         self.config = Configuration(config_path, defaults_path=CONFIG_DEFAULTS_PATH)
         self.registry = SatelliteRegistry()
         self.native_path = BASE_DIR / "satellites" / "native"
@@ -76,7 +76,7 @@ class StarCore:
         # these per StarCore install and nothing satellite-specific ever
         # touches it. A store from before this was introduced - engine/data/
         # auth.json, inside the checkout - is migrated over automatically,
-        # once, the first time this runs; see docs/deployment.md, "Runtime
+        # once, the first time this runs; see docs/guide/deployment.md, "Runtime
         # data location".
         self.auth = AuthStore(runtime_paths.migrate_legacy_file(
             ENGINE_DIR / "data" / "auth.json",

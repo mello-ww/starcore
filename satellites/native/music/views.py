@@ -5,7 +5,7 @@ list: each track with its heart (`liked` and `not_liked`, a pair the document dr
 toggle), its quality badge and the line under its title as text, and its position in the list.
 A long list is never sent whole: it comes a page at a time (`cursor`), and the audio host asks
 for the tracks at chosen positions (`positions`) to shuffle it, or for the list from a row on
-(`from`) to play it from there (docs/media-audio.md, A2). Settings, the scan and duplicates
+(`from`) to play it from there (docs/reference/media-audio.md, A2). Settings, the scan and duplicates
 (A5), Stats and Wrapped (A6) are shaped here too, so each page binds plain values.
 """
 

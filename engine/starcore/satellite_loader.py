@@ -109,7 +109,7 @@ class SatelliteLoader:
             if not defaults_path.is_file():
                 print(f"[WARNING]: config.toml not found for satellite {manifest.name}. Using empty config.")
             # else: no config.toml yet, but this satellite ships a
-            # config.default.toml (see docs/deployment.md, "Keeping
+            # config.default.toml (see docs/guide/deployment.md, "Keeping
             # configuration up to date") - SatelliteConfig below bootstraps
             # one from it, so this isn't the "using empty config" case above
             config_data = {}

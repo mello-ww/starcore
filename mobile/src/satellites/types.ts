@@ -1,6 +1,6 @@
 import type {OwnIcons} from './ui/contract';
 
-/** Mirrors GET /api/satellites - see docs/api.md. Only the fields this app actually
+/** Mirrors GET /api/satellites - see docs/reference/api.md. Only the fields this app actually
  * uses; StarCore's Satellite entry has more (commands, state, page) that
  * belong to Mission Control, not this app. */
 export interface SatelliteSummary {
@@ -25,7 +25,7 @@ export interface SatelliteSummary {
   state?: Record<string, unknown>;
   /** A name from the shared icon set (contracts/ui/vocabulary.json). */
   icon_name?: string | null;
-  /** Satellite capabilities it provides to others - see docs/ui-contract.md. */
+  /** Satellite capabilities it provides to others - see docs/reference/ui-contract.md. */
   provides?: Record<string, {version: number; operations: Record<string, string>}>;
   /** Its declarative interface (ui.json): a revision when the Engine
    * validated one, an error when it refused it, null when there is none. */

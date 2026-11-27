@@ -1,4 +1,4 @@
-/* Mission Control's shared audio player (docs/media-audio.md): its design tokens, the shared
+/* Mission Control's shared audio player (docs/reference/media-audio.md): its design tokens, the shared
    pieces it draws with, and its own surfaces. Loaded by the shell, so the player works on every
    page, before any Satellite's page has loaded. The --pl-* names are the player's tokens. */
 @import url("./components.css");

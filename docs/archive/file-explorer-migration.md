@@ -146,4 +146,4 @@ the app has no screen of its own for it. This migration gives Android the featur
 only generic contract features; it removes no entry from `engine/tests/test_client_modularity.py`.
 Its guard for protected areas (`protection.py`) names no Satellite since L1 of the Locked
 Folder: it asks the Engine, over the `files.protected` capability. Everything else left outside
-Satellite folders is listed in [`remaining-work.md`](remaining-work.md).
+Satellite folders is listed in [`remaining-work.md`](../project/remaining-work.md).

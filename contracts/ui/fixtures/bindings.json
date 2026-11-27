@@ -1,5 +1,5 @@
 {
-  "_about": "Binding resolution - docs/ui-contract.md, 'Bindings'. Each client must give exactly `expected` for `expr` in `context`.",
+  "_about": "Binding resolution - docs/reference/ui-contract.md, 'Bindings'. Each client must give exactly `expected` for `expr` in `context`.",
   "context": {
     "data": {"name": "Alpha", "count": 3, "on": false, "nested": {"level": 40}, "rows": [{"id": "a"}, {"id": "b"}]},
     "page": {"title": "Overview", "total": 12},

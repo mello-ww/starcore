@@ -6,7 +6,7 @@ import {checkDocument, isSafeRoute, MAJOR, type Providers, type UiDocument} from
 /**
  * The UI contract endpoints - `GET /api/satellites/<name>/ui` (a Satellite's
  * ui.json, ETag = its revision), `GET /api/catalog` (capability providers)
- * and the Satellite's own routes a document binds to. See docs/ui-contract.md.
+ * and the Satellite's own routes a document binds to. See docs/reference/ui-contract.md.
  *
  * Documents are cached per server and per contract major, and revalidated
  * with If-None-Match, so a screen paints at once and a 304 costs no body.

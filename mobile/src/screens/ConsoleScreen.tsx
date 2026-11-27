@@ -19,7 +19,7 @@ interface CommandResult {
  * "Console" tab: the Core's own console/logs, not a satellite's - see
  * "New mobile bottom navigation" in the task brief. Reuses
  * `POST /api/commands/execute`, the exact endpoint the terminal CLI and
- * Mission Control's own console already run through (see docs/api.md), so
+ * Mission Control's own console already run through (see docs/reference/api.md), so
  * behavior and output match them exactly.
  */
 export function ConsoleScreen() {

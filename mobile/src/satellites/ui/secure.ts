@@ -13,7 +13,7 @@ import {findProvider, type CapabilityProvider, type Providers} from './contract'
  *   biometric match) for a single-use grant for exactly these items. Nothing opens, so nothing
  *   has to be locked again, and an app killed half way leaves at most a grant that expires.
  * - No PIN passes through here: the prompt hands back only the grant.
- * See docs/ui-contract.md ("secure").
+ * See docs/reference/ui-contract.md ("secure").
  */
 
 /** What this app can run (the vocabulary's secure_operations; checked by the shared tests). */

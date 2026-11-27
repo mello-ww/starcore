@@ -18,7 +18,7 @@ def describe_satellite(engine, satellite) -> dict:
         "state": satellite.state(engine),
         "page": satellite.page,
         # a satellite exposes configuration purely by naming one of its own
-        # routes "configuration" (see docs/satellites.md) - the Core only ever
+        # routes "configuration" (see docs/satellites/README.md) - the Core only ever
         # checks for that name, so it never needs to know what any satellite's
         # settings actually are
         "configurable": "configuration" in satellite.routes,
@@ -37,7 +37,7 @@ def describe_definition(satellite) -> dict:
         # clients draw - see SatelliteManifest.icons
         "icon": satellite.manifest.icon,
         "icons": satellite.manifest.icons,
-        # Satellite capabilities it provides to others - see docs/ui-contract.md
+        # Satellite capabilities it provides to others - see docs/reference/ui-contract.md
         "provides": satellite.manifest.provides,
         # its declarative interface (ui.json): contract and revision only; the
         # document itself is GET /api/satellites/<name>/ui

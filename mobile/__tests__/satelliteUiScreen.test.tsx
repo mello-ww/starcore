@@ -75,7 +75,7 @@ function press(tree: ReturnType<typeof renderer.create>, label: string) {
 /**
  * A completely new Satellite's interface - navigation, data, buttons,
  * sliders, toggles, forms and the shared file browser - rendered from its
- * ui.json alone (UI contract 1.0, docs/ui-contract.md).
+ * ui.json alone (UI contract 1.0, docs/reference/ui-contract.md).
  */
 describe('SatelliteUiScreen', () => {
   afterEach(() => {

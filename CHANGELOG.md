@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to StarCore. Versions follow [semver](https://semver.org/); the version
-itself lives in the `VERSION` file (see `docs/releasing.md`).
+itself lives in the `VERSION` file (see `docs/project/releasing.md`).
 
 ## Unreleased
 
@@ -78,7 +78,7 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
   `locate` action shows a path's folder through `files.browse`'s new optional `locate`. Neither
   is in a protected document, and a client opens only a page id with string params. Mission
   Control and the Android app both draw them; no Satellite uses them yet (O2 to O4 of
-  `docs/open-with-audit.md`).
+  `docs/archive/open-with-audit.md`).
 - **A choice's accent really slides, and the thumbnail size slides too.** On Mission Control the
   picked segment of a choice (Photos' Month, Camera, All) painted its own fixed accent at once
   and faded it out while the sliding one was still on its way, which read as a stutter; it now
@@ -90,7 +90,7 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
   field whose value is long (a file's folder) sits under its label across the whole width,
   instead of wrapping in a narrow column; on Mission Control the other values no longer drop to
   the bottom of a tall row. The plan for Open with and Show in folder between Satellites is in
-  `docs/open-with-audit.md`.
+  `docs/archive/open-with-audit.md`.
 - **Photos' optional points.** Select all in a grid's selection, and Unfavorite on many
   photos at once; Remove from album on a selection (in an album of one's own); the recycle bin
   as a tile beside the folders, and a sentence when there are no phone folders or albums yet;
@@ -264,13 +264,13 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
 
 - **Pillow 13.** The lock pinned Pillow 12.3.0, which has 42 known advisories in its image
   parsers; it now pins 13.0.0, which has none. Found by the pre-release audit
-  (`docs/roadmap.md`), which also updated the Android project's build tooling where an update
+  (`docs/project/roadmap.md`), which also updated the Android project's build tooling where an update
   existed (`shell-quote`, `handlebars`, `joi`, `brace-expansion`).
 - **The session cookie is `Secure` behind an HTTPS proxy.** The Engine marks it when a proxy on
   the same machine says the request came over HTTPS (`X-Forwarded-Proto`), instead of leaving
   it to the proxy's configuration.
 - **Opening a file by its path keeps nothing of a protected area.** The review of "Opens with"
-  (`docs/open-with-audit.md`) found that a Locked Folder file, while the session had it open,
+  (`docs/archive/open-with-audit.md`) found that a Locked Folder file, while the session had it open,
   could become a Music track (its tags and transcodes kept) or be copied into Photos' library.
   Both now refuse it (403); Photos still shows it. A Music track from outside the library whose
   file a protected area comes to hold is dropped with all it kept, one whose path comes to lead
@@ -282,7 +282,7 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
   have marked all of it as backed up and never sent it. The server now answers "ask again
   later" (`503`) and takes nothing in meanwhile; the app also ignores an answer that isn't the
   server's own (a Wi-Fi sign-in page). Free space is checked at every chunk of an upload, not
-  once (`docs/photos-parity-audit.md`, "Security review of S1 to S4").
+  once (`docs/archive/photos-parity-audit.md`, "Security review of S1 to S4").
 - **Another name for the Locked Folder's folder is still the Locked Folder.** On a Windows
   server, a path such as `\\?\C:\...` or the drive's loopback share opened the vault's folder
   without being recognised as it, so File Explorer, Photo and Music let a session without the
@@ -342,11 +342,11 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
 - **Photos' own Mission Control page and Android screens** (`photo/mission_control/page.js` and
   `page.css`, `mobile/src/photo/`, their routes and tests): its shared interface is now the only
   one on both clients, its settings being forms (P1). The Satellite publishes no page, and the
-  app's dedicated-screen table keeps only Music's (`docs/remaining-work.md`, P3).
+  app's dedicated-screen table keeps only Music's (`docs/project/remaining-work.md`, P3).
 - **File Explorer's own Mission Control page** (`page.js`, `page.css` and its four storage themes):
   its shared interface is now the only one, on the web as on Android, and the storage is shown
   by the shared `metric` bars. The "own page" switch in Developer Mode no longer appears for it
-  (`docs/file-explorer-migration.md`, F7).
+  (`docs/archive/file-explorer-migration.md`, F7).
 - **The Locked Folder's own web page and Android screens** (`locked_folder/mission_control/page.js`
   and `page.css`, `mobile/src/lockedFolder/`), with Photos' Locked Folder tab and its own Lock
   move on both clients (`lockedMove.js`, the viewer's Lock button). Its shared interface is now
@@ -360,7 +360,7 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
   `react-native-background-fetch` and camera roll libraries, and the media, boot and wake lock
   permissions. The app removes what the task kept on the phone at its next start. Photo's
   settings now take effect at once, with nothing left to restart. `source_paths` and
-  `sync_default_path` stay for the new sync (`docs/photos-parity-audit.md`, S0).
+  `sync_default_path` stay for the new sync (`docs/archive/photos-parity-audit.md`, S0).
 
 ### Added
 
@@ -376,7 +376,7 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
   "Use mobile data" is on; "Only while charging" if chosen; never on a low battery. It shows
   where it stands and what failed, with "Try again". It uses a device credential limited to
   the backup, kept under an Android Keystore key, and revoked when you sign out
-  (`docs/photos-parity-audit.md`, S3). Tried on the emulator (S4): an item that failed is tried
+  (`docs/archive/photos-parity-audit.md`, S3). Tried on the emulator (S4): an item that failed is tried
   again when its backoff is over, not at the next six-hour run, and a photo taken while the
   app's process was dead is caught when the process starts.
 - **The Engine ends an upload that goes silent:** a raw request body (an upload's chunk) that
@@ -384,17 +384,17 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
   a phone that lost its network resumes from it instead of finding the file still being sent.
 - **Photo's Phone backup page** (Albums' Phone backup button): each device that backs up to
   Photo, when it was last seen and how many files it sent, and a "Back up this phone" button
-  that opens the app's sync screen; Mission Control hides it (`docs/photos-parity-audit.md`,
+  that opens the app's sync screen; Mission Control hides it (`docs/archive/photos-parity-audit.md`,
   S2).
 - **Photo's phone backup, server side (`media.sync` v1):** `status`, `check` (what the server
   already has, erased and protected media included, without saying which), a resumable
   `upload` written straight to disk in chunks of 8 MiB and checked against its SHA-256, and
   `devices`. Media erased from the recycle bin is remembered by its digest and never taken back
-  by a backup. The app's side comes next (`docs/photos-parity-audit.md`, S1).
+  by a backup. The app's side comes next (`docs/archive/photos-parity-audit.md`, S1).
 - **Device credentials:** `POST /api/auth/devices` issues, to a signed-in session, a credential
   limited to one capability that allows it (so far `media.sync`): it reaches only that
   provider's routes for it, never expires, is stored hashed, and is listed and revoked with the
-  sessions (`docs/api.md`, "Device credentials").
+  sessions (`docs/reference/api.md`, "Device credentials").
 
 - **Biometric unlock turned on from the Android app's unlock card:** a full unlock offers "Use
   biometrics next time", and the PIN that unlocks then enrols the phone; an enrolled phone's
@@ -406,7 +406,7 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
   without an unlock). Both clients' unlock cards then offer "Forgot your PIN?", which shows that
   page in place of the card; its way back, or its action, asks the store's status again. The
   Locked Folder's offers a new PIN with the recovery key, or says what else can be done
-  (`docs/ui-contract.md`, "Protected documents").
+  (`docs/reference/ui-contract.md`, "Protected documents").
 - **Protected documents (UI contract 1.2):** a document can declare
   `"protected": {"capability": "media.vault", "setup": "<page>"}`, and both clients then ask
   the store's status before any page. They show the setup page when it isn't set up, their own
@@ -414,7 +414,7 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
   A `403` asks again, `keep` runs while it shows, and it locks when it closes or stays hidden
   for 10 seconds. It keeps nothing: no offline page, widget or share; on Android images only in
   memory, a window that can't be captured, and no "open in another app". The Engine accepts it
-  only from the store's own Satellite (`docs/ui-contract.md`, "Protected documents").
+  only from the store's own Satellite (`docs/reference/ui-contract.md`, "Protected documents").
 - **The Locked Folder's shared interface, a preview** (`locked_folder/ui.json`, a protected
   document): a grid of everything in the vault in month groups, paged, with the picture or the
   video in a viewer, Move to Photos, Download and Delete forever, a selection, and Add files; a
@@ -429,7 +429,7 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
   page's state, storage or a log. It may show a field of the answer once (`reveal`), in the
   client's own dialog until the person says it is stored. A form field of kind `rows` holds a
   list the person adds to and removes from. After every action of a protected document both
-  clients ask the store's status again (`docs/ui-contract.md`, "Secrets and reveal",
+  clients ask the store's status again (`docs/reference/ui-contract.md`, "Secrets and reveal",
   "Repeatable rows").
 - **The Locked Folder's setup and settings in its shared interface:** the setup page chooses
   the folder, creates the PIN and sets a new one with the recovery key; a settings page changes
@@ -457,7 +457,7 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
 - **A clickable breadcrumb in File Explorer's folder page**, on both clients: each level of the
   path is a pill that opens that folder, the current one is shown and not pressable, and the
   row scrolls to the end when the path is long. It is **UI contract 1.2's `breadcrumb` block**,
-  for any Satellite (`docs/ui-contract.md`).
+  for any Satellite (`docs/reference/ui-contract.md`).
 - **File Explorer opens in its shared interface by default** in Mission Control, as it
   already did in the Android app: browsing, a file's page, management and upload now come from
   its `ui.json` on both clients. Its previous web page stays one switch away in Developer Mode
@@ -468,29 +468,29 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
   reporting each one ("Uploaded 2 of 3 files. Kept the existing notes.txt."). It is **UI
   contract 1.2's `upload` action**, for any Satellite: each file is streamed as the raw body of
   a POST to one of the Satellite's routes, with a `conflict` route for a `409`
-  (`docs/ui-contract.md`, `docs/file-explorer-migration.md`, F5).
+  (`docs/reference/ui-contract.md`, `docs/archive/file-explorer-migration.md`, F5).
 - **Managing files in File Explorer's shared interface**, on both clients: a folder's page
   creates a folder, renames it and deletes it; a file's page renames and deletes it. A delete
   asks first, and a rename or delete returns to the folder, which reloads. They use the same
   routes and Locked Folder guard as the web page, and a drive's root can be neither renamed nor
-  deleted (`docs/file-explorer-migration.md`, F4). The rename route now also answers with the
+  deleted (`docs/archive/file-explorer-migration.md`, F4). The rename route now also answers with the
   renamed entry's folder.
 - **A file's page in File Explorer's shared interface**, on both clients: a file's row opens its
   size, date, type and folder, a preview for a picture, and **Open**, **Download** and **Share**.
   Open is **UI contract 1.2's `open` on a download**, for any Satellite: Mission Control opens
   the file in a new tab, the app hands it to whichever app on the phone views that kind of file
-  (`docs/file-explorer-migration.md`, F3).
+  (`docs/archive/file-explorer-migration.md`, F3).
 - **Large folders in File Explorer's shared interface**, on both clients: a folder's folders and
   files arrive 200 at a time as you scroll (or with "Show more"), with the folder's totals
   ("250 folders, 10,000 files"); the server reads only the rows it sends. Through **UI contract
   1.2's `more` on a list**, the same paging as a media-grid's: any Satellite's long list can use
-  it (docs/file-explorer-migration.md, F2). On Android such a page is a virtualized list, so
+  it (docs/archive/file-explorer-migration.md, F2). On Android such a page is a virtualized list, so
   scrolling through 10,000 files no longer stalls it (F2b).
 - **File Explorer on Android**, read-only for now: the locations with their free space and the
   machine's total, then each folder's folders and files, with Up and back. It is File Explorer's
   first shared interface (`ui.json`, UI contract 1.2), drawn by the app's shared screen with no
   app change. Mission Control keeps File Explorer's own page by default and offers the shared one
-  in Developer Mode while it catches up (`docs/file-explorer-migration.md`, F1).
+  in Developer Mode while it catches up (`docs/archive/file-explorer-migration.md`, F1).
 - **Group Photos' Library by camera, or not at all**, on both clients, as Photo's own web page
   did: a "Group by" choice (Month, Camera, All) above the grid. Only Photo changed (its
   `gallery?group=` and `ui.json`). **UI contract 1.2's offline pages** may now depend on a
@@ -516,7 +516,7 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
 - **UI contract 1.2: tile icons and per-item tile actions.** A media-grid item's `icon` (from
   the shared set) is drawn when it has no image, and `open` gives a tile the first of up to 4
   `{action, visible}` entries that holds for its item, skipping one the client can't run there.
-- **UI contract 1.0** (`docs/ui-contract.md`). A Satellite can describe its interface in a
+- **UI contract 1.0** (`docs/reference/ui-contract.md`). A Satellite can describe its interface in a
   `ui.json`, using pages, navigation and 11 blocks bound to its own routes' data, and get a
   page in Mission Control and a screen in the Android app with no client code of its own.
   Each client renders it with its own components; neither runs code it receives.
@@ -555,7 +555,7 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
   or Satellite can find an audio library through `GET /api/catalog` without naming Music. A
   capability may now have optional operations, and an operation its version doesn't define is
   refused. The reserved client capability `media.audio-playback` is now `media.audio`. See
-  `docs/media-audio.md`.
+  `docs/reference/media-audio.md`.
 - **Android: one shared audio player.** The player, its queue, effects, downloads, Connect and
   the floating player UI moved to `mobile/src/media/` (the AudioHost). It plays from the
   catalog's `audio.library` provider, with Music's routes as the fallback on older servers.
@@ -742,7 +742,7 @@ fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known l
 - **A web page or drawing opened from a Satellite can no longer act as you.** An HTML, SVG or
   XML file opened in a browser tab (File Explorer's Open) ran on Mission Control's own origin,
   with the session. The Engine now sends such files sandboxed, and never lets a browser guess a
-  file's type (`docs/api.md`).
+  file's type (`docs/reference/api.md`).
 - **File Explorer lists large folders about 13 times faster.** A folder of 10,000 entries took
   about 6 seconds on Windows: each entry was read from disk three times and the Locked
   Folder's path resolved again for it. It now reads the folder once (`os.scandir`) and resolves
@@ -788,7 +788,7 @@ the people running it, not a feature-complete 1.0 - see "Known limitations" in
 - **Android app** - multiple servers, sign-in with optional biometric unlock, Home, Satellites,
   Music, Photos with Locked Folder, Status, Developer Mode.
 - **Linux deployment** - `deploy/linux/install.sh`, a hardened systemd unit and the nginx
-  HTTPS site (`docs/deployment.md`, "Linux server (systemd)").
+  HTTPS site (`docs/guide/deployment.md`, "Linux server (systemd)").
 
 ### Added in this release
 
@@ -802,7 +802,7 @@ the people running it, not a feature-complete 1.0 - see "Known limitations" in
 - Signed, standalone release APK (`mobile/scripts/build-release.ps1`): JS bundle embedded,
   signed with a release key kept outside the repository, verified with `apksigner`,
   `versionCode` derived from the version so updates install in order.
-- Release, signing, backup and rollback documentation (`docs/releasing.md`).
+- Release, signing, backup and rollback documentation (`docs/project/releasing.md`).
 
 ### Security
 

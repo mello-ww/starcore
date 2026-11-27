@@ -1,4 +1,4 @@
-// A form block's values (UI contract, docs/ui-contract.md "Blocks"): what each field starts
+// A form block's values (UI contract, docs/reference/ui-contract.md "Blocks"): what each field starts
 // with, an empty row of a `rows` field (1.2), and what keeps a submit from going out. Pure, so
 // mission_control/tests/forms.test.mjs checks it; the renderer draws the inputs.
 

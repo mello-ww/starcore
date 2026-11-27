@@ -458,7 +458,7 @@ class MusicConfigurationTest(unittest.TestCase):
         """A regression guard: the Core's own engine_config.py,
         satellite_config.py, toml_edit.py and api/*.py must never come to know
         about "library" or "music" by name - the generic mechanism
-        (docs/satellites.md) is what has to keep working for any future
+        (docs/satellites/README.md) is what has to keep working for any future
         satellite, not a special case for this one."""
         core_path = Path(configuration_module().__file__).resolve().parents[2].parent / "engine" / "starcore"
         offenders = []

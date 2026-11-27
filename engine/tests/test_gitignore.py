@@ -1,6 +1,6 @@
 """Verifies .gitignore actually protects the runtime-data/secret paths this
 milestone introduced, and does not accidentally hide legitimate source or
-configuration files - see "Runtime data location" in docs/deployment.md.
+configuration files - see "Runtime data location" in docs/guide/deployment.md.
 
 Uses a real, disposable git repository (git check-ignore) rather than
 reimplementing gitignore's own matching rules, so this verifies exactly
@@ -72,7 +72,7 @@ class GitignoreProtectsRuntimeDataTest(unittest.TestCase):
     def test_machine_specific_config_toml_is_ignored_wherever_it_lives(self):
         # config.toml is what an installation actually edits (bind
         # address/port, HTTPS paths, a Locked Folder path, a library
-        # location, ...) - see config_defaults.py and docs/deployment.md,
+        # location, ...) - see config_defaults.py and docs/guide/deployment.md,
         # "Keeping configuration up to date". Its config.default.toml
         # sibling (the tracked schema/shipped-defaults, never machine-
         # specific) is covered by GitignoreDoesNotHideSourceTest below.
@@ -139,7 +139,7 @@ class GitignoreDoesNotHideSourceTest(unittest.TestCase):
             "satellites/native/locked_folder/api.py",
             "satellites/native/locked_folder/ui.json",
             "satellites/native/photo/config.default.toml",
-            "docs/deployment.md",
+            "docs/guide/deployment.md",
             "docs/satellites/locked_folder.md",
             "mission_control/index.html",
             "mission_control/app.js",
@@ -152,8 +152,8 @@ class GitignoreDoesNotHideSourceTest(unittest.TestCase):
             "mobile/README.md",
             "README.md",
             "CHANGELOG.md",
-            "docs/ui-contract.md",
-            "docs/media-audio.md",
+            "docs/reference/ui-contract.md",
+            "docs/reference/media-audio.md",
         ]
         self.assertEqual(_ignored(paths), set())
 

@@ -6,7 +6,7 @@
 #
 # Safe to run again: it never overwrites an existing config.toml, account or library, and
 # it never starts, stops or restarts anything, and never touches nginx - those steps are
-# printed at the end, to run deliberately. Layout (see docs/deployment.md, "Linux server"):
+# printed at the end, to run deliberately. Layout (see docs/guide/deployment.md, "Linux server"):
 #
 #   /opt/starcore/app       the checkout, owned by the starcore user
 #   /opt/starcore/python    uv-managed Python 3.13 (outside any home directory)

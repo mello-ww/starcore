@@ -1,6 +1,6 @@
 /**
  * Secrets a protected document's action asks for, and a secret its answer reveals (UI contract
- * 1.2, docs/ui-contract.md "Protected documents"). The document only names them - `secrets`
+ * 1.2, docs/reference/ui-contract.md "Protected documents"). The document only names them - `secrets`
  * ({key: {kind, new?}}) and `reveal` (a field of the answer) - and this app asks and shows them in
  * dialogs of its own (./SecretPrompt.tsx), whose words name the Satellite asking. A secret
  * is typed only in those dialogs and goes only into the one request's body: never into a form's

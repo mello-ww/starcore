@@ -1,7 +1,7 @@
 """StarCore UI contract v1 on the Engine: the validator agrees with the shared
 vocabulary and fixtures in contracts/ui/ (which Mission Control and the
 Android app test against too), and the API serves documents, the catalog and
-rediscovery - see docs/ui-contract.md.
+rediscovery - see docs/reference/ui-contract.md.
 """
 
 from http.client import HTTPConnection
@@ -560,7 +560,7 @@ PLAY_CONSUMER_UI = {
 class PlayActionConsumerTest(unittest.TestCase):
     """A second consumer of the audio capabilities, built here in a temporary folder: a
     Satellite whose interface plays from whichever Satellite provides audio.library with the
-    play action (contract 1.2), without naming one (docs/media-audio.md)."""
+    play action (contract 1.2), without naming one (docs/reference/media-audio.md)."""
 
     @classmethod
     def setUpClass(cls):

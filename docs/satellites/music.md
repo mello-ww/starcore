@@ -57,7 +57,7 @@ length, different albums) are reported by `GET duplicates`, best quality first.
 ## Configuration
 
 `satellites/native/music/config.toml` (new keys are added from `config.default.toml`
-automatically - see `docs/deployment.md`, "Keeping configuration up to date"):
+automatically - see `docs/guide/deployment.md`, "Keeping configuration up to date"):
 
 ```toml
 enabled = true
@@ -380,7 +380,7 @@ playback continues while browsing other Mission Control pages.
 ### Shared interface
 
 `ui.json` (UI contract 1.2) is Music's only interface, drawn by both clients' shared renderers
-([docs/media-audio.md](../media-audio.md), "Music on the shared interface", A1 to A10; its own
+([docs/reference/media-audio.md](../reference/media-audio.md), "Music on the shared interface", A1 to A10; its own
 page and screens were removed in A10). It has Home, Search and Your Library (A2) and the album, artist, playlist, folder, mix,
 radio, mood, genre, search results, Liked Songs and track (credits) pages, and the playlists'
 own (A3): New playlist, New smart playlist, a playlist's details and rules, Import a playlist
@@ -402,7 +402,7 @@ or a genre (`artwork/mosaic/<key>`), and the rows' own fields: `liked`/`not_like
 ## Mobile
 
 Music's players on both clients are the reference for the shared audio host specified in
-[docs/media-audio.md](../media-audio.md); Music will provide `audio.library` from its existing
+[docs/reference/media-audio.md](../reference/media-audio.md); Music will provide `audio.library` from its existing
 routes (declared in `satellite.toml`: `search`, `tracks`, `playback`, `artwork`, `lyrics`).
 
 
@@ -456,7 +456,7 @@ music albums [count]      albums with their track counts
 - FFmpeg never sees a shell or a URL.
 - Uploaded covers must be PNG or JPEG by their bytes, at most 4 MB.
 - No external service is contacted. Metadata enrichment, scrobbling and lyric lookups are
-  deferred extension points (see `docs/roadmap.md`) and will be opt-in.
+  deferred extension points (see `docs/project/roadmap.md`) and will be opt-in.
 - A scan may be pointed at any directory by an authenticated administrator (as before); only
   audio files are ever indexed or served from it.
 - Never a protected area: a scan whose source, or one of whose configured folders, is in one

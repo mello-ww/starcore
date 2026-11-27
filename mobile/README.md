@@ -20,11 +20,11 @@ Mobile UI  ->  Existing StarCore API  ->  StarCore Engine  ->  Satellites
 - The shared audio player (`src/media/`), and Music's native library screens.
 - The phone's background backup (`src/sync/` and the Kotlin `sync` package), client
   capability `device.media-sync`: any server's `media.sync` provider, reached from a
-  document's `sync` action or Settings' "Phone backup" (`docs/photos-parity-audit.md`).
+  document's `sync` action or Settings' "Phone backup" (`docs/archive/photos-parity-audit.md`).
 - Developer Mode (`src/developer/`): the terminal icon at the top right of each tab, or the
   switch in Settings. Off by default and remembered per server on this device; it shows the
   Console and Config tabs and anything a Satellite marks `developer: true`. A display
-  preference only - see docs/satellites.md, "Developer Mode".
+  preference only - see docs/satellites/README.md, "Developer Mode".
 
 Not built yet: notifications, an iOS build and a light theme.
 
@@ -36,7 +36,7 @@ Not built yet: notifications, an iOS build and a light theme.
   setups need `ANDROID_HOME` pointed at an SDK install with `platform-tools`,
   `build-tools;34.0.0` and `platforms;android-34`.
 - A running StarCore server on the same network as the device/emulator you
-  test with (see `docs/deployment.md` in the repository root) - the app
+  test with (see `docs/guide/deployment.md` in the repository root) - the app
   never bundles or hardcodes a server address; you enter one on first
   launch (see "Connecting to a server" below).
 
@@ -78,7 +78,7 @@ picking up a newer 6.x release.
 ### Music playback
 
 Audio plays through the shared AudioHost (`src/media/`, see
-`docs/media-audio.md`), which plays from whichever Satellite the capability
+`docs/reference/media-audio.md`), which plays from whichever Satellite the capability
 catalog lists as the `audio.library` provider; that Satellite's pages are its
 `ui.json`, drawn by the shared renderer like any other. It
 uses that same `react-native-video` rather than adding
@@ -115,14 +115,14 @@ Status has no native screen of its own any more: see `docs/satellites/status.md`
 
 The first screen asks for your StarCore server's address (e.g.
 `http://192.168.1.20:8090`, or an HTTPS address if you've set that up per
-`docs/deployment.md`). This is stored locally on the device
+`docs/guide/deployment.md`). This is stored locally on the device
 (`src/storage/preferences.ts`, plain `AsyncStorage` - a convenience to
 remember, not a secret) and is never compiled into the app or committed to
 this repository, so the source code carries no server-specific
 configuration at all.
 
 A LAN address without HTTPS is expected and supported - StarCore's own
-default is plain HTTP on a private network (see `docs/deployment.md`,
+default is plain HTTP on a private network (see `docs/guide/deployment.md`,
 "Private LAN access") - which is why `android/app/src/main/res/xml/
 network_security_config.xml` allows cleartext traffic; see that file's own
 comment for the reasoning.
@@ -132,7 +132,7 @@ comment for the reasoning.
 Logging in calls the exact same `POST /api/auth/login` Mission Control
 uses (`src/api/auth.ts`), with `kind: "mobile"` and a device label so the
 session shows up distinctly in StarCore's "Active sessions" list (see
-`docs/api.md`, "Authentication", in the repository root). One small,
+`docs/reference/api.md`, "Authentication", in the repository root). One small,
 backwards-compatible server change was needed to support this: a
 `kind: "mobile"` login also returns the issued token in its JSON response
 body, because a native HTTP stack doesn't expose the `Set-Cookie` header to
@@ -189,7 +189,7 @@ same session token it would from a password login, exactly as before.
 
 The app knows UI contracts and capabilities, not individual Satellites. A
 Satellite that ships a `ui.json` (UI contract 1.0 to 1.2, see
-[`docs/ui-contract.md`](../docs/ui-contract.md)) opens in
+[`docs/reference/ui-contract.md`](../docs/reference/ui-contract.md)) opens in
 `src/screens/SatelliteUiScreen.tsx`, which draws its pages, navigation and
 blocks with this app's own components (`src/satellites/ui/`) - no app change
 is needed for a new one. Documents are cached per server and revalidated by
@@ -241,7 +241,7 @@ mobile/
 │   ├── developer/        Developer Mode
 │   ├── storage/          plain (non-secret) local preferences
 │   ├── music/            Music's screens, until they are retired
-│   │                     (docs/remaining-work.md)
+│   │                     (docs/project/remaining-work.md)
 │   └── config.ts         build-time constants only - no server address,
 │                          no credentials, ever
 └── __tests__/            Jest tests (see "Testing" below)
@@ -304,7 +304,7 @@ standalone release APK (JS bundle embedded - no Metro, USB or ADB) into
 checkout (`~/.starcore/signing/keystore.properties` by default, or
 `STARCORE_KEYSTORE_PROPERTIES`, or a gitignored `android/keystore.properties`)
 and never committed. Version, `versionCode`, commit and build date come from
-the repository's `VERSION` file and Git. See `docs/releasing.md` for signing,
+the repository's `VERSION` file and Git. See `docs/project/releasing.md` for signing,
 publishing, upgrades and rollback.
 
 A debug build (`npm run android`) and a release build are signed with

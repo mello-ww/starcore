@@ -15,7 +15,7 @@ class SatelliteConfig:
 
     def __init__(self, data: dict, path: Path = None, defaults_path: Path = None):
         """`defaults_path` is this satellite's own config.default.toml, if it
-        ships one (see docs/deployment.md, "Keeping configuration up to
+        ships one (see docs/guide/deployment.md, "Keeping configuration up to
         date") - optional and None by default, so a SatelliteConfig built
         directly with just data/path (every test that isn't going through
         satellite discovery itself) behaves exactly as it always has.
@@ -38,7 +38,7 @@ class SatelliteConfig:
         added = reconcile(self.path, self.data, defaults)
         for _, key in added:
             print(f"[INFO]: added new configuration default '{key}' to {self.path} "
-                  f"- see docs/deployment.md, \"Keeping configuration up to date\".")
+                  f"- see docs/guide/deployment.md, \"Keeping configuration up to date\".")
         return added
 
     def get(self, key, default=None):

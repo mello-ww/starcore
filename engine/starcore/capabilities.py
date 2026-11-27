@@ -25,7 +25,7 @@ other. The request carries `caller`, which a client's request over HTTP never ha
 operation meant for the server alone refuses clients (`refuse_clients`).
 
 Nothing here names a Satellite.
-See docs/ui-contract.md, "Shared blocks and Satellite capabilities".
+See docs/reference/ui-contract.md, "Shared blocks and Satellite capabilities".
 """
 
 import re

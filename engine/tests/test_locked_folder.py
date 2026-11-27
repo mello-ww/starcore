@@ -581,7 +581,7 @@ class LockedFolderApiTest(unittest.TestCase):
 
 class LockedFolderStorageMigrationTest(unittest.TestCase):
     """Where the PIN hash actually lives on disk - see runtime_paths.py and
-    "Runtime data location" in docs/deployment.md. Deliberately a separate
+    "Runtime data location" in docs/guide/deployment.md. Deliberately a separate
     fixture from LockedFolderApiTest above: that fixture always points
     "storage" at an explicit temp path precisely so its tests never depend
     on (or accidentally exercise) this default-resolution/migration logic -

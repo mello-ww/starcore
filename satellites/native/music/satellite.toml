@@ -13,7 +13,7 @@ logo = "music"
 stats = "activity"
 
 # a Satellite capability: any client or Satellite can search and play this
-# library's tracks through it without naming Music (docs/media-audio.md).
+# library's tracks through it without naming Music (docs/reference/media-audio.md).
 # Each operation is one of Music's existing routes.
 [provides."audio.library"]
 version = 1

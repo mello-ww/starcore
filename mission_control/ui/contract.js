@@ -2,7 +2,7 @@
 // bindings, route templates, route safety, formats and compatibility.
 // Pure functions, no DOM, so contracts/ui/tests/web.test.mjs can check them
 // against the same fixtures the Engine and the Android app use.
-// See docs/ui-contract.md. Nothing here ever evaluates code from a document.
+// See docs/reference/ui-contract.md. Nothing here ever evaluates code from a document.
 
 export const CONTRACT_NAME = "starcore.ui";
 export const MAJOR = 1;
@@ -439,7 +439,7 @@ function relative(seconds, now) {
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"];
 const BIT_UNITS = ["b/s", "kb/s", "Mb/s", "Gb/s", "Tb/s"];
 
-/** A value as display text - see "Formats" in docs/ui-contract.md.
+/** A value as display text - see "Formats" in docs/reference/ui-contract.md.
  * `options.utc` and `options.now` (epoch seconds) exist for the tests. */
 export function formatValue(value, format = "text", unit, options = {}) {
     const numeric = typeof value === "number" && Number.isFinite(value);

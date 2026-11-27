@@ -9,7 +9,7 @@ import {FloatingPlayerSpacer} from '../components/FloatingPlayerInset';
 
 const {palette, radii, space, type} = tokens;
 
-/** Mirrors GET/POST /api/configuration - see docs/api.md. */
+/** Mirrors GET/POST /api/configuration - see docs/reference/api.md. */
 interface Setting {
   section: string;
   key: string;

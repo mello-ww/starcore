@@ -6,7 +6,7 @@ for example) are machine-specific state, not source code
 application's user data never lives inside its own installation directory.
 This module is the one place that decides where that data actually goes, so
 nothing else in the Engine hard-codes a location or reinvents the same
-platform logic - see docs/deployment.md, "Runtime data location", for the
+platform logic - see docs/guide/deployment.md, "Runtime data location", for the
 full reasoning and the historical in-checkout locations this replaces.
 
 Deliberately small and dependency-free, matching the rest of the Engine.
@@ -84,7 +84,7 @@ def migrate_legacy_file(legacy_path, new_path) -> Path:
     try:
         new_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(legacy_path), str(new_path))
-        print(f"[INFO]: migrated {legacy_path} to {new_path} - see docs/deployment.md, "
+        print(f"[INFO]: migrated {legacy_path} to {new_path} - see docs/guide/deployment.md, "
               f"\"Runtime data location\".")
         return new_path
     except OSError as error:

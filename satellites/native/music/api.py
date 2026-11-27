@@ -41,7 +41,7 @@ def routes() -> dict:
         "connect": routes_playback.connect,
         # files.open: another interface's "Opens with" plays a sound by its path
         "open": opening.open_file,
-        # same convention as every other Satellite - see docs/satellites.md
+        # same convention as every other Satellite - see docs/satellites/README.md
         "configuration": configuration_route,
     }
 

@@ -1,9 +1,9 @@
 # Remaining work: every Satellite on the shared interface (2026-11-12, at 9c79049)
 
 This is the one list of what is left to do. The detailed audits it draws on stay where they
-are: [`file-explorer-migration.md`](file-explorer-migration.md) (File Explorer's matrix and
-contract specs), [`photos-parity-audit.md`](photos-parity-audit.md) (Photos' matrix, by `#`
-number) and [`media-audio.md`](media-audio.md) (the audio host). When an item here is done,
+are: [`file-explorer-migration.md`](../archive/file-explorer-migration.md) (File Explorer's matrix and
+contract specs), [`photos-parity-audit.md`](../archive/photos-parity-audit.md) (Photos' matrix, by `#`
+number) and [`media-audio.md`](../reference/media-audio.md) (the audio host). When an item here is done,
 tick it here.
 
 ## The goal
@@ -67,7 +67,7 @@ Small and independent; unblocked by the no-compatibility rule.
 
 ## 2. File Explorer (R1)
 
-From [`file-explorer-migration.md`](file-explorer-migration.md). F1 is done.
+From [`file-explorer-migration.md`](../archive/file-explorer-migration.md). F1 is done.
 
 - [x] **F2 - List paging:** `more` on `list` in the contract (Engine, both clients, fixtures);
   `view/folder` with `part`, `cursor` and `limit`; tested on 10,000 entries.
@@ -94,7 +94,7 @@ From [`file-explorer-migration.md`](file-explorer-migration.md). F1 is done.
 
 ## 3. Photos without its own interface (R2)
 
-From [`photos-parity-audit.md`](photos-parity-audit.md), which holds the inventory of the old
+From [`photos-parity-audit.md`](../archive/photos-parity-audit.md), which holds the inventory of the old
 phone sync, the design of the new one and each milestone's files and tests (plan approved by
 the owner 2026-11-15).
 
@@ -135,7 +135,7 @@ the owner 2026-11-15).
 ## 4. The Locked Folder through `media.vault` (R3)
 
 Its security audit is done (2026-11-15): findings by severity, the design and each milestone's
-files and tests are in [`satellites/locked_folder.md`](satellites/locked_folder.md), "Security
+files and tests are in [`satellites/locked_folder.md`](../satellites/locked_folder.md), "Security
 audit and plan". The owner approved the plan on 2026-11-15. The audit found one
 high-severity gap: disabling the Locked Folder Satellite removed File Explorer's guard. L0
 closed it.
@@ -196,14 +196,14 @@ What those milestones cover, as first listed:
   `protection.py`, over `files.protected`). Their comments naming each other go with them.
 - [x] Then remove the Locked Folder's `page.js` and `mobile/src/lockedFolder/`.
 
-Its audit and plan go in [`satellites/locked_folder.md`](satellites/locked_folder.md).
+Its audit and plan go in [`satellites/locked_folder.md`](../satellites/locked_folder.md).
 
 ## 5. Music on `ui.json` (R4)
 
 The largest piece. Its own audit comes first, as for Photos: a parity matrix of the web views
 and the Android screens against what the contract can draw.
 
-- [x] **The audit and plan,** in [`media-audio.md`](media-audio.md), "Music on the shared
+- [x] **The audit and plan,** in [`media-audio.md`](../reference/media-audio.md), "Music on the shared
   interface": a 42-row parity matrix, contract changes 6 to 10 and milestones A1 to A10.
   Written and approved by the owner on 2026-11-18.
 - [x] **Library pages, A1:** `play` with `tracks` or `route` (change 6), and Music's first
@@ -403,7 +403,7 @@ mechanisms first, since several Satellites use them, then each Satellite's items
 Linking Satellites without coupling them: File Explorer's file page lists what can open a
 file ("Opens with"), Photos opens images and videos, Music plays sounds (directly when they
 are outside its library, and they can still go in a playlist), and Photos and Music show an
-item's file in File Explorer. The audit and the plan: [`open-with-audit.md`](open-with-audit.md).
+item's file in File Explorer. The audit and the plan: [`open-with-audit.md`](../archive/open-with-audit.md).
 
 - [x] O1 contract change 16: the `files.open` capability (types, extensions, label), the
       `openers` block and the `locate` action (Show in folder; `reveal` was taken), on the

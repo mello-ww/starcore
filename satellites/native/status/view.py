@@ -1,6 +1,6 @@
 """What Status's ui.json binds to: the monitor's snapshot, shaped for display.
 
-UI contract documents have no expression language (docs/ui-contract.md,
+UI contract documents have no expression language (docs/reference/ui-contract.md,
 "Bindings"): a Satellite returns what it wants shown. This module is that
 step for Status. It measures nothing and keeps no state - every value comes
 from the same cached snapshot, history and diagnostics the other routes

@@ -74,7 +74,7 @@ from it alone whether anything it cached is out of date.
 generically (see `_satellite_status()` in `starcore/api/payloads.py`), never by branching on
 a Satellite's name. `"error"` means the Satellite's last `start`/`stop` hook failed;
 `"stopped"` means it declares a background service (see "Running a background service" in
-`docs/satellites.md`) that isn't currently running, whether because it's between starts or
+`docs/satellites/README.md`) that isn't currently running, whether because it's between starts or
 because `[satellites].services` is off entirely; a Satellite with no background service at
 all is simply `"running"` whenever it's enabled, since there's nothing to actually be
 stopped.
@@ -89,7 +89,7 @@ settings. See "Exposing configuration" in the Satellites documentation.
 `{name: {fallback, stroke, paths}}`, where `paths` is path data of absolute `M`, `L`, `C` and
 `Z` in a 24-unit box that clients stroke in their own colour, and `fallback` the shared icon to
 draw instead; a file the Engine refused has `fallback` alone. `icon` names the one among them
-that stands for the Satellite, or is `null` (see "Status and icon" in `docs/satellites.md`).
+that stands for the Satellite, or is `null` (see "Status and icon" in `docs/satellites/README.md`).
 The Satellite's served `ui.json` carries the same `icons`.
 `provides` lists the Satellite capabilities it offers others, as `{capability: {version,
 operations}}`. `ui` describes its declarative interface (`ui.json`):
@@ -204,7 +204,7 @@ reload controls. Each responds with the same shape:
 
 `error` is `null` on success. It is a message, and the response status is `500`, when the
 Satellite's own `start`/`stop` hook (see "Running a background service" in
-`docs/satellites.md`) raised - the same way `/api/commands/execute` reports a command that
+`docs/satellites/README.md`) raised - the same way `/api/commands/execute` reports a command that
 raised. Crucially, a failed `enable`/`disable` never leaves the Satellite looking like it
 changed state: the config is only persisted once the hook actually reports success, so
 `satellite.enabled` in the response always reflects what actually happened, not what was
@@ -217,14 +217,14 @@ way every other write endpoint is.
 it is the one route name Mission Control treats specially, purely by name (see
 `configurable` above): a Satellite that wants a Config button in Mission Control names one
 of its own routes `configuration` and answers `GET`/`POST` on it following the convention in
-`docs/satellites.md`. Photo's `GET|POST /api/satellites/photo/configuration` (`docs/satellites/photo.md`)
+`docs/satellites/README.md`. Photo's `GET|POST /api/satellites/photo/configuration` (`docs/satellites/photo.md`)
 is the first Satellite to do this.
 
 A file a Satellite returns is streamed rather than read into memory, and a `Range` request
 is answered with `206` and just the bytes asked for, so a browser can seek in a large file
 without downloading all of it. A Satellite route can also ask for the response to download
 as an attachment (`file_response(path, content_type, download_name="report.pdf")`) - the File
-Explorer Satellite (`docs/api.md` below, `satellites/native/file_explorer/`) is the first to
+Explorer Satellite (`docs/reference/api.md` below, `satellites/native/file_explorer/`) is the first to
 use this; nothing else has needed to yet.
 Every such file is sent with `X-Content-Type-Options: nosniff`, and one that a browser would
 run as a document with script (HTML, SVG, XML) also with `Content-Security-Policy: sandbox`:
@@ -358,7 +358,7 @@ per account) via the shared `hash_secret()` helper in `starcore/auth.py` - never
 logged, or returned anywhere. The Locked Folder Satellite's PIN (see `docs/satellites/locked_folder.md`)
 reuses this exact same function rather than a second hashing implementation. Sessions expire
 after 7 days. Nothing about the credential store depends on a third-party package; see
-"Dependencies" in `docs/deployment.md`.
+"Dependencies" in `docs/guide/deployment.md`.
 
 Every satellite route handler also receives the caller's already-validated session token as
 `request.token` (see `Request` in `starcore/api/response.py`) - set by `_authorized()` once,
@@ -383,7 +383,7 @@ When `https_enabled` is true, `ApiServer.start()` wraps its listening socket in 
 stdlib `ssl` module - no dependency. If the certificate or key is missing, unreadable, or
 doesn't match, Mission Control does **not** start and a `[WARNING]` explains why - it never
 silently falls back to plain HTTP, since that would be a false sense of security. See
-"HTTPS" in `docs/deployment.md` for how to obtain a certificate (including a self-signed one
+"HTTPS" in `docs/guide/deployment.md` for how to obtain a certificate (including a self-signed one
 for local/LAN use) on both Windows and Linux.
 
 This document will evolve as the API grows.

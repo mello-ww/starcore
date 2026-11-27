@@ -10,7 +10,7 @@ import React, {createContext, ReactNode, useCallback, useContext, useEffect, use
  *
  * The shared mechanism (the same one Mission Control uses): a setting, or a declarative
  * screen's section or item, that a Satellite describes with `developer: true` is shown only
- * while this is on - see `visibleToDeveloper` and docs/satellites.md, "Developer Mode".
+ * while this is on - see `visibleToDeveloper` and docs/satellites/README.md, "Developer Mode".
  */
 export const DEVELOPER_MODE_KEY = 'starcore.developerMode';
 

@@ -1,5 +1,5 @@
 // The full player's additions from the provider's document (UI contract 1.2, change 9: its
-// `audio`, docs/media-audio.md): its menu after the host's own Play next, the title's and
+// `audio`, docs/reference/media-audio.md): its menu after the host's own Play next, the title's and
 // artist's links and its way to the Satellite's pages, run by additions.ts with the playing
 // track as $. A choose opens the shared choose sheet; a message or an error shows as a toast.
 import React, {useCallback, useMemo, useState} from 'react';

@@ -6,7 +6,7 @@ import type {ConnectDevice, ConnectEvent, Lyrics, PlaybackPreferences, PlaybackI
  * The audio library the AudioHost plays from: whichever Satellite the capability catalog
  * (`GET /api/catalog`) lists first as an enabled `audio.library` v1 provider. Nothing here
  * names a Satellite: every URL is built from the provider's catalog entry. See
- * docs/media-audio.md.
+ * docs/reference/media-audio.md.
  */
 
 /** One provider as `/api/catalog` lists it. */

@@ -734,7 +734,7 @@ class FileExplorerApiTest(unittest.TestCase):
 
     def test_file_explorer_has_no_configurable_settings(self):
         # there is no longer a boundary (or anything else) to configure - the
-        # generic mechanism (docs/satellites.md) is just "a route named
+        # generic mechanism (docs/satellites/README.md) is just "a route named
         # 'configuration' exists", and File Explorer no longer names one
         status, payload = self.json_request("/api/satellites/FileExplorer")
         self.assertEqual(status, 200)

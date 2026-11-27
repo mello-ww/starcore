@@ -35,12 +35,12 @@ WRITE_ENDPOINTS = ("/api/commands/execute", "/api/shutdown", "/api/restart", RED
 # reserved below a satellite, so a satellite cannot claim any of these as a
 # route name of its own - "assets" is the satellite's Mission Control files,
 # the other three are the Core's generic lifecycle controls (see
-# docs/satellites.md); every satellite gets them for free, so none of them
+# docs/satellites/README.md); every satellite gets them for free, so none of them
 # can be shadowed
 ASSETS_SEGMENT = "assets"
 LIFECYCLE_ACTIONS = {"enable": True, "disable": False}
 RELOAD_SEGMENT = "reload"
-# the Satellite's declarative interface document (ui.json) - see docs/ui-contract.md
+# the Satellite's declarative interface document (ui.json) - see docs/reference/ui-contract.md
 UI_SEGMENT = "ui"
 
 FILE_CHUNK = 64 * 1024
@@ -188,7 +188,7 @@ class ApiServer:
         """
         if self.https_cert is None or self.https_key is None:
             print("[WARNING]: https_enabled is true but https_cert and/or https_key is not configured. "
-                  "Mission Control was not started. See docs/deployment.md for HTTPS setup.")
+                  "Mission Control was not started. See docs/guide/deployment.md for HTTPS setup.")
             return None
 
         if not self.https_cert.is_file():
@@ -725,7 +725,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         # stacks (OkHttp on Android, NSURLSession on iOS) do not expose
         # Set-Cookie to application code the way a browser's fetch() does,
         # so a mobile client has no other reliable way to read the token it
-        # was just issued - see docs/api.md, "Authentication", and
+        # was just issued - see docs/reference/api.md, "Authentication", and
         # mobile/src/api/auth.ts. This is additive and opt-in per `kind`;
         # a web login's response body is completely unchanged.
         payload = {"message": "Logged in."}

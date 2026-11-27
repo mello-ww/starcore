@@ -12,7 +12,7 @@ all fed by the same snapshot:
 | CLI | `status`, `status hardware`, `status network`, `status services`, `status history` |
 
 Its interface is described once, in `ui.json` (UI contract 1.1, see
-[docs/ui-contract.md](../ui-contract.md)), and drawn by both clients' shared renderers: Status
+[docs/reference/ui-contract.md](../reference/ui-contract.md)), and drawn by both clients' shared renderers: Status
 is the first existing Satellite migrated off client code of its own. See "Interface" below.
 
 Every value is a real reading. Anything a machine can't provide is shown as unavailable
@@ -162,7 +162,7 @@ section shows the live collection time. Linux readings are file reads from `/pro
   can't record are listed with the reason.
 - **Diagnostics**: the sampler, StarCore's own process, the history file and its tiers, every
   unavailable reading with its reason, and the raw JSON. Shown in Developer Mode only (the
-  route itself is signed-in only either way - see docs/satellites.md, "Developer Mode").
+  route itself is signed-in only either way - see docs/satellites/README.md, "Developer Mode").
 
 Meters carry severity: neutral below the warning threshold, then the warning colour, then the
 danger colour - never the accent, which would look like danger with the red preset. Chart lines

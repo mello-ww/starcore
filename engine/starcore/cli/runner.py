@@ -1,6 +1,6 @@
 """Runs one command line for any caller - the terminal, the one-shot CLI, or
 the Mission Control / mobile console - with the same parsing, authorization,
-confirmation, output and exit codes. See docs/cli.md.
+confirmation, output and exit codes. See docs/guide/cli.md.
 
 Nothing here executes a shell or evaluates text: a command line is split
 into plain string tokens and every token is handed to a registered

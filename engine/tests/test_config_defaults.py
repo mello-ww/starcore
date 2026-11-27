@@ -6,7 +6,7 @@ Covers the shared reconcile()/load_defaults() helpers in isolation
 (config_defaults.py), both callers that build on them - engine_config's
 Configuration ([section]-based) and satellite_config's SatelliteConfig
 (flat) - and satellite discovery actually wiring a satellite's own
-config.default.toml through. See docs/deployment.md, "Keeping configuration
+config.default.toml through. See docs/guide/deployment.md, "Keeping configuration
 up to date".
 """
 

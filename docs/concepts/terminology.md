@@ -31,7 +31,7 @@ The official graphical interface of StarCore.
 
 ## UI contract
 
-The versioned, declarative format (`starcore.ui/<major>.<minor>`) in which a Satellite describes its interface, in a `ui.json` beside its manifest. Clients render it; they never run code from it. See [UI contract](ui-contract.md).
+The versioned, declarative format (`starcore.ui/<major>.<minor>`) in which a Satellite describes its interface, in a `ui.json` beside its manifest. Clients render it; they never run code from it. See [UI contract](../reference/ui-contract.md).
 
 ---
 

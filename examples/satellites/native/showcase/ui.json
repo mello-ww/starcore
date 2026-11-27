@@ -1,5 +1,5 @@
 {
-  "_note": "Every block of StarCore UI contract 1.0, rendered by Mission Control and the Android app with no code of this Satellite's own. See docs/ui-contract.md.",
+  "_note": "Every block of StarCore UI contract 1.0, rendered by Mission Control and the Android app with no code of this Satellite's own. See docs/reference/ui-contract.md.",
   "contract": "starcore.ui/1.0",
   "title": "Showcase",
   "entry": "overview",

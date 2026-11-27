@@ -65,7 +65,7 @@ async function requestNotifications() {
 }
 
 /**
- * The app's one audio player (the `media.audio` client capability, docs/media-audio.md): it
+ * The app's one audio player (the `media.audio` client capability, docs/reference/media-audio.md): it
  * plays from whichever Satellite the catalog lists as the `audio.library` provider. One host
  * per signed-in server: AuthProvider is keyed by server, so switching servers unmounts it
  * and with it the player, its queue, Connect device and downloads. It sits under the lock

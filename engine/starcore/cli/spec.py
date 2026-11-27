@@ -3,7 +3,7 @@
 A command module (engine/starcore/cli/commands/*.py or a Satellite's own
 commands/*.py) declares `NAMESPACE` and `COMMANDS` built from the classes
 here. The loader registers them into the same CommandRegistry the older
-single-function commands use (see docs/cli.md), and starcore.cli.runner
+single-function commands use (see docs/guide/cli.md), and starcore.cli.runner
 parses, authorizes, confirms, runs, renders and audits them - so no command
 re-implements any of that itself.
 

@@ -1691,7 +1691,7 @@ class PhotoConfigurationTest(unittest.TestCase):
         """A regression guard, not just a design intention: the Core's own
         engine_config.py, satellite_config.py, toml_edit.py and api/*.py must
         never come to know about a Photo setting, or "photo", by name - the
-        generic mechanism (docs/satellites.md) is what has to keep working
+        generic mechanism (docs/satellites/README.md) is what has to keep working
         for any future satellite, not a special case for this one."""
         core_path = Path(self.configuration().__file__).resolve().parents[2].parent / "engine" / "starcore"
         offenders = []

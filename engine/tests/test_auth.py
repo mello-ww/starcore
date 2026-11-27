@@ -559,7 +559,7 @@ class AuthApiTest(unittest.TestCase):
         # a native HTTP client (Android/iOS) does not expose Set-Cookie to
         # application code the way a browser's fetch() does, so it has no
         # other reliable way to learn the token it was just issued - see
-        # docs/api.md, "Authentication", and mobile/src/api/auth.ts
+        # docs/reference/api.md, "Authentication", and mobile/src/api/auth.ts
         engine = start_engine(mission_control=True)
         try:
             self.request(engine, "/api/auth/setup", method="POST",

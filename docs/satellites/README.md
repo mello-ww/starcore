@@ -9,7 +9,7 @@ A Satellite can:
 - expose API endpoints
 - emit Signals
 - store data
-- describe its interface for every client (`ui.json` - see [UI contract](ui-contract.md))
+- describe its interface for every client (`ui.json` - see [UI contract](../reference/ui-contract.md))
 - provide capabilities other Satellites' interfaces can use (`[provides]`)
 - contribute pages to Mission Control
 - provide CLI commands (see CLI)
@@ -111,7 +111,7 @@ logo = "camera"
 `icon` names the one that stands for the Satellite itself, in the sidebar, on its card, on Home
 and in the app's Satellites list. The Engine validates every file at load time and turns it
 into path data both clients draw in their own colour (`engine/starcore/icons.py`; the rules
-are in [UI contract](ui-contract.md), "A Satellite's own icons"). A refused file or a missing
+are in [UI contract](../reference/ui-contract.md), "A Satellite's own icons"). A refused file or a missing
 one is reported with a warning and keeps its fallback, rather than failing the whole
 Satellite; an `icon` that isn't in `[icons]` is dropped. Its `ui.json` may name its own icons
 wherever it names a shared one. The Core holds no name-to-icon mapping of its own.
@@ -141,7 +141,7 @@ the hosted document, `icon_name`), and opens them with the `section` action, so 
 
 Every Satellite - native or link, with or without a background service - can be enabled,
 disabled and reloaded from Mission Control's Satellites page, or directly through
-`POST /api/satellites/<name>/enable|disable|reload` (see `docs/api.md`). This is generic: it
+`POST /api/satellites/<name>/enable|disable|reload` (see `docs/reference/api.md`). This is generic: it
 is implemented once, entirely in the Core (`StarCore.set_satellite_enabled()` and
 `.reload_satellite()`), and works the same way for every Satellite without any of them having
 to do anything beyond the `start`/`stop` hooks described above.
@@ -169,7 +169,7 @@ and a screen in the Android app, drawn by each client's shared renderer from the
 description: pages, navigation tabs, and blocks (fields, metrics, lists, buttons, toggles,
 sliders, forms, the shared file browser) bound to the JSON its own routes return. It is the
 default way to give a new Satellite an interface. The full specification is
-[UI contract](ui-contract.md); the example Satellite `examples/satellites/native/showcase/`
+[UI contract](../reference/ui-contract.md); the example Satellite `examples/satellites/native/showcase/`
 uses every block.
 
 The file is static and read without importing any code, so the Engine validates it at load
@@ -192,7 +192,7 @@ Each operation maps to one of its own routes. The Engine lists providers in
 `GET /api/catalog`, and shared blocks are bound to the capability, never to a Satellite: any
 `ui.json` can embed a `file-browser`, and Mission Control's folder picker uses the same
 capability. The known capabilities and their protocols are in "Shared blocks and Satellite
-capabilities" in [UI contract](ui-contract.md).
+capabilities" in [UI contract](../reference/ui-contract.md).
 
 ## Contributing a Mission Control page
 
@@ -286,7 +286,7 @@ its caller for the Core's own settings.
 A Satellite that ships a `config.default.toml` beside its `config.toml` gets its defaults kept
 up to date automatically the same way the Core's own `[server]` settings do: discovery fills in
 any key an installation's `config.toml` is missing from it, and never touches a key that's
-already there - see `docs/deployment.md`, "Keeping configuration up to date".
+already there - see `docs/guide/deployment.md`, "Keeping configuration up to date".
 
 ## Developer Mode
 
@@ -312,7 +312,7 @@ A Satellite opts in without a toggle of its own, in whichever of these it uses:
   `developer`: `developer.enabled` and `developer.subscribe(fn)` (returns an unsubscribe function),
   for example to leave a section that just disappeared - Status's Diagnostics tab does this.
 - **Shared interface (`ui.json`)**: add `"developer": true` to a block (a key every block has,
-  see `docs/ui-contract.md`); both clients leave it out unless Developer Mode is on.
+  see `docs/reference/ui-contract.md`); both clients leave it out unless Developer Mode is on.
 
 Applied so far:
 
@@ -373,10 +373,10 @@ Both categories share the same lifecycle and extension model. The only differenc
   Satellite configuration, all together.
 - **FileExplorer** (`satellites/native/file_explorer/`) - a Satellite with routes, a
   Mission Control page and a read-only shared interface (`ui.json`, a preview, over display
-  routes in `views.py`; see `docs/file-explorer-migration.md`) but no background service (`has_service` is `False`, so its status is
+  routes in `views.py`; see `docs/archive/file-explorer-migration.md`) but no background service (`has_service` is `False`, so its status is
   always `"running"` while enabled), and the first to use `file_response(...,
   download_name=...)` and a raw (non-JSON) request body - see "Satellite endpoints" in
-  `docs/api.md`. It has no `"configuration"` route and no configured root: it browses
+  `docs/reference/api.md`. It has no `"configuration"` route and no configured root: it browses
   anywhere this StarCore process can itself reach - the whole Linux filesystem from `/`, or
   every present drive on Windows (`satellites/native/file_explorer/paths.py`'s
   `list_roots()`) - and lets the operating system's own permissions decide what actually

@@ -305,7 +305,7 @@ function satelliteUrl(name, path = "") {
 }
 
 // "running" / "stopped" / "disabled" / "error" -> a compact badge, entirely
-// generic (see docs/satellites.md - Core never branches on a satellite's name)
+// generic (see docs/satellites/README.md - Core never branches on a satellite's name)
 const STATUS_BADGES = {
     running: ["badge-up", "running"],
     stopped: ["badge-stopped", "stopped"],
@@ -1580,7 +1580,7 @@ async function handleConfigurationSubmit(event) {
  *
  * Every session AuthStore currently considers valid (see starcore/auth.py) -
  * a browser's own "web" session and the Android app's "mobile" sessions,
- * established by logging in the same way a browser does (see docs/api.md,
+ * established by logging in the same way a browser does (see docs/reference/api.md,
  * "Authentication"). This never sees a token, only
  * the opaque session_id list_sessions() reports - revoking asks for that id,
  * never the token itself. */
@@ -1698,7 +1698,7 @@ function powerIcon() {
 }
 
 // action is "enable", "disable" or "reload" - each is a reserved route
-// segment the Core handles directly (see docs/api.md), never a satellite's
+// segment the Core handles directly (see docs/reference/api.md), never a satellite's
 // own route, so this is the one function every lifecycle control goes through
 async function runSatelliteAction(satellite, action) {
     const key = `${satellite.name}:${action}`;
@@ -2013,7 +2013,7 @@ function buildConfigField(setting) {
 
     // a "path"-typed setting gets a "Browse…" button that opens a directory
     // picker backed by whichever Satellite provides the files.browse
-    // capability (docs/ui-contract.md) - this form never names one
+    // capability (docs/reference/ui-contract.md) - this form never names one
     const browser = setting.type === "path" ? findCapabilityProvider("files.browse") : null;
     if (browser && browser.operations.list) {
         const row = element("div", "config-field-row");
@@ -2160,7 +2160,7 @@ function renderDirectoryPicker(payload) {
         // at the roots level an entry's name IS the absolute path already
         // (e.g. "/", or "C:\") - everywhere else it's a bare name that has to
         // be joined onto the directory being shown (the files.browse protocol,
-        // which every provider follows - see docs/ui-contract.md)
+        // which every provider follows - see docs/reference/ui-contract.md)
         const target = payload.path === "" ? entry.name : joinDirectoryPickerPath(payload.path, entry.name);
         const row = element("button", "dir-picker-row");
         row.type = "button";
@@ -2483,7 +2483,7 @@ function startApp() {
     startAudioHost();
 }
 
-// the shared audio player (media/host.js, docs/media-audio.md): on every page from sign-in on,
+// the shared audio player (media/host.js, docs/reference/media-audio.md): on every page from sign-in on,
 // playing from whichever Satellite the catalog lists as an audio library. A module, so it
 // loads on its own; without it (an older browser) Mission Control works as before, silent.
 function startAudioHost() {

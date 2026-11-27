@@ -130,7 +130,7 @@ class HeadlessCliTest(unittest.TestCase):
 class RuntimeDataDirectoryTest(unittest.TestCase):
     """runtime_paths.data_dir() - where StarCore's own credentials, sessions
     and generated satellite secrets live, kept out of the Git checkout by
-    default. See docs/deployment.md, "Runtime data location".
+    default. See docs/guide/deployment.md, "Runtime data location".
     """
 
     def test_the_environment_override_always_wins(self):
@@ -244,7 +244,7 @@ class AuthStoreMigrationTest(unittest.TestCase):
     """StarCore.__init__ wiring: an existing engine/data/auth.json (the
     historical, in-checkout location) is migrated to the application-data
     directory automatically, and a fresh install simply starts there - see
-    "Runtime data location" in docs/deployment.md. Patches core.ENGINE_DIR
+    "Runtime data location" in docs/guide/deployment.md. Patches core.ENGINE_DIR
     so this can never touch the real checkout's actual engine/data/, and
     STARCORE_DATA_DIR so it can never touch a real machine's actual
     application-data directory either.

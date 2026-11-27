@@ -1,7 +1,7 @@
 """Photo's own configuration: what it exposes, validates and persists.
 
 This is Photo-owned, not Core-owned. The generic satellite configuration
-mechanism (docs/satellites.md) only needs a satellite to name one of its own
+mechanism (docs/satellites/README.md) only needs a satellite to name one of its own
 routes "configuration" - everything about which settings exist, their
 defaults, validation and persistence belongs to the satellite itself. The
 Core never sees any of these settings by name.

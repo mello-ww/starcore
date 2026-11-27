@@ -19,7 +19,7 @@ function fakeClient(responses: Array<{status: number; body: any} | Error>) {
 
 /**
  * UI documents are cached per server and revalidated with their revision
- * (docs/ui-contract.md, "Caching and discovery"). The cache stands in for a
+ * (docs/reference/ui-contract.md, "Caching and discovery"). The cache stands in for a
  * definition only while the server is unreachable - never for a session the
  * server refused, and never for page data.
  */

@@ -7,7 +7,7 @@ authentication system.
 
 People reach it as the **Locked Folder tab of Photos**, on the web and in the Android app -
 it has no navigation entry of its own (`section_of = "Photo"` in its `satellite.toml`; see
-"Satellite manifest" in `docs/satellites.md`). That is presentation only: the Locked Folder
+"Satellite manifest" in `docs/satellites/README.md`). That is presentation only: the Locked Folder
 keeps its own data, PIN and routes, separate from Photo's, and every route checks the
 caller's session and unlock on the server. Hiding a navigation entry is never what keeps it
 private. Old links to `#/satellite/LockedFolder` open the Photos tab.
@@ -30,7 +30,7 @@ This is deliberate on two counts:
 
 - **The server enforces it, not the frontend.** The guard runs inside the same handler that
   would otherwise serve the file, using the resolved, symlink-followed real path
-  (`paths.resolve_path()` - see `docs/satellites.md`/File Explorer's own documentation for
+  (`paths.resolve_path()` - see `docs/satellites/README.md`/File Explorer's own documentation for
   what that guarantees), so a request that reaches File Explorer's API directly - never
   touching Mission Control's UI at all - is refused exactly the same way a browser would be.
   There is no client-side check anywhere that "hides" the Locked Folder; a locked vault is
@@ -74,7 +74,7 @@ security state never reads as permission.
 
 The PIN is hashed with the exact same function the core authentication system already uses
 for the administrator's password - `hash_secret()` in `starcore/auth.py`, PBKDF2-HMAC-SHA256
-at 260,000 iterations with a random per-PIN salt (see "Authentication" in `docs/api.md`) -
+at 260,000 iterations with a random per-PIN salt (see "Authentication" in `docs/reference/api.md`) -
 rather than a second hashing implementation living inside this Satellite. The hash and salt
 are the only things ever written to disk (`pin.json`, atomic `.part` + rename, the same
 convention every other Satellite's index files use); the plaintext PIN is never stored,
@@ -90,7 +90,7 @@ key. Before, an unreadable file read as "no PIN yet", which would have let anyon
 set a new one and open the vault.
 
 By default, `pin.json` lives under StarCore's application-data directory, not inside the Git
-checkout - see "Runtime data location" in `docs/deployment.md` for exactly where, and how an
+checkout - see "Runtime data location" in `docs/guide/deployment.md` for exactly where, and how an
 existing installation's PIN is migrated there automatically.
 
 Unlock state itself is **never persisted to disk at all** - it lives only in memory, keyed by
@@ -669,7 +669,7 @@ the vault is in Photo's document.
   - **Location:** the folder, whether it is missing, and Delink (asking first).
 - **Every PIN and recovery key** is asked in the client's own prompt (`secrets`), never in a
   form, and a new recovery key is shown only in the client's own dialog (`reveal`), see
-  [UI contract](../ui-contract.md), "Secrets and reveal". After every action the client asks
+  [UI contract](../reference/ui-contract.md), "Secrets and reveal". After every action the client asks
   `status` again, so a new PIN shows the unlock card and a delink the setup page.
 - **Every route still needs what it needed** before the shared interface: an unlock for `settings`, the
   location and `encryption/*`, the current PIN to change it, the PIN again to delete a backup or
@@ -759,7 +759,7 @@ lockout_seconds = 300           # how long that lockout lasts
 
 `storage` is internal, not exposed through the Satellite's own `"configuration"` route below
 - the literal default value, `"data"`, means "use StarCore's application-data directory" (see
-"Runtime data location" in `docs/deployment.md`), migrating any pre-existing PIN found in the
+"Runtime data location" in `docs/guide/deployment.md`), migrating any pre-existing PIN found in the
 historical in-checkout location automatically. Anything else - an explicit absolute path, or
 an explicit relative one other than `"data"` - is a deliberate override, resolved exactly as
 before (relative paths inside this Satellite's own directory), with no migration attempted.
@@ -771,7 +771,7 @@ the clients call every 30 seconds while they show the vault. That idle time isn'
 All four editable settings (`locked_folder_path`, `session_timeout_seconds`,
 `max_pin_attempts`, `lockout_seconds`) are exposed through the Satellite's own
 `"configuration"` route, the same mechanism Photo's `trash_retention_days` and
-`photo_directory` use (see "Exposing configuration" in `docs/satellites.md`) - not a second
+`photo_directory` use (see "Exposing configuration" in `docs/satellites/README.md`) - not a second
 configuration system. `locked_folder_path` must be an absolute path (or `~`-prefixed) and may
 not be a filesystem root; changing it to a new value revokes every existing unlock, and
 clearing it back to empty disables protection entirely (File Explorer then treats that
@@ -782,7 +782,7 @@ location as any other).
 `POST /api/auth/login` accepts an optional `kind` (`"web"` or `"mobile"`) and `device_name`,
 so the app's session is created through the same login endpoint every other client uses,
 just labeled so it can be told apart. `GET /api/auth/sessions` and
-`POST /api/auth/sessions/revoke` (see `docs/api.md`) list and revoke it. The Locked Folder's
+`POST /api/auth/sessions/revoke` (see `docs/reference/api.md`) list and revoke it. The Locked Folder's
 unlock always belongs to one session: a phone's unlock never opens the vault for the browser,
 or the other way round.
 
@@ -912,7 +912,7 @@ lockouts and recovery, again only on temporary folders and synthetic files:
 `engine/tests/test_auth.py` was extended alongside it to cover session `kind`/`device_name`
 labeling, `list_sessions()` and `revoke_session()`, and the two new `/api/auth/sessions*`
 endpoints - including that they themselves require a session, which they did not until this
-block (see "Authentication" in `docs/api.md`).
+block (see "Authentication" in `docs/reference/api.md`).
 
 `engine/tests/test_deployment.py` covers `runtime_paths.data_dir()` (the environment override,
 and each platform's default location) and `runtime_paths.migrate_legacy_file()` (an existing
@@ -961,7 +961,7 @@ the provider disabled) while a scan of its parent folder, or of the configured l
 and A9 are fixed; the Locked Folder has a shared interface with its setup, settings and forgot
 pages, validated by the owner on the web and the phone (L5); L6 moved media through
 capabilities, L7 reviewed L0 to L6 (the review is at the end of this page), and L8 removed the
-own page and screens.** Read from the code at `5b716a9`. It is the audit stage 4 of [Remaining work](../remaining-work.md)
+own page and screens.** Read from the code at `5b716a9`. It is the audit stage 4 of [Remaining work](../project/remaining-work.md)
 asks for, as M5 had ([its audit](../archive/m5-locked-folder-actions-audit.md)). The common
 order with Photos and the phone sync is in Remaining work.
 
@@ -1158,5 +1158,5 @@ folders, R2 from React Native's own source (0.73.6).
 - A session that has the vault open may rename or delete a folder that contains it through File
   Explorer: it is the owner's own action, as in M5.
 - A4 (what a session is worth) was Stabilisation's: session tokens are hashed at rest, and the
-  cookie is `Secure` behind an HTTPS proxy (`docs/roadmap.md`, "Pre-release audit"). Cleartext
+  cookie is `Secure` behind an HTTPS proxy (`docs/project/roadmap.md`, "Pre-release audit"). Cleartext
   in the app, for LAN servers, stays.

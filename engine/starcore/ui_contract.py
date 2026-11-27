@@ -2,7 +2,7 @@
 
 A Satellite describes its interface in a static `ui.json` next to its
 `satellite.toml`: pages, blocks, data bindings and actions, from the closed
-vocabulary in contracts/ui/vocabulary.json (see docs/ui-contract.md). Mission
+vocabulary in contracts/ui/vocabulary.json (see docs/reference/ui-contract.md). Mission
 Control and the Android app each render it with their own components.
 
 The Engine never renders anything. It only:
@@ -1791,7 +1791,7 @@ class _Validator:
         ("next" or "end") adds to the queue instead of replacing it, and `context` (text or a
         binding, at most 80 characters) is what the host reports with each play. A `route` answer may
         be paged ({tracks, count, cursor}): the host asks for more as the queue runs low, and draws a
-        shuffle's positions lazily (docs/media-audio.md)."""
+        shuffle's positions lazily (docs/reference/media-audio.md)."""
         self.since(f"{where}.play", "the play action", 2)
         self.unknown_keys(where, action, {"play"})
         play = action["play"]
@@ -2107,7 +2107,7 @@ class UiDefinition:
             return {"contract": None, "revision": None, "error": self.error}
         described = {"contract": self.document["contract"], "revision": self.revision, "error": None}
         if self.document.get("preview") is True:
-            # 1.2: clients with the Satellite's own interface keep opening it (docs/ui-contract.md)
+            # 1.2: clients with the Satellite's own interface keep opening it (docs/reference/ui-contract.md)
             described["preview"] = True
         return described
 
@@ -2188,7 +2188,7 @@ def _relative(seconds: float, now: float) -> str:
 
 
 def format_value(value, format: str = "text", unit=None, now: float = None, utc: bool = False) -> str:
-    """A value as display text - "Formats" in docs/ui-contract.md."""
+    """A value as display text - "Formats" in docs/reference/ui-contract.md."""
     numeric = isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
     if value is None or isinstance(value, (dict, list)):
         return DASH

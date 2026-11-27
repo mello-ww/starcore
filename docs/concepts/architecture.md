@@ -33,7 +33,7 @@ Mission Control does, over the same `/api/...` endpoints and the same session sy
 a second backend of its own. See `mobile/README.md`.
 
 Audio plays through one host per client (`media.audio`), which plays content any Satellite
-provides through `audio.library`. See [docs/media-audio.md](media-audio.md).
+provides through `audio.library`. See [docs/reference/media-audio.md](../reference/media-audio.md).
 
 ## Design
 
@@ -45,7 +45,7 @@ By using a common Satellite system for both native features and third-party inte
 
 Clients know UI contracts and capabilities, not individual Satellites.
 
-- A Satellite **describes** its interface in a `ui.json` (the [UI contract](ui-contract.md)): pages, navigation and blocks, bound to the live data its own routes return.
+- A Satellite **describes** its interface in a `ui.json` (the [UI contract](../reference/ui-contract.md)): pages, navigation and blocks, bound to the live data its own routes return.
 - The Engine **validates** each description when it loads the Satellite, gives it a revision, and keeps the **catalog**: what every Satellite is, and the **Satellite capabilities** each provides to the others (`files.browse`, for a start).
 - Mission Control and the Android app **render** the same description, each with its own platform components and the shared design tokens. Neither runs code it receives.
 - **Shared blocks** are bound to a capability, not to a Satellite, so any Satellite can embed them: the file browser works through whichever Satellite provides `files.browse`.
@@ -69,7 +69,7 @@ flowchart LR
     Android -- "actions and data" --> Routes
 ```
 
-**Today**, this runs alongside what came before it. Status (UI contract 1.1) is drawn from its `ui.json` alone, on both clients and on Home. Photos (1.2) is drawn from its `ui.json` alone on both clients; its previous page and screens are retired (P3). File Explorer (1.2) is drawn from its `ui.json` by default on both clients; its previous `page.js` is retired. Music and the Locked Folder keep their dedicated, hand-written screens on both clients (and their Mission Control `page.js`) until the shared blocks reach parity with them ([Remaining work](remaining-work.md)). Those screens are the reference the shared components are extracted from, not code to discard. A handful of name-based couplings from before the contract remain, each listed in a test that only lets the list shrink. See "Current implementation and target" and "Migration" in [UI contract](ui-contract.md).
+**Today**, this runs alongside what came before it. Status (UI contract 1.1) is drawn from its `ui.json` alone, on both clients and on Home. Photos (1.2) is drawn from its `ui.json` alone on both clients; its previous page and screens are retired (P3). File Explorer (1.2) is drawn from its `ui.json` by default on both clients; its previous `page.js` is retired. Music and the Locked Folder keep their dedicated, hand-written screens on both clients (and their Mission Control `page.js`) until the shared blocks reach parity with them ([Remaining work](../project/remaining-work.md)). Those screens are the reference the shared components are extracted from, not code to discard. A handful of name-based couplings from before the contract remain, each listed in a test that only lets the list shrink. See "Current implementation and target" and "Migration" in [UI contract](../reference/ui-contract.md).
 
 
 

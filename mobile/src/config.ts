@@ -12,7 +12,7 @@ export const APP_NAME = 'StarCore';
 
 /** How this client identifies itself in StarCore's "Active sessions" list
  * (`AuthStore.create_session`'s `kind`/`device_name` - see
- * docs/api.md, "Authentication"). Every mobile login uses this `kind`;
+ * docs/reference/api.md, "Authentication"). Every mobile login uses this `kind`;
  * `device_name` is filled in at runtime from `platform/device.ts`. */
 export const SESSION_KIND = 'mobile' as const;
 

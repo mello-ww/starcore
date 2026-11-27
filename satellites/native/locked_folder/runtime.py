@@ -125,7 +125,7 @@ def _storage_root(satellite) -> Path:
     runs. Nobody sets "data" on purpose as a deliberate choice - it is
     simply what's shipped until changed - so treating it as "use whatever
     the current default actually is" is exactly what changing the default
-    is supposed to mean; see docs/deployment.md, "Runtime data location".
+    is supposed to mean; see docs/guide/deployment.md, "Runtime data location".
 
     Anything else - an explicit absolute path, or an explicit relative one
     other than "data" - is an explicit override and is resolved exactly as

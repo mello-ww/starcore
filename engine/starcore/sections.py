@@ -7,7 +7,7 @@ Satellites it hosts, so its code never names them: their names, titles and icons
 registry, each from the hosted Satellite's own manifest and document.
 
 Nothing here names a Satellite.
-See docs/ui-contract.md, "Actions" (the section action).
+See docs/reference/ui-contract.md, "Actions" (the section action).
 """
 
 import re

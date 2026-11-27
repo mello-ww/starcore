@@ -65,7 +65,7 @@ def starcoreBuildDate = new Date().format("yyyy-MM-dd", TimeZone.getTimeZone("UT
 //   3. ~/.starcore/signing/keystore.properties - outside any checkout, so a
 //      `git clean` can never delete the one key every future update needs
 // holding storeFile, storePassword, keyAlias and keyPassword (see
-// docs/releasing.md). Without one, a release build is left unsigned and
+// docs/project/releasing.md). Without one, a release build is left unsigned and
 // says so - it is never silently signed with the debug key.
 def keystorePropertiesFile = [
         System.getenv("STARCORE_KEYSTORE_PROPERTIES"),
@@ -124,7 +124,7 @@ android {
     // gitignore just to run `npm run android` locally.
     //
     // A release build is signed with the release key described above -
-    // never committed to this repository. See docs/releasing.md and the
+    // never committed to this repository. See docs/project/releasing.md and the
     // Android section of the repository's own .gitignore.
     buildTypes {
         release {
@@ -132,7 +132,7 @@ android {
             if (signingConfigs.findByName("release") != null) {
                 signingConfig signingConfigs.release
             } else {
-                logger.warn("StarCore: no release keystore found - the release APK will be UNSIGNED (see docs/releasing.md)")
+                logger.warn("StarCore: no release keystore found - the release APK will be UNSIGNED (see docs/project/releasing.md)")
             }
         }
     }

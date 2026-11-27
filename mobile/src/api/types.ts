@@ -1,4 +1,4 @@
-/** Mirrors the shapes StarCore's own API already returns - see docs/api.md
+/** Mirrors the shapes StarCore's own API already returns - see docs/reference/api.md
  * in the main repository. Nothing here invents a new response format; this
  * app is a client of the existing API, not a second implementation of it. */
 

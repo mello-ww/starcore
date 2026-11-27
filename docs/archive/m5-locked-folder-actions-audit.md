@@ -1,7 +1,7 @@
 # M5 security audit: Locked Folder actions from the shared interface (2026-11-08)
 
 The audit comes before implementation. M5 is milestone 5 of the Photos roadmap in
-[`photos-parity-audit.md`](../photos-parity-audit.md) (gap #24): "Move to Locked Folder" from the
+[`photos-parity-audit.md`](photos-parity-audit.md) (gap #24): "Move to Locked Folder" from the
 shared Photos viewer and selection, on the web and on Android, without weakening the Locked
 Folder. I read the code at `42ff5e4`. Nothing has been implemented.
 
@@ -27,7 +27,7 @@ Folder. I read the code at `42ff5e4`. Nothing has been implemented.
   removing the photo from the library, its albums and its thumbnails. If anything fails, the
   photo stays where it was. The digest is recorded in `sealed.json`, so phone sync never
   sends the photo back.
-- The Locked Folder **provides no Satellite capability** (`docs/ui-contract.md`, "Shared blocks
+- The Locked Folder **provides no Satellite capability** (`docs/reference/ui-contract.md`, "Shared blocks
   and Satellite capabilities"), and Photo's `media.gallery` never includes vault items.
 
 **The dedicated clients' flow** is the same on both:
@@ -45,7 +45,7 @@ Where each step lives:
   `biometricUnlock.ts` in `mobile/src/lockedFolder/`. It also evicts the thumbnail and the
   original from the image cache, and forgets the cached photo list and offline copies.
 
-**The contract today** (`docs/ui-contract.md`, "Actions"):
+**The contract today** (`docs/reference/ui-contract.md`, "Actions"):
 - A document's `route` stays inside its own Satellite's `/api/satellites/<name>/`.
 - A document can't reach another Satellite, so Photo's `ui.json` can't call
   `LockedFolder/move_in`.
@@ -283,7 +283,7 @@ the Satellite decide, through its document.
    and `album`.
 5. **Storage moves to `starcore_ui_offline:v2`.** Tidy-up deletes every `v1` entry, so copies
    that already hold GPS data are erased on the first run after the update.
-6. **Docs:** "Offline pages" in `docs/ui-contract.md` says the copy is unencrypted app
+6. **Docs:** "Offline pages" in `docs/reference/ui-contract.md` says the copy is unencrypted app
    storage, and that a Satellite must omit anything it wouldn't want on the device that way.
 
 **Dependency on M5:** none. I recommend shipping it first, as its own commit, because it fixes

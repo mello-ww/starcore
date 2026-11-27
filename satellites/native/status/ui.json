@@ -1,5 +1,5 @@
 {
-  "_about": "Status's interface for every client - UI contract 1.1 (docs/ui-contract.md). It binds to the Satellite's own routes: view and view/diagnostics (the snapshot shaped for display, see view.py) and history (the recorded series). Nothing here is Status-specific on the clients.",
+  "_about": "Status's interface for every client - UI contract 1.1 (docs/reference/ui-contract.md). It binds to the Satellite's own routes: view and view/diagnostics (the snapshot shaped for display, see view.py) and history (the recorded series). Nothing here is Status-specific on the clients.",
   "contract": "starcore.ui/1.2",
   "title": "Status",
   "entry": "overview",

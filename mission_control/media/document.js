@@ -1,5 +1,5 @@
 // What the audio host adds to its player from the document of the Satellite it plays from
-// (UI contract 1.2, the document's `audio`, docs/media-audio.md): menu entries after the host's
+// (UI contract 1.2, the document's `audio`, docs/reference/media-audio.md): menu entries after the host's
 // own in More, the title's and artist's links, and a way to the Satellite's pages, each run
 // with the playing track as $. and no page around it. A navigate opens that page of the
 // Satellite's shared interface wherever the player is. Without `audio`, nothing is added.

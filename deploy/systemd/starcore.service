@@ -18,7 +18,7 @@ RestartSec=5
 TimeoutStopSec=30
 
 # accounts, sessions, the audit log, Status history and Locked Folder state live here,
-# outside the checkout (see "Runtime data location" in docs/deployment.md)
+# outside the checkout (see "Runtime data location" in docs/guide/deployment.md)
 StateDirectory=starcore
 StateDirectoryMode=0700
 Environment=STARCORE_DATA_DIR=/var/lib/starcore

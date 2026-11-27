@@ -36,7 +36,7 @@ def routes() -> dict:
         # the media.sync capability (backup.py): a device's one-way backup into the library
         "backup": backup.route,
         # naming a route "configuration" is the whole contract with the Core's
-        # generic satellite configuration mechanism - see docs/satellites.md
+        # generic satellite configuration mechanism - see docs/satellites/README.md
         "configuration": configuration_route,
     }
 

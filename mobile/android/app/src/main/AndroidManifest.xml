@@ -2,7 +2,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- StarCore is typically reached over the local network - a LAN
-         address, or a home server's own domain - which docs/deployment.md
+         address, or a home server's own domain - which docs/guide/deployment.md
          (in the main repository) already supports over plain HTTP by
          default. Every other permission below is declared for a feature
          that uses it, never speculatively ahead of one. -->

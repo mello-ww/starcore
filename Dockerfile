@@ -3,7 +3,7 @@
 #   docker build -t starcore .
 #   docker run --rm -p 8090:8090 -v starcore-data:/data starcore
 #
-# The image mirrors the Linux server (docs/deployment.md): Python 3.13, the `thumbnails` and
+# The image mirrors the Linux server (docs/guide/deployment.md): Python 3.13, the `thumbnails` and
 # `encryption` extras, FFmpeg. Accounts, sessions, libraries and Locked Folder state live in
 # the /data volume (STARCORE_DATA_DIR); the media (music, files, photo) is /srv/starcore.
 # Settings a Satellite saves into its config.toml stay in the container's writable layer.

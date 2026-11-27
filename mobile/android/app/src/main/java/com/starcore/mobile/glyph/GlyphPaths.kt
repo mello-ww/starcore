@@ -1,7 +1,7 @@
 package com.starcore.mobile.glyph
 
 /**
- * Reads a Satellite's own icon path (UI contract 1.2, docs/ui-contract.md "Icons"): the Engine
+ * Reads a Satellite's own icon path (UI contract 1.2, docs/reference/ui-contract.md "Icons"): the Engine
  * turns every SVG it accepts into path data of absolute M, L, C and Z only, numbers separated by
  * one space, in a 24-unit box. This reads exactly that and nothing else - no relative commands,
  * no arcs, no exponents - and gives null for anything outside it, so the view draws nothing

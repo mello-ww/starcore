@@ -257,7 +257,7 @@ dimensions, plus duration) as a photo.
 ## Mobile app
 
 Photo's shared interface (below) is what the app opens by default. Its previous screens, kept
-in Developer Mode until they are retired (`docs/remaining-work.md`), are a dedicated gallery: Library, Albums, Map and Search, as
+in Developer Mode until they are retired (`docs/project/remaining-work.md`), are a dedicated gallery: Library, Albums, Map and Search, as
 segments of one screen, with Photo configuration reached separately (see below) rather than as
 a segment of its own. All of it is built on exactly the routes above and the same Albums model
 documented there - there is no second implementation of the library, albums, the recycle bin,
@@ -309,7 +309,7 @@ What it covers:
 | Map clustering | web only, by rounded coordinates | both clients, a grid about 64 px wide on screen |
 | Import from a folder on the server: check, then import | web only | yes, both clients ("Import from a folder" on Library) |
 | Settings: phone folders (`source_paths`), the default album for synced photos, the recycle bin's retention, the default import folder | yes | yes, both clients: Settings on Albums, one form each, the phone folders as repeatable rows (see below) |
-| Phone sync | removed (S0) | removed (S0); its new form comes in S1 to S4 of [the parity audit](../photos-parity-audit.md) |
+| Phone sync | removed (S0) | removed (S0); its new form comes in S1 to S4 of [the parity audit](../archive/photos-parity-audit.md) |
 | Locked Folder | yes | its tile among the folders on Albums (a lock, shown while the Locked Folder is enabled) opens it with the `section` action: its shared interface, its only one ([the Locked Folder](locked_folder.md#shared-interface)) |
 | Move a photo into the Locked Folder | yes, from the viewer | yes: the viewer (Library, Search, Map, an album) and a selection (Library, an album), through the secure action - see below |
 | Offline cache of the library (Android) | yes, the whole list (metadata only) | yes: Library, Albums and an album, with up to 600 items each (`offline` pages, see the UI contract's "Offline pages"), only the fields they show, and never an item's GPS location or its folder on the server; never the recycle bin, Search or Map |
@@ -411,7 +411,7 @@ reads the whole library at once, did not finish loading it on the emulator withi
 
 Photo provides the `media.gallery` capability (`satellite.toml`), so any interface can let a
 person choose from the library through the client's media picker without naming Photo (the
-`pick` action in [docs/ui-contract.md](../ui-contract.md)):
+`pick` action in [docs/reference/ui-contract.md](../reference/ui-contract.md)):
 
 - `list` is `GET media?kinds=image,video[&limit=N&cursor=C]`: the active library, newest first, with an id, kind,
   title, duration and month - never a path. A photo in the recycle bin is not listed, and
@@ -443,7 +443,7 @@ restart.
 ## Phone backup
 
 Photo provides `media.sync` v1 (`backup.py`): a one-way backup of a device's media into the
-library. The server side is done (S1 of [the parity audit](../photos-parity-audit.md), which
+library. The server side is done (S1 of [the parity audit](../archive/photos-parity-audit.md), which
 holds the whole design); the shared interface's Phone backup page and its `sync` action are S2,
 and the Android app's own sync screen and background backup, `device.media-sync`, are S3.
 The app finds Photo in the catalog as `media.sync`'s provider and never names it. The previous
@@ -480,7 +480,7 @@ item's id (the first 16 hex digits of its SHA-256, nothing else) in `library.jso
 so a backup never sends it again. Importing a folder on purpose still takes such a file in.
 
 **Authentication.** A phone backs up with a device credential the Engine issues for
-`media.sync` (`POST /api/auth/devices`, see "Device credentials" in [API](../api.md)): it reaches
+`media.sync` (`POST /api/auth/devices`, see "Device credentials" in [API](../reference/api.md)): it reaches
 only the routes above, never expires and is revoked with the sessions. A signed-in session may
 call them too.
 

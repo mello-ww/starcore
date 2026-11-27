@@ -1,5 +1,5 @@
 """File Explorer's shared interface (UI contract 1.2, F1-F6 of
-docs/file-explorer-migration.md): its ui.json, and the read-only view routes it
+docs/archive/file-explorer-migration.md): its ui.json, and the read-only view routes it
 binds to. The listing itself is the `entries` route's (test_file_explorer.py)."""
 
 from datetime import datetime, timezone

@@ -2,7 +2,7 @@
 
 File Explorer gives access to the entire filesystem the StarCore process
 itself can reach - there is no sandbox or configured root confining it (see
-"File Explorer" in docs/api.md). The operating system's own permissions are
+"File Explorer" in docs/reference/api.md). The operating system's own permissions are
 the only boundary that matters: this module's job is turning a request's
 path into a real, canonical filesystem Path and rejecting anything
 malformed before it ever reaches the filesystem; actual existence and

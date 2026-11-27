@@ -37,7 +37,7 @@ export type MainTabParamList = {
 export type SatellitesStackParamList = {
   SatellitesList: undefined;
   /** Any Satellite's declarative interface (its ui.json, UI contract 1.0 -
-   * see docs/ui-contract.md): one page of it, with the page's params.
+   * see docs/reference/ui-contract.md): one page of it, with the page's params.
    * `revision` is the one GET /api/satellites reported, so a cached copy of
    * exactly that document opens without a request. */
   SatelliteUi: {name: string; page?: string; params?: Record<string, any>; revision?: string | null};
@@ -146,7 +146,7 @@ function tabIcon(name: keyof MainTabParamList) {
  * Bottom tabs - exactly the five destinations in "New mobile bottom
  * navigation" in the task brief. Individual Satellites are never their own
  * tab; they live inside the Satellites tab's own stack. The shared audio
- * player (AudioHost, docs/media-audio.md) lives above all of them, so changing
+ * player (AudioHost, docs/reference/media-audio.md) lives above all of them, so changing
  * tabs or screens never stops playback, and its mini-player floats over every
  * tab, above the tab bar.
  */

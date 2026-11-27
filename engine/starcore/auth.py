@@ -1,6 +1,6 @@
 """Server-side authentication for StarCore.
 
-Deliberately small: one admin-capable user to start (see docs/mission_control.md
+Deliberately small: one admin-capable user to start (see docs/guide/mission-control.md
 for the reasoning), stdlib-only password hashing and session tokens, and a
 single flat JSON store - no ORM, no database dependency, matching the same
 "avoid unnecessary dependencies" precedent the rest of the engine follows.
@@ -8,7 +8,7 @@ single flat JSON store - no ORM, no database dependency, matching the same
 Nothing here assumes a browser. A session token works identically whether
 it arrives as a cookie (the web UI) or an `Authorization: Bearer` header (a
 future API/mobile client) - see AuthStore.token_from_request() and
-docs/api.md.
+docs/reference/api.md.
 
 A session also carries a `kind` ("web" by default, "mobile" for a future
 native client) and an optional `device_name` - free-form labels, not a

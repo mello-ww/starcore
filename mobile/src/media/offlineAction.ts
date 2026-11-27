@@ -1,4 +1,4 @@
-// The offline action (UI contract 1.2, change 10, docs/media-audio.md): a page of the Satellite
+// The offline action (UI contract 1.2, change 10, docs/reference/media-audio.md): a page of the Satellite
 // that provides audio.library names tracks of its own - `tracks` (a binding, or a list of
 // bindings) or `route` (one of its routes answering {tracks}, paged or not) - and the app keeps
 // them on the phone through the audio host's DownloadManager, at the listener's download

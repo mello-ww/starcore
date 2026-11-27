@@ -178,7 +178,7 @@ port = 8080
 - `GET`/`POST /api/configuration`
 - Mission Control's Configuration page
 
-See "Private LAN access" below for the specific case of `server.host`, and `docs/api.md` / `docs/mission_control.md` for the API and the Configuration page respectively.
+See "Private LAN access" below for the specific case of `server.host`, and `docs/reference/api.md` / `docs/guide/mission-control.md` for the API and the Configuration page respectively.
 
 ### Keeping configuration up to date
 
@@ -195,7 +195,7 @@ got it, is never touched; a custom key your `config.default.toml` doesn't even k
 alone too. You'll see it happen, one line per key, in the startup log:
 
 ```
-[INFO]: added new configuration default 'server.https_enabled' to .../config.toml - see docs/deployment.md, "Keeping configuration up to date".
+[INFO]: added new configuration default 'server.https_enabled' to .../config.toml - see docs/guide/deployment.md, "Keeping configuration up to date".
 ```
 
 A fresh install with no `config.toml` at all yet gets one written from scratch, entirely from
@@ -259,7 +259,7 @@ curl -X POST http://127.0.0.1:8090/api/configuration -H 'Content-Type: applicati
      -d '{"section": "server", "key": "host", "value": "0.0.0.0"}'
 ```
 
-or the Configuration page in Mission Control, described in `docs/mission_control.md`.
+or the Configuration page in Mission Control, described in `docs/guide/mission-control.md`.
 
 Whichever way you use, the change is saved to `config.toml` immediately but does **not** apply to the process that's already running - `[server]` is only read at startup. **Restart StarCore** (`systemctl restart starcore` on Linux, or stop and re-run `python -m starcore` on Windows) for the new bind address to take effect. After restarting, reach Mission Control from another device using the server's LAN IP and the configured port, e.g. `http://192.168.1.20:8090`.
 
@@ -296,7 +296,7 @@ Scope any of the above to the private/LAN network profile rather than "any netwo
 ## Authentication
 
 StarCore ships with a single-administrator authentication system - see "Authentication" in
-`docs/api.md` for the full mechanics (endpoints, sessions, password hashing). What matters for
+`docs/reference/api.md` for the full mechanics (endpoints, sessions, password hashing). What matters for
 deployment:
 
 - A fresh install has no administrator account. Until one exists, the API answers only a

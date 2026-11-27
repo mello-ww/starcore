@@ -1,4 +1,4 @@
-"""Published to Mission Control's dashboard (see docs/satellites.md,
+"""Published to Mission Control's dashboard (see docs/satellites/README.md,
 "Publishing state"). Nothing depends on it to create the runtime: every
 route, the Engine's questions (files.protected's check, media.vault's
 sealed) included, creates it on first use (see runtime.py), so a cold

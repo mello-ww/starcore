@@ -13,7 +13,7 @@ logo = "camera"
 albums = "folder"
 
 # what any interface can pick from through the client's media picker (the pick action in
-# docs/ui-contract.md): the active library only - never the recycle bin or the Locked Folder
+# docs/reference/ui-contract.md): the active library only - never the recycle bin or the Locked Folder
 [provides."media.gallery"]
 version = 1
 operations = { list = "media", thumbnail = "thumbnails", resolve = "media/resolve", original = "media/original", release = "media/release", adopt = "media/adopt" }

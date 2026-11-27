@@ -1,5 +1,5 @@
 {
-  "_about": "Value formatting - docs/ui-contract.md, 'Formats'. {value, format, unit?, options?} -> expected display text. options.utc formats times in UTC instead of the device's time zone, and options.now (epoch seconds) is the moment 'relative' is measured from - both exist so every implementation can be tested with the same expectations.",
+  "_about": "Value formatting - docs/reference/ui-contract.md, 'Formats'. {value, format, unit?, options?} -> expected display text. options.utc formats times in UTC instead of the device's time zone, and options.now (epoch seconds) is the moment 'relative' is measured from - both exist so every implementation can be tested with the same expectations.",
   "cases": [
     {"value": null, "format": "text", "expected": "—"},
     {"value": "hello", "format": "text", "expected": "hello"},

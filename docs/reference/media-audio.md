@@ -220,7 +220,7 @@ Follow-ups found while building it:
   so they also wait while the phone is in deep sleep, which playback prevents.
 - **Naming left from Music** in both hosts (a type, test IDs, labels, the web's keyboard
   shortcuts tied to Music's page): listed under "Leftovers the guard can't see" in
-  [Remaining work](remaining-work.md).
+  [Remaining work](../project/remaining-work.md).
 
 Accepted when:
 - `MainTabs.tsx` imports nothing from `src/music/`.
@@ -288,7 +288,7 @@ block (the counterpart of `file-browser`) is still not designed: nothing needs o
 
 ## Music on the shared interface: audit and plan (2026-11-18, at 24bb300)
 
-Stage 5 (R4) of [Remaining work](remaining-work.md). Music is the last Satellite with an
+Stage 5 (R4) of [Remaining work](../project/remaining-work.md). Music is the last Satellite with an
 interface of its own. Its player is already the shared audio host (milestones 3 to 5 above);
 what is left is its library: every view and screen below, then their removal. Compared from
 the code, not the docs:
@@ -306,7 +306,7 @@ the code, not the docs:
 - **Server:** Music's routes (`routes_catalog.py`, `routes_listener.py`, `routes_playback.py`,
   `discovery.py`), which already answer most pages' data.
 
-Legend, as in [the Photos audit](photos-parity-audit.md):
+Legend, as in [the Photos audit](../archive/photos-parity-audit.md):
 - **Marks:** ✅ = yes, ◐ = partly or different, ✗ = no; n/a = not on that platform.
 - **Fix types:** C*n* = contract change *n* (below); S = a Music server change; J = Music's
   `ui.json` only; H = a host or renderer change with no contract change; N = accepted as a
@@ -731,7 +731,7 @@ the migration as it went; none of them exists any more. What was removed:
   `satellites/native/music/library.py` that the pattern matches. All three are then empty,
   stage 5's "Done".
 - Docs: this file's references to the own interface, `docs/satellites/music.md`,
-  [Remaining work](remaining-work.md), `CHANGELOG.md`, `mobile/README.md`.
+  [Remaining work](../project/remaining-work.md), `CHANGELOG.md`, `mobile/README.md`.
 
 ### Risks and open points
 

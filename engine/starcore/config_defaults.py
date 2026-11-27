@@ -12,7 +12,7 @@ This is the piece that lets `git pull` add a new default setting without
 ever conflicting with a machine's own edited config.toml: the tracked
 config.default.toml is the only file a future StarCore version changes to
 introduce one, and every value the running installation already has -
-however it got there - is left completely alone. See docs/deployment.md,
+however it got there - is left completely alone. See docs/guide/deployment.md,
 "Configuration" and "Keeping configuration up to date".
 """
 

@@ -34,4 +34,4 @@ A new Satellite should not require a client update, unless it introduces a genui
 
 Existing implementations are the reference for what the shared components must do. The platform becomes modular by extracting and generalising what already works, not by rebuilding it.
 
-See [UI contract](ui-contract.md) for the contract, and for what is implemented today and what is still the target.
+See [UI contract](../reference/ui-contract.md) for the contract, and for what is implemented today and what is still the target.

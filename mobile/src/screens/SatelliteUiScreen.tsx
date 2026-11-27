@@ -133,7 +133,7 @@ function usePolling(source: UiSource | undefined, active: boolean, load: () => v
 
 /**
  * Any Satellite's declarative interface (its ui.json - see
- * docs/ui-contract.md), drawn with this app's own components. This screen
+ * docs/reference/ui-contract.md), drawn with this app's own components. This screen
  * knows the contract, never a Satellite: a new one that ships a ui.json
  * works here with no change to the app.
  *

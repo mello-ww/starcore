@@ -6,9 +6,9 @@ system's permissions are the only boundary (`satellites/native/file_explorer/pat
 Locked Folder's guard still refuses anything inside a locked Locked Folder.
 
 Its interface is described once, in `ui.json` (UI contract 1.2, see
-[docs/ui-contract.md](../ui-contract.md)), and drawn by both clients' shared renderers. Since F7
+[docs/reference/ui-contract.md](../reference/ui-contract.md)), and drawn by both clients' shared renderers. Since F7
 it is File Explorer's only interface on both clients; the migration's history is in
-[docs/file-explorer-migration.md](../file-explorer-migration.md).
+[docs/archive/file-explorer-migration.md](../archive/file-explorer-migration.md).
 
 ## What it does
 
@@ -40,7 +40,7 @@ satellites/native/file_explorer/
 
 It provides the `files.browse` capability (`list` → `entries`), which any interface's
 file-browser block and Mission Control's folder picker use without naming this Satellite. Two
-more operations are for other Satellites (change 16, `docs/open-with-audit.md`): `stat?path=`
+more operations are for other Satellites (change 16, `docs/archive/open-with-audit.md`): `stat?path=`
 (one file or folder the session may browse) and `locate?path=` (the folder page that shows a
 path, `{"page": "folder", "params": {"path", "select"}}`). Both run the same guard as `content`:
 the roots, and the Locked Folder's areas. The file page ends its details with the "Opens with"
@@ -50,7 +50,7 @@ line (the `openers` block), one link per Satellite that opens the file.
 
 File Explorer's own Mission Control page (`page.js`, `page.css`, with its four storage themes) was
 retired in F7: the web and the Android app draw the same `ui.json`, and the shared `metric` bars
-show the storage. The migration's history is in `docs/file-explorer-migration.md`.
+show the storage. The migration's history is in `docs/archive/file-explorer-migration.md`.
 
 ## Tests
 

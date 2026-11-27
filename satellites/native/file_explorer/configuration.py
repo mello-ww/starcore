@@ -1,7 +1,7 @@
 """File Explorer's own configuration: just its root directory.
 
 Owned entirely by this satellite, exactly like Photo Sync's configuration.py -
-the generic mechanism (docs/satellites.md) only needs a route named
+the generic mechanism (docs/satellites/README.md) only needs a route named
 "configuration"; the Core never sees the key "root" by name.
 """
 

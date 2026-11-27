@@ -70,7 +70,7 @@ The music library is generated demo content; system readings are real.</sub>
 - **CLI** — interactive alongside a running StarCore, or one-shot from scripts.
 - **Signals** — the internal event system (planned, not implemented yet).
 
-More in [Architecture](docs/architecture.md) and [Terminology](docs/terminology.md).
+More in [Architecture](docs/concepts/architecture.md) and [Terminology](docs/concepts/terminology.md).
 
 ## Satellites
 
@@ -83,7 +83,7 @@ More in [Architecture](docs/architecture.md) and [Terminology](docs/terminology.
 | <img src="docs/assets/readme/satellite-file-explorer.svg" width="24" align="center" alt=""> **File&nbsp;Explorer** | Browse, upload and manage files | Web · Android |
 | <img src="docs/assets/readme/satellite-docker.svg" width="24" align="center" alt=""> **Docker** | *Link Satellite* - a placeholder that loads and reports its status | — |
 
-<sub>Locked Folder on Android lives in the Photos tab. See [Satellites](docs/satellites.md) for how Satellites work and
+<sub>Locked Folder on Android lives in the Photos tab. See [Satellites](docs/satellites/README.md) for how Satellites work and
 how to build one.</sub>
 
 ## Get started
@@ -117,7 +117,7 @@ python -m starcore help
 python -m starcore engine health --json
 ```
 
-See the [CLI documentation](docs/cli.md) for every command, `--json`, exit codes and permissions.
+See the [CLI documentation](docs/guide/cli.md) for every command, `--json`, exit codes and permissions.
 
 ### Run it on a Linux server
 
@@ -132,8 +132,8 @@ sudo systemctl enable --now starcore
 sudo bash deploy/linux/install.sh --update   # later: fast-forward and re-sync
 ```
 
-See [Deployment](docs/deployment.md) for the full walkthrough, HTTPS, LAN access and Windows
-unattended startup, and [Releasing](docs/releasing.md) for updates, backups and rollback.
+See [Deployment](docs/guide/deployment.md) for the full walkthrough, HTTPS, LAN access and Windows
+unattended startup, and [Releasing](docs/project/releasing.md) for updates, backups and rollback.
 
 ### Install the Android app
 
@@ -150,8 +150,8 @@ Satellite management, shutdown and restart, and every Satellite API) once the ad
 account exists. Before that, a fresh install answers only the machine it runs on, and remote
 setup needs a one-time code. Sign-in attempts are throttled per client, also behind a reverse
 proxy. Mission Control can serve HTTPS itself with a certificate you provide, or sit behind
-nginx. See "Authentication" and "HTTPS" in [API](docs/api.md) and [Deployment](docs/deployment.md),
-and the latest security review in the [Roadmap](docs/roadmap.md).
+nginx. See "Authentication" and "HTTPS" in [API](docs/reference/api.md) and [Deployment](docs/guide/deployment.md),
+and the latest security review in the [Roadmap](docs/project/roadmap.md).
 
 ## Release
 
@@ -161,25 +161,25 @@ v0.1.0-alpha.1.
 
 - [Release notes and known limitations](docs/releases/v0.1.0.md)
 - [Changelog](CHANGELOG.md)
-- [How releases are versioned, signed and published](docs/releasing.md)
+- [How releases are versioned, signed and published](docs/project/releasing.md)
 
 Mission Control (Configuration > About) and the Android app (Settings > About) show the exact
 version, build and commit, and can copy them for a bug report.
 
 ## Documentation
 
-- [API](docs/api.md)
-- [Architecture](docs/architecture.md)
-- [CLI](docs/cli.md)
-- [Deployment](docs/deployment.md)
-- [Mission Control](docs/mission_control.md)
-- [Philosophy](docs/philosophy.md)
-- [Releasing](docs/releasing.md)
-- [Roadmap](docs/roadmap.md) (also the current state, known limitations and latest security review)
-- [Satellites](docs/satellites.md)
-- [Terminology](docs/terminology.md)
-- [UI contract](docs/ui-contract.md) (how Satellites describe their interfaces for every client)
-- [Audio playback](docs/media-audio.md) (the shared `media.audio` host and `audio.library` capability)
+- [API](docs/reference/api.md)
+- [Architecture](docs/concepts/architecture.md)
+- [CLI](docs/guide/cli.md)
+- [Deployment](docs/guide/deployment.md)
+- [Mission Control](docs/guide/mission-control.md)
+- [Philosophy](docs/concepts/philosophy.md)
+- [Releasing](docs/project/releasing.md)
+- [Roadmap](docs/project/roadmap.md) (also the current state, known limitations and latest security review)
+- [Satellites](docs/satellites/README.md)
+- [Terminology](docs/concepts/terminology.md)
+- [UI contract](docs/reference/ui-contract.md) (how Satellites describe their interfaces for every client)
+- [Audio playback](docs/reference/media-audio.md) (the shared `media.audio` host and `audio.library` capability)
 - [StarCore for Android](mobile/README.md)
 
 ## License

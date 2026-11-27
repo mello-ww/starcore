@@ -10,19 +10,19 @@ planned. What was implemented but not verified is under "Not verified yet".
 
 At 2026-11-27, release 0.1.0 (the first stable release), after the 0.1.0-alpha.1 Alpha and the stable checkpoint
 `checkpoint-2026-11-02` (the StarCore design-language redesign). The test runs recorded at
-each step until then are in this file's history (`git log -p docs/roadmap.md`).
+each step until then are in this file's history (`git log -p docs/project/roadmap.md`).
 
-- **UI contract 1.2** (`starcore.ui/1.2`) is complete and released with 0.1.0 (`docs/ui-contract.md`). It added media
+- **UI contract 1.2** (`starcore.ui/1.2`) is complete and released with 0.1.0 (`docs/reference/ui-contract.md`). It added media
   blocks and the shared viewer, `search` and `map`, `play`, `pick`, `own`, `secure`, `download`
   and `share`, offline pages, the actions row, templates and capabilities; changes 1 to 17 are
   listed there.
 - **Every Satellite is on its shared interface on both clients** (Status, File Explorer, Photos,
   the Locked Folder, Music): no Satellite has client code of its own, and the modularity guard's
-  exception lists are empty (`docs/remaining-work.md`). Music plays through the shared audio
+  exception lists are empty (`docs/project/remaining-work.md`). Music plays through the shared audio
   host, with gapless playback on Android; Photos' phone backup, the Locked Folder's
   management and "Open with" / "Show in folder" between Satellites are done.
 - 0.1.0 was released after the pre-release audit (below). What is still open is in
-  `docs/remaining-work.md` and the sections below: verification on a physical phone and on
+  `docs/project/remaining-work.md` and the sections below: verification on a physical phone and on
   Linux.
 
 ### Not verified yet
@@ -78,7 +78,7 @@ each step until then are in this file's history (`git log -p docs/roadmap.md`).
 - Without Pillow on the server, Locked Folder (like Photos) shows originals as thumbnails.
 - The Signal Bus is not implemented yet (`engine/starcore/signals.py` is empty).
 - Space Mode does not exist yet. Developer Mode is a visibility preference only (see
-  docs/satellites.md).
+  docs/satellites/README.md).
 
 ### Security review (2026-11-02)
 
@@ -184,11 +184,11 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] HTTPS with a provided certificate
 - [ ] Storage (satellites keep their own SQLite and JSON stores today)
 - [ ] Signal Bus
-- [x] UI contract 1.0: validated `ui.json`, revisions and ETags, the capability catalog, metadata-only rediscovery (`docs/ui-contract.md`)
+- [x] UI contract 1.0: validated `ui.json`, revisions and ETags, the capability catalog, metadata-only rediscovery (`docs/reference/ui-contract.md`)
 - [x] UI contract 1.1: `chart`, `table`, `choice`, `status`, `code`, the `dashboard` template, page state and sources, Home widgets, dates in formats
 - [x] UI contract 1.2 (released with 0.1.0): media blocks and the shared viewer, `search` and `map`, `play`, `pick`, `own`, `secure`, `download` and `share`, offline pages, `preview`
 - [x] UI contract next: templates, discovered sections
-- [x] Retire every Satellite-specific interface (`docs/remaining-work.md`)
+- [x] Retire every Satellite-specific interface (`docs/project/remaining-work.md`)
 
 ## Mission Control
 
@@ -209,7 +209,7 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [ ] Rediscover and cache controls in the app
 - [x] Move Status onto shared blocks, at parity - UI contract 1.1 (`docs/satellites/status.md`, "Status's migration")
 - [x] Retire Status's previous page and screen
-- [x] Specify `media.audio` and `audio.library` from Music's player (`docs/media-audio.md`)
+- [x] Specify `media.audio` and `audio.library` from Music's player (`docs/reference/media-audio.md`)
 - [x] Audio contract groundwork: `audio.library` v1 in the vocabulary, provided by Music; `media.audio` reserved
 - [x] Audio: the Android AudioHost (`mobile/src/media/`), playing from the catalog's `audio.library` provider
 - [x] Audio: `audio.session` v1 in the shared vocabulary (`queue` required, the rest optional)
@@ -217,16 +217,16 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] Audio: the web AudioHost (`mission_control/media/`), started by the shell, playing from the catalog's `audio.library` provider
 - [x] Audio: any Satellite can play through both clients with the UI contract's `play` action (1.2)
 - [x] Remove `mobile/src/satellites/builtins.tsx` once Music's declarative interface replaces its native screens (A10)
-- [x] Move Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/ui-contract.md`, "Migration")
-    - [x] Photos opens in its shared interface by default on both clients (M1-M6 of `docs/photos-parity-audit.md`)
+- [x] Move Photos, the Locked Folder and Music onto shared blocks and capabilities, at parity (`docs/reference/ui-contract.md`, "Migration")
+    - [x] Photos opens in its shared interface by default on both clients (M1-M6 of `docs/archive/photos-parity-audit.md`)
     - [x] Photos' shared interface after the owner's review: whole photo in the viewer, full width, Favorites and the Locked Folder among the folders, tile hearts, download and share, web swipe, Library grouping (M7-M14)
     - [x] Retire Photo's own page and screens once the shared interface is validated
-    - [x] Move File Explorer onto its `ui.json`, giving Android a file browser (`docs/file-explorer-migration.md`)
+    - [x] Move File Explorer onto its `ui.json`, giving Android a file browser (`docs/archive/file-explorer-migration.md`)
         - [x] F1: read-only browsing, as a preview (Android opens it; the web keeps its own page)
         - [x] F2-F5: list paging, the file page (download, share, open), management, upload
         - [x] F6-F7: shared by default, then retire its own page
-    - [x] The Locked Folder through `media.vault`, its only interface on both clients (R3 of `docs/remaining-work.md`)
-    - [x] Music on `ui.json` (R4 of `docs/remaining-work.md`)
+    - [x] The Locked Folder through `media.vault`, its only interface on both clients (R3 of `docs/project/remaining-work.md`)
+    - [x] Music on `ui.json` (R4 of `docs/project/remaining-work.md`)
 - [ ] Light theme (after the stable release)
 - [x] Icons instead of text glyphs for the remaining Music controls
 - [ ] Audio playback validated on a real device (release 1)

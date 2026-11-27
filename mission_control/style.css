@@ -1073,7 +1073,7 @@ button.chip:hover {
  *
  * A generic filesystem directory picker, opened from any "path"-typed
  * configuration field. It browses through whichever Satellite provides
- * files.browse (docs/ui-contract.md) - nothing here knows any Satellite's
+ * files.browse (docs/reference/ui-contract.md) - nothing here knows any Satellite's
  * settings. */
 
 #directory-picker-overlay .modal {

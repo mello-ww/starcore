@@ -1,4 +1,4 @@
-// The web audio host's provider handling (mission_control/media/, docs/media-audio.md).
+// The web audio host's provider handling (mission_control/media/, docs/reference/media-audio.md).
 // Run: node --test mission_control/tests/media.test.mjs
 import assert from "node:assert/strict";
 import { test } from "node:test";

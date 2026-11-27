@@ -9,7 +9,7 @@ This page is the specification of **UI contract 1.2** (`starcore.ui/1.2`), relea
 Each minor only adds to the one before: every 1.0 document is a valid 1.1 and 1.2 document,
 and keeps working on clients that know only 1.0. What arrived in 1.1 and 1.2 is marked
 where it is described. It covers what is implemented today and what is still the target. The closed vocabulary itself is
-machine-readable in [`contracts/ui/vocabulary.json`](../contracts/ui/vocabulary.json).
+machine-readable in [`contracts/ui/vocabulary.json`](../../contracts/ui/vocabulary.json).
 
 - [Two ways a Satellite gets an interface](#two-ways-a-satellite-gets-an-interface)
 - [Two kinds of capability](#two-kinds-of-capability)
@@ -45,7 +45,7 @@ side by side before the old page is retired. Status is the first Satellite to ma
 move (1.1; its page is gone since). Photo follows in 1.2: its document was a **preview** (see
 [The document](#the-document)) until it reached parity, and is now its default interface, with
 its own page and screens kept in Developer Mode until they were retired. Music followed the
-same path (A1-A10 of `docs/media-audio.md`): its document is its only interface.
+same path (A1-A10 of `docs/reference/media-audio.md`): its document is its only interface.
 File Explorer's document, a preview until F6, is now its only interface on both clients; its
 `page.js` was retired in F7 (see [Migration](#migration)). Those
 implementations are the behavioural reference for the capabilities still to come, not code
@@ -913,7 +913,7 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
   - A client without that client capability hides the control, and says so as a notice if the
     action runs from elsewhere (a list row). Mission Control has none (a browser can't back up
     in the background); the app's comes with its sync screen (S3 of
-    [the parity audit](photos-parity-audit.md)).
+    [the parity audit](../archive/photos-parity-audit.md)).
   - Not in a selection or a tile's quick actions.
 - **`download`** and **`share`** (1.2): `{"download": "originals/{$.id}", "name": "$.title"}`
   fetches one of the Satellite's own routes with the client's own session, then saves the file
@@ -1154,9 +1154,9 @@ says so in place, and a document that `requires` it is not opened.
 | `audio.library` | 1 | `search`, `track`, `resolve`, `artwork`; optional `lyrics` - see [Audio playback](media-audio.md) | none yet; the `media.audio` client capability will play it |
 | `media.gallery` | 1 | `list`: `GET ?kinds=image,video[&limit=N&cursor=C]` -> `{items: [{id, kind, title, duration, group}], next}` (with `limit`, one page and the next cursor; without it, everything); `thumbnail`: `GET /<id>` -> an image; optional `resolve`: `GET /<id>` -> `{id, kind}` for an item that may be acted on now, `404` otherwise; optional, for the server alone, `original`, `release` and `adopt` (what a `media.vault` provider moves media in and out with) | the client's media picker (the `pick` action), which pages through a provider that pages |
 | `audio.session` | 1 | `queue`; optional `history`, `radio`, `preferences`, `favorites`, `stream`, `connect` - see [Audio playback](media-audio.md) | none; the audio host uses it beside the same Satellite's `audio.library` |
-| `media.vault` | 1 | `status`, `unlock` (`for` asks for a single-use grant for one move; without it, an unlock of this session that ends after `idle_seconds` without use), `lock`, `move_in` (`{items: [reference], grant?}`); optional `keep` (`POST` -> `{expires_at}`, restarts the idle time), `biometric` (`challenge {key_id, for?}`: the purpose is fixed with the challenge, never beside the signature) and, for the server alone, `sealed` (`GET /<sha256>` -> `{sealed}`, asked of every provider by `starcore.capabilities.sealed`) - see "Moves from a shared interface" in [the Locked Folder](satellites/locked_folder.md) | none: the `secure` action and protected documents use it, through each client's own unlock prompt. It has no operation that lists or reads what it holds |
-| `files.protected` | 1 | `check`: `GET ?path=<absolute path>[&tree=1]` -> `{protected, open, message?}`: whether the path is in a protected area (with `tree=1`, or contains one), and whether this session may reach it now - see "Every Satellite asks the Engine" in [the Locked Folder](satellites/locked_folder.md) | none: server-side only, and `check` refuses a client's request (`403`). The Engine asks every provider, enabled or not (`starcore.capabilities.protection`), before File Explorer, Photo or Music touch a path; a provider that fails keeps the path closed |
-| `media.sync` | 1 | `status` (`GET ?device=` -> `{accepts, max_bytes, chunk_bytes, device}`), `check` (`POST {items: [{sha256, size}]}`, at most 500 -> `{known, wanted}`), `upload` (`GET /<sha256>` -> `{offset}`; `POST /<sha256>?offset=&size=&name=&folder=&taken=` with raw bytes -> `{offset}`, or at the last byte `{status, id, offset}`); optional `devices` (`GET` -> `{devices}`). `"device_credentials": true`: the Engine issues a credential that reaches only these routes - see "Phone backup" in [Photo](satellites/photo.md) | none; the `sync` action opens the client's own sync screen for it (`device.media-sync`, the Android app's, `mobile/src/sync/`) |
+| `media.vault` | 1 | `status`, `unlock` (`for` asks for a single-use grant for one move; without it, an unlock of this session that ends after `idle_seconds` without use), `lock`, `move_in` (`{items: [reference], grant?}`); optional `keep` (`POST` -> `{expires_at}`, restarts the idle time), `biometric` (`challenge {key_id, for?}`: the purpose is fixed with the challenge, never beside the signature) and, for the server alone, `sealed` (`GET /<sha256>` -> `{sealed}`, asked of every provider by `starcore.capabilities.sealed`) - see "Moves from a shared interface" in [the Locked Folder](../satellites/locked_folder.md) | none: the `secure` action and protected documents use it, through each client's own unlock prompt. It has no operation that lists or reads what it holds |
+| `files.protected` | 1 | `check`: `GET ?path=<absolute path>[&tree=1]` -> `{protected, open, message?}`: whether the path is in a protected area (with `tree=1`, or contains one), and whether this session may reach it now - see "Every Satellite asks the Engine" in [the Locked Folder](../satellites/locked_folder.md) | none: server-side only, and `check` refuses a client's request (`403`). The Engine asks every provider, enabled or not (`starcore.capabilities.protection`), before File Explorer, Photo or Music touch a path; a provider that fails keeps the path closed |
+| `media.sync` | 1 | `status` (`GET ?device=` -> `{accepts, max_bytes, chunk_bytes, device}`), `check` (`POST {items: [{sha256, size}]}`, at most 500 -> `{known, wanted}`), `upload` (`GET /<sha256>` -> `{offset}`; `POST /<sha256>?offset=&size=&name=&folder=&taken=` with raw bytes -> `{offset}`, or at the last byte `{status, id, offset}`); optional `devices` (`GET` -> `{devices}`). `"device_credentials": true`: the Engine issues a credential that reaches only these routes - see "Phone backup" in [Photo](../satellites/photo.md) | none; the `sync` action opens the client's own sync screen for it (`device.media-sync`, the Android app's, `mobile/src/sync/`) |
 
 | `files.open` | 1 | `open`: `POST {path}` -> `{page, params}`, the provider's page showing that file, `404` when it can't open it or the user may not read it. The provider also declares `types` (required: kinds from the vocabulary's `file_kinds`, `image`, `video`, `audio`), `extensions` (optional, in place of the kinds' lists: a dot and 1 to 10 lower-case letters or digits, at most 64) and `label` (optional, 1 to 40 characters), which the catalog publishes with it | `openers` (change 16). Any number of Satellites may provide it |
 
@@ -1404,7 +1404,7 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 |---|---|---|
 | Blocks | the 22 above, including `chart`, `table`, `image`, `media-list`, `media-grid`, `search`, `map` and `breadcrumb`; the `dashboard` template | more, minor by minor: `tabs`; templates `list-detail`, `settings`, `media-library` |
 | Satellite capabilities | `files.browse` (File Explorer), `audio.library` and `audio.session` (Music), `media.gallery` (Photo), `media.vault` (Locked Folder, `move_in` only through the `secure` action), `files.protected` (Locked Folder, asked by the Engine only), `media.sync` (Photo, a device's backup) | more pickable capabilities (files) |
-| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action and protected documents; `secure.screen` on Android; `device.media-sync` on Android (the app's background backup of the phone's media, opened by the `sync` action; [the parity audit](photos-parity-audit.md), S3); saving, sharing and opening files (`download`, `share`); sending files (`upload`) | |
+| Client capabilities | `media.audio` on both clients (the shared audio host, [Audio playback](media-audio.md)), used by the `play` action; `media.picker` (the media picker), used by the `pick` action; each client's own unlock prompt for `media.vault`, used by the `secure` action and protected documents; `secure.screen` on Android; `device.media-sync` on Android (the app's background backup of the phone's media, opened by the `sync` action; [the parity audit](../archive/photos-parity-audit.md), S3); saving, sharing and opening files (`download`, `share`); sending files (`upload`) | |
 | Home | `widgets` in each document, drawn by both clients | |
 | Sections | `section_of` and the `section` action; a host lists its sections from the Engine's registry | |
 | Icons | the shared set; from 1.2 a Satellite's own (`icons/`, validated by the Engine, drawn as paths), with `icon_name` or a neutral circle as fallback | |
@@ -1415,9 +1415,9 @@ navigation, detail pages, a form, a slider and the shared file browser. It lives
 
 Every step replaces a hand-written screen only once the shared one reaches parity and the
 owner has validated it. Music keeps its dedicated screens until then. File Explorer
-and Status open their shared interfaces alone ([File Explorer's plan](file-explorer-migration.md),
+and Status open their shared interfaces alone ([File Explorer's plan](../archive/file-explorer-migration.md),
 F1-F7 done), and Photos keeps its previous screens in Developer Mode until they are retired.
-Retiring all of them is planned in [Remaining work](remaining-work.md).
+Retiring all of them is planned in [Remaining work](../project/remaining-work.md).
 
 1. **Done:** the first document format (a `mobile` route, removed since) and `page.js`; the modularity guard.
 2. **Done:** Engine metadata: `icon_name`, `provides`, `ui.json` with revisions and ETags,
@@ -1433,16 +1433,16 @@ Retiring all of them is planned in [Remaining work](remaining-work.md).
    `dashboard` template, page state and sources, the header and widgets. Status's `ui.json`
    now draws its interface on both clients; its previous web page, Android screen and Home card
    are removed (see "Differences from the interfaces it replaced" in
-   [docs/satellites/status.md](satellites/status.md)).
+   [docs/satellites/status.md](../satellites/status.md)).
 7. **Capabilities, one at a time, extracted from the existing code:**
    1. `media.gallery` from Photos' grid and viewer. **Done (1.2):** the shared
       `media-grid` block and viewer, and Photo's `ui.json`, now its default interface on both
-      clients (see "Shared interface" in [docs/satellites/photo.md](satellites/photo.md)).
+      clients (see "Shared interface" in [docs/satellites/photo.md](../satellites/photo.md)).
       Photo's own page and screens are removed;
    2. `media.vault` from the Locked Folder. **Done (1.2):** the `secure` action moves
       photos in from Photos' shared viewer and selection, behind each client's own PIN and
       biometric prompt, a document can be protected by the store, and the Locked Folder itself
-      has only its shared interface (see [docs/satellites/locked_folder.md](satellites/locked_folder.md));
+      has only its shared interface (see [docs/satellites/locked_folder.md](../satellites/locked_folder.md));
    3. `audio.library` and `media.audio` from Music's player, queue and downloads, specified in
       [Audio playback](media-audio.md). **Done (1.2):** the shared audio host on both clients
       and the `play` action, which also plays a Satellite's own tracks (`tracks`, `route`).
@@ -1455,5 +1455,5 @@ Retiring all of them is planned in [Remaining work](remaining-work.md).
    are removed. `page.js` stays as the web extension mechanism.
 
 Backward compatibility is not required for now: StarCore runs only on the owner's server, on
-the latest version, with the latest app ([Remaining work](remaining-work.md)). The app no
+the latest version, with the latest app ([Remaining work](../project/remaining-work.md)). The app no
 longer keeps a fallback for a server without `/api/catalog` or without a Satellite's `ui.json`.

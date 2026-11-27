@@ -13,7 +13,7 @@ logo = "folder"
 
 # a Satellite capability others can use without knowing this Satellite: any
 # interface with a file-browser block, and Mission Control's folder picker,
-# browse through whichever Satellite provides files.browse (docs/ui-contract.md)
+# browse through whichever Satellite provides files.browse (docs/reference/ui-contract.md)
 [provides."files.browse"]
 version = 1
 operations = { list = "entries", content = "content", locate = "locate", stat = "stat" }

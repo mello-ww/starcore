@@ -129,7 +129,7 @@ address, `localhost` or `host:port`.
 ## Updating the Linux server
 
 The server runs from a Git checkout (`/opt/starcore/app`, see "Linux server (systemd)" in
-`docs/deployment.md`). Back up first (below), then:
+`docs/guide/deployment.md`). Back up first (below), then:
 
 ```
 sudo bash /opt/starcore/app/deploy/linux/install.sh --update   # fast-forward + dependencies

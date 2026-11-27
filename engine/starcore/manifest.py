@@ -26,5 +26,5 @@ class SatelliteManifest:
         # ui_contract.normalise_provides: {"files.browse": {"version": 1,
         # "operations": {"list": "entries"}}}. Shared blocks (a file browser,
         # later a media picker) are bound to a capability, never to the
-        # Satellite that happens to provide it - see docs/ui-contract.md.
+        # Satellite that happens to provide it - see docs/reference/ui-contract.md.
         self.provides = provides or {}

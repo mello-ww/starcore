@@ -12,7 +12,7 @@ export interface AuthApiClient {
 }
 
 /**
- * The `/api/auth/*` endpoints this app needs - see docs/api.md,
+ * The `/api/auth/*` endpoints this app needs - see docs/reference/api.md,
  * "Authentication", in the main repository. Every call here is exactly the
  * request/response shape StarCore's own auth system already defines;
  * nothing is reinterpreted or renamed on this side.

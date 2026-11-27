@@ -170,14 +170,14 @@ each must move to the contract or to a generic capability before the stable rele
 
 **Status: approved by the owner (2026-11-15). S0 is done: the old sync is removed as the
 inventory below lists. S1 is done (2026-11-16): `media.sync` v1 in Photo and the Engine's
-device credentials** ("Phone backup" in [Photo](satellites/photo.md), "Device credentials" in
-[API](api.md)). **S2 is done (2026-11-16): the `sync` action (contract change 4) and
+device credentials** ("Phone backup" in [Photo](../satellites/photo.md), "Device credentials" in
+[API](../reference/api.md)). **S2 is done (2026-11-16): the `sync` action (contract change 4) and
 Photo's Phone backup page. S3 is done (2026-11-16): the app's sync** (`mobile/src/sync/` and
 the Kotlin package `com.starcore.mobile.sync`), so the app has `device.media-sync` and shows
 the button; Mission Control still hides it. All four decisions are taken. Read from
 the code at `5b716a9`. The old sync is removed entirely, then a real automatic backup is built
 as a generic capability. The common order with the Locked Folder is in
-[Remaining work](remaining-work.md).
+[Remaining work](../project/remaining-work.md).
 
 ### Inventory of the old sync
 
@@ -433,7 +433,7 @@ configuration.
   forged (a forged "known" keeps a file from being sent). The screen says so; HTTPS is the fix.
 - The Engine's auth store was not locked against concurrent writes, and session tokens were
   kept as they were (device credentials were hashed): both were older than the sync, and are
-  fixed since (`docs/roadmap.md`, "Security").
+  fixed since (`docs/project/roadmap.md`, "Security").
 
 ### Decisions for the owner
 

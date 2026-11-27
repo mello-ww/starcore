@@ -36,7 +36,7 @@ class Satellite:
     @property
     def has_service(self) -> bool:
         """Whether this satellite declares a start/stop hook at all - see
-        "Running a background service" in docs/satellites.md. Purely generic:
+        "Running a background service" in docs/satellites/README.md. Purely generic:
         a satellite either wires up satellite.py or it doesn't, and the Core
         never needs to know which one this happens to be."""
         return bool(self.lifecycle)
@@ -55,7 +55,7 @@ class Satellite:
         particular - can report it honestly instead of assuming the hook
         worked just because it didn't crash the Core. A satellite with no
         hook for this event counts as a no-op success, matching the existing
-        "both are optional" contract (see docs/satellites.md).
+        "both are optional" contract (see docs/satellites/README.md).
         """
         handler = self.lifecycle.get(hook)
         if handler is None:

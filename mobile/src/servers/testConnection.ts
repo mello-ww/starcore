@@ -23,7 +23,7 @@ function looksLocal(address: string): boolean {
  * public host name (`starcore.example.com`, a DuckDNS name) is assumed to be
  * behind HTTPS - so not even the first request goes out unencrypted - while
  * a LAN address or `host:port` keeps StarCore's LAN-first plain-HTTP default
- * (docs/deployment.md). An address that already names a scheme is left
+ * (docs/guide/deployment.md). An address that already names a scheme is left
  * alone (aside from trimming a trailing slash). */
 export function normalizeServerUrl(input: string): string {
   const trimmed = input.trim().replace(/\/+$/, '');
@@ -50,7 +50,7 @@ function originOf(url: string | undefined): string | null {
 /** Actually reaches the server before the caller treats it as connected -
  * see "Do not silently treat an incorrect or unreachable server as
  * successfully connected" in the task brief. `/api/auth/status` is
- * StarCore's lightest always-open endpoint (see docs/api.md): answerable
+ * StarCore's lightest always-open endpoint (see docs/reference/api.md): answerable
  * whether or not the server has been bootstrapped yet, so it doubles as a
  * pure reachability probe. Checking the response shape (not just the HTTP
  * status) catches an address that answers with 200 but isn't StarCore at

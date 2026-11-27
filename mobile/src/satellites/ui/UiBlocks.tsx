@@ -30,7 +30,7 @@ import type {GridPages} from './offline';
 const {palette, space, type, radii} = tokens;
 
 /**
- * This app's components for UI contract 1.1 blocks (docs/ui-contract.md).
+ * This app's components for UI contract 1.1 blocks (docs/reference/ui-contract.md).
  * Each block is drawn with the app's own components and tokens; what it
  * shows comes from bindings into live data, and what it does is an action
  * the screen runs against the Satellite's own routes. No block knows which
@@ -550,7 +550,7 @@ function ListBlock({block, scope, context}: {block: UiBlock; scope: Scope; conte
 /** A list with `more` (1.2) drawn in place, inside a page that scrolls as a whole (in a card):
  * its rows, then the next page - loaded as the screen scrolls near its end, or with "Show
  * more". A paged list among a page's own blocks makes the page a virtualized list instead
- * (VirtualListPage; docs/ui-contract.md, "Paging a list"). */
+ * (VirtualListPage; docs/reference/ui-contract.md, "Paging a list"). */
 function PagedListBlock({
   block, scope, context, draw,
 }: {block: UiBlock; scope: Scope; context: BlockContext; draw?: (rows: any[]) => React.ReactNode}) {

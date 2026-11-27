@@ -1,7 +1,7 @@
 # StarCore in Docker (optional)
 
 Docker is **optional**. The supported way to run StarCore is `deploy/linux/install.sh` and
-systemd (`docs/deployment.md`). The container is for trying StarCore without installing
+systemd (`docs/guide/deployment.md`). The container is for trying StarCore without installing
 anything, or for hosts where you would rather run containers.
 
 It runs the same thing as the server: the Engine, Mission Control and every Satellite, with
@@ -59,5 +59,5 @@ are lost if the container is removed and recreated.
 - The container runs as an unprivileged user. The host media folders must be writable by it.
 - Do not mix this with the systemd install on the same host and port.
 - This is separate from the **Docker Satellite**, which is a link to a Docker server and is
-  still only a placeholder (`docs/remaining-work.md`).
+  still only a placeholder (`docs/project/remaining-work.md`).
 - The image has not been built in CI or on the owner's server yet.

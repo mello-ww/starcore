@@ -38,7 +38,7 @@ Pages are addressable: `#/overview`, `#/satellites`, `#/console`, `#/configurati
 Mission Control polls the API every 5 seconds. If the Core becomes unreachable it keeps the last known values and shows an error message.
 
 Home also carries each enabled Satellite's **widgets** - the summaries a Satellite declares in
-its `ui.json` (UI contract 1.1, see [UI contract](ui-contract.md)), drawn by the shared renderer.
+its `ui.json` (UI contract 1.1, see [UI contract](../reference/ui-contract.md)), drawn by the shared renderer.
 Status's is overall health, CPU, memory, satellites online and the most important warnings. A
 widget without a source binds to the state its Satellite publishes, which already arrives with
 that 5-second `/api/satellites` poll, so it adds no request of its own; clicking it opens the
@@ -50,7 +50,7 @@ The topbar's "Stop StarCore" button requests a graceful shutdown of the Core thr
 
 The "Restart" button next to it does the same graceful shutdown - it is not a second,
 separate shutdown path - but leaves StarCore's process ready to start itself straight back up
-(`POST /api/restart`, see `docs/api.md`). Like Stop, it asks for confirmation first (a second
+(`POST /api/restart`, see `docs/reference/api.md`). Like Stop, it asks for confirmation first (a second
 click within a few seconds). After the request is sent, Mission Control shows a "StarCore is
 restarting..." banner and polls `/api/status` in the background until the new process
 answers, then reconnects and clears the banner automatically - there is nothing to click to
@@ -58,7 +58,7 @@ reconnect.
 
 ## Logging in
 
-Mission Control is protected by StarCore's authentication system (`docs/api.md` -
+Mission Control is protected by StarCore's authentication system (`docs/reference/api.md` -
 "Authentication") once an administrator account exists. A fresh install shows a setup screen
 instead of the app itself, asking for a username and password to create that first account;
 after that, Mission Control shows a login screen to anyone without a valid session, and a
@@ -66,7 +66,7 @@ after that, Mission Control shows a login screen to anyone without a valid sessi
 to the login screen. Until an administrator account is created, the setup screen itself is
 reachable with no session, by design. Opened from any device other than the server itself
 (including through the HTTPS proxy), it also asks for the one-time setup code StarCore prints
-at startup - see "Authentication" in `docs/api.md`.
+at startup - see "Authentication" in `docs/reference/api.md`.
 
 ## About and build information
 
@@ -75,7 +75,7 @@ of the running Engine (Mission Control is served by it, so they share one versio
 sidebar shows the version at its bottom. **Copy build info** copies the same details as plain
 text for a bug report - nothing about the server's address, accounts or paths. Everything comes
 from `/api/status` "build" (`engine/starcore/build_info.py`: the `VERSION` file and Git); see
-`docs/releasing.md`.
+`docs/project/releasing.md`.
 
 ## Developer Mode
 
@@ -83,7 +83,7 @@ The terminal icon at the top right turns Developer Mode on and off. It is off by
 remembered per account in this browser. While it is on, Mission Control also shows the Console,
 Mission Control's address and port, Satellite reload buttons and versions, and each Satellite's
 advanced settings and diagnostics. It only changes what is shown: every action is still checked
-by the server. See docs/satellites.md, "Developer Mode".
+by the server. See docs/satellites/README.md, "Developer Mode".
 
 ## Configuration
 
@@ -98,7 +98,7 @@ port = 8080
 
 `enabled = false` starts the Core without the web interface. Defaults are used when the section, a key or the configuration file itself is missing.
 
-`host`, `port` and `enabled` can all be viewed and changed from the Configuration page, without editing `config.toml` by hand - the same is true from the terminal CLI's `config` command (`docs/cli.md` covers the command convention it follows) and from `GET`/`POST /api/configuration` directly. All three go through the same `Configuration.set()` call, so validation and persistence are identical everywhere: an invalid value (an empty host, a non-numeric or out-of-range port) is rejected with a clear error and nothing is written.
+`host`, `port` and `enabled` can all be viewed and changed from the Configuration page, without editing `config.toml` by hand - the same is true from the terminal CLI's `config` command (`docs/guide/cli.md` covers the command convention it follows) and from `GET`/`POST /api/configuration` directly. All three go through the same `Configuration.set()` call, so validation and persistence are identical everywhere: an invalid value (an empty host, a non-numeric or out-of-range port) is rejected with a clear error and nothing is written.
 
 `[server]` is only read once, when the Core starts, so a saved change never applies to the process that's already running - the Configuration page, the CLI and the API all say so plainly ("restart required") rather than implying the change is live. Restart StarCore for a saved `[server]` change to take effect.
 
@@ -110,11 +110,11 @@ A Satellite with a `ui.json` gets a page drawn by Mission Control's shared rende
 (`mission_control/ui/renderer.js`, mounted exactly like a `page.js`): its navigation as tabs,
 its blocks, live data from its routes, and actions that call them. A Satellite without one
 gets its own `mission_control/page.js` when it ships one. The renderer knows the
-[UI contract](ui-contract.md), never a Satellite. A new revision of the document (after an
+[UI contract](../reference/ui-contract.md), never a Satellite. A new revision of the document (after an
 update or a rediscovery) remounts the page.
 
 Audio plays through the shell's shared player (`mission_control/media/`, see
-[Audio playback](media-audio.md)): started after sign-in, it plays from whichever Satellite
+[Audio playback](../reference/media-audio.md)): started after sign-in, it plays from whichever Satellite
 the catalog lists as the `audio.library` provider, and its floating bar and top-bar disc stay
 across every page, reloads included.
 
@@ -134,7 +134,7 @@ Satellites are never hardcoded into the Core or into the frontend. A Satellite a
 
 Every Satellite card, its sidebar entry and its own page show a status badge -
 "Running", "Stopped", "Disabled" or "Error" - built from the generic `status` field
-`GET /api/satellites` already reports (see "Status and icon" in `docs/satellites.md`); the
+`GET /api/satellites` already reports (see "Status and icon" in `docs/satellites/README.md`); the
 frontend does not compute or guess status itself, only labels the value it's given. The same
 Satellite also shows an icon next to its name wherever it's listed, taken from its own
 declared `icon` (again generic - the Core does not maintain a name-to-icon mapping) or a
@@ -163,13 +163,13 @@ Which settings exist, their defaults, validation and persistence all belong to t
 Satellite; Mission Control and the Core only provide the button, the modal, and the generic
 request plumbing. Photo's settings were the first to use this - see `docs/satellites/photo.md` -
 and the underlying mechanism is documented for Satellite authors in
-`docs/satellites.md` under "Exposing configuration".
+`docs/satellites/README.md` under "Exposing configuration".
 
 A setting a Satellite describes with `"type": "path"` (Photo's `photo_directory` and Music's
 `library` - see `docs/satellites/photo.md` and `docs/satellites/music.md`) gets a "Browse…" button next to its
 field in the modal, opening a small directory picker. The picker is itself completely
 generic: it browses through whichever enabled Satellite provides the `files.browse`
-capability (File Explorer, with its `entries` route - see [UI contract](ui-contract.md)) and
+capability (File Explorer, with its `entries` route - see [UI contract](../reference/ui-contract.md)) and
 simply hands back whatever absolute path was chosen. It only appears when such a provider is
 present and enabled; a `"path"` field always still accepts a typed path directly, with or
 without it.

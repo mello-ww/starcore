@@ -21,7 +21,7 @@ import {CAPABILITY_VERSIONS, PROTECTED_CAPABILITIES, type CapabilityProvider, ty
  *
  * One gate serves every screen of a document (its entry and the detail pages pushed over it):
  * see attachGate. No React here, so the tests drive it with fake timers.
- * See docs/ui-contract.md ("protected").
+ * See docs/reference/ui-contract.md ("protected").
  */
 
 /** How often a shown document calls keep; well inside the server's idle time. */

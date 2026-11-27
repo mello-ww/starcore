@@ -6,7 +6,7 @@
     The JS bundle is embedded in the APK (no Metro, USB or ADB needed to run it). The
     version comes from the repository's VERSION file; versionCode, commit, build number and
     date are stamped by android/app/build.gradle. The APK is signed with the release key
-    from keystore.properties (see docs/releasing.md) - this script refuses to produce an
+    from keystore.properties (see docs/project/releasing.md) - this script refuses to produce an
     unsigned or debug-signed release.
 
     Output: dist/StarCore-<version>.apk and dist/StarCore-<version>.apk.sha256 at the
@@ -46,7 +46,7 @@ $keystoreProps = @(
     (Join-Path $env:USERPROFILE ".starcore\signing\keystore.properties")
 ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 if (-not $keystoreProps) {
-    Fail "no release keystore.properties found - see docs/releasing.md, 'Signing key'"
+    Fail "no release keystore.properties found - see docs/project/releasing.md, 'Signing key'"
 }
 
 $dirty = git -C $repo status --porcelain --untracked-files=no

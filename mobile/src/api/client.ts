@@ -5,7 +5,7 @@ export type TokenProvider = () => Promise<string | null>;
 
 /**
  * A thin wrapper around `fetch`, talking to the exact same `/api/...`
- * StarCore already serves to Mission Control - see docs/api.md in the main
+ * StarCore already serves to Mission Control - see docs/reference/api.md in the main
  * repository. This is the *only* place in the app that builds a request
  * URL or reads a response; every other module (api/auth.ts, the shared
  * renderer, the audio host, and the Satellite-specific folders) goes
