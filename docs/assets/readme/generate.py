@@ -6,7 +6,9 @@ so the GitHub page can't drift from the real interface. Standard library only.
 
     python docs/assets/readme/generate.py
 
-Writes header.svg, architecture.svg and satellite-<name>.svg next to itself.
+Writes header.svg, architecture.svg, social-preview.svg and satellite-<name>.svg
+next to itself. social-preview.svg is the source of the repository's social preview
+image (GitHub wants a 1280 x 640 PNG: render it with any browser).
 """
 
 from pathlib import Path
@@ -45,7 +47,7 @@ def icon_body(folder: str) -> str:
     return re.search(r"<svg[^>]*>(.*)</svg>", text, re.S).group(1).strip()
 
 
-def icon(folder: str, x: float, y: float, size: float, color: str = ICON) -> str:
+def icon(folder: str, x: float, y: float, size: float, color: str = ACCENT) -> str:
     scale = size / 24
     return (f'<g transform="translate({x:.1f} {y:.1f}) scale({scale:.4f})" fill="none" stroke="{color}" '
             f'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">{icon_body(folder)}</g>')
@@ -58,8 +60,8 @@ def dots(x: float, y: float, w: float, h: float, step: int = 18) -> str:
             f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="url(#dots)"/>')
 
 
-def eyebrow(x: float, y: float, text: str, anchor: str = "start") -> str:
-    return (f'<text x="{x}" y="{y}" fill="{TEXT3}" font-family="{SANS}" font-size="13" font-weight="600" '
+def eyebrow(x: float, y: float, text: str, anchor: str = "start", color: str = TEXT3) -> str:
+    return (f'<text x="{x}" y="{y}" fill="{color}" font-family="{SANS}" font-size="13" font-weight="600" '
             f'letter-spacing="3" text-anchor="{anchor}">{text.upper()}</text>')
 
 
@@ -76,37 +78,67 @@ def svg(width: int, height: int, title: str, body: str) -> str:
             f'<title id="t">{title}</title>\n{body}\n</svg>\n')
 
 
+def mark(x: float, y: float, scale: float) -> str:
+    """The sidebar's mark (circle, tilted orbit, a moon in the accent)."""
+    return (f'<g transform="translate({x} {y}) scale({scale})" fill="none" stroke="{TEXT}" stroke-width="1.1">'
+            '<circle cx="11" cy="12" r="5"/>'
+            '<ellipse cx="11" cy="12" rx="9.3" ry="3.3" transform="rotate(-22 11 12)" opacity="0.7"/>'
+            f'<circle cx="19" cy="3" r="0.9" fill="{ACCENT}" stroke="none"/></g>')
+
+
+def ecosystem(cx: float, cy: float, k: float = 1.0) -> str:
+    """One Engine, Satellites on two orbits, the nearest orbit and one Satellite in the accent."""
+    tilt = -22
+    inner, outer = (150 * k, 50 * k), (225 * k, 78 * k)
+    parts = [
+        f'<ellipse cx="{cx}" cy="{cy}" rx="{outer[0]}" ry="{outer[1]}" transform="rotate({tilt} {cx} {cy})" '
+        f'fill="none" stroke="{TEXT}" stroke-opacity="0.16" stroke-dasharray="2 6"/>',
+        f'<ellipse cx="{cx}" cy="{cy}" rx="{inner[0]}" ry="{inner[1]}" transform="rotate({tilt} {cx} {cy})" '
+        f'fill="none" stroke="{ACCENT}" stroke-opacity="0.55"/>',
+        f'<circle cx="{cx}" cy="{cy}" r="{30 * k}" fill="{BG}" stroke="{TEXT}" stroke-width="1.5"/>',
+        f'<circle cx="{cx}" cy="{cy}" r="{4 * k}" fill="{ACCENT}"/>',
+    ]
+    for angle, orbit, r, color in [
+        (200, inner, 5, ACCENT), (20, inner, 4, ICON), (115, inner, 3, TEXT3),
+        (300, outer, 4, ICON), (60, outer, 3, TEXT3), (160, outer, 3, TEXT3),
+    ]:
+        x, y = orbit_point(cx, cy, orbit[0], orbit[1], angle, tilt)
+        parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{(r + 3) * k:.1f}" fill="{BG}"/>'
+                     f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r * k:.1f}" fill="{color}"/>')
+    return "".join(parts)
+
+
 def header() -> str:
     w, h = 1200, 300
-    cx, cy, tilt = 930, 150, -22
     parts = [
         f'<rect x="0.5" y="0.5" width="{w - 1}" height="{h - 1}" rx="16" fill="{BG}" stroke="{LINE}"/>',
         f'<defs><clipPath id="card"><rect x="1" y="1" width="{w - 2}" height="{h - 2}" rx="16"/></clipPath></defs>',
         f'<g clip-path="url(#card)">{dots(660, 0, 540, h)}</g>',
-        # the sidebar's mark (circle, tilted orbit, a moon), drawn large
-        f'<g transform="translate(72 70) scale(3.2)" fill="none" stroke="{TEXT}" stroke-width="1.1">'
-        '<circle cx="11" cy="12" r="5"/>'
-        '<ellipse cx="11" cy="12" rx="9.3" ry="3.3" transform="rotate(-22 11 12)" opacity="0.7"/>'
-        f'<circle cx="19" cy="3" r="0.9" fill="{TEXT}" stroke="none"/></g>',
-        eyebrow(76, 186, "Self-hosted platform"),
+        mark(72, 70, 3.2),
+        eyebrow(76, 186, "Self-hosted platform", color=ACCENT),
         f'<text x="72" y="244" fill="{TEXT}" font-family="{DISPLAY}" font-size="68" font-weight="700" '
         'letter-spacing="-1.5">StarCore</text>',
-        # the ecosystem: one Engine, Satellites on two orbits, one of them in the accent
-        f'<circle cx="{cx}" cy="{cy}" r="30" fill="{BG}" stroke="{TEXT}" stroke-width="1.5"/>',
-        f'<circle cx="{cx}" cy="{cy}" r="4" fill="{TEXT}"/>',
-        f'<ellipse cx="{cx}" cy="{cy}" rx="150" ry="50" transform="rotate({tilt} {cx} {cy})" fill="none" '
-        f'stroke="{TEXT}" stroke-opacity="0.35"/>',
-        f'<ellipse cx="{cx}" cy="{cy}" rx="225" ry="78" transform="rotate({tilt} {cx} {cy})" fill="none" '
-        f'stroke="{TEXT}" stroke-opacity="0.16" stroke-dasharray="2 6"/>',
+        ecosystem(930, 150),
     ]
-    for angle, (rx, ry), r, color in [
-        (200, (150, 50), 5, ACCENT), (20, (150, 50), 4, ICON), (115, (150, 50), 3, TEXT3),
-        (300, (225, 78), 4, ICON), (60, (225, 78), 3, TEXT3), (160, (225, 78), 3, TEXT3),
-    ]:
-        x, y = orbit_point(cx, cy, rx, ry, angle, tilt)
-        parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r + 3}" fill="{BG}"/>'
-                     f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r}" fill="{color}"/>')
     return svg(w, h, "StarCore", "\n".join(parts))
+
+
+def social_preview() -> str:
+    w, h = 1280, 640
+    parts = [
+        f'<rect width="{w}" height="{h}" fill="{BG}"/>',
+        dots(640, 0, 640, h),
+        mark(96, 150, 4.4),
+        eyebrow(102, 318, "Self-hosted platform", color=ACCENT),
+        f'<text x="96" y="412" fill="{TEXT}" font-family="{DISPLAY}" font-size="104" font-weight="700" '
+        'letter-spacing="-2.5">StarCore</text>',
+        f'<text x="100" y="470" fill="{TEXT2}" font-family="{SANS}" font-size="27">'
+        'One Engine, one API, one sign-in and one interface</text>',
+        f'<text x="100" y="508" fill="{TEXT2}" font-family="{SANS}" font-size="27">'
+        'for the services you run at home.</text>',
+        ecosystem(985, 300, 1.25),
+    ]
+    return svg(w, h, "StarCore: a modular, self-hosted platform", "\n".join(parts))
 
 
 def tile(x, y, w, h, title, caption=None, folder=None, muted=False) -> str:
@@ -114,7 +146,7 @@ def tile(x, y, w, h, title, caption=None, folder=None, muted=False) -> str:
     tx = x + 18
     if folder:
         parts.append(f'<rect x="{x + 14}" y="{y + (h - 36) / 2}" width="36" height="36" rx="9" fill="{CONTROL}"/>')
-        parts.append(icon(folder, x + 22, y + (h - 36) / 2 + 8, 20, TEXT3 if muted else ICON))
+        parts.append(icon(folder, x + 22, y + (h - 36) / 2 + 8, 20, TEXT3 if muted else ACCENT))
         tx = x + 62
     if caption:
         parts.append(f'<text x="{tx}" y="{y + h / 2 - 3}" fill="{TEXT3 if muted else TEXT}" font-family="{DISPLAY}" '
@@ -156,7 +188,7 @@ def architecture() -> str:
     # engine
     ey = 196
     parts.append(f'<rect x="{pad}" y="{ey}" width="{inner}" height="132" rx="16" fill="{CARD}" stroke="{LINE}"/>')
-    parts.append(eyebrow(pad + 24, ey + 34, "Engine"))
+    parts.append(eyebrow(pad + 24, ey + 34, "Engine", color=ACCENT))
     parts.append(f'<circle cx="{pad + inner - 32}" cy="{ey + 30}" r="4" fill="{ACCENT}"/>')
     parts.append(f'<text x="{pad + 24}" y="{ey + 68}" fill="{TEXT}" font-family="{DISPLAY}" font-size="24" '
                  'font-weight="700">StarCore Engine</text>')
@@ -193,6 +225,7 @@ def satellite_tile(folder: str, label: str) -> str:
 def main():
     (HERE / "header.svg").write_text(header(), "utf-8", newline="\n")
     (HERE / "architecture.svg").write_text(architecture(), "utf-8", newline="\n")
+    (HERE / "social-preview.svg").write_text(social_preview(), "utf-8", newline="\n")
     for name, label, folder in SATELLITES:
         (HERE / f"satellite-{name}.svg").write_text(satellite_tile(folder, label), "utf-8", newline="\n")
     print("wrote", ", ".join(sorted(p.name for p in HERE.glob("*.svg"))))
