@@ -7,8 +7,8 @@ open the file ("Opens with"), each a link to that Satellite's page on it. Decide
 a sound outside Music's library **plays directly**, and **can still be added to a playlist**.
 
 This file is the audit (what exists, what is missing, the risks) and the plan (contract
-change 16, milestones O1 to O6). O1, the contract change, is done (see "What O1 built"); no
-Satellite uses it yet.
+change 16, milestones O1 to O6). O1 to O4 are built (see "What O1 built" to "What O4 built"),
+and O5 reviewed them (see "Security review of O1 to O4"); O6 is left.
 
 ## What exists
 
@@ -127,8 +127,9 @@ anyway).
   for links, and log nothing of the path beyond what File Explorer already logs.
 - The answered `page` must be one of the provider's own pages; the client refuses anything
   else (the same check as `navigate`).
-- To review in O5: a race between the check and the read (a link swapped under the path), the
-  cost of re-checks on a long playlist (batched), and what an external track's tags may carry.
+- Reviewed in O5 (see "Security review of O1 to O4"): a race between the check and the read
+  (a link swapped under the path), the cost of re-checks on a long playlist (batched), and what
+  an external track's tags may carry.
 
 ## Android parity
 
@@ -212,3 +213,80 @@ a playlist going `missing`.
 - Decided while building: opening a library track shows its page (Play is one tap away, the
   contract's answer being a page, not a command); a like on an external track is not listed under
   Liked Songs (the library's view), and is dropped with the track, with its plays.
+
+## Security review of O1 to O4 (O5)
+
+Reviewed: the Engine's `files.open` validation and catalog, `capabilities.call` and
+`protection`, the HTTP gate and device credentials, File Explorer's `stat`, `locate` and
+`content`, Photos' and Music's `opening.py` and every Music route that reads a track's file,
+and both clients' `openers`, `locate` and the check of an answer.
+
+### What held
+
+- **One guard for paths.** Photos and Music never take a path from a client as it is: each
+  question goes to `files.browse` with the asking session, which resolves it (links followed)
+  and runs the protection check on where it really leads. A refusal there, whatever the reason,
+  is a 404 that says nothing more.
+- **The session.** `capabilities.call` runs the provider's route in-process, after the asking
+  route passed the HTTP gate, with the same token: File Explorer sees the same session as when
+  the user browses. StarCore has no per-user rights on Satellites, so nothing is reached that the
+  user could not reach in File Explorer.
+- **Device credentials** reach only the routes of their own capability's operations (Photos'
+  `backup/*`), never `open`, `file/*` or `gallery/file`.
+- **What the client opens.** Both clients take the answer as a page id (`[a-z][a-z0-9_-]{0,47}`)
+  and string params, and open it only in the Satellite they asked, only if it has a shared
+  interface; the answer cannot name another Satellite. A page id the provider does not have
+  opens that interface's entry page, as any unknown page does there. The `label` is checked by the Engine (1 to
+  40 characters) and drawn as text; an external track's tags are drawn as text like a library
+  track's.
+- **What is served.** Photos serves a file inline only as a picture or video type of its own
+  table (never SVG or HTML), with `nosniff` and `private, no-store`.
+- **Cost.** A re-check asks about at most 200 files at a time; ids are 64-bit hashes, not
+  guessable; the clean-up bounds the rows that opening many files leaves.
+
+### What it found, and the fixes
+
+1. **A protected area open for the session passed `stat`** (the guard lets an open area
+   through). Music would then keep an external track of a Locked Folder file (its tags, its
+   path, its transcodes), and Photos' **Add to library** would copy it into the library, outside
+   the area. Both now ask `starcore.capabilities.protection` themselves: Music refuses to open
+   such a file (403, "in a protected area"), Photos shows it (nothing is kept) but hides **Add to
+   library** ("In a protected area") and refuses `file/add` (403).
+2. **A file a protected area comes to hold** (the area's path set over an existing folder):
+   Music's re-check now asks the same question and drops the external track with everything kept
+   about it (tags, plays, likes, lyric offsets, transcodes, `opening.forget`); a playlist keeps
+   the entry, missing and nameless.
+3. **A link put in a track's way.** An external track is the file at the real path it was
+   opened at. When that path later leads elsewhere (a folder replaced by a link), the re-check
+   answered for the other file, and Music would have played it; it is now missing. Show in folder
+   is not offered for a missing track.
+4. **Lyrics beside an external track** were read without a check (a `.lrc` that is a link could
+   lead anywhere). Each one is now read only if `files.browse` lets this session browse it where
+   it is (`opening.readable`).
+5. **Copies left behind.** A transcode of an external track stayed in the cache after its file
+   left; it is dropped when the re-check finds the file gone and when the track is dropped
+   (`Transcoder.forget`). The stream of an external track is served `private, no-store`, as File
+   Explorer serves files, so the browser keeps no copy either.
+6. **Show in folder** was hidden for a library track in a container Music does not open by path
+   (`.mp4`): `location` now asks `stat` for any file, `open` still only for sounds.
+
+Tests: `test_music_open` (eight more) and `test_photo_open` (one more); each fails without its
+fix. The test of a lyric file that links elsewhere needs the right to make symbolic links (it is
+skipped where Windows does not give it); the test of a link in a track's way uses a junction
+there.
+
+### What stays, accepted
+
+- **The check and the read are two steps.** A link swapped in between them, in that instant,
+  is not caught, in Music as in File Explorer's own `content`; doing it needs write access to
+  the server's folders outside StarCore (File Explorer makes no links). A hard link to a
+  protected file is the same file to every check, as it is for File Explorer. An encrypted Locked
+  Folder holds only ciphertext, and the guard refuses it even when open.
+- **A file moved into the Locked Folder** leaves its external track missing with its title in
+  its playlists, as a library track does: the 404 says nothing about where a file went, on
+  purpose. The track is dropped with the rest after 30 days when nothing holds it.
+- **What a client keeps.** A track downloaded for offline listening stays on the phone, as any
+  file downloaded from File Explorer does; the path of a file opened in Photos is in the page's
+  address (the browser's history), as File Explorer's folders are.
+- **Tags are read by the same code as a scan** (and FFmpeg for a transcode), on files the user
+  could already put in a source by uploading them.

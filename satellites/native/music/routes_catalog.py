@@ -57,7 +57,7 @@ def tracks(call):
         return error_response(f"unknown track '{call.segment(0)}'")
     if page:
         # Show in folder: the file's path, only for a file this session may browse
-        track["location"] = opening.location(call.request, row["path"])
+        track["location"] = None if track["missing"] else opening.location(call.request, row["path"])
         track["library_note"] = "Not in the library" if track["external"] else ""
     track["liked"] = music.collection.is_favorite(call.user, "track", track["id"])
     track["plays"] = music.history.play_counts(call.user).get(track["id"], 0)
@@ -245,7 +245,10 @@ def lyrics(call):
         music.db.execute("INSERT INTO lyrics_offsets (user, track_id, offset_ms) VALUES (?, ?, ?) ON CONFLICT "
                          "(user, track_id) DO UPDATE SET offset_ms = excluded.offset_ms", (call.user, track_id, offset))
         return ok({"offset": offset})
-    found = lyric_files.lyrics(Path(row["path"]), call.query.get("language"))
+    # beside a sound from outside the library, a lyric file is read only if this session may
+    # browse it where it is (no link out of the folder)
+    allowed = (lambda entry: opening.readable(call.request, entry)) if row["external"] else None
+    found = lyric_files.lyrics(Path(row["path"]), call.query.get("language"), allowed)
     if found is None:
         return error_response("no lyrics were found for this track")
     found["offset"] = music.db.value("SELECT offset_ms FROM lyrics_offsets WHERE user = ? AND track_id = ?",

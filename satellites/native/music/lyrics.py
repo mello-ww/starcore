@@ -120,8 +120,10 @@ def sidecars(track_path: Path) -> list:
     return found
 
 
-def lyrics(track_path: Path, language: str = None):
-    candidates = sidecars(track_path)
+def lyrics(track_path: Path, language: str = None, allowed=None):
+    """The track's lyrics, from a sidecar file or its tags. `allowed`, when given, says which
+    sidecar files may be read at all."""
+    candidates = [(lang, path) for lang, path in sidecars(track_path) if allowed is None or allowed(path)]
     languages = sorted({lang for lang, _ in candidates if lang})
     chosen = None
     if language:

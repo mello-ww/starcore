@@ -133,6 +133,14 @@ class Transcoder:
         with self._locks_guard:
             return self._locks.setdefault(name, Lock())
 
+    def forget(self, track_id: str) -> None:
+        """Drops every finished transcode of this track (one in progress is left to finish)."""
+        try:
+            for path in self.cache_dir.glob(f"{track_id}-*"):
+                path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
     def _evict(self, keep: Path):
         try:
             files = [path for path in self.cache_dir.iterdir() if path.is_file() and not path.name.startswith(".")]

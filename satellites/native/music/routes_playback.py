@@ -10,6 +10,8 @@ from .library import MusicScanError
 from .routing import identifier, ok, route
 
 STREAM_CACHE = "private, max-age=3600"
+# a sound from outside the library is read fresh each time, as the browsing Satellite serves files
+EXTERNAL_CACHE = "private, no-store"
 QUALITIES = ("original", "high", "normal", "low")
 
 
@@ -42,10 +44,11 @@ def stream(call):
         path = music.track_path({"id": row["id"], "path": row["path"]})
     except MusicScanError as error:
         return error_response(str(error))
+    cache = EXTERNAL_CACHE if track["external"] else STREAM_CACHE
     if plan["delivery"] == "transcode":
         target = music.transcoder.transcode(row, plan)
-        return file_response(target, plan["content_type"], STREAM_CACHE)
-    return file_response(path, audio.CONTENT_TYPES.get(track["format"], "application/octet-stream"), STREAM_CACHE)
+        return file_response(target, plan["content_type"], cache)
+    return file_response(path, audio.CONTENT_TYPES.get(track["format"], "application/octet-stream"), cache)
 
 
 @route("GET")

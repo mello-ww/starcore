@@ -9,7 +9,7 @@ import shutil
 import tempfile
 import unittest
 
-from tests.support import start_engine, stop_engine
+from tests.support import protecting, start_engine, stop_engine
 from tests.test_photo import png
 
 
@@ -121,6 +121,21 @@ class PhotoOpenTest(unittest.TestCase):
         path.write_bytes(b"not a picture at all")
         status, _ = self.json("file/add", "POST", {"path": str(path)})
         self.assertEqual(status, 415)
+
+    def test_a_file_of_a_protected_area_is_shown_but_never_taken_in(self):
+        vault = self.outside / "vault"
+        vault.mkdir()
+        path = self.picture(folder=vault)
+        with protecting(vault):
+            status, view = self.json("gallery/file", path=str(path))
+            self.assertEqual((status, view["can_add"], view["library_note"]), (200, False, "In a protected area"))
+            self.assertEqual(self.request("file/content", path=str(path))[0], 200)
+            status, refused = self.json("file/add", "POST", {"path": str(path)})
+        self.assertEqual(status, 403)
+        self.assertIn("protected area", refused["error"])
+        # nothing was taken in: outside the area, the same file is still not in the library
+        status, view = self.json("gallery/file", path=str(path))
+        self.assertEqual((view["can_add"], view["library_note"]), (True, "Not in the library"))
 
 
 if __name__ == "__main__":

@@ -12,6 +12,11 @@ library query leaves it out, a scan leaves it alone). It is checked again, with 
 asking, each time it is played or its playlist is loaded: a file moved, deleted or locked since
 shows as missing, the state a playlist already has. One that no playlist, saved queue or recent
 play holds is dropped once it has not been used for a while.
+
+Nothing about a file of a protected area is kept: one is refused even while the session has the
+area open, and an external track whose file a protected area comes to hold is dropped (its tags,
+plays and transcodes) at its next check. A track keeps the real path it was opened at: when that
+path leads somewhere else later (a link put in its way), it is missing, never the other file.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -37,10 +42,10 @@ def _usable(path) -> bool:
     return isinstance(path, str) and bool(path) and len(path) <= 4096 and "\x00" not in path
 
 
-def stat(request, path):
+def browsed(request, path):
     """The file's {name, path, size, ...} as the browsing Satellite answers for this session, or
-    None: for everything that is not a sound the session may browse, whatever the reason."""
-    if not _usable(path) or PurePath(path).suffix.lower() not in OPENS:
+    None for anything that is not a file the session may browse, whatever the reason."""
+    if not _usable(path):
         return None
     answer = capabilities.call(request.engine, BROWSE, "stat", query={"path": path}, token=request.token)
     payload = getattr(answer, "payload", None)
@@ -49,10 +54,29 @@ def stat(request, path):
     return payload
 
 
+def stat(request, path):
+    """`browsed`, for a sound this Satellite plays (by its extension) only."""
+    if not _usable(path) or PurePath(path).suffix.lower() not in OPENS:
+        return None
+    return browsed(request, path)
+
+
+def readable(request, path) -> bool:
+    """Whether this session may browse the file at `path`, and `path` is where it really is (no
+    link on the way): what a file read beside an external track (its lyrics) must pass."""
+    found = browsed(request, str(path))
+    return found is not None and found.get("path") == str(path)
+
+
+def protected(request, path) -> bool:
+    """Whether `path` is in a protected area, open for this session or not."""
+    return capabilities.protection(request.engine, path, request.token).protected
+
+
 def location(request, path):
     """The file's path, if this session may browse it: what Show in folder asks about. The
     path is only ever handed to a client for a file it could open in the browsing Satellite."""
-    found = stat(request, path) if _usable(path) else None
+    found = browsed(request, path)
     return found["path"] if found else None
 
 
@@ -61,7 +85,9 @@ def location(request, path):
 def refresh(music, request, track_ids) -> None:
     """Asks again, for each external track among `track_ids`, whether this session may still
     read its file, and records the answer (`missing`) and the use (`last_used`). A file whose
-    size changed is read again, so its tags follow."""
+    size changed, or that comes back, is read again, so its tags follow. A file now in a
+    protected area takes its track with it; one gone, or whose path now leads elsewhere, leaves
+    no transcode behind."""
     ids = [track_id for track_id in dict.fromkeys(track_ids) if isinstance(track_id, str)]
     if not ids:
         return
@@ -72,13 +98,21 @@ def refresh(music, request, track_ids) -> None:
         rows += music.db.all(f"SELECT id, path, size, missing FROM tracks WHERE external = 1 AND id IN ({marks})", chunk)
     stamp = now()
     for row in rows[:CHECKED]:
+        if protected(request, row["path"]):
+            forget(music, [row["id"]])
+            continue
         found = stat(request, row["path"])
-        if found is not None and found.get("size") != row["size"]:
+        if found is not None and found.get("path") != row["path"]:
+            # the path now leads to another file (a link in its way): not the one that was opened
+            found = None
+        if found is not None and (found.get("size") != row["size"] or row["missing"]):
             try:
                 register(music, found)
                 continue
             except (OSError, audio.UnsupportedAudio):
                 found = None
+        if found is None and not row["missing"]:
+            music.transcoder.forget(row["id"])
         music.db.execute("UPDATE tracks SET missing = ?, last_used = ? WHERE id = ?",
                          (int(found is None), stamp, row["id"]))
 
@@ -131,18 +165,29 @@ def purge(music) -> int:
         return 0
     queues = "\n".join(row["state"] or "" for row in music.db.all("SELECT state FROM playback_state"))
     dropped = [track_id for track_id in candidates if track_id not in queues]
+    forget(music, dropped)
+    return len(dropped)
+
+
+def forget(music, track_ids) -> None:
+    """Drops these external tracks and everything kept about them: their tags, plays, likes,
+    lyric offsets and transcodes. A playlist keeps the entry, as missing, with no title."""
+    track_ids = list(track_ids)
     with music.db.transaction() as connection:
-        for track_id in dropped:
+        for track_id in track_ids:
             # keyed by the track's rowid: deleting by an UNINDEXED column would scan the whole index
-            rowid = connection.execute("SELECT rowid FROM tracks WHERE id = ?", (track_id,)).fetchone()
-            if rowid is not None:
-                connection.execute("DELETE FROM track_search WHERE rowid = ?", (rowid[0],))
+            rowid = connection.execute("SELECT rowid FROM tracks WHERE id = ? AND external = 1",
+                                       (track_id,)).fetchone()
+            if rowid is None:
+                continue
+            connection.execute("DELETE FROM track_search WHERE rowid = ?", (rowid[0],))
             connection.execute("DELETE FROM track_artists WHERE track_id = ?", (track_id,))
             connection.execute("DELETE FROM plays WHERE track_id = ?", (track_id,))
             connection.execute("DELETE FROM lyrics_offsets WHERE track_id = ?", (track_id,))
             connection.execute("DELETE FROM favorites WHERE kind = 'track' AND item_id = ?", (track_id,))
             connection.execute("DELETE FROM tracks WHERE id = ?", (track_id,))
-    return len(dropped)
+    for track_id in track_ids:
+        music.transcoder.forget(track_id)
 
 
 # ---------- the route ----------
@@ -161,6 +206,9 @@ def open_file(call):
     held = music.db.one("SELECT id FROM tracks WHERE path = ? AND external = 0", (found["path"],))
     if held is not None:
         return ok({"page": "track", "params": {"id": held["id"]}})
+    if protected(call.request, found["path"]):
+        # even while the session has the area open: playing it here would mean keeping its tags
+        return error_response("this file is in a protected area, so it can't be kept here", status=403)
     try:
         track_id = register(music, found)
     except (OSError, audio.UnsupportedAudio):

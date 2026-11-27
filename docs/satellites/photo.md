@@ -562,6 +562,8 @@ browse?) and then `content`, so that Satellite's roots and the protected areas a
 the user browses; anything else is a 404. The `file` page (`gallery/file?path=`) shows the
 picture (or the video, in the shared viewer), whether the library holds a file of that name and
 size, **Add to library** (`POST file/add`, the same checks as an import, which brings the item
-back from the recycle bin if it was there) and **Show in folder**. The library's viewers carry
+back from the recycle bin if it was there) and **Show in folder**. A file of a protected area
+is shown while the session has the area open, but never added: the page says "In a protected
+area" and `file/add` answers 403, since a copy in the library would be outside it. The library's viewers carry
 **Show in folder** too (`locate`, on the item's source folder, shown only for an item that has
 one).

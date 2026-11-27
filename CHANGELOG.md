@@ -204,6 +204,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Security
 
+- **Opening a file by its path keeps nothing of a protected area.** The review of "Opens with"
+  (`docs/open-with-audit.md`) found that a Locked Folder file, while the session had it open,
+  could become a Music track (its tags and transcodes kept) or be copied into Photos' library.
+  Both now refuse it (403); Photos still shows it. A Music track from outside the library whose
+  file a protected area comes to hold is dropped with all it kept, one whose path comes to lead
+  elsewhere is missing instead of playing the other file, lyrics beside it are read only where the
+  session may browse them, and its transcodes and browser copy no longer outlive its file.
 - **A phone is never told its photos are safe when nobody knows.** The phone's backup asks the
   server which files it already has. When a protected store (the Locked Folder) could not
   answer, every file the library didn't have was reported as already there, so the phone would

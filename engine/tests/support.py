@@ -1,9 +1,12 @@
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest import SkipTest, mock
 import io
+import os
 import shutil
 import tempfile
 
+from starcore import capabilities
 from starcore.auth import AuthStore
 from starcore.cli.audit import AuditLog
 from starcore.core import StarCore
@@ -56,3 +59,30 @@ def every_block(blocks):
     for block in blocks:
         yield block
         yield from every_block(block.get("blocks", []))
+
+
+def protecting(folder):
+    """starcore.capabilities.protection answering as a files.protected provider would for an
+    area at `folder` that the session has open: protected, and open. Only what asks through the
+    module sees it (the browsing Satellite's own guard keeps the real answer, so it lets the
+    files through, as it does for an area open for the session)."""
+    area = Path(folder).resolve()
+
+    def protection(engine, path, token="", tree=False):
+        if Path(path).resolve().is_relative_to(area):
+            return capabilities.Protection(True, True, None)
+        return capabilities.UNPROTECTED
+
+    return mock.patch.object(capabilities, "protection", protection)
+
+
+def link_folder(link, target):
+    """A link at `link` to the folder `target`: a symbolic link, or a junction where Windows
+    gives no right to make one."""
+    try:
+        os.symlink(target, link, target_is_directory=True)
+    except OSError:
+        if os.name != "nt":
+            raise SkipTest("no symbolic links here")
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))

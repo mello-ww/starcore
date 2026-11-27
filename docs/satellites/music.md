@@ -272,7 +272,14 @@ Satellite's roots and the protected areas apply as when the user browses; anythi
   expansion and the track page ask `files.browse` again with the asking session
   (`opening.refresh`): a file moved, deleted or put in the Locked Folder since is `missing`
   (the state a playlist already has), and comes back when the file does. A file whose size
-  changed is read again. The file is read only after that check.
+  changed is read again. The file is read only after that check, and only at the real path it
+  was opened at: a path that comes to lead elsewhere (a link in its way) is missing too. Its
+  stream is served `private, no-store`, and its transcodes are dropped once the file is gone.
+- **Nothing of a protected area.** A file in a protected area is refused (403) even while the
+  session has the area open, and an external track whose file a protected area comes to hold is
+  dropped at its next check with everything kept about it (`opening.forget`); its playlist
+  entries stay, missing. Lyrics beside an external track are read only if the session may
+  browse them where they are.
 - **Dropped after a while.** One that no playlist, saved queue or play of the last 30 days
   holds, and that was not used for that long, is deleted (`opening.purge`, run at each open)
   with its plays and lyric offsets. Nothing about a file the session may not browse is stored.

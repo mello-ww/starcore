@@ -409,7 +409,9 @@ item's file in File Explorer. The audit and the plan: [`open-with-audit.md`](ope
 - [x] O2 File Explorer: `stat` and `locate`, "Opens with" on the file page.
 - [x] O3 Photos: open by path, its page for a file outside the library, Show in folder.
 - [x] O4 Music: open by path, external tracks (direct playback, playlists), Show in folder.
-- [ ] O5 security review of O1 to O4.
+- [x] O5 security review of O1 to O4: a protected area open for the session is never kept by
+      Music nor taken into Photos' library, a track's path that comes to lead elsewhere is missing,
+      lyrics beside an outside sound are checked, its transcodes and the browser's copy go with it.
 - [ ] O6 runs on the web demo and the emulator, docs, a new APK.
 - [x] File Explorer names media types the way a desktop file manager does ("MP4 video",
       "M4A audio", "BMP image"), and a long field value (a folder's path) takes a line of its

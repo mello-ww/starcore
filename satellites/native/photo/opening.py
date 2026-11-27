@@ -7,7 +7,9 @@ exactly as when the user browses. A file the user may not browse is a 404, never
 exists. This module names no other Satellite.
 
 A path opens the `file` page: the picture or the video, read through the browsing Satellite's
-`content`, with an "Add to library" action when the library does not hold it yet.
+`content`, with an "Add to library" action when the library does not hold it yet. A file of a
+protected area is shown while the session has the area open (nothing about it is kept), but never
+taken into the library: it leaves that area only through the area's own way out.
 """
 
 import mimetypes
@@ -52,6 +54,11 @@ def stat(request, path):
     return payload, None
 
 
+def protected(request, path) -> bool:
+    """Whether `path` is in a protected area, open for this session or not."""
+    return capabilities.protection(request.engine, path, request.token).protected
+
+
 def open_route(request):
     """POST open {path} -> {page, params}: the page of this interface that shows the file."""
     if request.method != "POST":
@@ -81,6 +88,7 @@ def file_view(request):
         return failure
     photo = in_library(request.satellite, found)
     kind = kind_of(found["path"])
+    shielded = protected(request, found["path"])
     return json_response({
         "name": found["name"],
         "path": found["path"],
@@ -89,8 +97,9 @@ def file_view(request):
         "size": found["size"],
         "is_image": kind == "image",
         "is_video": kind == "video",
-        "library_note": "In the library" if photo is not None else "Not in the library",
-        "can_add": photo is None,
+        "library_note": ("In the library" if photo is not None else
+                         "In a protected area" if shielded else "Not in the library"),
+        "can_add": photo is None and not shielded,
         "id": photo["id"] if photo else None,
         # a video is drawn by the shared viewer, from this one tile
         "videos": [{"key": found["path"], "title": found["name"], "kind": kind, "size": found["size"]}]
@@ -125,6 +134,9 @@ def add(request):
     found, failure = stat(request, body.get("path"))
     if failure is not None:
         return failure
+    if protected(request, found["path"]):
+        # even while the session has the area open: a copy in the library would be outside it
+        return error_response("this file is in a protected area, so it can't be added to the library", status=403)
     answer = capabilities.call(request.engine, BROWSE, "content", query={"path": found["path"]}, token=request.token)
     source = getattr(answer, "path", None)
     if answer is None or answer.status != 200 or source is None:
