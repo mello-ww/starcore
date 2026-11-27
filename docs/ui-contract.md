@@ -489,8 +489,12 @@ collection: the document says where each picture comes from and what can be done
 - **`viewer`**: full screen, over everything. It shows `image` (the tile's own when absent), or
   plays `video` in place for a video, with the client's own player controls; on Android only
   the item on screen has a player. `title`, `subtitle`, up to 12 `fields` (`{label, value,
-  format, unit}`, shown under Details, empty ones left out) and up to 8 `actions`
-  (`{label, action, icon, style, visible}`) on the item shown. Left and right (arrow keys on
+  format, unit, href}`, shown under Details, empty ones left out) and up to 8 `actions`
+  (`{label, action, icon, style, visible}`) on the item shown. A field's `href` (1.2, contract
+  change 15) makes its value a link that opens in the browser: a template that starts with
+  `https://` (or `http://`), a host and `/` before any binding, its bindings URL-encoded, so a
+  value can never change where it leads. The Engine refuses it in a protected document, and the
+  offline check ignores what only a link binds. Left and right (arrow keys on
   the web, a swipe on Android and on a touch screen's browser) move between items; Escape or
   Back closes it. A web swipe is one finger, over 40 px and well wider than tall, and a swipe
   that starts on a video stays the player's. After an action's
@@ -506,9 +510,11 @@ collection: the document says where each picture comes from and what can be done
   On the web it shows on hover or focus, always while active and always on a touch screen; on
   Android always. It hides while selecting and in the media picker; no secure action here.
 - **`selection`**: up to 4 `actions`. "Select" (or a long press on Android, or Shift-click on
-  the web) starts a selection; the bar shows the count and the actions. An action runs once
-  per selected item with that item as `$.`; its `confirm` is asked once, its `then` applies
-  once at the end, and a count of failures is shown if any.
+  the web) starts a selection; the bar shows the count, "Select all" (every item loaded so far)
+  and the actions. An action's `visible` is read against the page (`$.editable`, say), since
+  it acts on many items. An action runs once per selected item with that item as `$.`; its
+  `confirm` is asked once, its `then` applies once at the end, and a count of failures is shown
+  if any.
 - **`layout`** (change 7): `grid` (the default) or `row`, one row of tiles that scrolls
   sideways (a shelf), at the grid's `size`, with no paging, density control or selection.
   Android draws a horizontal list that snaps to its tiles; the web a scroll-snapping row with
@@ -643,6 +649,11 @@ focus, text and caret while the results reload, on both clients.
   page data then needs no items, only `bounds` (the block's `bounds` binding) for the map to fit
   first, so a map of any number of items stays a bounded answer. A late answer is dropped, and a
   failed one keeps what is shown with "Try again".
+- **Cluster preview** (`viewport.preview`, optional, 1.2, contract change 15): a route like
+  `located?bbox={$value.bbox}&preview=12`, where `$value.bbox` is a provider cluster's bounds.
+  Its answer has the page data's shape, with the cluster's newest items one by one. On the web a
+  tap on the cluster shows them in its popup with "Zoom in"; on Android the map zooms into the
+  cluster and the viewer opens on them. Without it, or if it fails, a tap only zooms in.
 - Each client draws with the map it already had: Mission Control with Leaflet and
   OpenStreetMap tiles (loaded only when a map is shown), the Android app with
   react-native-maps, which needs a Google Maps key in `android/gradle.properties` to draw

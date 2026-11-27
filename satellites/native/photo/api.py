@@ -65,6 +65,8 @@ def gallery_route(request):
         if path == ("backup",):
             return json_response(gallery.backup_view(backup.device_list(request)))
         if path == ("map",):
+            if request.query.get("preview") not in (None, ""):
+                return json_response(gallery.map_preview(request.satellite, request.query))
             return json_response(gallery.map_view(request.satellite, gallery.viewport(request.query),
                                                   overview=request.query.get("overview") == "1"))
     except AlbumNotFound as error:
@@ -306,11 +308,7 @@ def _album_add_photo(request, store, album_id, body):
             photo_ids = gallery.picked_ids(request.satellite, body["items"])
         except ValueError as error:
             return error_response(str(error), status=400)
-        album = store.get(album_id)
-        if album is None:
-            raise AlbumNotFound(f"unknown album '{album_id}'")
-        for photo_id in photo_ids:
-            album = store.add_photo(album_id, photo_id)
+        album = store.add_photos(album_id, photo_ids)  # one save for the whole pick
         count = len(photo_ids)
         return json_response({**album, "message": f"Added {count} {'item' if count == 1 else 'items'}."})
 

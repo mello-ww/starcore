@@ -120,7 +120,7 @@ export function MapBlock({block, scope, context}: {block: UiBlock; scope: Scope;
   const {color: accent} = useAccent();
   const item = (block.item ?? {}) as Record<string, any>;
   const {mediaSource, runAction, load} = context;
-  const viewport = block.viewport as {route?: string} | undefined;
+  const viewport = block.viewport as {route?: string; preview?: string} | undefined;
   const map = useRef<MapView>(null);
 
   const source = useCallback(
@@ -225,8 +225,10 @@ export function MapBlock({block, scope, context}: {block: UiBlock; scope: Scope;
   const [zoom, setZoom] = useState(() => (initial ? zoomFor(initial.longitudeDelta) : 2));
   const groups = useMemo(() => points.filter(point => point.count > 1), [points]);
   const clusters = useMemo(() => clusterPoints(points.filter(point => point.count <= 1), zoom), [points, zoom]);
-  // the viewer, open on one marker's items: their keys, so it follows the page's fresh data
-  const [viewing, setViewing] = useState<{keys: string[]; start: string} | null>(null);
+  // the viewer, open on one marker's items: their keys, so it follows the page's fresh data; a
+  // provider's cluster opens on its preview instead, which isn't among the markers drawn
+  const [viewing, setViewing] = useState<{keys: string[]; start: string; preview?: MapPoint[]} | null>(null);
+  const previewToken = useRef(0);
 
   if (!initial) {
     const empty = block.empty !== undefined ? resolve(block.empty, scope) : null;
@@ -245,7 +247,37 @@ export function MapBlock({block, scope, context}: {block: UiBlock; scope: Scope;
     }
   };
 
-  const viewed = viewing ? points.filter(point => viewing.keys.includes(point.key)) : [];
+  // a provider's cluster: the map zooms into it, and with a `preview` route the viewer opens on
+  // its newest items too
+  const openGroup = (group: MapPoint) => {
+    map.current?.animateToRegion(
+      group.area && (group.area[0] !== group.area[2] || group.area[1] !== group.area[3])
+        ? regionFor([{lat: group.area[0], lon: group.area[1]}, {lat: group.area[2], lon: group.area[3]}])
+        : {latitude: group.lat, longitude: group.lon, latitudeDelta: 0.05, longitudeDelta: 0.05},
+      300,
+    );
+    if (!viewport?.preview || !load || !block.viewer) {
+      return;
+    }
+    const area = group.area ?? [group.lat, group.lon, group.lat, group.lon];
+    const route = resolveTemplate(viewport.preview, {...scope, value: {bbox: area.join(',')}});
+    if (!isSafeRoute(route)) {
+      return;
+    }
+    const mine = ++previewToken.current;
+    load(route)
+      .then(data => {
+        const preview = locate(resolve(block.items, {...scope, data: data ?? {}, page: data ?? {}}), scope).filter(
+          point => point.count <= 1,
+        );
+        if (mine === previewToken.current && preview.length) {
+          setViewing({keys: preview.map(point => point.key), start: preview[0].key, preview});
+        }
+      })
+      .catch(() => undefined);  // the zoom already shows the cluster's area
+  };
+
+  const viewed = viewing ? viewing.preview ?? points.filter(point => viewing.keys.includes(point.key)) : [];
   const entries = viewed.map((point, index) => ({
     item: point.item,
     key: point.key,
@@ -280,14 +312,7 @@ export function MapBlock({block, scope, context}: {block: UiBlock; scope: Scope;
             title=""
             thumb={source(item.image, group.scope)}
             accent={accent}
-            onPress={() =>
-              map.current?.animateToRegion(
-                group.area && (group.area[0] !== group.area[2] || group.area[1] !== group.area[3])
-                  ? regionFor([{lat: group.area[0], lon: group.area[1]}, {lat: group.area[2], lon: group.area[3]}])
-                  : {latitude: group.lat, longitude: group.lon, latitudeDelta: 0.05, longitudeDelta: 0.05},
-                300,
-              )
-            }
+            onPress={() => openGroup(group)}
           />
         ))}
         {clusters.map(cluster => (

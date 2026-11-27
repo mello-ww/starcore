@@ -271,6 +271,27 @@ export function resolveTemplate(template, context) {
     });
 }
 
+// a viewer field's link (change 15): scheme and host fixed, before any binding
+const HREF = /^(https?:\/\/[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*(?::[0-9]{1,5})?)\/[^\s\\]*$/;
+
+/** A viewer field's `href` as an address, or null: its bindings URL-encoded, and only when it
+ * stays on the scheme and host the document wrote itself. */
+export function resolveLink(template, context) {
+    if (typeof template !== "string" || template.length > 2048) {
+        return null;
+    }
+    const start = HREF.exec(template);
+    if (!start) {
+        return null;
+    }
+    const address = resolveTemplate(template, context);
+    try {
+        return new URL(address).origin === new URL(`${start[1]}/`).origin ? address : null;
+    } catch {
+        return null;
+    }
+}
+
 /** Whether a resolved route stays beneath its Satellite - never a Core
  * endpoint, another Satellite or another host. */
 export function isSafeRoute(route) {

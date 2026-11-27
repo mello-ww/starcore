@@ -136,6 +136,16 @@
       ]}}}
     },
     {
+      "name": "cluster-preview-and-field-link",
+      "_why": "1.2, change 15: a map whose provider clusters show their own items (viewport.preview, $value.bbox the cluster's bounds), and a viewer field that links to an address on a host the document names.",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "map", "items": "$.items", "bounds": "$.bounds",
+         "item": {"lat": "$.lat", "lon": "$.lon", "key": "$.id", "count": "$.count", "bounds": "$.area"},
+         "viewport": {"route": "located?bbox={$value.bbox}&zoom={$value.zoom}", "preview": "located?bbox={$value.bbox}&preview=12"},
+         "viewer": {"fields": [{"label": "Place", "value": "$.place", "href": "https://maps.example.org/?lat={$.lat}&lon={$.lon}#here"}]}}
+      ]}}}
+    },
+    {
       "name": "pick-action",
       "_why": "1.2: the client's media picker chooses from whichever Satellite provides media.gallery, then the action's route gets the references as $value.",
       "document": {"contract": "starcore.ui/1.2", "requires": {"client": ["media.picker"], "capabilities": ["media.gallery"]},
@@ -734,6 +744,36 @@
       "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [
         {"type": "button", "label": "Go", "action": {"route": "go", "body": {"zoom": "$value.zoom"}}}]}}},
       "error": "needs starcore.ui/1.2"
+    },
+    {
+      "name": "cluster-preview-off-the-satellite",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "map", "items": "$.items", "item": {"lat": "$.lat", "lon": "$.lon"},
+         "viewport": {"route": "located?bbox={$value.bbox}", "preview": "/api/other?bbox={$value.bbox}"}}]}}},
+      "error": "must be relative"
+    },
+    {
+      "name": "field-link-with-a-bound-host",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": "$.items", "item": {"image": "t/{$.id}"},
+         "viewer": {"fields": [{"label": "Site", "value": "$.site", "href": "https://{$.host}/page"}]}}]}}},
+      "error": "href"
+    },
+    {
+      "name": "field-link-in-a-protected-document",
+      "_why": "what a protected document shows stays in it: no link to anywhere else",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "protected": {"capability": "media.vault", "setup": "setup"}, "pages": {
+        "home": {"source": {"route": "items"}, "blocks": [{"type": "media-grid", "items": "$.items", "item": {"image": "t/{$.id}"},
+          "viewer": {"fields": [{"label": "Place", "value": "$.place", "href": "https://maps.example.org/?lat={$.lat}"}]}}]},
+        "setup": {"source": {"route": "status"}, "blocks": [{"type": "text", "text": "$.message"}]}}},
+      "error": "links nowhere"
+    },
+    {
+      "name": "field-link-not-https",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [
+        {"type": "media-grid", "items": "$.items", "item": {"image": "t/{$.id}"},
+         "viewer": {"fields": [{"label": "Run", "value": "$.x", "href": "javascript:alert(1)//"}]}}]}}},
+      "error": "href"
     },
     {
       "name": "viewport-without-route",

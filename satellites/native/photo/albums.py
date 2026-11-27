@@ -150,6 +150,16 @@ class AlbumStore:
             self._save()
         return album
 
+    def add_photos(self, album_id: str, photo_ids) -> dict:
+        """Adds each of `photo_ids` not already there, in order, with one save for them all."""
+        album = self._require(album_id)
+        added = [photo_id for photo_id in dict.fromkeys(photo_ids) if photo_id not in album["photo_ids"]]
+        if added:
+            album["photo_ids"].extend(added)
+            album["updated_at"] = _now()
+            self._save()
+        return album
+
     def remove_photo(self, album_id: str, photo_id: str) -> dict:
         album = self._require(album_id)
         if photo_id in album["photo_ids"]:

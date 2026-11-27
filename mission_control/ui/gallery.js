@@ -5,7 +5,7 @@
 // full-screen viewer with the document's facts and actions on the item shown. It knows the
 // contract, never a Satellite: everything it shows and does comes from the block.
 
-import { formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveTemplate } from "./contract.js";
+import { formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveLink, resolveTemplate } from "./contract.js";
 import { icon } from "./icons.js";
 import { createListPaging } from "./listpaging.js";
 
@@ -695,7 +695,17 @@ export function createGallery(host) {
         if (grid.resizable) {
             actions.appendChild(sizeControl(block, grid));  // a new size keeps the selection
         }
-        for (const entry of (block.selection.actions || []).filter((item) => host.canRun(item.action))) {
+        if (count < grid.keys.length && (!picking || picking.multiple)) {
+            const all = el("button", "ui-pill", "Select all");
+            all.type = "button";
+            all.title = "Select every item loaded so far";
+            all.addEventListener("click", () => selectAll(block, grid));
+            actions.appendChild(all);
+        }
+        // an action can depend on the page (an album only its owner may change)
+        const offered = (block.selection.actions || []).filter((item) => host.canRun(item.action)
+            && (item.visible === undefined || isVisible(resolve(item.visible, grid.scope))));
+        for (const entry of offered) {
             const button = actionButton(entry, grid.scope);
             button.disabled = count === 0;
             button.addEventListener("click", () => runOnSelection(block, grid, entry, button));
@@ -706,6 +716,23 @@ export function createGallery(host) {
         cancel.addEventListener("click", () => clearSelection(block, grid));
         actions.appendChild(cancel);
         bar.appendChild(actions);
+    }
+
+    /** Every item loaded so far: what a later page brings is not selected for the user. */
+    function selectAll(block, grid) {
+        grid.keys.forEach((key, at) => {
+            grid.selected.add(key);
+            grid.chosen.set(key, grid.items[at]);
+            const tile = grid.tiles.get(key);
+            if (tile) {
+                tile.classList.add("is-selected");
+                tile.setAttribute("aria-pressed", "true");
+            }
+        });
+        renderSelectionBar(block, grid);
+        if (picking) {
+            picking.onChange([...grid.chosen.values()]);
+        }
     }
 
     async function runOnSelection(block, grid, entry, button) {
@@ -985,7 +1012,20 @@ export function createGallery(host) {
                     continue;
                 }
                 panel.appendChild(el("dt", null, field.label));
-                panel.appendChild(el("dd", null, formatValue(value, field.format, field.unit !== undefined ? resolve(field.unit, scope) : undefined)));
+                const text = formatValue(value, field.format, field.unit !== undefined ? resolve(field.unit, scope) : undefined);
+                const address = field.href !== undefined ? resolveLink(field.href, scope) : null;
+                const detail = el("dd");
+                if (address) {
+                    // a field's link (change 15): the address opens in a new tab, telling it nothing
+                    const link = el("a", "ui-viewer-link", text);
+                    link.href = address;
+                    link.target = "_blank";
+                    link.rel = "noopener noreferrer";
+                    detail.appendChild(link);
+                } else {
+                    detail.textContent = text;
+                }
+                panel.appendChild(detail);
             }
             chrome.appendChild(panel);
         }

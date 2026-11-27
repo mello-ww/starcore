@@ -124,9 +124,13 @@ the owner 2026-11-15).
   `mobile/src/photo/` (with its tests), its routes in `MainTabs.tsx` and its `DEDICATED_SCREENS`
   entry. The Satellite publishes no page of its own; `KNOWN_IMPORTS` lost `MainTabs.tsx` and
   `KNOWN_COUPLINGS` its Photo count.
-- [ ] Optional, from the audit: the summary's tools note (#5), album group hints (#6), bulk
-  remove from an album (#10), map cluster preview (#15), exposure details and map link (#20),
-  select all and bulk routes (#23), one album save per pick (#32).
+- [x] Optional, from the audit: the summary's tools note (#5), the bin as a tile and album
+  group hints (#6), bulk remove from an album (#10), map cluster preview (#15), exposure details
+  and map link (#20), select all and bulk unfavorite (#23), one album save per pick (#32).
+  Contract change 15: a viewer field's `href`, a map's `viewport.preview`. Left out, still
+  optional: adding a selection to an album (a selection can't `choose`, and the library's
+  selection has its 4 actions), bulk routes (each selected item is still one request), and
+  orientation among the details (thumbnails are already turned upright).
 
 ## 4. The Locked Folder through `media.vault` (R3)
 

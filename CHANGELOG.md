@@ -7,6 +7,15 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Photos' optional points.** Select all in a grid's selection, and Unfavorite on many
+  photos at once; Remove from album on a selection (in an album of one's own); the recycle bin
+  as a tile beside the folders, and a sentence when there are no phone folders or albums yet;
+  the photo's details show Exposure (aperture, shutter, ISO, focal length) and a Location that
+  opens OpenStreetMap; the library says when Pillow or FFmpeg is missing on the server; a
+  cluster on the map shows its newest photos (a popup on the web, the viewer on Android); and
+  adding picked photos to an album saves it once. UI contract 1.2 change 15 adds a viewer
+  field's `href` and a map's `viewport.preview`; a selection action's `visible` is read against
+  the page on both clients.
 - **The Android player applies Normalize volume and Music's accent, and hides what it doesn't
   apply.** Normalize runs a compressor and limiter on the app's audio session (Android 9 and
   later); the floating and full players take StarCore's accent, a colour of one's own or the

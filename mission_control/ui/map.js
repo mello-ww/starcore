@@ -196,21 +196,24 @@ export function createMaps(host) {
         return route && isSafeRoute(route) ? `${host.satelliteBase}/${route}` : null;
     }
 
-    function open(block, entry, points, index) {
+    function open(block, entry, points, index, preview = false) {
         const point = points[index];
         if (block.viewer) {
-            entry.viewing = points.map((each) => each.key);
+            // a cluster's preview isn't among the markers drawn, so fresh data can't follow it
+            entry.viewing = preview ? null : points.map((each) => each.key);
             host.gallery.view(block, points.map((each) => each.item), entry.scope, point.key);
         } else if (block.action) {
             host.runAction(block.action, point.scope);
         }
     }
 
-    function popup(block, entry, points) {
+    /** A marker's items, as thumbnails; a provider's cluster passes its whole `total` and a way to
+     * zoom into it, since only a preview of its items is here. */
+    function popup(block, entry, points, cluster) {
         const body = el("div", "ui-map-popup");
-        const title = block.item.title !== undefined && points.length === 1 ? resolve(block.item.title, points[0].scope) : null;
+        const title = block.item.title !== undefined && points.length === 1 && !cluster ? resolve(block.item.title, points[0].scope) : null;
         body.appendChild(el("p", "ui-map-popup-title",
-            title !== null && title !== undefined && title !== "" ? String(title) : `${points.length} here`));
+            title !== null && title !== undefined && title !== "" ? String(title) : `${cluster ? cluster.total : points.length} here`));
         const grid = el("div", "ui-map-popup-grid");
         points.slice(0, POPUP_THUMBNAILS).forEach((point, index) => {
             const button = el("button", "ui-map-popup-thumb");
@@ -230,7 +233,7 @@ export function createMaps(host) {
             }
             button.addEventListener("click", () => {
                 entry.map.closePopup();
-                open(block, entry, points, index);
+                open(block, entry, points, index, Boolean(cluster));
             });
             grid.appendChild(button);
         });
@@ -240,11 +243,59 @@ export function createMaps(host) {
             more.type = "button";
             more.addEventListener("click", () => {
                 entry.map.closePopup();
-                open(block, entry, points, 0);
+                open(block, entry, points, 0, Boolean(cluster));
             });
             body.appendChild(more);
         }
+        if (cluster) {
+            const zoom = el("button", "ui-pill ui-map-popup-more", "Zoom in");
+            zoom.type = "button";
+            zoom.addEventListener("click", () => {
+                entry.map.closePopup();
+                cluster.zoom();
+            });
+            body.appendChild(zoom);
+        }
         return body;
+    }
+
+    /** A provider's cluster, tapped: with a `preview` route, its newest items in a popup (and a way
+     * to zoom in); without one, or if the preview can't be loaded, the map zooms into it. */
+    function openCluster(block, entry, point, marker) {
+        const zoom = () => {
+            if (point.area && (point.area[0] !== point.area[2] || point.area[1] !== point.area[3])) {
+                entry.map.fitBounds([[point.area[0], point.area[1]], [point.area[2], point.area[3]]], { padding: [32, 32] });
+            } else {
+                entry.map.setView([point.lat, point.lon], Math.min(entry.map.getZoom() + 3, 19));
+            }
+        };
+        const area = point.area || [point.lat, point.lon, point.lat, point.lon];
+        const route = block.viewport?.preview && host.load
+            ? resolveTemplate(block.viewport.preview, { ...entry.scope, value: { bbox: area.join(",") } })
+            : null;
+        if (!route || !isSafeRoute(route)) {
+            zoom();
+            return;
+        }
+        const token = entry.token;
+        host.load(route).then((data) => {
+            const items = located(block, { ...entry.scope, data: data || {}, page: data || {} })
+                .filter((each) => each.count <= 1);
+            if (token !== entry.token || !entry.map) {
+                return;  // the map moved on meanwhile
+            }
+            if (!items.length) {
+                zoom();
+                return;
+            }
+            const content = popup(block, entry, items, { total: point.count, zoom });
+            window.L.popup({ className: "ui-map-leaflet-popup", maxWidth: 280 })
+                .setLatLng(marker.getLatLng()).setContent(content).openOn(entry.map);
+        }).catch(() => {
+            if (token === entry.token) {
+                zoom();
+            }
+        });
     }
 
     function draw(block, entry) {
@@ -259,13 +310,7 @@ export function createMaps(host) {
                 iconAnchor: [14, 14],
             });
             const marker = L.marker([point.lat, point.lon], { icon, keyboard: true, title: `${point.count} items` });
-            marker.on("click", () => {
-                if (point.area && (point.area[0] !== point.area[2] || point.area[1] !== point.area[3])) {
-                    entry.map.fitBounds([[point.area[0], point.area[1]], [point.area[2], point.area[3]]], { padding: [32, 32] });
-                } else {
-                    entry.map.setView([point.lat, point.lon], Math.min(entry.map.getZoom() + 3, 19));
-                }
-            });
+            marker.on("click", () => openCluster(block, entry, point, marker));
             entry.markers.addLayer(marker);
         }
         for (const cluster of clusterPoints(entry.points.filter((each) => each.count <= 1), entry.map.getZoom())) {

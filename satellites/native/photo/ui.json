@@ -11,11 +11,12 @@
   ],
   "pages": {
     "library": {
-      "offline": {"omit": ["location", "folder"]},
+      "offline": {"omit": ["location", "lat", "lon", "folder"]},
       "state": {"group": "month"},
       "source": {"route": "gallery?limit=120&group={$state.group}"},
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary"},
+        {"type": "text", "style": "caption", "text": "$.tools", "visible": "$.tools"},
         {"type": "button", "label": "Import from a folder", "style": "secondary", "action": {"navigate": "import"}},
         {"type": "choice", "key": "group", "label": "Group by",
          "options": [{"value": "month", "label": "Month"}, {"value": "camera", "label": "Camera"}, {"value": "all", "label": "All"}]},
@@ -42,12 +43,12 @@
               {"label": "Taken", "value": "$.taken", "format": "datetime"},
               {"label": "Length", "value": "$.duration", "format": "duration"},
               {"label": "Size", "value": "$.size", "format": "bytes"},
-              {"label": "Dimensions", "value": "$.dimensions"},
-              {"label": "Resolution", "value": "$.megapixels"},
+              {"label": "Dimensions", "value": "$.resolution"},
+              {"label": "Exposure", "value": "$.exposure"},
               {"label": "Format", "value": "$.format"},
               {"label": "Camera", "value": "$.camera"},
               {"label": "Lens", "value": "$.lens"},
-              {"label": "Location", "value": "$.location"},
+              {"label": "Location", "value": "$.location", "href": "https://www.openstreetmap.org/?mlat={$.lat}&mlon={$.lon}#map=16/{$.lat}/{$.lon}"},
               {"label": "Folder", "value": "$.folder"},
               {"label": "File", "value": "$.title"},
               {"label": "Imported", "value": "$.imported", "format": "datetime"}
@@ -69,6 +70,8 @@
             "actions": [
               {"label": "Favorite", "icon": "heart",
                "action": {"route": "albums/favorites/photos", "body": {"photo_id": "$.id"}, "then": "refresh"}},
+              {"label": "Unfavorite", "icon": "heart",
+               "action": {"route": "albums/favorites/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}},
               {"label": "Move to Locked Folder", "icon": "lock",
                "action": {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id", "confirm": "Move the selected items to the Locked Folder? They leave Photos and stay behind your PIN.", "then": "refresh"}},
               {"label": "Move to bin", "icon": "trash-2", "style": "danger",
@@ -113,12 +116,12 @@
               {"label": "Taken", "value": "$.taken", "format": "datetime"},
               {"label": "Length", "value": "$.duration", "format": "duration"},
               {"label": "Size", "value": "$.size", "format": "bytes"},
-              {"label": "Dimensions", "value": "$.dimensions"},
-              {"label": "Resolution", "value": "$.megapixels"},
+              {"label": "Dimensions", "value": "$.resolution"},
+              {"label": "Exposure", "value": "$.exposure"},
               {"label": "Format", "value": "$.format"},
               {"label": "Camera", "value": "$.camera"},
               {"label": "Lens", "value": "$.lens"},
-              {"label": "Location", "value": "$.location"},
+              {"label": "Location", "value": "$.location", "href": "https://www.openstreetmap.org/?mlat={$.lat}&mlon={$.lon}#map=16/{$.lat}/{$.lon}"},
               {"label": "Folder", "value": "$.folder"},
               {"label": "File", "value": "$.title"},
               {"label": "Imported", "value": "$.imported", "format": "datetime"}
@@ -148,7 +151,7 @@
           "id": "places",
           "items": "$.items",
           "bounds": "$.bounds",
-          "viewport": {"route": "gallery/map?bbox={$value.bbox}&zoom={$value.zoom}"},
+          "viewport": {"route": "gallery/map?bbox={$value.bbox}&zoom={$value.zoom}", "preview": "gallery/map?bbox={$value.bbox}&preview=12"},
           "empty": "No photos have location data yet. Photos with GPS metadata will appear here automatically.",
           "item": {"lat": "$.lat", "lon": "$.lon", "key": "$.id", "image": "thumbnails/{$.cover}", "title": "$.title", "kind": "$.kind",
                    "count": "$.count", "bounds": "$.bounds"},
@@ -161,12 +164,12 @@
               {"label": "Taken", "value": "$.taken", "format": "datetime"},
               {"label": "Length", "value": "$.duration", "format": "duration"},
               {"label": "Size", "value": "$.size", "format": "bytes"},
-              {"label": "Dimensions", "value": "$.dimensions"},
-              {"label": "Resolution", "value": "$.megapixels"},
+              {"label": "Dimensions", "value": "$.resolution"},
+              {"label": "Exposure", "value": "$.exposure"},
               {"label": "Format", "value": "$.format"},
               {"label": "Camera", "value": "$.camera"},
               {"label": "Lens", "value": "$.lens"},
-              {"label": "Location", "value": "$.location"},
+              {"label": "Location", "value": "$.location", "href": "https://www.openstreetmap.org/?mlat={$.lat}&mlon={$.lon}#map=16/{$.lat}/{$.lon}"},
               {"label": "Folder", "value": "$.folder"},
               {"label": "File", "value": "$.title"},
               {"label": "Imported", "value": "$.imported", "format": "datetime"}
@@ -188,7 +191,7 @@
       ]
     },
     "albums": {
-      "offline": {"omit": ["location", "folder"]},
+      "offline": {"omit": ["location", "lat", "lon", "folder"]},
       "source": {"route": "gallery/albums"},
       "blocks": [
         {"type": "actions", "blocks": [
@@ -198,7 +201,6 @@
              "submit": {"label": "Create album",
                         "action": {"route": "albums", "body": {"name": "$form.name"}, "then": {"navigate": "album", "params": {"id": "$.id"}}}}}
           ]},
-          {"type": "button", "label": "Recycle bin", "style": "secondary", "action": {"navigate": "trash"}},
           {"type": "button", "label": "Phone backup", "style": "secondary", "action": {"navigate": "backup"}},
           {"type": "button", "label": "Settings", "style": "secondary", "action": {"navigate": "settings"}}
         ]},
@@ -211,9 +213,12 @@
           "item": {"image": "thumbnails/{$.cover}", "key": "$.id", "title": "$.title", "subtitle": "$.subtitle", "group": "$.group", "icon": "$.icon"},
           "open": [
             {"visible": "$.section", "action": {"section": "$.section"}},
+            {"visible": "$.trash", "action": {"navigate": "trash"}},
             {"action": {"navigate": "album", "params": {"id": "$.id"}}}
           ]
-        }
+        },
+        {"type": "text", "style": "caption", "text": "$.folders_hint", "visible": "$.folders_hint"},
+        {"type": "text", "style": "caption", "text": "$.albums_hint", "visible": "$.albums_hint"}
       ]
     },
     "backup": {
@@ -292,7 +297,7 @@
     "album": {
       "title": "$.name",
       "params": ["id"],
-      "offline": {"omit": ["location", "folder"]},
+      "offline": {"omit": ["location", "lat", "lon", "folder"]},
       "source": {"route": "gallery/albums/{$params.id}?limit=120"},
       "blocks": [
         {"type": "text", "style": "caption", "text": "$.summary"},
@@ -332,10 +337,11 @@
               {"label": "Taken", "value": "$.taken", "format": "datetime"},
               {"label": "Length", "value": "$.duration", "format": "duration"},
               {"label": "Size", "value": "$.size", "format": "bytes"},
-              {"label": "Dimensions", "value": "$.dimensions"},
+              {"label": "Dimensions", "value": "$.resolution"},
+              {"label": "Exposure", "value": "$.exposure"},
               {"label": "Format", "value": "$.format"},
               {"label": "Camera", "value": "$.camera"},
-              {"label": "Location", "value": "$.location"},
+              {"label": "Location", "value": "$.location", "href": "https://www.openstreetmap.org/?mlat={$.lat}&mlon={$.lon}#map=16/{$.lat}/{$.lon}"},
               {"label": "File", "value": "$.title"}
             ],
             "actions": [
@@ -355,6 +361,8 @@
           },
           "selection": {
             "actions": [
+              {"label": "Remove from album", "icon": "x", "visible": "$.editable",
+               "action": {"route": "albums/{$params.id}/photos/remove", "body": {"photo_id": "$.id"}, "then": "refresh"}},
               {"label": "Move to Locked Folder", "icon": "lock",
                "action": {"secure": {"capability": "media.vault", "operation": "move_in"}, "item": "$.id", "confirm": "Move the selected items to the Locked Folder? They leave Photos and stay behind your PIN.", "then": "refresh"}},
               {"label": "Move to bin", "icon": "trash-2", "style": "danger",

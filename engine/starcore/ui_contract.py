@@ -149,6 +149,9 @@ FIRST_SEGMENT = re.compile(r"^[A-Za-z0-9_-]+$")
 SEGMENT = re.compile(r"^[A-Za-z0-9_.~%-]+$")
 QUERY = re.compile(r"^[A-Za-z0-9_.~%&=+-]*$")
 PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
+# a viewer field's link (change 15): its scheme and host are fixed, before any binding, and it
+# holds no space or backslash a browser would read its own way
+HREF_START = re.compile(r"^https?://[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*(:[0-9]{1,5})?/[^\s\\]*$")
 BINDING_ROOTS = ("$.", "$page.", "$params.", "$form.", "$state.", "$sources.", "$value.")
 BINDING_WORDS = {"$", "$value", "$page", "$params", "$form", "$state", "$sources"}
 
@@ -633,7 +636,7 @@ class _Validator:
             elif isinstance(value, list):
                 for item in value:
                     visit(item, key)
-            elif isinstance(value, str):
+            elif isinstance(value, str) and key != "href":  # a link only goes, nothing is shown by it
                 if key == "key" and value.startswith("$."):
                     needed.update(value[2:].split("."))
                 for expression in TEMPLATE_PLACEHOLDER.findall(value):
@@ -1238,8 +1241,11 @@ class _Validator:
             if not isinstance(viewport, dict):
                 self.error(f"{where}.viewport", "must be {route}")
             else:
-                self.unknown_keys(f"{where}.viewport", viewport, {"route"})
+                self.unknown_keys(f"{where}.viewport", viewport, {"route", "preview"})
                 self.check_route(f"{where}.viewport.route", viewport.get("route"))
+                if "preview" in viewport:
+                    # a provider cluster's own items (change 15), with {$value.bbox} its bounds
+                    self.check_route(f"{where}.viewport.preview", viewport["preview"])
         if "bounds" in block:
             self.check_binding(f"{where}.bounds", block["bounds"])
 
@@ -1267,7 +1273,7 @@ class _Validator:
             if not isinstance(field, dict):
                 self.error(at, "must be an object")
                 continue
-            self.unknown_keys(at, field, {"label", "value", "format", "unit"})
+            self.unknown_keys(at, field, {"label", "value", "format", "unit", "href"})
             if not isinstance(field.get("label"), str):
                 self.error(at, "needs a 'label'")
             if "value" not in field:
@@ -1278,8 +1284,23 @@ class _Validator:
                 self.check_format(f"{at}.format", field["format"])
             if "unit" in field:
                 self.check_text(f"{at}.unit", field["unit"])
+            if "href" in field:
+                self.check_href(f"{at}.href", field["href"])
         if "actions" in viewer:
             self.check_media_actions(f"{where}.actions", viewer["actions"], LIMITS["viewer_actions"])
+
+    def check_href(self, where: str, template):
+        """A viewer field's link (change 15): an address on a host the document names itself,
+        https:// (or http://) and the host fixed, bindings only after them, each URL-encoded by
+        the client. A protected document links nowhere: what it shows stays in it."""
+        if self.protected:
+            self.error(where, "a protected document links nowhere outside it")
+            return
+        if not isinstance(template, str) or len(template) > 2048 or not HREF_START.match(template):
+            self.error(where, "must start with https:// (or http://), a host and /, before any binding")
+            return
+        for expression in PLACEHOLDER.findall(template):
+            self.check_binding(where, expression)
 
     def check_media_actions(self, where: str, actions, limit: int, required: bool = False,
                             secure: bool = True, icon: bool = False, files: bool = True,

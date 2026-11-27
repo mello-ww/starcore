@@ -186,7 +186,10 @@ class PhotoUiDocumentTest(unittest.TestCase):
         # the document names none of them, and nothing about the vault is in it
         grid = next(block for block in blocks if block["type"] == "media-grid")
         self.assertEqual(grid["open"], [{"visible": "$.section", "action": {"section": "$.section"}},
+                                        {"visible": "$.trash", "action": {"navigate": "trash"}},
                                         {"action": {"navigate": "album", "params": {"id": "$.id"}}}])
+        # the recycle bin is a tile among the folders now, not a button of its own
+        self.assertEqual([block for block in every_block(blocks) if block.get("label") == "Recycle bin"], [])
         text = json.dumps({key: value for key, value in self.document.items() if not key.startswith("_")})
         self.assertNotIn("LockedFolder", text)
         self.assertNotIn('"own": "locked"', text)
@@ -332,7 +335,65 @@ class PhotoGalleryApiTest(unittest.TestCase):
         # the client groups consecutive tiles, so Favorites heads the Folders group, before the
         # Locked Folder and the phone's folders
         self.assertEqual(tiles, [("Favorites", "Folders"), ("Locked Folder", "Folders"), ("Camera", "Folders"),
-                                 ("Holidays", "Albums")])
+                                 ("Recycle bin", "Folders"), ("Holidays", "Albums")])
+
+    def test_the_recycle_bin_is_a_folder_tile_and_empty_groups_say_what_they_hold(self):
+        photos = self.import_photos("a.png", "b.png")
+        view = self.json_request("/api/satellites/photo/gallery/albums")[1]
+        binned = next(tile for tile in view["albums"] if tile.get("trash"))
+        self.assertEqual((binned["title"], binned["subtitle"], binned["icon"], binned["group"]),
+                         ("Recycle bin", "Empty", "trash-2", "Folders"))
+        self.assertIn("phone folder", view["folders_hint"])
+        self.assertIn("Create one", view["albums_hint"])
+
+        self.json_request(f"/api/satellites/photo/trash/{photos['a.png']['id']}", "POST")
+        self.json_request("/api/satellites/photo/albums", "POST", {"name": "Holidays"})
+        view = self.json_request("/api/satellites/photo/gallery/albums")[1]
+        self.assertEqual(next(tile for tile in view["albums"] if tile.get("trash"))["subtitle"], "1 item")
+        self.assertIsNone(view["albums_hint"])
+        # a search for albums never offers the bin, which isn't an album
+        found = self.json_request("/api/satellites/photo/gallery/search?q=recycle")[1]
+        self.assertEqual(found["albums"], [])
+
+    def test_a_pick_is_added_to_an_album_with_one_save(self):
+        from unittest import mock
+        from satellites.native.photo.albums import AlbumStore
+        photos = self.import_photos("a.png", "b.png", "c.png")
+        album = self.json_request("/api/satellites/photo/albums", "POST", {"name": "Trip"})[1]
+        picked = [{"provider": "Photo", "capability": "media.gallery", "id": photo["id"], "kind": "image"}
+                  for photo in photos.values()]
+        with mock.patch.object(AlbumStore, "_save", autospec=True, side_effect=AlbumStore._save) as save:
+            status, answer = self.json_request(f"/api/satellites/photo/albums/{album['id']}/photos", "POST",
+                                               {"items": picked + picked[:1]})
+        self.assertEqual(status, 200)
+        self.assertEqual(save.call_count, 1)
+        self.assertEqual(answer["photo_ids"], [photo["id"] for photo in photos.values()])
+        self.assertEqual(answer["message"], "Added 3 items.")
+
+    def test_the_library_says_which_tools_the_server_lacks(self):
+        from unittest import mock
+        from satellites.native.photo import gallery, images, videos
+        with mock.patch.object(images, "thumbnails_available", return_value=True),                 mock.patch.object(videos, "thumbnails_available", return_value=True):
+            self.assertIsNone(gallery.tools_note())
+        with mock.patch.object(images, "thumbnails_available", return_value=False),                 mock.patch.object(videos, "thumbnails_available", return_value=False):
+            note = gallery.tools_note()
+        self.assertIn("Pillow", note)
+        self.assertIn("FFmpeg", note)
+        self.assertIn("tools", self.json_request("/api/satellites/photo/gallery")[1])
+
+    def test_exposure_is_one_line_and_dimensions_carry_the_resolution(self):
+        from satellites.native.photo import gallery
+        photo = {"id": "p1", "width": 4032, "height": 3024, "media_type": "image",
+                 "metadata": {"megapixels": 12.2, "aperture": 1.8, "shutter_speed": "1/120", "iso": 100,
+                              "focal_length": 4.25, "gps_latitude": 48.85, "gps_longitude": 2.35}}
+        shown = gallery.item(photo, set())
+        self.assertEqual(shown["exposure"], "f/1.8 · 1/120 s · ISO 100 · 4.25 mm")
+        self.assertEqual(shown["resolution"], "4032 × 3024 · 12.2 MP")
+        self.assertEqual((shown["lat"], shown["lon"]), (48.85, 2.35))
+        long_exposure = gallery.item({**photo, "metadata": {"shutter_speed": "2s"}}, set())
+        self.assertEqual(long_exposure["exposure"], "2 s")
+        self.assertIsNone(gallery.item({"id": "p2", "metadata": {}}, set())["exposure"])
+        self.assertIsNone(gallery.item({"id": "p2", "metadata": {}}, set())["lat"])
 
     def test_a_hosted_satellite_is_a_folder_tile_while_it_is_enabled(self):
         from starcore import capabilities
@@ -667,6 +728,21 @@ class PhotoGalleryApiTest(unittest.TestCase):
         self.import_photos("plain.png")
         located = self.json_request("/api/satellites/photo/gallery/map")[1]
         self.assertEqual((located["items"], located["summary"]), ([], None))
+
+    def test_a_cluster_preview_lists_the_newest_photos_in_its_bounds(self):
+        photos = self.import_photos("a.png", "b.png", "c.png", "far.png")
+        for name, lat in (("a.png", 48.80), ("b.png", 48.81), ("c.png", 48.82)):
+            self.locate(photos[name]["id"], lat, 2.3)
+        self.locate(photos["far.png"]["id"], 10.0, 10.0)
+
+        status, preview = self.json_request("/api/satellites/photo/gallery/map?bbox=48.7,2.2,48.9,2.4&preview=2")
+        self.assertEqual(status, 200)
+        self.assertEqual(preview["count"], 3)
+        self.assertEqual(len(preview["items"]), 2)
+        self.assertTrue(all(item["count"] == 1 and item["cover"] == item["id"] for item in preview["items"]))
+        self.assertNotIn(photos["far.png"]["id"], [item["id"] for item in preview["items"]])
+        for query in ("bbox=48.7,2.2,48.9,2.4&preview=0", "bbox=48.7,2.2,48.9,2.4&preview=61", "bbox=x&preview=3"):
+            self.assertEqual(self.json_request(f"/api/satellites/photo/gallery/map?{query}")[0], 400, query)
 
 
 if __name__ == "__main__":

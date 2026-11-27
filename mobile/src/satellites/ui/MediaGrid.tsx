@@ -1,6 +1,6 @@
 import React, {memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState} from 'react';
 import {
-  ActivityIndicator, Animated, FlatList, Image, Modal, Pressable, ScrollView, StatusBar, StyleSheet,
+  ActivityIndicator, Animated, FlatList, Image, Linking, Modal, Pressable, ScrollView, StatusBar, StyleSheet,
   Text, useWindowDimensions, View,
 } from 'react-native';
 import {GestureDetector, GestureHandlerRootView, type GestureType} from 'react-native-gesture-handler';
@@ -14,7 +14,7 @@ import {useReducedMotion} from '../../components/motion';
 import {MemoryImages, useImageSource} from './memoryImages';
 import {keptPages} from './offline';
 import {tokens, useAccent} from '../../theme';
-import {formatValue, isIconName, isSafeRoute, isVisible, resolve, resolveTemplate, type Scope, type OwnIcons, type UiAction, type UiBlock} from './contract';
+import {formatValue, isIconName, isSafeRoute, isVisible, resolve, resolveLink, resolveTemplate, type Scope, type OwnIcons, type UiAction, type UiBlock} from './contract';
 import type {BlockContext} from './UiBlocks';
 import {holdPlayerAside} from '../../media/ui/dock';
 import {RowMenuSheet} from './RowMenu';
@@ -404,6 +404,11 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
     setSelecting(false);
   }, []);
 
+  // every item loaded so far: what a later page brings is not selected for the person
+  const selectAll = useCallback(() => {
+    setSelected(new Map(entriesRef.current.map(entry => [entry.key, entry.item])));
+  }, []);
+
   const runOnSelection = useCallback(
     async (action: UiAction) => {
       // everything selected, on whichever loaded page it is
@@ -449,15 +454,19 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
   // which secure actions can run changes only with the catalog: the bar is rebuilt then, never on
   // every render (the context is a new object each time, and the bar is the screen's overlay)
   const offered = (block.selection as {actions?: any[]} | undefined)?.actions;
+  // an action can also depend on the page (an album only its owner may change)
   const canRunHere = (Array.isArray(offered) ? offered : [])
-    .map((entry: any) => (canRun(context, entry?.action) ? '1' : '0'))
+    .map((entry: any) =>
+      canRun(context, entry?.action) && (entry?.visible === undefined || isVisible(resolve(entry.visible, scope))) ? '1' : '0',
+    )
     .join('');
+  const loaded = entries.length;
   const latest = useRef({scope, runOnSelection, context});
   latest.current = {scope, runOnSelection, context};
   const selection = block.selection as {actions?: any[]} | undefined;
   const selectionBar = useMemo(() => {
-    const selectionActions: any[] = (Array.isArray(selection?.actions) ? selection!.actions! : []).filter(entry =>
-      canRun(latest.current.context, entry?.action),
+    const selectionActions: any[] = (Array.isArray(selection?.actions) ? selection!.actions! : []).filter((_, at) =>
+      canRunHere[at] === '1',
     );
     if (!block.selection || !selecting || picking) {
       return null;
@@ -468,6 +477,9 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
           {selected.size ? `${selected.size} selected` : 'Select items'}
         </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectionActions}>
+          {selected.size < loaded && (
+            <ActionPill entry={{label: 'Select all'}} scope={latest.current.scope} disabled={busy} onPress={selectAll} />
+          )}
           {selectionActions.map((entry, index) => (
             <ActionPill
               key={index}
@@ -481,7 +493,7 @@ export function useMediaGrid(block: UiBlock, scope: Scope, context: BlockContext
         </ScrollView>
       </View>
     );
-  }, [block.selection, selection, selecting, selected, busy, clearSelection, picking, canRunHere]);
+  }, [block.selection, selection, selecting, selected, busy, clearSelection, selectAll, picking, canRunHere, loaded]);
   useEffect(() => {
     setOverlay?.(selectionBar);
   }, [setOverlay, selectionBar]);
@@ -1187,14 +1199,26 @@ export function MediaViewer({
         <View style={styles.viewerBottom} pointerEvents="box-none">
           {info && fields.length > 0 && (
             <ScrollView style={styles.details} contentContainerStyle={styles.detailsContent} testID="media-details">
-              {fields.map((field, at) => (
-                <View key={at} style={styles.detailRow}>
-                  <Text style={[type.caption, styles.detailLabel]}>{String(field.label)}</Text>
-                  <Text style={styles.detailValue}>
-                    {formatValue(resolve(field.value, scope), field.format, field.unit !== undefined ? asText(resolve(field.unit, scope)) : undefined)}
-                  </Text>
-                </View>
-              ))}
+              {fields.map((field, at) => {
+                const text = formatValue(resolve(field.value, scope), field.format, field.unit !== undefined ? asText(resolve(field.unit, scope)) : undefined);
+                const link = field.href !== undefined ? resolveLink(field.href, scope) : null;
+                return (
+                  <View key={at} style={styles.detailRow}>
+                    <Text style={[type.caption, styles.detailLabel]}>{String(field.label)}</Text>
+                    {link ? (
+                      <Text
+                        style={[styles.detailValue, styles.detailLink]}
+                        accessibilityRole="link"
+                        accessibilityHint="Opens in your browser"
+                        onPress={() => Linking.openURL(link).catch(() => undefined)}>
+                        {text}
+                      </Text>
+                    ) : (
+                      <Text style={styles.detailValue}>{text}</Text>
+                    )}
+                  </View>
+                );
+              })}
             </ScrollView>
           )}
           {actions.length > 0 && (
@@ -1411,5 +1435,6 @@ const styles = StyleSheet.create({
   detailRow: {flexDirection: 'row', gap: space.md},
   detailLabel: {width: 96},
   detailValue: {...type.caption, color: palette.text, flex: 1},
+  detailLink: {textDecorationLine: 'underline'},
   viewerActions: {gap: space.sm, paddingHorizontal: space.xs, alignItems: 'center'},
 });

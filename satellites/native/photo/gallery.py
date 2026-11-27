@@ -14,6 +14,7 @@ GET gallery/trash             what's in the recycle bin, with the days each item
 GET gallery/import            the default import folder and the formats an import takes in
 GET gallery/search?q=&kind=   photos and albums matching a search, for the shared Search page
 GET gallery/map               every photo with a location, for the shared Map page
+GET gallery/map?bbox=&preview=   a cluster's newest photos, for the map's preview of it
 GET gallery/backup            the devices that back up here (backup.py), for the Phone backup page
 GET media?kinds=              the media.gallery capability's list: what a picker may offer
 
@@ -81,6 +82,24 @@ def _camera(metadata: dict):
     return " ".join(part for part in (make, model) if part) or None
 
 
+def _number(value) -> str:
+    return f"{value:g}" if isinstance(value, (int, float)) and not isinstance(value, bool) else ""
+
+
+def _exposure(metadata: dict):
+    """Aperture, shutter, ISO and focal length in one line, as a camera shows them
+    ("f/1.8 · 1/120 s · ISO 100 · 4.2 mm"), or None when the photo has none of them."""
+    aperture, focal, iso = _number(metadata.get("aperture")), _number(metadata.get("focal_length")), metadata.get("iso")
+    shutter = metadata.get("shutter_speed")
+    parts = [
+        f"f/{aperture}" if aperture else None,
+        f"{shutter.rstrip('s')} s" if isinstance(shutter, str) and shutter else None,
+        f"ISO {iso}" if isinstance(iso, int) and not isinstance(iso, bool) and iso > 0 else None,
+        f"{focal} mm" if focal else None,
+    ]
+    return " · ".join(part for part in parts if part) or None
+
+
 def item(photo: dict, favorites: set) -> dict:
     """One photo or video as the gallery shows it."""
     metadata = photo.get("metadata") or {}
@@ -88,6 +107,9 @@ def item(photo: dict, favorites: set) -> dict:
     video = photo.get("media_type") == "video"
     width, height = photo.get("width"), photo.get("height")
     favorite = photo["id"] in favorites
+    spot = _located(photo)
+    dimensions = f"{width} × {height}" if width and height else None
+    megapixels = f"{metadata['megapixels']} MP" if metadata.get("megapixels") else None
     return {
         "id": photo["id"],
         "title": photo.get("filename") or photo["id"],
@@ -98,12 +120,18 @@ def item(photo: dict, favorites: set) -> dict:
         "date": format_value(_epoch(taken), "date") if taken else None,
         "imported": _epoch(_moment(photo.get("imported_at"))),
         "size": photo.get("size"),
-        "dimensions": f"{width} × {height}" if width and height else None,
-        "megapixels": f"{metadata['megapixels']} MP" if metadata.get("megapixels") else None,
+        "dimensions": dimensions,
+        "megapixels": megapixels,
+        # the viewer's Dimensions line: both in one field, which leaves room for Exposure
+        "resolution": " · ".join(part for part in (dimensions, megapixels) if part) or None,
+        "exposure": _exposure(metadata),
         "format": (photo.get("format") or "").upper() or None,
         "camera": _camera(metadata),
         "lens": metadata.get("lens_model"),
         "location": metadata.get("gps_coordinates"),
+        # the location's own coordinates, for the viewer's link to a map
+        "lat": spot[0] if spot else None,
+        "lon": spot[1] if spot else None,
         "folder": photo.get("physical_path"),
         "favorite": favorite,
         "can_favorite": not favorite,
@@ -230,7 +258,18 @@ def library_view(satellite, limit=None, cursor=None, group="month") -> dict:
         "items": items,
         "next": following,
         "summary": _summary(len(photos), sum(photo.get("size") or 0 for photo in photos)),
+        "tools": tools_note(),
     }
+
+
+def tools_note():
+    """What the server lacks to draw thumbnails, as Photo's own page said it, or None."""
+    missing = []
+    if not images.thumbnails_available():
+        missing.append("Pillow is not installed on the server, so photos show as their originals instead of thumbnails")
+    if not videos.thumbnails_available():
+        missing.append("FFmpeg is not installed on the server, so videos have no preview frame")
+    return (". ".join(missing) + ".") if missing else None
 
 
 def section_tiles(satellite, engine) -> list:
@@ -265,7 +304,21 @@ def albums_view(satellite, engine=None) -> dict:
     } for album in listed]
     pinned = sum(1 for album in listed if album.get("kind") == "favorites")
     tiles[pinned:pinned] = section_tiles(satellite, engine)
-    return {"albums": tiles}
+    # the recycle bin, last among the folders, as the card Photo's own page showed
+    binned = len(photo_library.trashed(configuration.trash_retention_days(satellite)))
+    folders_end = max((index + 1 for index, tile in enumerate(tiles) if tile["group"] == "Folders"), default=0)
+    tiles.insert(folders_end, {"id": "trash", "title": "Recycle bin", "group": "Folders", "cover": "", "icon": "trash-2",
+                               "subtitle": f"{binned} {'item' if binned == 1 else 'items'}" if binned else "Empty",
+                               "trash": True})
+    physical = any(album.get("kind") == "physical" for album in listed)
+    custom = any(album.get("kind", "virtual") == "virtual" for album in listed)
+    return {
+        "albums": tiles,
+        # what an empty group would hold, as Photo's own page said under each heading
+        "folders_hint": None if physical else
+        "No phone folders yet. Map one in Settings, or back up a phone, and its album appears here.",
+        "albums_hint": None if custom else "No albums of your own yet. Create one to gather photos from anywhere in the library.",
+    }
 
 
 def album_view(satellite, album_id: str, limit=None, cursor=None) -> dict:
@@ -325,7 +378,8 @@ def search_view(satellite, query=None, kind=None, limit=None, cursor=None) -> di
     if kind in ("image", "video"):
         photos = [photo for photo in photos if ("video" if photo.get("media_type") == "video" else "image") == kind]
     # album names are matched on the first page only: they are few, and the later pages are photos
-    albums = [album for album in albums_view(satellite)["albums"] if text in album["title"].lower()] if cursor is None else []
+    albums = [album for album in albums_view(satellite)["albums"]
+              if not album.get("trash") and text in album["title"].lower()] if cursor is None else []
     count = len(photos)
     shown, following = page(photos, limit, cursor)
     summary = (f"{count} {'result' if count == 1 else 'results'}" if count
@@ -428,6 +482,33 @@ def map_view(satellite, area=None, overview=False) -> dict:
             "kind": "image",
         })
     return {"items": items, "summary": summary, "visible": len(shown)}
+
+
+PREVIEW_LIMIT = 60
+
+
+def map_preview(satellite, query) -> dict:
+    """A cluster's preview (the map's `viewport.preview`): the newest `preview` photos (1-60)
+    located in `bbox` (south,west,north,east, the cluster's bounds), one by one, and how many
+    the area holds in all."""
+    try:
+        south, west, north, east = (float(part) for part in str(query.get("bbox")).split(","))
+        limit = int(query.get("preview"))
+    except (TypeError, ValueError):
+        raise ViewportError("'bbox' must be south,west,north,east and 'preview' a whole number")
+    if not (-90 <= south <= north <= 90 and -180 <= west <= 180 and -180 <= east <= 180 and 1 <= limit <= PREVIEW_LIMIT):
+        raise ViewportError(f"'bbox' is out of range, or 'preview' is not between 1 and {PREVIEW_LIMIT}")
+    favorites = _favorites(satellite)
+
+    def inside(spot):
+        across = west <= spot[1] <= east if west <= east else (spot[1] >= west or spot[1] <= east)
+        return south <= spot[0] <= north and across
+
+    shown = [(photo, spot) for photo in library(satellite).all() if (spot := _located(photo)) and inside(spot)]
+    shown.sort(key=lambda member: _newest_first(member[0]), reverse=True)
+    return {"items": [{**item(photo, favorites), "lat": spot[0], "lon": spot[1], "count": 1, "cover": photo["id"]}
+                      for photo, spot in shown[:limit]],
+            "count": len(shown)}
 
 
 def media_view(satellite, kinds=None, limit=None, cursor=None) -> dict:

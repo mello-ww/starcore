@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import test from "node:test";
 
-import { checkDocument, isSafeRoute, isVisible, resolve, resolveTemplate } from "../ui/contract.js";
+import { checkDocument, isSafeRoute, isVisible, resolve, resolveLink, resolveTemplate } from "../ui/contract.js";
 import { itemKey, mediaKind, tileAction, tileIcon } from "../ui/gallery.js";
 
 const NATIVE = new URL("../../satellites/native/", import.meta.url);
@@ -61,4 +61,19 @@ test("Photo's albums open a section tile through the section action, and name no
     assert.deepEqual(tileAction(grid, { data: section }, all), { section: "$.section" });
     assert.equal(tileAction(grid, { data: { id: "album-1" } }, all).navigate, "album");
     assert.equal(tileIcon(grid, { data: section }), "lock");
+});
+
+test("a viewer field's link stays on its own host, its bindings encoded", () => {
+    const template = "https://maps.example.org/?mlat={$.lat}&mlon={$.lon}";
+    assert.equal(resolveLink(template, { data: { lat: 48.5, lon: 2 } }), "https://maps.example.org/?mlat=48.5&mlon=2");
+    assert.equal(resolveLink(template, { data: { lat: "1&x=@evil.example", lon: 2 } }),
+        "https://maps.example.org/?mlat=1%26x%3D%40evil.example&mlon=2");
+    assert.equal(resolveLink("{$.url}", { data: { url: "https://evil.example/" } }), null);
+    assert.equal(resolveLink("javascript:alert(1)//x/", { data: {} }), null);
+    const photo = read("photo");
+    const fields = photo.pages.library.blocks.flatMap(function find(block) {
+        return [...(block.viewer?.fields || []), ...(block.blocks || []).flatMap(find)];
+    });
+    const located = fields.find((field) => field.href);
+    assert.ok(resolveLink(located.href, { data: { lat: 1, lon: 2 } }).startsWith("https://www.openstreetmap.org/"));
 });
