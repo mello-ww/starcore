@@ -369,11 +369,13 @@ mechanisms first, since several Satellites use them, then each Satellite's items
       the app's audio session (`DynamicsProcessing`, Android 9 and later, with Mission
       Control's compressor and limiter settings), and the accent colours the floating player
       and the full player (StarCore's, a colour of one's own, or the cover's, sampled by
-      Mission Control's rule in `media/ArtworkPalette.kt`). Gapless playback, crossfade and
-      the player theme, density and visualizer stay Mission Control's: the page hides them on
-      Android through a block's `requires` (contract change 14) and the client capabilities
-      `media.audio-gapless`, `-crossfade`, `-theme`, `-density` and `-visualizer`, which only
-      Mission Control claims. Lining up the next track needs a second player in the AudioHost.
+      Mission Control's rule in `media/ArtworkPalette.kt`). Crossfade and the player theme,
+      density and visualizer stay Mission Control's: the page hides them on Android through a
+      block's `requires` (contract change 14) and the client capabilities `media.audio-crossfade`,
+      `-theme`, `-density` and `-visualizer`, which only Mission Control claims. Gapless
+      playback now runs on Android too (`media.audio-gapless`): the AudioHost keeps a second
+      player that loads the next track, paused, 25 seconds before the end and starts it the
+      moment the current one ends.
       Checking it found an older fault, now fixed: an Android form kept the values of its
       first drawing, before the page's data came, so a select showed no choice and a saved one
       seemed lost. A form now follows its data until the person changes something in it.

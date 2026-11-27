@@ -177,6 +177,8 @@ export interface PlaybackPreferences {
   replaygain: 'off' | 'track' | 'album';
   normalize: boolean;
   crossfade: number;
+  /** the next track starts the moment one ends (on unless turned off) */
+  gapless?: boolean;
   equalizer: Equalizer;
   bass_boost: number;
   speed: number;

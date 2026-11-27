@@ -91,6 +91,122 @@ describe('PlayerController', () => {
     expect(player.state.track?.id).toBe(tracks[1].id);
   });
 
+  describe('gapless playback', () => {
+    const flush = () => new Promise<void>(resolve => setImmediate(() => resolve()));
+
+    async function nearTheEnd(player: PlayerController) {
+      await player.playTracks(tracks, 0, 'album:ab01ab01ab01ab01');
+      player.onLoad(200);
+      for (const second of [170, 172, 174, 176]) {
+        player.onProgress(second);
+      }
+      await flush();
+    }
+
+    it('loads the next track on the second player, paused, near the end of the current one', async () => {
+      const {player} = setup();
+      await player.playTracks(tracks, 0);
+      player.onLoad(200);
+      player.onProgress(100);
+      await flush();
+      expect(player.state.standby).toBeNull();
+      player.onProgress(176);
+      await flush();
+      expect(player.state.standby).toMatchObject({role: 'next', track: {id: tracks[1].id}, position: 1, ready: false});
+      expect(player.state.standby?.source.uri).toContain(tracks[1].id);
+      expect(player.state.standby?.key).not.toBe(player.state.sourceKey);
+      // what plays now is untouched
+      expect(player.state.track?.id).toBe(tracks[0].id);
+      expect(player.state.volume).toBeCloseTo(Math.pow(10, -6 / 20));
+    });
+
+    it('starts the loaded next track the moment the current one ends, on the other player', async () => {
+      const {player, api, effects} = setup();
+      await nearTheEnd(player);
+      const next = player.state.standby!;
+      player.onStandbyLoad(next.key, 210);
+      const before = {deck: player.state.deck, key: player.state.sourceKey, source: player.state.source};
+      effects.setEqualizer.mockClear();
+      await player.onEnd();
+      expect(player.state.track?.id).toBe(tracks[1].id);
+      expect(player.state.queue.position).toBe(1);
+      expect(player.state.deck).toBe(before.deck === 0 ? 1 : 0);
+      expect(player.state.sourceKey).toBe(next.key);
+      expect(player.state.source).toBe(next.source);
+      expect(player.state.playing).toBe(true);
+      expect(player.state.duration).toBe(210);
+      expect(api.playback).toHaveBeenCalledTimes(2);
+      // the one that ended stays, with its key, until the new one has played
+      expect(player.state.standby).toMatchObject({role: 'retired', key: before.key, source: before.source});
+      expect(effects.setEqualizer).toHaveBeenCalled();
+      player.onNativePlaying(true);
+      expect(player.state.standby?.role).toBe('retired');
+      player.onProgress(1);
+      expect(player.state.standby?.role).toBe('retired');
+      player.onProgress(3);
+      expect(player.state.standby).toBeNull();
+      expect(api.recordPlay).toHaveBeenCalledWith(tracks[0].id, 6, 'mobile-device-1', 'album:ab01ab01ab01ab01');
+    });
+
+    it('skips at once to a next track that is already loaded', async () => {
+      const {player} = setup();
+      await nearTheEnd(player);
+      player.onStandbyLoad(player.state.standby!.key, 200);
+      await player.next();
+      expect(player.state.track?.id).toBe(tracks[1].id);
+      expect(player.state.standby?.role).toBe('retired');
+    });
+
+    it('loads the next track at the end as before when it is not ready, turned off or no longer next', async () => {
+      const notReady = setup();
+      await nearTheEnd(notReady.player);
+      const key = notReady.player.state.sourceKey;
+      await notReady.player.onEnd();
+      expect(notReady.player.state.track?.id).toBe(tracks[1].id);
+      expect(notReady.player.state.sourceKey).toBe(key);
+      expect(notReady.player.state.standby?.role).not.toBe('retired');
+
+      const off = setup();
+      off.setPrefs({gapless: false});
+      await nearTheEnd(off.player);
+      expect(off.player.state.standby).toBeNull();
+
+      const moved = setup();
+      await nearTheEnd(moved.player);
+      moved.player.onStandbyLoad(moved.player.state.standby!.key, 200);
+      moved.player.playNext([makeTracks(1, 'z')[0]]);
+      await moved.player.onEnd();
+      expect(moved.player.state.track?.title).toBe('Song z0');
+      expect(moved.player.state.standby?.role).not.toBe('retired');
+    });
+
+    it('does not line up a track for repeat one, the end of the queue or a stop at the end', async () => {
+      const {player} = setup();
+      await player.playTracks(tracks, 2);
+      player.onLoad(200);
+      player.onProgress(190);
+      await flush();
+      expect(player.state.standby).toBeNull();
+
+      const sleeper = setup();
+      sleeper.player.setSleep('end');
+      await nearTheEnd(sleeper.player);
+      expect(sleeper.player.state.standby).toBeNull();
+    });
+
+    it('drops a next track the second player could not load, and loads it at the end instead', async () => {
+      const {player} = setup();
+      await nearTheEnd(player);
+      player.onStandbyError(player.state.standby!.key);
+      expect(player.state.standby).toBeNull();
+      player.onProgress(180);
+      await flush();
+      expect(player.state.standby).toBeNull();
+      await player.onEnd();
+      expect(player.state.track?.id).toBe(tracks[1].id);
+    });
+  });
+
   it('does not count a seek as listening time', async () => {
     const {player, api} = setup();
     await player.playTracks(tracks, 0);

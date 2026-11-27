@@ -10,7 +10,7 @@ import {DownloadManager} from './downloads';
 import {handOver, type HandOverOptions} from './handover';
 import {AudioLibraryClient, type AudioProvider, type Catalog, resolveAudioProvider} from './library';
 import {audioEffects, backgroundTimers, nativeDownloads} from './native';
-import {PlayerController, type PlayerState} from './player';
+import {PlayerController, type PlayerState, type Source} from './player';
 import {deviceId as loadDeviceId, playerKeys, readJson, type SavedQueue, writeJson} from './storage';
 import type {PlaybackPreferences, Track} from './types';
 
@@ -100,7 +100,9 @@ export function AudioHost({
   const [fullPlayer, setFullPlayer] = useState(false);
   const [audioDoc, setAudioDoc] = useState<UiAudio | null>(null);
   const changedListeners = useRef(new Set<(capability: string) => void>());
-  const videoRef = useRef<VideoRef>(null);
+  // the two native players: the one playing (PlayerState.deck) and the one holding the next track
+  const firstDeck = useRef<VideoRef>(null);
+  const secondDeck = useRef<VideoRef>(null);
 
   const downloads = useMemo(
     () =>
@@ -247,7 +249,7 @@ export function AudioHost({
   useEffect(() => () => downloads.dispose(), [downloads]);
 
   useEffect(() => {
-    player.seeker = seconds => videoRef.current?.seek(seconds);
+    player.seeker = seconds => (player.state.deck === 0 ? firstDeck : secondDeck).current?.seek(seconds);
     return () => {
       player.seeker = null;
     };
@@ -429,26 +431,15 @@ export function AudioHost({
   return (
     <AudioHostContext.Provider value={value}>
       {children}
-      <AudioOutput player={player} videoRef={videoRef} downloads={downloads} />
+      <AudioOutput player={player} decks={[firstDeck, secondDeck]} downloads={downloads} />
     </AudioHostContext.Provider>
   );
 }
 
-/** The native player (react-native-video on Media3): background playback, the media
- * notification, lock-screen controls and audio focus all come from it. */
-function AudioOutput({
-  player,
-  videoRef,
-  downloads,
-}: {
-  player: PlayerController;
-  videoRef: React.RefObject<VideoRef>;
-  downloads: DownloadManager;
-}) {
-  const state = usePlayerState(player);
+/** A track's cover as a file on the phone, for the media notification. */
+function useArtworkFile(track: Track | null | undefined, downloads: DownloadManager): string | undefined {
   const [artwork, setArtwork] = useState<string | undefined>(undefined);
-  const albumId = state.track?.has_artwork ? state.track.album_id : null;
-
+  const albumId = track?.has_artwork ? track.album_id : null;
   useEffect(() => {
     let cancelled = false;
     setArtwork(undefined);
@@ -459,44 +450,104 @@ function AudioOutput({
       cancelled = true;
     };
   }, [albumId, downloads]);
+  return artwork;
+}
 
-  if (!state.source || !state.track) {
-    return null;
-  }
-  const track = state.track;
-  return (
-    <View style={styles.hidden} pointerEvents="none">
+function videoSource(source: Source, track: Track, artwork: string | undefined) {
+  return {
+    uri: source.uri,
+    headers: source.headers,
+    metadata: {
+      title: track.title,
+      artist: track.artist ?? track.album_artist,
+      subtitle: track.album ?? undefined,
+      imageUri: artwork,
+    },
+  };
+}
+
+/** The native players (react-native-video on Media3): background playback, the media
+ * notification, lock-screen controls and audio focus all come from the one playing. The other
+ * holds the next track, loaded and paused, so it starts the moment the current one ends
+ * (gapless playback), then the track that ended until the new one has the notification. Each
+ * keeps its place and its key when the roles swap, so neither native player is recreated. */
+function AudioOutput({
+  player,
+  decks,
+  downloads,
+}: {
+  player: PlayerController;
+  decks: [React.RefObject<VideoRef>, React.RefObject<VideoRef>];
+  downloads: DownloadManager;
+}) {
+  const state = usePlayerState(player);
+  const artwork = useArtworkFile(state.track, downloads);
+  const standby = state.standby;
+  const standbyArtwork = useArtworkFile(standby?.role === 'next' ? standby.track : null, downloads);
+
+  const deck = (slot: 0 | 1) => {
+    if (slot === state.deck) {
+      if (!state.source || !state.track) {
+        return null;
+      }
+      return (
+        <Video
+          key={`${slot}-${state.sourceKey}`}
+          ref={decks[slot]}
+          source={videoSource(state.source, state.track, artwork)}
+          paused={!state.playing}
+          rate={state.speed}
+          volume={state.volume}
+          playInBackground
+          playWhenInactive
+          showNotificationControls
+          progressUpdateInterval={1000}
+          onLoad={event => player.onLoad(event.duration)}
+          onProgress={event => player.onProgress(event.currentTime)}
+          onBuffer={event => player.onBuffer(event.isBuffering)}
+          onEnd={() => player.onEnd()}
+          onPlaybackStateChanged={event => player.onNativePlaying(event.isPlaying, event.isSeeking)}
+          onReadyForDisplay={() => player.onNativeReady()}
+          onError={event => player.onError(event.error?.errorString)}
+          onAudioBecomingNoisy={() => player.onInterrupted()}
+          onAudioFocusChanged={event => !event.hasAudioFocus && player.onInterrupted()}
+          style={styles.hidden}
+        />
+      );
+    }
+    if (!standby) {
+      return null;
+    }
+    const next = standby.role === 'next';
+    const key = standby.key;
+    return (
       <Video
-        key={`${state.sourceKey}`}
-        ref={videoRef}
-        source={{
-          uri: state.source.uri,
-          headers: state.source.headers,
-          metadata: {
-            title: track.title,
-            artist: track.artist ?? track.album_artist,
-            subtitle: track.album ?? undefined,
-            imageUri: artwork,
-          },
-        }}
-        paused={!state.playing}
+        key={`${slot}-${key}`}
+        ref={decks[slot]}
+        source={videoSource(standby.source, standby.track, next ? standbyArtwork : undefined)}
+        paused
         rate={state.speed}
-        volume={state.volume}
+        volume={standby.gainDb < 0 ? Math.pow(10, standby.gainDb / 20) : 1}
         playInBackground
         playWhenInactive
-        showNotificationControls
+        // the next track has no notification of its own; the one that ended keeps its own
+        // until the new one holds the notification
+        showNotificationControls={!next}
         progressUpdateInterval={1000}
-        onLoad={event => player.onLoad(event.duration)}
-        onProgress={event => player.onProgress(event.currentTime)}
-        onBuffer={event => player.onBuffer(event.isBuffering)}
-        onEnd={() => player.onEnd()}
-        onPlaybackStateChanged={event => player.onNativePlaying(event.isPlaying, event.isSeeking)}
-        onReadyForDisplay={() => player.onNativeReady()}
-        onError={event => player.onError(event.error?.errorString)}
-        onAudioBecomingNoisy={() => player.onInterrupted()}
-        onAudioFocusChanged={event => !event.hasAudioFocus && player.onInterrupted()}
+        onLoad={event => next && player.onStandbyLoad(key, event.duration)}
+        onError={() => next && player.onStandbyError(key)}
         style={styles.hidden}
       />
+    );
+  };
+
+  if (!state.source && !standby) {
+    return null;
+  }
+  return (
+    <View style={styles.hidden} pointerEvents="none">
+      {deck(0)}
+      {deck(1)}
     </View>
   );
 }

@@ -92,8 +92,9 @@ react-native-video plugin hook that gives the equalizer, bass boost,
 loudness (ReplayGain boost) and pitch/tempo the player's own audio session,
 Wi-Fi/cellular detection, and private-storage downloads under
 `files/music/<server>/`. Limits of this approach: the notification shows
-play/pause and seek, not next/previous; there is no crossfade or true gapless
-playback (one player, tracks are loaded back to back); and remote control
+play/pause and seek, not next/previous; there is no crossfade (gapless playback
+uses a second player that holds the next track, loaded and paused, and starts the
+moment the current one ends); and remote control
 through StarCore Connect only runs while the app is in the foreground.
 
 ### Status

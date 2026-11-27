@@ -43,7 +43,7 @@ export const ICONS = new Set([
  * (src/media/), which the play action plays through, the media picker the pick action chooses
  * through, a window that can't be captured (every protected document has it), and the
  * background backup of the phone's media (src/sync/), which the sync action opens. */
-export const CLIENT_CAPABILITIES = new Set<string>(['device.media-sync', 'media.audio', 'media.audio-offline', 'media.picker', 'secure.screen']);
+export const CLIENT_CAPABILITIES = new Set<string>(['device.media-sync', 'media.audio', 'media.audio-gapless', 'media.audio-offline', 'media.picker', 'secure.screen']);
 
 /** Whether this app offers every client capability a block's requires names (1.2, change 14): a
  * block it can't serve, such as a player preference its audio host doesn't apply, is left out,

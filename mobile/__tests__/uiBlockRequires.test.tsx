@@ -37,12 +37,13 @@ describe("a block's requires", () => {
       {type: 'text', text: 'Play', requires: {client: ['media.audio']}},
       {type: 'text', text: 'Normalize'},
     ]);
-    expect(shown).toEqual(['Play', 'Normalize']);
+    expect(shown).toEqual(['Gapless', 'Play', 'Normalize']);
   });
 
   it('needs every capability it names', () => {
     expect(servesBlock({requires: {client: ['media.audio', 'secure.screen']}})).toBe(true);
-    expect(servesBlock({requires: {client: ['media.audio', 'media.audio-gapless']}})).toBe(false);
+    expect(servesBlock({requires: {client: ['media.audio', 'media.audio-crossfade']}})).toBe(false);
+    expect(CLIENT_CAPABILITIES.has('media.audio-gapless')).toBe(true);
     expect(servesBlock({requires: {client: []}})).toBe(true);
     expect(servesBlock({})).toBe(true);
     expect(CLIENT_CAPABILITIES.has('media.audio-crossfade')).toBe(false);

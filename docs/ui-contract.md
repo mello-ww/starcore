@@ -1337,10 +1337,11 @@ The contract is `starcore.ui/<major>.<minor>`:
 capability protocol versions). Clients check a document's `requires` against their own client
 capabilities and the catalog's providers. Both clients claim `media.audio` (the `play` action)
 and `media.picker` (the `pick` action); the app also claims `secure.screen`, a window that can't
-be captured, which it applies to every protected document. Mission Control alone claims what
-its audio host does beyond playing: `media.audio-gapless`, `media.audio-crossfade` (lining up
-the next track), `media.audio-theme`, `media.audio-density` and `media.audio-visualizer` (its
-player's looks); a block names them in its `requires` (change 14). The other reserved names are
+be captured, which it applies to every protected document. Both claim `media.audio-gapless`
+(the next track starts the moment one ends). Mission Control alone claims the rest of what its
+audio host does beyond playing: `media.audio-crossfade`, `media.audio-theme`,
+`media.audio-density` and `media.audio-visualizer` (its player's looks); a block names them in
+its `requires` (change 14). The other reserved names are
 in `vocabulary.json`. The `own` action needs no capability: whether a client has a Satellite's own
 interface is its own knowledge, so it hides what it can't open.
 

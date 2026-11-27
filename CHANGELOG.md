@@ -7,6 +7,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Gapless playback on Android.** The AudioHost keeps a second player: 25 seconds before a
+  track ends it loads the next one, paused, and starts it the moment the first ends; a skip to
+  that track is instant too. Repeat one, the end of the queue, a stop at the end of the track,
+  remote playback or turning Gapless off go back to loading tracks one after the other. The
+  app now claims `media.audio-gapless`, so Music's Gapless setting shows on Android. The native
+  registry follows both players (effects go to the one playing) and clears the media
+  notification a released player leaves behind.
 - **Show in folder from the player's menu and the viewer's details (UI contract 1.2 change
   18).** A player's menu entry may run `locate`, with a `route` of the Satellite's own that
   answers the path (the playing track keeps none); a viewer field may carry an `action`, a
@@ -216,6 +223,12 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   the paths in their own colour, so the app now shows each Satellite's own mark too. Every
   Satellite's `mission_control/icon.svg` moved to `icons/logo.svg`, and Photo's Albums tab has
   its own icon.
+
+### Changed
+
+- **Music's player draws icons, not characters.** The Android player's chevron, menu, queue
+  arrows, device kinds, liked and downloaded marks and the artwork and lyrics placeholders are
+  Feather icons; Mission Control's empty lyric line draws a note icon.
 
 ### Security
 

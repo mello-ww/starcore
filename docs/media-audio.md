@@ -97,8 +97,9 @@ The behavioural reference is `player/player.js` (web) and `mobile/src/music/play
   `error`), `queue`, `sleep`, `blocked` (the web: audio needs a tap first), and `remote` (see
   Connect below).
 - Streams come from the provider's `resolve` with the listener's quality preference. Gapless
-  playback and crossfade follow the existing engine behaviour (`audio/engine.js`; Android's
-  player).
+  playback follows the existing engine behaviour on both clients (`audio/engine.js`; on
+  Android a second player in the AudioHost holds the next track); crossfade is the web's
+  only.
 
 ### Lifecycle and native integration
 

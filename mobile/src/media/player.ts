@@ -12,6 +12,24 @@ export interface Source {
   quality: Quality;
 }
 
+/** What the second native player holds (gapless playback, the `media.audio-gapless` client
+ * capability): the next track, loaded paused so it starts the moment the current one ends, or
+ * the track that just ended, kept until the new one plays so the media notification passes
+ * from one player to the other without the service stopping in between. */
+export interface Standby {
+  role: 'next' | 'retired';
+  track: Track;
+  /** the queue position it plays at */
+  position: number;
+  source: Source;
+  key: number;
+  /** the native player has loaded it */
+  ready: boolean;
+  duration: number;
+  plan: PlaybackPlan | null;
+  gainDb: number;
+}
+
 export interface PlayerState {
   queue: Q.Queue;
   track: Track | null;
@@ -22,6 +40,10 @@ export interface PlayerState {
   error: string | null;
   source: Source | null;
   sourceKey: number;
+  /** which of the two native players plays `source` */
+  deck: 0 | 1;
+  /** what the other one holds */
+  standby: Standby | null;
   plan: PlaybackPlan | null;
   volume: number;
   speed: number;
@@ -54,6 +76,12 @@ const MAX_RETRIES = 3;
 const SERVER_SAVE_MS = 10_000;
 const LOCAL_SAVE_MS = 2_000;
 const RESTART_THRESHOLD = 3;
+/** seconds before the end of a track at which the next one is loaded, as Mission Control does */
+export const PRELOAD_BEFORE = 25;
+/** seconds the new player plays before the old one goes: the notification service posts the old
+ * one's last change a moment after the swap, and a player removed before that leaves its
+ * notification behind */
+const RETIRE_AFTER = 3;
 
 type Listener = (state: PlayerState) => void;
 
@@ -68,6 +96,8 @@ export class PlayerController {
     error: null,
     source: null,
     sourceKey: 0,
+    deck: 0,
+    standby: null,
     plan: null,
     volume: 1,
     speed: 1,
@@ -91,6 +121,16 @@ export class PlayerController {
   private serverTimer: any = null;
   private notifiedPermission = false;
   private gainDb = 0;
+  /** the highest key a native player was given: a new one is always fresh */
+  private keys = 0;
+  /** the next track is being resolved */
+  private preloading = false;
+  /** the track whose successor could not be loaded ahead: it is then simply loaded at the end */
+  private preloadFailedFor: string | null = null;
+  /** the players just swapped: the first sign of the new one playing settles the handover */
+  private swapped = false;
+  /** the effects go to the new player's session once it plays */
+  private effectsPending = false;
   private now: () => number;
   private setTimer: (callback: () => void, ms: number) => any;
   private clearTimer: (handle: any) => void;
@@ -150,7 +190,7 @@ export class PlayerController {
     this.listened = 0;
     this.lastProgress = null;
     if (!track) {
-      this.set({track: null, playing: false, source: null, position: 0, duration: 0, plan: null});
+      this.set({track: null, playing: false, source: null, position: 0, duration: 0, plan: null, standby: null});
       this.persist();
       return;
     }
@@ -172,8 +212,14 @@ export class PlayerController {
       return;
     }
     const same = this.state.source?.uri === source.uri;
-    this.set({source, sourceKey: same ? this.state.sourceKey + 1 : this.state.sourceKey});
+    this.set({source, sourceKey: same ? this.nextKey() : this.state.sourceKey});
     this.persist();
+  }
+
+  /** A key no native player had: a player given it is created afresh. */
+  private nextKey(): number {
+    this.keys = Math.max(this.keys, this.state.sourceKey, this.state.standby?.key ?? 0) + 1;
+    return this.keys;
   }
 
   private async quality(): Promise<Quality> {
@@ -186,31 +232,193 @@ export class PlayerController {
   }
 
   async resolveSource(track: Track, forceOriginal: boolean): Promise<Source> {
+    const resolved = await this.resolve(track, forceOriginal);
+    this.set({plan: resolved.plan});
+    this.applyGain(resolved.gainDb);
+    return resolved.source;
+  }
+
+  /** Where `track` plays from, with its plan and gain, changing nothing of what plays now. */
+  private async resolve(track: Track, forceOriginal: boolean): Promise<{source: Source; plan: PlaybackPlan | null; gainDb: number}> {
     const local = this.deps.downloads?.localUri(track.id);
     if (local) {
       this.deps.downloads?.markPlayed(track.id);
-      this.set({plan: null});
-      this.applyGain(this.trackGain(track));
-      return {uri: local, local: true, quality: 'original'};
+      return {source: {uri: local, local: true, quality: 'original'}, plan: null, gainDb: this.trackGain(track)};
     }
     // a queue restored at launch asks before the catalog has named the provider
     await this.deps.api.ready;
     const quality = forceOriginal ? 'original' : await this.quality();
     const format = this.deps.preferences()?.transcode_format ?? 'opus';
     let path = this.deps.api.streamPath(track.id, quality, format);
+    let plan: PlaybackPlan | null = null;
+    let gainDb = this.trackGain(track);
     try {
       const info = await this.deps.api.playback(track.id, quality);
-      this.set({plan: info.plan});
-      this.applyGain(info.gain.db);
+      plan = info.plan;
+      gainDb = info.gain.db;
       path = info.stream;
     } catch {
-      this.set({plan: null});
-      this.applyGain(this.trackGain(track));
+      // the stream's own path, with the track's gain as the library listed it
     }
     if (!path || !this.deps.api.path) {
       throw new Error('There is no audio library to play from.');
     }
-    return {uri: `${this.deps.baseUrl}${this.deps.api.path}/${path}`, headers: authHeaders(this.deps.token()), local: false, quality};
+    const source = {uri: `${this.deps.baseUrl}${this.deps.api.path}/${path}`, headers: authHeaders(this.deps.token()), local: false, quality};
+    return {source, plan, gainDb};
+  }
+
+  // ---------- gapless: the next track on the second player ----------
+
+  private gapless(): boolean {
+    return this.deps.preferences()?.gapless !== false;
+  }
+
+  /** The track that follows the current one when it ends on its own, or null when it would not
+   * simply follow (repeat one, the end of the queue, a sleep timer that stops at the end). */
+  private following(): {position: number; track: Track} | null {
+    const {queue, sleepAtEnd, remote} = this.state;
+    if (sleepAtEnd || remote || !this.gapless()) {
+      return null;
+    }
+    const position = Q.nextPosition(queue, false);
+    if (position === null || position === queue.position) {
+      return null;
+    }
+    const track = Q.current({...queue, position});
+    return track && !track.missing ? {position, track} : null;
+  }
+
+  /** The prepared next track, when it is still the one that follows. */
+  private prepared(): Standby | null {
+    const standby = this.state.standby;
+    const wanted = this.following();
+    if (!standby || standby.role !== 'next' || !wanted) {
+      return null;
+    }
+    return standby.position === wanted.position && standby.track.id === wanted.track.id ? standby : null;
+  }
+
+  /** Near the end of a track, loads the next one on the second player, paused. */
+  private async preload() {
+    const track = this.state.track;
+    if (!track || this.preloading || this.swapped || this.retiring()
+        || this.preloadFailedFor === track.id) {
+      return;
+    }
+    const wanted = this.following();
+    const standby = this.state.standby;
+    if (!wanted) {
+      if (standby) {
+        this.set({standby: null});
+      }
+      return;
+    }
+    if (this.prepared()) {
+      return;
+    }
+    const remaining = (this.state.duration || 0) - this.state.position;
+    if (!this.state.duration || remaining > PRELOAD_BEFORE) {
+      return;
+    }
+    this.preloading = true;
+    try {
+      const resolved = await this.resolve(wanted.track, false);
+      const still = this.following();
+      if (this.state.track?.id === track.id && still?.track.id === wanted.track.id && still.position === wanted.position
+          && !this.retiring()) {
+        this.set({standby: {role: 'next', track: wanted.track, position: wanted.position, source: resolved.source,
+          key: this.nextKey(), ready: false, duration: wanted.track.duration ?? 0, plan: resolved.plan, gainDb: resolved.gainDb}});
+      }
+    } catch {
+      this.preloadFailedFor = track.id;
+    } finally {
+      this.preloading = false;
+    }
+  }
+
+  /** The second player still holds the track that just ended. */
+  private retiring(): boolean {
+    return this.state.standby?.role === 'retired';
+  }
+
+  /** The second player has loaded what it was given. */
+  onStandbyLoad(key: number, duration: number) {
+    const standby = this.state.standby;
+    if (standby?.role === 'next' && standby.key === key) {
+      this.set({standby: {...standby, ready: true, duration: duration || standby.duration}});
+    }
+  }
+
+  /** The second player could not load the next track: it is loaded at the end instead. */
+  onStandbyError(key: number) {
+    const standby = this.state.standby;
+    if (standby?.role === 'next' && standby.key === key) {
+      this.preloadFailedFor = this.state.track?.id ?? null;
+      this.set({standby: null});
+    }
+  }
+
+  /** Starts the prepared next track on the second player, which becomes the playing one; the
+   * one that played is kept, paused, until the new one plays. False when nothing is ready. */
+  private promote(): boolean {
+    const next = this.prepared();
+    if (!next || !next.ready || !this.state.track || !this.state.source) {
+      return false;
+    }
+    const retired: Standby = {
+      role: 'retired', track: this.state.track, position: this.state.queue.position, source: this.state.source,
+      key: this.state.sourceKey, ready: true, duration: this.state.duration, plan: this.state.plan, gainDb: this.gainDb,
+    };
+    this.retries = 0;
+    this.listened = 0;
+    this.lastProgress = 0;
+    this.pendingSeek = null;
+    this.endingTrack = false;
+    this.nativeStop = false;
+    this.preloadFailedFor = null;
+    this.swapped = true;
+    this.effectsPending = true;
+    this.gainDb = Number.isFinite(next.gainDb) ? Math.max(-24, Math.min(next.gainDb, 12)) : 0;
+    this.set({
+      queue: {...this.state.queue, position: next.position},
+      track: next.track,
+      source: next.source,
+      sourceKey: next.key,
+      deck: this.state.deck === 0 ? 1 : 0,
+      standby: retired,
+      playing: true,
+      position: 0,
+      duration: next.duration,
+      plan: next.plan,
+      buffering: false,
+      error: null,
+      volume: this.effectiveVolume(),
+    });
+    this.applyEffects();
+    this.persist();
+    return true;
+  }
+
+  /** The new player plays: the effects follow its audio session. */
+  private followSwap() {
+    if (this.effectsPending) {
+      this.effectsPending = false;
+      this.applyGain(this.gainDb);
+      this.applyEffects();
+    }
+  }
+
+  /** The new player has played a few seconds, so it holds the notification and the old one's
+   * last change is posted: the old one goes. */
+  private settleSwap(seconds: number) {
+    this.followSwap();
+    if (!this.swapped || seconds < RETIRE_AFTER) {
+      return;
+    }
+    this.swapped = false;
+    if (this.state.standby?.role === 'retired') {
+      this.set({standby: null});
+    }
   }
 
   private trackGain(track: Track): number {
@@ -285,6 +493,10 @@ export class PlayerController {
     }
     this.flushListen();
     const position = Q.nextPosition(this.state.queue, manual);
+    // the next track is already loaded on the second player: it starts at once
+    if (position !== null && position === this.prepared()?.position && this.promote()) {
+      return;
+    }
     if (position === null) {
       await this.queueEnded();
       return;
@@ -466,7 +678,7 @@ export class PlayerController {
       return;
     }
     this.retries = 0;
-    this.set({error: null, playing: true, buffering: true, sourceKey: this.state.sourceKey + 1});
+    this.set({error: null, playing: true, buffering: true, sourceKey: this.nextKey()});
   }
 
   // ---------- events from the native player ----------
@@ -506,6 +718,8 @@ export class PlayerController {
     this.lastProgress = seconds;
     this.set({position: seconds, buffering: false});
     this.persist();
+    this.settleSwap(seconds);
+    this.preload().catch(() => undefined);
   }
 
   onBuffer(buffering: boolean) {
@@ -525,6 +739,10 @@ export class PlayerController {
     this.endingTrack = true;
     this.nativeStop = false;
     this.flushListen();
+    // gapless: the next track waits, loaded, on the second player
+    if (this.promote()) {
+      return;
+    }
     if (this.state.sleepAtEnd) {
       this.set({sleepAtEnd: false});
       const position = Q.nextPosition(this.state.queue, true);
@@ -558,7 +776,7 @@ export class PlayerController {
       const fallback = this.state.source?.quality !== 'original' || this.retries === MAX_RETRIES;
       const source = await this.resolveSource(track, fallback);
       if (this.state.track?.id === track.id) {
-        this.set({source, sourceKey: this.state.sourceKey + 1});
+        this.set({source, sourceKey: this.nextKey()});
       }
     }, delay);
   }
@@ -580,6 +798,7 @@ export class PlayerController {
         this.set({playing: true});
         this.persist();
       }
+      this.followSwap();
       return;
     }
     this.nativeStop = this.pausedNatively(isSeeking);
