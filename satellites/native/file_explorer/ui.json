@@ -14,6 +14,11 @@
         ]},
         {"type": "list", "items": "$.drives", "empty": "No location can be browsed.",
          "item": {"title": "$.title", "subtitle": "$.summary", "value": "$.used_percent", "format": {"value": "percent"}, "icon": "hard-drive"},
+         "action": {"navigate": "folder", "params": {"path": "$.path"}}},
+        {"type": "text", "style": "caption", "developer": true, "visible": "$.has_system_drives",
+         "text": "System locations, shown in Developer Mode only:"},
+        {"type": "list", "items": "$.system_drives", "developer": true, "visible": "$.has_system_drives",
+         "item": {"title": "$.title", "subtitle": "$.summary", "value": "$.used_percent", "format": {"value": "percent"}, "icon": "hard-drive"},
          "action": {"navigate": "folder", "params": {"path": "$.path"}}}
       ]
     },
@@ -25,6 +30,7 @@
       "blocks": [
         {"type": "breadcrumb", "items": "$.crumbs", "item": {"title": "$.name"},
          "action": {"navigate": "folder", "params": {"path": "$.path"}}},
+        {"type": "status", "label": "Sensitive location", "tone": "warn", "detail": "$.warning", "visible": "$.warning"},
         {"type": "text", "style": "caption", "text": "$.summary"},
         {"type": "actions", "blocks": [
           {"type": "button", "label": "Up", "style": "secondary", "visible": "$.parent",

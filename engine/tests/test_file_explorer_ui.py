@@ -88,6 +88,23 @@ class FileExplorerViewTest(unittest.TestCase):
             self.assertLessEqual(view["machine"]["used"], view["machine"]["total"])
             self.assertIn("free across", view["machine_summary"])
 
+    def test_boot_locations_are_kept_apart_for_developer_mode_and_warned_about(self):
+        from importlib import import_module
+        from pathlib import PurePosixPath as Path
+
+        views = import_module("satellites.native.file_explorer.views")
+        listing = {"entries": [{"name": place, "storage": None, "device": ""}
+                               for place in ("/", "/boot", "/boot/efi", "/srv/data")],
+                   "machine": None}
+        view = views.locations_view(listing)
+        self.assertEqual([drive["path"] for drive in view["drives"]], ["/", "/srv/data"])
+        self.assertEqual([drive["path"] for drive in view["system_drives"]], ["/boot", "/boot/efi"])
+        self.assertTrue(view["has_system_drives"])
+        self.assertFalse(views.locations_view({"entries": listing["entries"][:1], "machine": None})["has_system_drives"])
+        for place, warned in (("/boot", True), ("/boot/efi/EFI", True), ("/bootleg", False), ("/srv", False)):
+            folder = views.folder_view(Path(place), "/", [], None)
+            self.assertEqual(bool(folder["warning"]), warned, place)
+
     def test_a_folder_lists_its_folders_then_its_files_with_full_paths(self):
         (self.directory / "Beta").mkdir()
         (self.directory / "alpha").mkdir()

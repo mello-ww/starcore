@@ -45,19 +45,34 @@ def _storage_summary(storage) -> str:
     return f"{_bytes(storage['free'])} free of {_bytes(storage['total'])}"
 
 
+# the boot partitions: a mistake there can stop the machine from starting, so they are listed in
+# Developer Mode only, and a warning is shown in them
+SENSITIVE_LOCATIONS = ("/boot", "/boot/efi")
+SENSITIVE_WARNING = ("This is part of the system's boot files. Changing or deleting anything here "
+                     "can stop the machine from starting.")
+
+
+def _sensitive(path: str) -> bool:
+    return any(path == place or path.startswith(place + "/") for place in SENSITIVE_LOCATIONS)
+
+
 def locations_view(listing: dict) -> dict:
     """The roots (drives on Windows, `/` elsewhere), each with its storage,
     and the machine's total across distinct volumes."""
-    drives = [{
+    rows = [{
         "path": entry["name"],
         "title": entry["name"],
         "summary": " - ".join(part for part in (entry.get("device"), _storage_summary(entry.get("storage")))
                               if part),
         "used_percent": _used_percent(entry.get("storage")),
     } for entry in listing["entries"]]
+    drives = [row for row in rows if not _sensitive(row["path"])]
+    system_drives = [row for row in rows if _sensitive(row["path"])]
     machine = listing.get("machine")
     return {
         "drives": drives,
+        "system_drives": system_drives,
+        "has_system_drives": bool(system_drives),
         "machine": None if not machine else {
             "used": machine["used"],
             "total": machine["total"],
@@ -123,6 +138,7 @@ def folder_view(target: Path, parent, items: list, storage, folders_next=None, f
         "empty": not total_folders and not total_files,
         "summary": _summary(total_folders, total_files),
         "storage": _storage_summary(storage) if storage else None,
+        "warning": SENSITIVE_WARNING if _sensitive(str(target)) else None,
     }
 
 

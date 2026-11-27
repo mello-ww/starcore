@@ -10,6 +10,8 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 - **File Explorer's home page lists every mounted disk on Linux**, each with its mount point,
   filesystem, device and free space, like a server's own storage page; before, it showed only
   "/" as a single drive. Browsing was never confined to those: they are shortcuts.
+  The boot partitions (`/boot`, `/boot/efi`) are listed in Developer Mode only, and a folder
+  inside them shows a "Sensitive location" warning.
 
 ### Fixed
 
