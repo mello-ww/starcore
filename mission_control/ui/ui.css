@@ -1415,6 +1415,13 @@ button.ui-list-row:hover {
     transition: opacity 180ms ease;
 }
 
+/* an image block's frame takes its shape from its size, never from the picture: a percentage
+   height in the grid would follow the picture, so a portrait in a wide frame was cut */
+.ui-image-frame img {
+    position: absolute;
+    inset: 0;
+}
+
 .ui-fit-contain .ui-media-frame img {
     object-fit: contain;
 }

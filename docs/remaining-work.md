@@ -412,7 +412,9 @@ item's file in File Explorer. The audit and the plan: [`open-with-audit.md`](ope
 - [x] O5 security review of O1 to O4: a protected area open for the session is never kept by
       Music nor taken into Photos' library, a track's path that comes to lead elsewhere is missing,
       lyrics beside an outside sound are checked, its transcodes and the browser's copy go with it.
-- [ ] O6 runs on the web demo and the emulator, docs, a new APK.
+- [x] O6 runs on the web demo and the emulator, docs, a new APK: the Android screen now
+      fetches the Satellites for an opener or a locate, and a portrait picture fits its frame on
+      the web. The folder page does not mark `select` yet.
 - [x] File Explorer names media types the way a desktop file manager does ("MP4 video",
       "M4A audio", "BMP image"), and a long field value (a folder's path) takes a line of its
       own on both clients instead of wrapping in a narrow column and pushing the other values

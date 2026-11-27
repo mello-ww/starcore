@@ -418,6 +418,13 @@ export function locateProvider(providers: Providers | null | undefined): Capabil
   return provider && typeof provider.operations?.locate === 'string' ? provider : null;
 }
 
+/** Whether a document opens another Satellite's shared interface - a section action (1.2), or
+ * the openers block or locate action (change 16) - so the screen needs the list of Satellites
+ * to find the one it pushes. */
+export function opensOtherSatellites(document: unknown): boolean {
+  return /"(section|locate)"\s*:|"type"\s*:\s*"openers"/.test(JSON.stringify(document ?? null));
+}
+
 const OPENED_PAGE = /^[a-z][a-z0-9_-]{0,47}$/;
 
 /** What an opener or locate answered, {page, params} - null unless page is a page id and every

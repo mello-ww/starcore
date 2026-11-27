@@ -7,6 +7,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Opens with and Show in folder, run on both clients (O6).** On Android an opener or a
+  Show in folder did nothing but "That isn't available in this app.": the screen fetched the
+  list of Satellites only for a document with a section action. It now does for `openers` and
+  `locate` too. On Mission Control an image block's picture took its height from the picture,
+  so a portrait one was cut in a wide frame; it now fits its frame.
 - **Music plays a sound by its path.** It declares `files.open` for audio, so File Explorer's
   "Opens with" offers it: a sound the library holds opens its page, any other becomes an
   external track, playable, queueable and addable to playlists but never part of the library,

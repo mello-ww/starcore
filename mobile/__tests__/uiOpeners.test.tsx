@@ -1,7 +1,9 @@
 import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import {UiBlocks, type BlockContext} from '../src/satellites/ui/UiBlocks';
-import {fileExtension, locateProvider, openedPage, openersFor, type Providers, type UiBlock} from '../src/satellites/ui/contract';
+import {
+  fileExtension, locateProvider, openedPage, openersFor, opensOtherSatellites, type Providers, type UiBlock,
+} from '../src/satellites/ui/contract';
 
 // change 16: the Satellites that open a file, from the catalog's files.open providers
 const opener = (satellite: string, extra: Record<string, any>) => ({
@@ -43,6 +45,19 @@ describe('openers (change 16)', () => {
     });
     expect(locateProvider(browse({list: 'entries', locate: 'locate'}))?.satellite).toBe('Files');
     expect(locateProvider(browse({list: 'entries'}))).toBeNull();
+  });
+
+  it('makes the screen fetch the Satellites for an opener or a locate, not only a section', () => {
+    // found on the emulator in O6: without the list, the pushed Satellite was never found
+    expect(opensOtherSatellites({pages: {file: {blocks: [{type: 'openers', path: '$.path'}]}}})).toBe(true);
+    expect(opensOtherSatellites({pages: {file: {blocks: [{type: 'button', label: 'Show', action: {locate: '$.path'}}]}}})).toBe(true);
+    expect(opensOtherSatellites({pages: {home: {blocks: [{type: 'button', action: {section: 'Vault'}}]}}})).toBe(true);
+    expect(opensOtherSatellites({pages: {home: {blocks: [{type: 'text', value: 'openers'}]}}})).toBe(false);
+    expect(opensOtherSatellites(null)).toBe(false);
+    // the documents that use change 16 today
+    for (const satellite of ['file_explorer', 'photo', 'music']) {
+      expect(opensOtherSatellites(require(`../../satellites/native/${satellite}/ui.json`))).toBe(true);
+    }
   });
 
   const context = (openWith?: BlockContext['openWith']): BlockContext => ({

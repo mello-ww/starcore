@@ -13,7 +13,7 @@ import {useAppActive} from '../hooks/useAppActive';
 import {useServers} from '../servers/ServersContext';
 import {UiApi} from '../satellites/ui/api';
 import {
-  findProvider, formatValue, isIconName, isSafeRoute, isVisible, locateProvider, missingRequirements, openedPage, resolve,
+  findProvider, formatValue, isIconName, isSafeRoute, isVisible, locateProvider, missingRequirements, openedPage, opensOtherSatellites, resolve,
   resolveTemplate, servesBlock, type CapabilityProvider, type Providers, type Scope, type UiAction, type UiDocument, type UiSource,
 } from '../satellites/ui/contract';
 import {SatellitesApi} from '../satellites/api';
@@ -167,8 +167,8 @@ export function SatelliteUiScreen({route, navigation}: Props) {
   const [document, setDocument] = useState<UiDocument | null>(null);
   const [offline, setOffline] = useState(false);
   const [providers, setProviders] = useState<Providers>({});
-  // the Satellites this one may host (section_of), for the section action (1.2) - only fetched
-  // for a document that has one
+  // the Satellites this one may open: those it hosts (section_of, the section action, 1.2) and
+  // the providers of openers and locate (change 16) - only fetched for a document that has one
   const [satellites, setSatellites] = useState<SatelliteSummary[] | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
@@ -339,7 +339,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
         setDocument(loaded.document);
         setOffline(loaded.offline);
         setProviders(found);
-        if (/"section"\s*:/.test(JSON.stringify(loaded.document))) {
+        if (opensOtherSatellites(loaded.document)) {
           new SatellitesApi(client)
             .list()
             .then(list => !cancelled && setSatellites(list))

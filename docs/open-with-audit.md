@@ -8,7 +8,8 @@ a sound outside Music's library **plays directly**, and **can still be added to 
 
 This file is the audit (what exists, what is missing, the risks) and the plan (contract
 change 16, milestones O1 to O6). O1 to O4 are built (see "What O1 built" to "What O4 built"),
-and O5 reviewed them (see "Security review of O1 to O4"); O6 is left.
+O5 reviewed them (see "Security review of O1 to O4") and O6 ran them on the web demo and the
+emulator (see "What O6 found"). The plan is done.
 
 ## What exists
 
@@ -148,7 +149,7 @@ the app.
 | O3 | Photos: lookup by path, `open`, its `file` page through `content`, Show in folder | Opus 5.5 | high |
 | O4 | Music: lookup by path, `open`, external tracks (direct playback, playlists, re-checks, clean-up), Show in folder | Opus 5.5 | xhigh |
 | O5 | Security review of O1 to O4 | Opus 5.5 | xhigh |
-| O6 | Web demo and emulator runs, docs, a new APK | Sonnet 5.5 | medium |
+| O6 | Web demo and emulator runs, docs, a new APK (done) | Sonnet 5.5 | medium |
 
 Tests: the Engine's catalog validation and `open`/`locate` (a protected path, a path outside
 the roots, a user without File Explorer, a file locked after it was added); the clients'
@@ -290,3 +291,28 @@ there.
   address (the browser's history), as File Explorer's folders are.
 - **Tags are read by the same code as a scan** (and FFmpeg for a transcode), on files the user
   could already put in a source by uploading them.
+
+## What O6 found
+
+Run on an isolated demo engine (its own data directory, a test account, a folder holding a
+picture and a sound outside both libraries, a Locked Folder holding one of each) in Mission
+Control and in the release APK on the emulator: File Explorer's file page and its "Opens with",
+Photos' `file` page (Add to library, Show in folder), Music's page of an external track (Play,
+Show in folder), and the protected files, locked and open.
+
+1. **Android: an opener did nothing but "That isn't available in this app."** The screen
+   fetches the list of Satellites only for a document that can open another one, and it looked
+   only for the `section` action (1.2); a document with `openers` or `locate` never got the list,
+   so the provider was never found. `opensOtherSatellites` (`contract.ts`) now counts all three,
+   with a test that the three documents using change 16 need it.
+2. **Web: a portrait picture was cut in a wide frame.** The image block's picture took its
+   height from the picture rather than the frame (a percentage height in the frame's grid), so
+   `fit: contain` showed the middle of a portrait one. The picture now fills its frame exactly
+   (`ui.css`), whatever the shape.
+
+Held as designed: a locked file is "not here" to Music and Photos; once the area is open, Music
+refuses it (403) and Photos shows it with "In a protected area", without Add to library, and
+refuses `file/add` (403).
+
+Still open: the folder page that Show in folder opens does not mark the file named in `select`
+(see "What O2 built").
