@@ -23,6 +23,9 @@ export interface AdditionDeps {
   /** what the app keeps of that capability, read again */
   reload: (capability: string) => Promise<void> | void;
   notify: (message: string, error?: boolean) => void;
+  /** change 18: opens the folder holding a path in whichever Satellite browses files; resolves
+   * with whether it opened */
+  locate?: (path: string) => Promise<boolean>;
 }
 
 export interface AdditionEntry {
@@ -81,6 +84,28 @@ export function additionRunner(deps: AdditionDeps) {
       }
       if (action.play) {
         return await play(action.play, scope, deps);
+      }
+      if (action.locate !== undefined) {
+        // change 18: the playing track keeps no path, so `route` (the Satellite's own, read with
+        // the track) answers the $. the path is read from
+        let from = scope;
+        if (action.route !== undefined) {
+          const route = resolveTemplate(action.route, scope);
+          if (!isSafeRoute(route)) {
+            throw refused();
+          }
+          from = {data: (await deps.load(route)) ?? {}};
+        }
+        const path = resolve(action.locate, from);
+        if (!deps.locate) {
+          deps.notify("That isn't available in this app.", true);
+          return false;
+        }
+        if (typeof path !== 'string' || !path) {
+          deps.notify("That file isn't in a folder you can browse.", true);
+          return false;
+        }
+        return await deps.locate(path);
       }
       let result: any;
       if (action.choose) {

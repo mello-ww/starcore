@@ -1027,7 +1027,21 @@ export function createGallery(host) {
                 const text = formatValue(value, field.format, field.unit !== undefined ? resolve(field.unit, scope) : undefined);
                 const address = field.href !== undefined ? resolveLink(field.href, scope) : null;
                 const detail = el("dd");
-                if (address) {
+                if (field.action !== undefined && host.canRun(field.action)) {
+                    // change 18: the value shows its path's folder, in whichever Satellite browses files
+                    const link = el("button", "ui-viewer-link", text);
+                    link.type = "button";
+                    link.title = "Show it in its folder";
+                    link.addEventListener("click", async () => {
+                        link.disabled = true;
+                        if (await host.runAction(field.action, scope)) {
+                            closeViewer();
+                        } else {
+                            link.disabled = false;
+                        }
+                    });
+                    detail.appendChild(link);
+                } else if (address) {
                     // a field's link (change 15): the address opens in a new tab, telling it nothing
                     const link = el("a", "ui-viewer-link", text);
                     link.href = address;

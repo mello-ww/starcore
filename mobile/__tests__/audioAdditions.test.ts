@@ -89,6 +89,22 @@ describe('the audio host additions (UI contract 1.2, change 9)', () => {
     expect(calls).toEqual([['notify', 'That action points outside its Satellite and was refused.', true]]);
   });
 
+  it('shows the track folder from the path its route answers (change 18)', async () => {
+    const located: string[] = [];
+    const {deps, calls} = fakeDeps({
+      load: async route => (route === 'tracks/t1?page=1' ? {location: '/music/a.flac'} : {}),
+      locate: async path => located.push(path) > 0,
+    });
+    const action = {locate: '$.location', route: 'tracks/{$.id}?page=1'};
+    expect(await additionRunner(deps)(action, track)).toBe(true);
+    expect(located).toEqual(['/music/a.flac']);
+    // a file the session can't browse answers no path; an outside route is refused
+    expect(await additionRunner(deps)(action, {...track, id: 't2'} as Track)).toBe(false);
+    expect(await additionRunner(deps)({locate: '$.location', route: '../api/x'}, track)).toBe(false);
+    expect(located).toEqual(['/music/a.flac']);
+    expect(calls.map(call => call[2])).toEqual([true, true]);
+  });
+
   it('sends nothing when a confirm is declined, and notifies a failed request', async () => {
     const declined = fakeDeps({confirm: async () => false});
     expect(await additionRunner(declined.deps)({route: 'x', method: 'POST', confirm: 'Sure?'}, track)).toBe(false);

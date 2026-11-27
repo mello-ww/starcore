@@ -49,7 +49,7 @@
               {"label": "Camera", "value": "$.camera"},
               {"label": "Lens", "value": "$.lens"},
               {"label": "Location", "value": "$.location", "href": "https://www.openstreetmap.org/?mlat={$.lat}&mlon={$.lon}#map=16/{$.lat}/{$.lon}"},
-              {"label": "Folder", "value": "$.folder"},
+              {"label": "Folder", "value": "$.folder", "action": {"locate": "$.folder"}},
               {"label": "File", "value": "$.title"},
               {"label": "Imported", "value": "$.imported", "format": "datetime"}
             ],
@@ -123,7 +123,7 @@
               {"label": "Camera", "value": "$.camera"},
               {"label": "Lens", "value": "$.lens"},
               {"label": "Location", "value": "$.location", "href": "https://www.openstreetmap.org/?mlat={$.lat}&mlon={$.lon}#map=16/{$.lat}/{$.lon}"},
-              {"label": "Folder", "value": "$.folder"},
+              {"label": "Folder", "value": "$.folder", "action": {"locate": "$.folder"}},
               {"label": "File", "value": "$.title"},
               {"label": "Imported", "value": "$.imported", "format": "datetime"}
             ],
@@ -172,7 +172,7 @@
               {"label": "Camera", "value": "$.camera"},
               {"label": "Lens", "value": "$.lens"},
               {"label": "Location", "value": "$.location", "href": "https://www.openstreetmap.org/?mlat={$.lat}&mlon={$.lon}#map=16/{$.lat}/{$.lon}"},
-              {"label": "Folder", "value": "$.folder"},
+              {"label": "Folder", "value": "$.folder", "action": {"locate": "$.folder"}},
               {"label": "File", "value": "$.title"},
               {"label": "Imported", "value": "$.imported", "format": "datetime"}
             ],
@@ -345,6 +345,7 @@
               {"label": "Format", "value": "$.format"},
               {"label": "Camera", "value": "$.camera"},
               {"label": "Location", "value": "$.location", "href": "https://www.openstreetmap.org/?mlat={$.lat}&mlon={$.lon}#map=16/{$.lat}/{$.lon}"},
+              {"label": "Folder", "value": "$.folder", "action": {"locate": "$.folder"}},
               {"label": "File", "value": "$.title"}
             ],
             "actions": [

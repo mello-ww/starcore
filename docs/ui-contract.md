@@ -494,7 +494,10 @@ collection: the document says where each picture comes from and what can be done
   change 15) makes its value a link that opens in the browser: a template that starts with
   `https://` (or `http://`), a host and `/` before any binding, its bindings URL-encoded, so a
   value can never change where it leads. The Engine refuses it in a protected document, and the
-  offline check ignores what only a link binds. Left and right (arrow keys on
+  offline check ignores what only a link binds. A field's `action` (1.2, change 18), a
+  `locate` and nothing else, never beside an `href`, makes its value a link that shows that
+  path's folder: the viewer closes and the folder's page opens, as a `locate` button's does
+  (`{"label": "Folder", "value": "$.folder", "action": {"locate": "$.folder"}}`). Left and right (arrow keys on
   the web, a swipe on Android and on a touch screen's browser) move between items; Escape or
   Back closes it. A web swipe is one finger, over 40 px and well wider than tall, and a swipe
   that starts on a video stays the player's. After an action's
@@ -893,7 +896,9 @@ The rules are `mission_control/ui/forms.js` and `mobile/src/satellites/ui/forms.
     mark that row with a list item's `selected` (change 17).
   - A provider that refuses the path (a `404`: outside its roots, protected, not this user's)
     is a notice. With no provider offering `locate`, the control is hidden.
-  - Not in a protected document, a selection, a tile's quick actions or the player's menu.
+  - Not in a protected document, a selection or a tile's quick actions. In the player's menu
+    and as a viewer field's `action`, since change 18 (see
+    [The player's additions](#the-players-additions) and `viewer` under Media).
 - **`sync`** (1.2), on its own: `{"sync": {"capability": "media.sync"}}` opens the **client's own
   sync screen** for the document's own provider of that capability, and nothing else.
   - The vocabulary's `sync_capabilities` names which screen: `media.sync` opens
@@ -1040,8 +1045,14 @@ action runs with the **playing track** (as the provider's `track` operation answ
 ```
 
 - `menu`: up to 10 entries (`label`, `icon`, `visible`, `action`) shown after the host's own
-  (Play next) in the player's More menu. An entry runs `navigate`, `play`, `choose` or a route
-  action.
+  (Play next) in the player's More menu. An entry runs `navigate`, `play`, `choose`, `locate`
+  (change 18) or a route action.
+- A `locate` there shows the folder of the playing track's file. The track the player keeps
+  carries no path, so the entry may name `route`, the Satellite's own GET route, resolved with
+  the track: the client reads it and resolves `locate` in its answer, as `$.`
+  (`{"locate": "$.location", "route": "tracks/{$.id}?page=1"}`). An answer without a path (a
+  file the session may not browse) is a notice. The full player closes, and the folder's page
+  opens as a navigate's does. `route` is refused on a `locate` anywhere else.
 - `album`, `artist`: navigate actions behind the player's title and artist. The id the player
   shows (one of several artists, say) stands in for the track's own `album_id` or `artist_id`.
 - `library`: `{label, action}`, a navigate action, the host's way to the Satellite's pages

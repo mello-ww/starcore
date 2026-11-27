@@ -7,6 +7,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Show in folder from the player's menu and the viewer's details (UI contract 1.2 change
+  18).** A player's menu entry may run `locate`, with a `route` of the Satellite's own that
+  answers the path (the playing track keeps none); a viewer field may carry an `action`, a
+  `locate`, which makes its value a link to that folder. Music's player menu offers Show in
+  folder, and Photos' viewers make the Folder detail that link. On Android the player's
+  session (its accent among it) is read again each time the app comes back to the front, so a
+  choice made on the web shows without restarting the app.
 - **Show in folder marks the file (UI contract 1.2 change 17).** A `list` item can map `selected`;
   both clients draw that row with the accent and scroll to it once. File Explorer's folder page
   marks the file `locate` named, so Show in folder from Photos or Music lands on it.

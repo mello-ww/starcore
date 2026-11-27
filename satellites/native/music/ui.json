@@ -11526,6 +11526,14 @@
     }
    },
    {
+    "label": "Show in folder",
+    "icon": "folder",
+    "action": {
+     "locate": "$.location",
+     "route": "tracks/{$.id}?page=1"
+    }
+   },
+   {
     "label": "Credits",
     "icon": "info",
     "action": {

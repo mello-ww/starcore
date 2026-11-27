@@ -256,6 +256,21 @@ test("a route action with reloads reloads the host's preferences and likes once 
     assert.deepEqual(deps.calls.reload, ["audio.session"]);  // a failed one reloads nothing
 });
 
+test("a locate entry shows the track's folder from the path its route answers (change 18)", async () => {
+    const { actionRunner } = await import("../media/document.js");
+    const located = [];
+    const deps = { ...fakeDeps(), load: async (route) => (route === "tracks/t1?page=1" ? { location: "/music/a.flac" } : {}),
+        locate: async (path) => located.push(path) > 0 };
+    const action = { locate: "$.location", route: "tracks/{$.id}?page=1" };
+    assert.equal(await actionRunner(deps)(action, { id: "t1" }), true);
+    assert.deepEqual(located, ["/music/a.flac"]);
+    // a file the session can't browse answers no path; an outside route is refused
+    assert.equal(await actionRunner(deps)(action, { id: "t2" }), false);
+    assert.equal(await actionRunner(deps)({ locate: "$.location", route: "../api/x" }, { id: "t1" }), false);
+    assert.deepEqual(located, ["/music/a.flac"]);
+    assert.deepEqual(deps.calls.notify.map((entry) => entry[1]), ["error", "error"]);
+});
+
 test("session.reload reads preferences and likes again; only a change the client makes itself is followed", async () => {
     library.setProvider(library.resolveProvider({
         "audio.library": [radio],

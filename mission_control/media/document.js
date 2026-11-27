@@ -6,7 +6,9 @@
 //
 // audioHooks and actionRunner are the rules, kept free of the page so they are tested on their
 // own; watchDocument wires them to Mission Control.
-import { checkDocument, isSafeRoute, isVisible, resolve, resolveTemplate } from "../ui/contract.js";
+import {
+    checkDocument, isSafeRoute, isVisible, locateProvider, openedSection, resolve, resolveTemplate,
+} from "../ui/contract.js";
 import { runChoose } from "../ui/choose.js";
 import { setDocumentExtensions } from "./extensions.js";
 import * as session from "./session.js";
@@ -30,7 +32,9 @@ export function sectionFor(page, params) {
  *  - load(route), post(route, body): the Satellite's routes, rejecting with its error;
  *  - choose(options), confirm(text): the choose dialog and a question;
  *  - reload(capability): what the client keeps of that capability, read again;
- *  - notify(message, kind).
+ *  - notify(message, kind);
+ *  - locate(path): opens the folder holding a path in whichever Satellite browses files
+ *    (change 18), resolving with whether it opened.
  * Resolves with whether it ran.
  */
 export function actionRunner(deps) {
@@ -46,6 +50,9 @@ export function actionRunner(deps) {
             }
             if (action.play) {
                 return await play(action.play, bindings, deps);
+            }
+            if (action.locate !== undefined) {
+                return await locate(action, bindings, deps);
             }
             let result;
             if (action.choose) {
@@ -85,6 +92,30 @@ export function actionRunner(deps) {
             return false;
         }
     };
+}
+
+// change 18: the folder holding the track's file, in whichever Satellite browses files. The
+// playing track keeps no path, so `route` (the Satellite's own, read with the track) answers
+// the $. the path is read from.
+async function locate(action, bindings, deps) {
+    let from = bindings;
+    if (action.route !== undefined) {
+        const route = resolveTemplate(action.route, bindings);
+        if (!route || !isSafeRoute(route)) {
+            throw refused();
+        }
+        from = { data: (await deps.load(route)) || {} };
+    }
+    const path = resolve(action.locate, from);
+    if (typeof deps.locate !== "function") {
+        deps.notify("That isn't available in Mission Control.", "error");
+        return false;
+    }
+    if (typeof path !== "string" || !path) {
+        deps.notify("That file isn't in a folder you can browse.", "error");
+        return false;
+    }
+    return deps.locate(path);
 }
 
 async function play(spec, bindings, deps) {
@@ -229,6 +260,22 @@ export async function watchDocument(satellite, { player, menu, handOver, playSea
         confirm: (question) => window.confirm(question),
         reload: (capability) => (capability === "audio.session" ? session.reload() : null),
         notify: (message, kind) => session.toast(message, kind),
+        locate: async (path) => {
+            const catalog = await requestJson("/api/catalog").catch(() => null);
+            const browser = locateProvider(catalog && catalog.capabilities);
+            if (!browser) {
+                throw new Error("That isn't available in Mission Control.");
+            }
+            const answer = await requestJson(
+                `/api/satellites/${encodeURIComponent(browser.satellite)}/${browser.operations.locate}?${new URLSearchParams({ path })}`);
+            const section = openedSection(answer);
+            if (!section) {
+                throw new Error("That isn't available in Mission Control.");
+            }
+            closeFullscreen();
+            window.dispatchEvent(new CustomEvent("starcore:open-shared", { detail: { satellite: browser.satellite, section } }));
+            return true;
+        },
     });
     setDocumentExtensions(audioHooks(doc.audio, {
         run,

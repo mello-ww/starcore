@@ -449,15 +449,15 @@ class _Validator:
         self.check_action(where, action)
 
     def check_audio_action(self, where: str, action):
-        """What a player's menu entry may run: navigate, play, choose or a route action (no pick,
-        secrets or reveal), never with `then` - there is no page to refresh or go back from."""
+        """What a player's menu entry may run: navigate, play, choose, locate (change 18) or a
+        route action (no pick, secrets or reveal), never with `then` - there is no page to
+        refresh or go back from."""
         if not isinstance(action, dict):
             return
-        kinds = {"navigate", "play", "choose"}
-        others = {"own", "secure", "section", "sync", "offline", "download", "share", "upload", "pick", "secrets", "reveal",
-                  "locate"}
+        kinds = {"navigate", "play", "choose", "locate"}
+        others = {"own", "secure", "section", "sync", "offline", "download", "share", "upload", "pick", "secrets", "reveal"}
         if not kinds & set(action) and others & set(action):
-            self.error(where, f"the player runs navigate, play, choose or a route action, not {sorted(others & set(action))[0]}")
+            self.error(where, f"the player runs navigate, play, choose, locate or a route action, not {sorted(others & set(action))[0]}")
         if "then" in action:
             self.error(f"{where}.then", "the player has no page: no then")
 
@@ -1046,10 +1046,14 @@ class _Validator:
     def check_locate(self, where: str, action: dict):
         """{locate: path} (1.2, change 16): the client asks files.browse's locate for the path and
         opens the folder page it answers. One place at a time, and never from a protected
-        document."""
+        document. In a player's menu (change 18), where the playing track carries only what the
+        queue keeps, `route` names the Satellite's own GET route (resolved with the track) whose
+        answer is the $. the path resolves in."""
         self.since(f"{where}.locate", "the locate action", 2)
-        self.unknown_keys(where, action, {"locate"})
+        self.unknown_keys(where, action, {"locate", "route"} if self.in_audio else {"locate"})
         self.check_text(f"{where}.locate", action["locate"])
+        if "route" in action:
+            self.check_route(f"{where}.route", action["route"])
         if self.in_bulk:
             self.error(f"{where}.locate", "opens one folder: not in a selection or a tile's quick actions")
         if self.protected:
@@ -1310,7 +1314,7 @@ class _Validator:
             if not isinstance(field, dict):
                 self.error(at, "must be an object")
                 continue
-            self.unknown_keys(at, field, {"label", "value", "format", "unit", "href"})
+            self.unknown_keys(at, field, {"label", "value", "format", "unit", "href", "action"})
             if not isinstance(field.get("label"), str):
                 self.error(at, "needs a 'label'")
             if "value" not in field:
@@ -1323,6 +1327,16 @@ class _Validator:
                 self.check_text(f"{at}.unit", field["unit"])
             if "href" in field:
                 self.check_href(f"{at}.href", field["href"])
+            if "action" in field:
+                # change 18: the value is a link that shows its path's folder - a locate, nothing
+                # else, and never beside an href
+                action = field["action"]
+                if "href" in field:
+                    self.error(f"{at}.action", "a field links one way: an href or an action")
+                elif not isinstance(action, dict) or "locate" not in action:
+                    self.error(f"{at}.action", "a field's action is a locate")
+                else:
+                    self.check_action(f"{at}.action", action)
         if "actions" in viewer:
             self.check_media_actions(f"{where}.actions", viewer["actions"], LIMITS["viewer_actions"])
 

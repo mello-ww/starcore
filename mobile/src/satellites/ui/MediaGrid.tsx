@@ -1140,6 +1140,16 @@ export function MediaViewer({
   const actions: any[] = (Array.isArray(spec.actions) ? spec.actions : []).filter(
     (entry: any) => canRun(context, entry?.action) && (entry.visible === undefined || isVisible(resolve(entry.visible, scope))),
   );
+  // the viewer is a window of its own over the screen: a locate that opened the folder's page
+  // closes it, so that page is what shows
+  const runViewerAction = async (action: any) => {
+    setBusy(true);
+    const ran = await context.runAction(action, scope);
+    setBusy(false);
+    if (ran && action?.locate !== undefined) {
+      onClose();
+    }
+  };
 
   return (
     <Modal visible animationType={reduced ? 'none' : 'fade'} onRequestClose={onClose} statusBarTranslucent>
@@ -1202,10 +1212,20 @@ export function MediaViewer({
               {fields.map((field, at) => {
                 const text = formatValue(resolve(field.value, scope), field.format, field.unit !== undefined ? asText(resolve(field.unit, scope)) : undefined);
                 const link = field.href !== undefined ? resolveLink(field.href, scope) : null;
+                // change 18: a value that shows its path's folder, in whichever Satellite browses files
+                const opens = field.action !== undefined && !busy && canRun(context, field.action);
                 return (
                   <View key={at} style={styles.detailRow}>
                     <Text style={[type.caption, styles.detailLabel]}>{String(field.label)}</Text>
-                    {link ? (
+                    {opens ? (
+                      <Text
+                        style={[styles.detailValue, styles.detailLink]}
+                        accessibilityRole="link"
+                        accessibilityHint="Shows it in its folder"
+                        onPress={() => void runViewerAction(field.action)}>
+                        {text}
+                      </Text>
+                    ) : link ? (
                       <Text
                         style={[styles.detailValue, styles.detailLink]}
                         accessibilityRole="link"
@@ -1231,13 +1251,13 @@ export function MediaViewer({
                   dark
                   disabled={busy}
                   onPress={async () => {
-                    setBusy(true);
                     if (entry.action?.secure) {
+                      setBusy(true);
                       await context.runSecure?.(entry.action, [scope], imageUrls(block, source));
+                      setBusy(false);
                     } else {
-                      await context.runAction(entry.action, scope);
+                      await runViewerAction(entry.action);
                     }
-                    setBusy(false);
                   }}
                 />
               ))}

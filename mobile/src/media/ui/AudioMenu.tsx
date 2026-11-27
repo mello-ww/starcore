@@ -65,9 +65,10 @@ export function useAudioAdditions(): AudioAdditions {
         confirm: text => confirmAction(text),
         reload,
         notify,
+        locate: host.locate,
       }),
-    // host.playTracks is stable (a useCallback in the host)
-    [api, openPage, playSearch, reload, satellite, host.playTracks],
+    // host.playTracks and host.locate are stable (useCallbacks in the host)
+    [api, openPage, playSearch, reload, satellite, host.playTracks, host.locate],
   );
 
   const link = useCallback(

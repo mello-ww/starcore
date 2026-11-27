@@ -3,7 +3,7 @@ import {AppState, PermissionsAndroid, Platform, StyleSheet, View} from 'react-na
 import Video, {type VideoRef} from 'react-native-video';
 import {useAuth} from '../auth/AuthContext';
 import {UiApi} from '../satellites/ui/api';
-import type {UiAudio} from '../satellites/ui/contract';
+import {locateProvider, openedPage, type Providers, type UiAudio} from '../satellites/ui/contract';
 import {useServers} from '../servers/ServersContext';
 import {ConnectClient} from './connect';
 import {DownloadManager} from './downloads';
@@ -46,6 +46,9 @@ export interface AudioHostValue {
   audio: UiAudio | null;
   /** Opens a page of the provider's shared interface, wherever the player is. */
   openPage: (page: string, params: Record<string, string>) => void;
+  /** Opens the folder holding a path in whichever Satellite browses files (the locate action,
+   * change 18); rejects when none can. */
+  locate: (path: string) => Promise<boolean>;
   /** Reads again what the app keeps of a capability (`reloads`: "audio.session"). */
   reload: (capability: string) => Promise<void>;
   /** Tells `listener` the capability the app itself changed (a like, a preference), so a page
@@ -86,6 +89,8 @@ export function AudioHost({
   const library = useMemo(() => new AudioLibraryClient(client), [client]);
   const [provider, setProvider] = useState<AudioProvider | null>(null);
   const [preferences, setPreferences] = useState<PlaybackPreferences | null>(null);
+  // the capability catalog as last read: the player's locate finds the files.browse provider in it
+  const catalogRef = useRef<Catalog | null>(null);
   const preferencesRef = useRef(preferences);
   preferencesRef.current = preferences;
   const [deviceId, setDeviceId] = useState<string | null>(null);
@@ -200,6 +205,7 @@ export function AudioHost({
       if (cancelled) {
         return;
       }
+      catalogRef.current = catalog;
       const resolved = resolveAudioProvider(catalog);
       library.setProvider(resolved);
       setProvider(resolved);
@@ -304,6 +310,19 @@ export function AudioHost({
     [library],
   );
 
+  // what the session keeps may have changed elsewhere (the player's accent chosen on the web, say):
+  // read it again each time the app comes back to the front
+  useEffect(() => {
+    let previous = AppState.currentState;
+    const subscription = AppState.addEventListener('change', status => {
+      if (status === 'active' && previous !== 'active') {
+        reload('audio.session').catch(() => undefined);
+      }
+      previous = status;
+    });
+    return () => subscription.remove();
+  }, [reload]);
+
   const onChanged = useCallback((listener: (capability: string) => void) => {
     changedListeners.current.add(listener);
     return () => {
@@ -320,6 +339,28 @@ export function AudioHost({
       }
     },
     [openPage, satellite],
+  );
+
+  // change 18: the folder holding a track's path, in whichever Satellite browses files - the
+  // page its locate answers, opened as any other page of that Satellite's shared interface
+  const locate = useCallback(
+    async (path: string) => {
+      const browser = locateProvider(catalogRef.current as Providers | null);
+      if (!browser || !openPage) {
+        throw new Error("That isn't available in this app.");
+      }
+      const answer = await new UiApi(client, serverId).act(
+        browser.satellite, `${browser.operations.locate}?path=${encodeURIComponent(path)}`, 'GET', null,
+      );
+      const opened = openedPage(answer);
+      if (!opened) {
+        throw new Error("That isn't available in this app.");
+      }
+      setFullPlayer(false);
+      openPage(browser.satellite, opened.page, opened.params);
+      return true;
+    },
+    [client, openPage, serverId],
   );
 
   const playSearch = useCallback(
@@ -380,6 +421,7 @@ export function AudioHost({
     offlineFor,
     audio: audioDoc,
     openPage: openProviderPage,
+    locate,
     reload,
     onChanged,
   };

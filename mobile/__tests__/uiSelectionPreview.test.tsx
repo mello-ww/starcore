@@ -116,6 +116,24 @@ describe('a viewer field link', () => {
     expect(open).toHaveBeenCalledWith('https://maps.example.org/?mlat=48.85&mlon=2.35');
     open.mockRestore();
   });
+
+  it('shows its path in its folder, and the viewer gives way to that page (change 18)', async () => {
+    const block: UiBlock = {
+      type: 'media-grid', items: '$.items', item: {image: 'thumbs/{$.id}', key: '$.id'},
+      viewer: {title: '$.id', fields: [{label: 'Folder', value: '$.folder', action: {locate: '$.folder'}}]},
+    };
+    const ctx = context();
+    const tree = mount(block, {items: [{id: 'a', folder: '/photos/Holiday'}]}, ctx);
+    act(() => tree.root.find((node: any) => node.type === Pressable && node.props.testID === 'media-tile-a').props.onPress());
+    const viewer = tree.root.findByType(Modal);
+    act(() => viewer.find((node: any) => node.props.accessibilityLabel === 'Show details' && node.props.onPress).props.onPress());
+    const link = viewer.find((node: any) => node.type === Text && node.props.accessibilityRole === 'link');
+    expect(link.props.children).toBe('/photos/Holiday');
+    await act(async () => link.props.onPress());
+    expect((ctx.runAction as jest.Mock).mock.calls[0][0]).toEqual({locate: '$.folder'});
+    expect((ctx.runAction as jest.Mock).mock.calls[0][1].data.folder).toBe('/photos/Holiday');
+    expect(tree.root.findAllByType(Modal)).toHaveLength(0);
+  });
 });
 
 describe('a provider cluster with a preview', () => {
