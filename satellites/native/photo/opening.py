@@ -76,7 +76,7 @@ def in_library(satellite, found: dict):
     folder = str(PurePath(found["path"]).parent)
     for photo in library(satellite).all():
         if (photo.get("filename") == found["name"] and photo.get("size") == found["size"]
-                and photo.get("physical_path") in (None, folder)):
+                and photo.get("physical_path") in (None, folder) and photo.get("origin") in (None, folder)):
             return photo
     return None
 
@@ -144,7 +144,8 @@ def add(request):
 
     photo_library = library(request.satellite)
     try:
-        added = photo_library.add_file(source, filename=found["name"], private=policy(request.engine))
+        added = photo_library.add_file(source, filename=found["name"], private=policy(request.engine),
+                                       origin=str(PurePath(found["path"]).parent))
     except images.UnsupportedImage:
         return error_response("that file isn't a picture or a video this library can keep", status=415)
     except PhotoImportError as error:

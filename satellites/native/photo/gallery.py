@@ -132,7 +132,8 @@ def item(photo: dict, favorites: set) -> dict:
         # the location's own coordinates, for the viewer's link to a map
         "lat": spot[0] if spot else None,
         "lon": spot[1] if spot else None,
-        "folder": photo.get("physical_path"),
+        # its physical album, or else the folder on the server it was imported from
+        "folder": photo.get("physical_path") or photo.get("origin"),
         "favorite": favorite,
         "can_favorite": not favorite,
     }

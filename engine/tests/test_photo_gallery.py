@@ -112,6 +112,13 @@ class PhotoUiDocumentTest(unittest.TestCase):
         item = gallery.item({"id": "p1", "metadata": {"gps_coordinates": "49.1, 6.2"}, "physical_path": "/srv/p"}, set())
         self.assertTrue({"location", "folder"} <= set(item))  # the fields the omissions name
 
+    def test_the_folder_is_the_physical_album_or_else_where_it_was_imported_from(self):
+        from satellites.native.photo import gallery
+        self.assertEqual(gallery.item({"id": "p1", "metadata": {}, "origin": "/srv/in"}, set())["folder"], "/srv/in")
+        self.assertEqual(gallery.item({"id": "p1", "metadata": {}, "physical_path": "/srv/p", "origin": "/srv/in"},
+                                      set())["folder"], "/srv/p")
+        self.assertIsNone(gallery.item({"id": "p1", "metadata": {}}, set())["folder"])
+
     def test_it_never_reaches_the_locked_folder_itself(self):
         # no route or media of the document goes near it: it only opens Photo's own screens,
         # which ask for the PIN as they always did

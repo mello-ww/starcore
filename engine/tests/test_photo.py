@@ -211,6 +211,43 @@ class PhotoLibraryTest(unittest.TestCase):
 
         self.assertIsNone(self.library.all()[0]["physical_path"])
 
+    def test_an_import_remembers_the_folder_each_file_came_from(self):
+        self.write("holiday.png", png(4, 3))
+        self.write("nested/beach.png", png(5, 3))
+        self.library.import_directory(self.source)
+
+        origins = {photo["filename"]: photo["origin"] for photo in photo_library(self.library.root).all()}
+
+        source = self.source.resolve()
+        self.assertEqual(origins, {"holiday.png": str(source), "beach.png": str(source / "nested")})
+
+    def test_importing_a_folder_again_fills_in_an_unknown_origin(self):
+        self.write("holiday.png", png(4, 3))
+        self.library.import_directory(self.source)
+        # as an import made before origins were recorded left it
+        index = json.loads(self.library.index_path.read_text(encoding="utf-8"))
+        for photo in index["photos"].values():
+            del photo["origin"]
+        self.library.index_path.write_text(json.dumps(index), encoding="utf-8")
+        library = photo_library(self.library.root)
+        self.assertIsNone(library.all()[0]["origin"])
+
+        result = library.import_directory(self.source)
+
+        self.assertEqual((result["imported"], result["duplicates"]), (0, 1))
+        self.assertEqual(photo_library(self.library.root).all()[0]["origin"], str(self.source.resolve()))
+
+    def test_a_known_origin_is_kept_when_the_same_file_comes_from_elsewhere(self):
+        self.write("holiday.png", png(4, 3))
+        self.library.import_directory(self.source)
+        elsewhere = self.directory / "elsewhere"
+        elsewhere.mkdir()
+        (elsewhere / "copy.png").write_bytes(png(4, 3))
+
+        self.library.import_directory(elsewhere)
+
+        self.assertEqual(photo_library(self.library.root).all()[0]["origin"], str(self.source.resolve()))
+
     def test_add_file_can_be_given_a_physical_path(self):
         source = self.write("shot.png", png(4, 3))
 

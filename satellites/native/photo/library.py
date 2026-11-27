@@ -217,7 +217,7 @@ class PhotoLibrary:
     # ---------- import ----------
 
     def add_file(self, source, filename: str = None, save: bool = True, physical_path: str = None, private=None,
-                 captured_at: str = None):
+                 captured_at: str = None, origin: str = None):
         """Takes a single file into the library.
 
         Returns the new record, or None when that exact image is already stored.
@@ -237,6 +237,12 @@ class PhotoLibrary:
         those photos simply have no physical album, exactly like a photo
         imported before this concept existed.
 
+        `origin` is the folder on the server the file was taken from (a directory
+        import, or a file opened by its path): what the viewer's Folder shows when
+        there is no physical album. Metadata only, like `physical_path`. A duplicate
+        that has no origin yet takes this one, so importing a folder again fills it
+        in for what an earlier import took from there.
+
         `private` (see private_media.py) refuses media that was moved into the
         Locked Folder: it is answered exactly like a duplicate, so a phone
         that still has the photo stops re-sending it, and nothing tells the
@@ -247,6 +253,13 @@ class PhotoLibrary:
         photo_id = full_digest[:ID_LENGTH]
 
         if photo_id in self._photos:
+            known = self._photos[photo_id]
+            if origin and not known.get("origin"):
+                known["origin"] = origin
+                if save:
+                    self._save()
+                else:
+                    self._unsaved = True
             return None
         if private is not None and private.is_sealed(full_digest):
             return None
@@ -303,6 +316,7 @@ class PhotoLibrary:
             },
             "trashed_at": None,
             "physical_path": physical_path,
+            "origin": origin,
         }
 
         self._photos[photo_id] = photo
@@ -340,11 +354,12 @@ class PhotoLibrary:
         imported = []
         failed = []
         found = duplicates = 0
+        self._unsaved = False
 
         for path in self._candidates(source, private):
             found += 1
             try:
-                photo = self.add_file(path, save=False, private=private)
+                photo = self.add_file(path, save=False, private=private, origin=str(path.parent))
             except (images.UnsupportedImage, OSError, ValueError) as error:
                 failed.append({"file": path.name, "reason": str(error)})
                 continue
@@ -354,8 +369,9 @@ class PhotoLibrary:
             else:
                 imported.append(photo)
 
-        if imported:
+        if imported or self._unsaved:
             self._save()
+        self._unsaved = False
 
         return {
             "source": str(source),
@@ -526,6 +542,7 @@ class PhotoLibrary:
                 # has no physical album, exactly like it has no media_type
                 # override above - never re-resolved just for being read
                 photo.setdefault("physical_path", None)
+                photo.setdefault("origin", None)
             self._photos = photos
 
         erased = index.get("erased")

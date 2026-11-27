@@ -84,7 +84,12 @@ Importing a directory:
 2. hashes each one and skips it when that exact image is already stored
 3. reads its dimensions, refusing files whose headers cannot be understood
 4. copies it aside and moves it into place, so an interrupted import leaves nothing half written
-5. records it in the index
+5. records it in the index, with the folder it came from (`origin`)
+
+The folder a photo came from is what the viewer's Folder shows, and opens in the browsing
+Satellite, when the photo has no physical album. A file taken in from its own page ("Add to
+library") keeps its folder too. Importing a folder again fills that in for photos an earlier
+import took from there before it was recorded, and copies nothing.
 
 The result reports how many files were found, how many were imported, how many were
 duplicates, and which files failed and why. A file that cannot be read or decoded is
