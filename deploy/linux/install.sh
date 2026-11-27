@@ -118,11 +118,13 @@ say "systemd unit"
 install -m 0644 "$APP/deploy/systemd/starcore.service" /etc/systemd/system/starcore.service
 systemctl daemon-reload
 if [[ "$MEDIA" != /srv/starcore ]]; then
-    # the unit only lets StarCore write under /srv/starcore; allow the chosen media folder too
+    # the unit lets StarCore write under /srv/starcore; replace that list (an empty value resets
+    # it) with the chosen media folder, since systemd won't start with a listed path missing
     install -d /etc/systemd/system/starcore.service.d
     printf '[Service]
-ReadWritePaths=%s
-' "$MEDIA" > /etc/systemd/system/starcore.service.d/media.conf
+ReadWritePaths=
+ReadWritePaths=%s/engine %s/satellites %s
+' "$APP" "$APP" "$MEDIA" > /etc/systemd/system/starcore.service.d/media.conf
     systemctl daemon-reload
 fi
 systemd-analyze verify /etc/systemd/system/starcore.service || true

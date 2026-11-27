@@ -3,6 +3,14 @@
 All notable changes to StarCore. Versions follow [semver](https://semver.org/); the version
 itself lives in the `VERSION` file (see `docs/releasing.md`).
 
+## Unreleased
+
+### Fixed
+
+- `deploy/linux/install.sh` with `STARCORE_MEDIA` set to another folder: the service now
+  starts. The unit's write list still named `/srv/starcore`, which systemd refuses to start
+  with when that folder doesn't exist; the drop-in now replaces the list instead of adding to it.
+
 ## 0.1.0 - 2026-11-27
 
 The first stable release. Every Satellite now has only its shared interface (UI contract 1.2)
