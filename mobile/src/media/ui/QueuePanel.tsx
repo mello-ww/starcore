@@ -1,5 +1,6 @@
 import React from 'react';
 import {FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
+import Icon from 'react-native-vector-icons/Feather';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useAudioHost, usePlayerState} from '../AudioHost';
 import {upcoming} from '../queue';
@@ -29,14 +30,14 @@ export function QueuePanel() {
             </View>
             <Pressable onPress={() => player.move(item.position, item.position - 1)} disabled={index === 0} hitSlop={6}
               accessibilityLabel="Move up">
-              <Text style={[styles.icon, index === 0 && styles.disabled]}>▲</Text>
+              <Icon name="chevron-up" size={20} color={colors.textDim} style={[styles.icon, index === 0 && styles.disabled]} />
             </Pressable>
             <Pressable onPress={() => player.move(item.position, item.position + 1)} disabled={index === next.length - 1}
               hitSlop={6} accessibilityLabel="Move down">
-              <Text style={[styles.icon, index === next.length - 1 && styles.disabled]}>▼</Text>
+              <Icon name="chevron-down" size={20} color={colors.textDim} style={[styles.icon, index === next.length - 1 && styles.disabled]} />
             </Pressable>
             <Pressable onPress={() => player.removeAt(item.position)} hitSlop={6} accessibilityLabel="Remove from queue">
-              <Text style={styles.icon}>✕</Text>
+              <Icon name="x" size={20} color={colors.textDim} style={styles.icon} />
             </Pressable>
           </View>
         )}
@@ -51,6 +52,6 @@ const styles = StyleSheet.create({
   header: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm},
   row: {flexDirection: 'row', alignItems: 'center', gap: spacing.sm},
   track: {flex: 1},
-  icon: {color: colors.textDim, fontSize: 14, padding: 4},
+  icon: {padding: 4},
   disabled: {opacity: 0.3},
 });

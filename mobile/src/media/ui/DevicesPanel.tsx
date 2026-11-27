@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import Icon from 'react-native-vector-icons/Feather';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {useAudioHost, usePlayerState} from '../AudioHost';
 import type {ConnectDevice} from '../types';
@@ -57,7 +58,8 @@ export function DevicesPanel() {
         return (
           <Pressable key={device.id} onPress={() => select(device)} disabled={!device.online && device.id !== deviceId}
             style={[styles.device, current && {backgroundColor: `${accentStyle.text.color}1f`}, !device.online && styles.offline]}>
-            <Text style={styles.icon}>{device.kind === 'web' ? '🖥' : device.kind === 'mobile' ? '📱' : '🔊'}</Text>
+            <Icon name={device.kind === 'web' ? 'monitor' : device.kind === 'mobile' ? 'smartphone' : 'speaker'} size={20}
+              color={current ? accentStyle.text.color as string : colors.textDim} style={styles.icon} />
             <View style={styles.text}>
               <Text style={[typography.body, current && [styles.current, accentStyle.text]]}>
                 {device.name}{device.id === deviceId ? ' (this phone)' : ''}
@@ -82,7 +84,7 @@ const styles = StyleSheet.create({
   device: {flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, paddingHorizontal: spacing.md,
     marginBottom: spacing.xs, borderRadius: 16, backgroundColor: colors.raised},
   offline: {opacity: 0.5},
-  icon: {fontSize: 22},
+  icon: {width: 22, textAlign: 'center'},
   text: {flex: 1},
   current: {fontWeight: '600'},
   note: {marginTop: spacing.md},

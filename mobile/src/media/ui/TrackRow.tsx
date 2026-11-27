@@ -1,5 +1,6 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
+import Icon from 'react-native-vector-icons/Feather';
 import {colors, spacing, TOUCH_TARGET, touchTarget, typography, useAccentStyles} from '../../theme';
 import {useCurrentTrackId, useAudioHost} from '../AudioHost';
 import type {Track} from '../types';
@@ -38,8 +39,8 @@ export function TrackRow({track, onPress, onMore, showArtwork = true, number, su
           {track.title || 'Unavailable track'}
         </Text>
         <Text numberOfLines={1} style={typography.caption}>
-          {liked.has(track.id) ? '♥ ' : ''}
-          {downloads.isDownloaded(track.id) ? '↓ ' : ''}
+          {liked.has(track.id) && <><Icon name="heart" size={11} color={colors.textDim} />{' '}</>}
+          {downloads.isDownloaded(track.id) && <><Icon name="download" size={11} color={colors.textDim} />{' '}</>}
           {track.quality?.hires ? 'Hi-Res · ' : track.quality?.lossless ? 'Lossless · ' : ''}
           {subtitle ?? track.reason ?? track.artist ?? track.album_artist ?? ''}
         </Text>
@@ -47,7 +48,7 @@ export function TrackRow({track, onPress, onMore, showArtwork = true, number, su
       <Text style={styles.time}>{duration(track.duration)}</Text>
       {onMore && (
         <Pressable onPress={onMore} style={styles.more} accessibilityRole="button" accessibilityLabel="Track options">
-          <Text style={styles.moreGlyph}>⋮</Text>
+          <Icon name="more-vertical" size={20} color={colors.textDim} />
         </Pressable>
       )}
     </Pressable>
@@ -63,5 +64,4 @@ const styles = StyleSheet.create({
   title: {...typography.body},
   time: {...typography.label},
   more: touchTarget,
-  moreGlyph: {color: colors.textDim, fontSize: 20},
 });

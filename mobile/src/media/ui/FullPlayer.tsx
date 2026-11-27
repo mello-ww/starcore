@@ -70,10 +70,10 @@ function PlayerBody() {
     <>
       <View style={[styles.screen, {paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + spacing.md}]}>
         <View style={styles.top} {...responder.panHandlers}>
-          <Pressable onPress={close} style={styles.touch} accessibilityRole="button" accessibilityLabel="Close the player"><Text style={styles.chevron}>⌄</Text></Pressable>
+          <Pressable onPress={close} style={styles.touch} accessibilityRole="button" accessibilityLabel="Close the player"><Icon name="chevron-down" size={26} color={colors.text} /></Pressable>
           <Text numberOfLines={1} style={typography.label}>{remote ? `Playing on ${remote.name}` : state.context ?? 'Now playing'}</Text>
           {showMenu ? (
-            <Pressable onPress={showMenu} style={styles.touch} accessibilityRole="button" accessibilityLabel="Track options"><Text style={styles.chevron}>⋮</Text></Pressable>
+            <Pressable onPress={showMenu} style={styles.touch} accessibilityRole="button" accessibilityLabel="Track options"><Icon name="more-vertical" size={22} color={colors.text} /></Pressable>
           ) : (
             <View style={styles.touch} />
           )}
@@ -158,7 +158,6 @@ const styles = StyleSheet.create({
   toggle: {...touchTarget, borderRadius: 24, alignItems: 'center', justifyContent: 'center'},
   tabPill: {minHeight: 34, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.raised, alignItems: 'center', justifyContent: 'center'},
   tabTouch: {minHeight: 48, minWidth: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs},
-  chevron: {color: colors.text, fontSize: 26},
   middle: {flex: 1, marginBottom: spacing.md},
   artwork: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   titleRow: {flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm},

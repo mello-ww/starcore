@@ -1,6 +1,6 @@
 import * as library from "./library.js";
 import * as session from "./session.js";
-import { button, el, emptyState } from "./dom.js";
+import { button, el, emptyState, icon } from "./dom.js";
 import { player } from "./player.js";
 
 const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -111,7 +111,7 @@ export function lyricsPanel({ karaoke = false } = {}) {
                     row.append(span);
                 }
             } else {
-                row.append(el("span", null, line.text || "♪"));
+                row.append(line.text ? el("span", null, line.text) : icon("note", 16));
             }
             if (line.translation) {
                 row.append(el("span", "pl-lyric-translation", line.translation));

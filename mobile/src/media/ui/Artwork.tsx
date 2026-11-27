@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import {Image, StyleSheet, Text, View} from 'react-native';
+import Icon from 'react-native-vector-icons/Feather';
 import {colors, radius} from '../../theme';
 import {useArtworkUri} from '../AudioHost';
 
@@ -10,7 +11,8 @@ export function Artwork({albumId, size, round, label}: {albumId?: string | null;
   if (!source || failed) {
     return (
       <View style={[styles.fallback, shape]}>
-        <Text style={[styles.glyph, {fontSize: size / 3}]}>{label ? label.slice(0, 1).toUpperCase() : '♪'}</Text>
+        {label ? <Text style={[styles.glyph, {fontSize: size / 3}]}>{label.slice(0, 1).toUpperCase()}</Text>
+          : <Icon name="music" size={size / 3} color={colors.textFaint} />}
       </View>
     );
   }

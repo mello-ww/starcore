@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import Icon from 'react-native-vector-icons/Feather';
 import {colors, spacing, typography, useAccentStyles} from '../../theme';
 import {activeLine, activeWords, lyricsTime} from '../lyrics';
 import {useAudioHost, usePlayerState} from '../AudioHost';
@@ -87,7 +88,7 @@ export function LyricsPanel({trackId}: {trackId: string}) {
                     ))}
                   </Text>
                 ) : (
-                  <Text style={[styles.text, active && styles.active, position < index && styles.past]}>{line.text || '♪'}</Text>
+                  <Text style={[styles.text, active && styles.active, position < index && styles.past]}>{line.text || <Icon name="music" size={16} color={colors.textDim} />}</Text>
                 )}
                 {!!line.translation && <Text style={typography.caption}>{line.translation}</Text>}
               </Pressable>
