@@ -830,7 +830,7 @@ function slidersIcon() {
 
 /* ---------- accent colour ---------- */
 
-const ACCENTS = [["red", "Red"], ["orange", "Orange"], ["green", "Green"], ["blue", "Blue"], ["mono", "Mono"]];
+const ACCENTS = [["purple", "Purple"], ["red", "Red"], ["orange", "Orange"], ["green", "Green"], ["blue", "Blue"], ["mono", "Mono"]];
 const ACCENT_KEY = "starcore.accent";
 const HEX_PATTERN = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i;
 
@@ -859,16 +859,16 @@ function onAccentFor(hex) {
 // a preset's name, or the custom "#rrggbb"
 function currentAccent() {
     const custom = normalizeHex(document.documentElement.style.getPropertyValue("--sc-accent"));
-    return custom || document.documentElement.dataset.accent || "red";
+    return custom || document.documentElement.dataset.accent || "purple";
 }
 
 function currentAccentHex() {
-    return normalizeHex(getComputedStyle(document.documentElement).getPropertyValue("--sc-accent")) || "#ee444b";
+    return normalizeHex(getComputedStyle(document.documentElement).getPropertyValue("--sc-accent")) || "#b76fff";
 }
 
 function storedAccent() {
     try {
-        return localStorage.getItem(ACCENT_KEY) || "red";
+        return localStorage.getItem(ACCENT_KEY) || "purple";
     } catch (error) {
         return currentAccent();
     }
@@ -885,7 +885,7 @@ function setAccent(value, save = true) {
     } else {
         root.style.removeProperty("--sc-accent");
         root.style.removeProperty("--sc-on-accent");
-        if (value === "red") {
+        if (value === "purple") {
             delete root.dataset.accent;
         } else {
             root.dataset.accent = value;

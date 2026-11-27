@@ -24,6 +24,7 @@ export const palette = {
 } as const;
 
 export const ACCENTS = [
+  {name: 'purple', label: 'Purple', color: '#b76fff'},
   {name: 'red', label: 'Red', color: '#ee444b'},
   {name: 'orange', label: 'Orange', color: '#f08a3c'},
   {name: 'green', label: 'Green', color: '#45c486'},
@@ -33,7 +34,7 @@ export const ACCENTS = [
 
 export type AccentName = (typeof ACCENTS)[number]['name'];
 
-export const DEFAULT_ACCENT: AccentName = 'red';
+export const DEFAULT_ACCENT: AccentName = 'purple';
 
 export function accentColor(name: AccentName): string {
   return (ACCENTS.find(accent => accent.name === name) ?? ACCENTS[0]).color;

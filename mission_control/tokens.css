@@ -14,7 +14,7 @@
     --sc-text-2: #a6a8b1;
     --sc-text-3: #8b8f9a;
 
-    --sc-accent: #ee444b;
+    --sc-accent: #b76fff;
     --sc-on-accent: #141215;
     --sc-danger: #ee444b;
     --sc-warn: #f0b43c;
@@ -44,6 +44,7 @@
 }
 
 /* accent presets, picked from the Home header and remembered per browser */
+:root[data-accent="red"] { --sc-accent: #ee444b; }
 :root[data-accent="orange"] { --sc-accent: #f08a3c; }
 :root[data-accent="green"] { --sc-accent: #45c486; }
 :root[data-accent="blue"] { --sc-accent: #5b95f7; }

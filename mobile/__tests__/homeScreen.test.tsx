@@ -158,7 +158,7 @@ describe('AccentProvider', () => {
         </AccentProvider>,
       );
     });
-    expect(seen).toBe('red');
+    expect(seen).toBe('purple');
   });
 });
 

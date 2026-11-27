@@ -56,7 +56,7 @@ describe('custom accent', () => {
     const field = () => tree.root.findByProps({testID: 'accent-hex'});
 
     await act(async () => field().props.onChangeText('#1A23'));
-    expect(seen.color).toBe('#ee444b');
+    expect(seen.color).toBe('#b76fff');
     expect(field().props.style).toEqual(expect.arrayContaining([expect.objectContaining({borderColor: '#ee444b'})]));
 
     await act(async () => field().props.onChangeText('#1A237E'));

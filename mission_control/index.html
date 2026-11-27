@@ -21,7 +21,7 @@ try {
         const root = document.documentElement.style;
         root.setProperty("--sc-accent", accent.toLowerCase());
         root.setProperty("--sc-on-accent", (light + 0.05) / 0.0573 >= 1.05 / (light + 0.05) ? "#141215" : "#ffffff");
-    } else if (accent && accent !== "red") {
+    } else if (accent && accent !== "purple") {
         document.documentElement.dataset.accent = accent;
     }
 } catch (error) {}

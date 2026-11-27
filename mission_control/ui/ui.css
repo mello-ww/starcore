@@ -446,7 +446,7 @@ button.ui-list-row:hover {
 .ui-list-icon {
     display: inline-flex;
     flex: none;
-    color: var(--sc-text-icon);
+    color: var(--sc-accent);
 }
 
 .ui-list-main {

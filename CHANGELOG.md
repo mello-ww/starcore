@@ -13,6 +13,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   The boot partitions (`/boot`, `/boot/efi`) are listed in Developer Mode only, and a folder
   inside them shows a "Sensitive location" warning.
 
+- **A purple accent preset (#B76FFF), now StarCore's default** on both clients; red stays a
+  preset. Anyone who picked an accent keeps it. Mission Control's list rows now draw their
+  icons in the accent, as the Android app already did, which colours File Explorer's home.
+  The app needs a new APK for the new default.
+
 ### Fixed
 
 - `deploy/linux/install.sh` with `STARCORE_MEDIA` set to another folder: the service now

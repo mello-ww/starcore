@@ -38,7 +38,7 @@
     /* The player follows StarCore's accent unless the listener's preference says otherwise (theme.js
        sets these inline on the root then): a colour of their own, or, in "artwork" mode, the playing cover's
        colour for the now-playing controls only. The on-* tokens are the text colour that reads on each. */
-    --pl-accent: var(--sc-accent, rgb(238, 68, 75));
+    --pl-accent: var(--sc-accent, rgb(183, 111, 255));
     --pl-on-accent: var(--sc-on-accent, #141215);
     --pl-player-accent: var(--pl-accent);
     --pl-player-on-accent: var(--pl-on-accent);

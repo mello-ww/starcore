@@ -367,6 +367,7 @@ body {
     border-color: var(--sc-text);
 }
 
+.accent-swatch[data-accent="purple"] { background-color: #b76fff; }
 .accent-swatch[data-accent="red"] { background-color: #ee444b; }
 .accent-swatch[data-accent="orange"] { background-color: #f08a3c; }
 .accent-swatch[data-accent="green"] { background-color: #45c486; }
