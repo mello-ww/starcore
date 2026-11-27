@@ -8,6 +8,7 @@
 import { formatValue, ICONS, isSafeRoute, isVisible, resolve, resolveLink, resolveTemplate } from "./contract.js";
 import { icon } from "./icons.js";
 import { createListPaging } from "./listpaging.js";
+import { slideSelection } from "./motion.js";
 
 // tiles revealed at a time: enough for a first screen, little enough to paint at once
 export const GRID_PAGE = 60;
@@ -625,6 +626,8 @@ export function createGallery(host) {
         const group = el("div", "ui-pill-group ui-media-size");
         group.setAttribute("role", "group");
         group.setAttribute("aria-label", "Thumbnail size");
+        // the accent slides to the size picked (ui/motion.js), from where this grid last had it
+        group.dataset.slide = gridSizeKey(block);
         const current = gridSize(block, grid.size);
         GRID_SIZES.forEach((size, at) => {
             const button = el("button", "ui-pill-segment");
@@ -655,8 +658,17 @@ export function createGallery(host) {
         wrapper.classList.add(`ui-media-grid-${size}`);
         grid.size = size;
         host.preferences?.set(gridSizeKey(block), size);
-        for (const button of wrapper.querySelectorAll(".ui-media-size .ui-pill-segment")) {
-            button.setAttribute("aria-pressed", String(button.dataset.size === size));
+        for (const group of wrapper.querySelectorAll(".ui-media-size")) {
+            let pressed = null;
+            for (const button of group.querySelectorAll(".ui-pill-segment")) {
+                const on = button.dataset.size === size;
+                button.setAttribute("aria-pressed", String(on));
+                button.classList.remove("ui-slid");
+                pressed = on ? button : pressed;
+            }
+            if (group.dataset.slide) {
+                slideSelection(group, pressed, group.dataset.slide);
+            }
         }
         if (anchor) {
             const moved = anchor.getBoundingClientRect().top - before;

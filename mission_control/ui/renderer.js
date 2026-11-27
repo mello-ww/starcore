@@ -2420,8 +2420,8 @@ export function mount(context) {
         const body = el("div", `ui-page${state.dataError ? " ui-page-stale" : ""}`);
         renderPageBlocks(page.blocks, scope, body, template);
         host.appendChild(body);
-        for (const group of body.querySelectorAll(".ui-segmented[data-slide]")) {
-            slideSelection(group, group.querySelector(".ui-segment.active"), group.dataset.slide);
+        for (const group of body.querySelectorAll(".ui-segmented[data-slide], .ui-pill-group[data-slide]")) {
+            slideSelection(group, group.querySelector(".ui-segment.active, .ui-pill-segment[aria-pressed=\"true\"]"), group.dataset.slide);
         }
         markLoading();
         gallery.afterRender();

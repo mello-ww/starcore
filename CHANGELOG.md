@@ -7,6 +7,11 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **A choice's accent really slides, and the thumbnail size slides too.** On Mission Control the
+  picked segment of a choice (Photos' Month, Camera, All) painted its own fixed accent at once
+  and faded it out while the sliding one was still on its way, which read as a stutter; it now
+  paints nothing and the accent alone moves. The grid's thumbnail size pill slides its accent
+  the same way.
 - **File Explorer names media types like a desktop file manager, and a long path keeps its
   line.** A picture, a sound or a video reads as its extension and what it is ("MP4 video",
   "M4A audio", "BMP image"), with more video and audio extensions known. On both clients a

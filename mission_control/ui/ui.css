@@ -59,8 +59,19 @@
 }
 
 .ui-slide-row > .ui-slid,
-.ui-slide-row > .ui-slid:hover {
+.ui-slide-row > .ui-slid:hover,
+.ui-segmented.ui-slide-row > .ui-segment.ui-slid,
+.ui-pill-group.ui-slide-row > .ui-pill-segment.ui-slid {
+    /* the option's own accent (`.active`, `aria-pressed`) is declared further down: these
+       selectors outrank it, or it would paint the new place before the accent has got there */
     background: transparent;
+    /* and at once: a fade from the accent would leave a fixed rectangle while the accent slides */
+    transition: none;
+}
+
+.ui-pill-group.ui-slide-row > .ui-pill-segment {
+    position: relative;
+    z-index: 2;
 }
 
 @media (prefers-reduced-motion: reduce) {
