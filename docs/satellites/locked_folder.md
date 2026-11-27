@@ -1157,5 +1157,6 @@ folders, R2 from React Native's own source (0.73.6).
 
 - A session that has the vault open may rename or delete a folder that contains it through File
   Explorer: it is the owner's own action, as in M5.
-- A4 (what a session is worth: unhashed session tokens, the cookie behind a TLS proxy, cleartext
-  in the app) is Stabilisation's, unchanged.
+- A4 (what a session is worth) was Stabilisation's: session tokens are hashed at rest, and the
+  cookie is `Secure` behind an HTTPS proxy (`docs/roadmap.md`, "Pre-release audit"). Cleartext
+  in the app, for LAN servers, stays.

@@ -616,9 +616,19 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def _session_cookie(self, token: str, max_age: int = SESSION_TTL_SECONDS) -> str:
         parts = [f"{SESSION_COOKIE}={token}", "Path=/", "HttpOnly", "SameSite=Lax", f"Max-Age={max_age}"]
-        if getattr(self.server, "https_enabled", False):
+        if self._over_https():
             parts.append("Secure")
         return "; ".join(parts)
+
+    def _over_https(self) -> bool:
+        """True when the client reached StarCore over HTTPS: the Engine serves it itself, or a
+        reverse proxy on this machine says it accepted the request that way (X-Forwarded-Proto,
+        its nearest entry). Like the other forwarding headers it is believed only from this
+        machine: anyone else could make it up."""
+        if getattr(self.server, "https_enabled", False):
+            return True
+        scheme = self.headers.get("X-Forwarded-Proto", "").split(",")[-1].strip().lower()
+        return self._proxied() and scheme == "https"
 
     def _handle_auth_status(self):
         engine = self.server.engine

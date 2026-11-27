@@ -28,7 +28,8 @@ each step until then are in this file's history (`git log -p docs/roadmap.md`).
 
 ### Not verified yet
 
-- The Python tests skipped on Windows (51 at `347d7dd`, among them: permission denials, symlink cases - among
+- The Python tests skipped on Windows (5 at `347d7dd` with both extras installed, 51 without
+  them, since Pillow's and cryptography's tests skip too: permission denials, symlink cases - among
   them the Locked Folder check that a symlink into the vault stays blocked while locked - and
   FFmpeg video thumbnails): run them on Linux before relying on those behaviours.
 - A physical Android phone: biometric unlock and grants, background playback, the
@@ -95,16 +96,51 @@ Non-destructive review. The two confirmed weaknesses it found have since been fi
   successful sign-in resets it. The record is in memory only. Behind a reverse proxy all
   clients share the proxy's address, and so share one lockout.
 
-Potential risks:
+Potential risks, as they stand after the audit below:
 
-- Before the first administrator is created the API is open by design; this is only safe
-  while the server stays on `127.0.0.1`.
+- Before the first administrator is created the API is open only to a client on the server
+  itself that doesn't come through a proxy; anyone else reaches only the setup screen, which
+  asks for the one-time code StarCore prints at startup (guesses are throttled).
 - The Android app allows cleartext HTTP for any host (deliberate, for LAN servers), so
   without HTTPS the session token crosses the network in the clear.
-- `npm audit` reports 33 advisories in the Android project. Almost all are build-time
-  tooling (React Native CLI, Metro, codegen). The one shipped in the app, React Navigation's
-  `query-string`/`decode-uri-component` denial of service, is not reachable: the app
-  registers no deep links.
+
+### Pre-release audit (2026-11-27)
+
+Dependencies, the risks accepted so far, and the server-side changes made since the last
+review ("Opens with", O5).
+
+- **Pillow (fixed).** The lock pinned Pillow 12.3.0, which the Linux server and the Docker
+  image install as it is (`uv sync --frozen`); `pip-audit` lists 42 advisories against it,
+  all fixed in 13.0.0. Pillow parses every picture the library takes in, including what a
+  phone's backup credential uploads, so this was the audit's one finding on the server. The
+  lock now pins 13.0.0, with no known advisory; `cryptography` 50.0.2 has none. The server
+  takes it at its next `install.sh --update`.
+- **The session cookie behind an HTTPS proxy (fixed).** The Engine marked it `Secure` only
+  when it served HTTPS itself; behind a proxy that was left to the proxy's configuration
+  (the shipped nginx file appends it). The Engine now also marks it when a proxy on the same
+  machine says it took the request over HTTPS (`X-Forwarded-Proto`, believed only from
+  loopback, like the other forwarding headers). This closes the last open part of the
+  Locked Folder audit's A4.
+- **npm (Android project): 26 advisories, 22 after `npm audit fix`.** The two critical ones
+  (`shell-quote`, `handlebars`) and `joi` and `brace-expansion` are updated in the lock. All
+  of these, and what is left of the React Native CLI, Metro (`image-size`),
+  `fast-xml-parser` and the TypeScript ESLint packages, are build and test tooling: they run
+  on the machine that builds the APK, on the project's own files, and are not in the app.
+  The only flagged code in the app is still React Navigation 6's
+  `query-string`/`decode-uri-component` (a denial of service on a crafted link): the app
+  registers no deep link and passes no `linking` configuration, so nothing outside the app
+  reaches it. Clearing these needs React Navigation 7 and a newer React Native, both major
+  upgrades left for after the release.
+- **Since the last review:** a list row's `selected`, `locate` from the player and the
+  viewer's details, File Explorer's `select` and Photos' `origin` add no route and no
+  authority: `select` is only compared with the names of the page, and `origin` is a folder
+  path shown to the signed-in owner, as a physical album's already was. The Docker image
+  runs as its own user, and a request through its published port is not "this machine", so
+  a fresh container asks for the setup code. It copies `uv` from an unpinned `latest` tag:
+  pin it if the image is ever published.
+- **Accepted, unchanged:** cleartext HTTP in the app for LAN servers (the screens say so);
+  an unencrypted Locked Folder against someone who can edit StarCore's files; device
+  credentials that never expire, revoked from the sessions list.
 
 Found and fixed while moving the Locked Folder into Photos (each covered by
 `engine/tests/test_locked_folder_security.py`):
@@ -254,6 +290,6 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [x] The auth store locked against concurrent writes (requests run on threads), and a "last
   used" kept for device credentials, so a stale one can be told apart
   (`photos-parity-audit.md`, "Security review of S1 to S4")
-- [ ] Periodic security audits, including dependency audits
+- [ ] Periodic security audits, including dependency audits (the last: 2026-11-27, above)
 - [x] Locked Folder encryption at rest (server-side; see its threat model)
 - [ ] End-to-end encryption for the Locked Folder (keys never on the server)

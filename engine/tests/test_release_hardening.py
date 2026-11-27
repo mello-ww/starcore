@@ -150,6 +150,24 @@ class ClientAddressTest(unittest.TestCase):
         self.assertFalse(self.handler("127.0.0.1", {"Forwarded": "for=203.0.113.7"})._direct_local())
         self.assertFalse(self.handler("192.168.1.50", {})._direct_local())
 
+    def test_the_session_cookie_is_secure_behind_an_https_proxy(self):
+        class Server:
+            https_enabled = False
+
+        def cookie(peer, headers):
+            handler = self.handler(peer, headers)
+            handler.server = Server()
+            return handler._session_cookie("token")
+
+        https = {"X-Real-IP": "203.0.113.7", "X-Forwarded-Proto": "https"}
+        self.assertIn("; Secure", cookie("127.0.0.1", https))
+        self.assertIn("; Secure", cookie("127.0.0.1", {"X-Forwarded-For": "203.0.113.7",
+                                                       "X-Forwarded-Proto": "http, HTTPS"}))
+        # a proxy that took plain HTTP, no proxy at all, and a header anyone on the LAN can send
+        self.assertNotIn("Secure", cookie("127.0.0.1", {"X-Real-IP": "203.0.113.7", "X-Forwarded-Proto": "http"}))
+        self.assertNotIn("Secure", cookie("127.0.0.1", {}))
+        self.assertNotIn("Secure", cookie("192.168.1.50", https))
+
 
 class SetupCodeTest(unittest.TestCase):
     def test_codes_are_unambiguous_and_differ(self):

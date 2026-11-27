@@ -237,6 +237,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Security
 
+- **Pillow 13.** The lock pinned Pillow 12.3.0, which has 42 known advisories in its image
+  parsers; it now pins 13.0.0, which has none. Found by the pre-release audit
+  (`docs/roadmap.md`), which also updated the Android project's build tooling where an update
+  existed (`shell-quote`, `handlebars`, `joi`, `brace-expansion`).
+- **The session cookie is `Secure` behind an HTTPS proxy.** The Engine marks it when a proxy on
+  the same machine says the request came over HTTPS (`X-Forwarded-Proto`), instead of leaving
+  it to the proxy's configuration.
 - **Opening a file by its path keeps nothing of a protected area.** The review of "Opens with"
   (`docs/open-with-audit.md`) found that a Locked Folder file, while the session had it open,
   could become a Music track (its tags and transcodes kept) or be copied into Photos' library.

@@ -289,7 +289,8 @@ gets `413`, and an invalid `Content-Length` gets `400`. Non-JSON uploads are str
 subject to this limit.
 
 A successful setup or login sets a `starcore_session` cookie (`HttpOnly`, `SameSite=Lax`,
-and `Secure` automatically when HTTPS is enabled - see below). A client that isn't a browser
+and `Secure` automatically when HTTPS is enabled - see below - or when a reverse proxy on the
+server itself forwards the request with `X-Forwarded-Proto: https`). A client that isn't a browser
 (a future mobile app, a script) can use the same token as a bearer token instead:
 `Authorization: Bearer <token>` - both are checked by the same `AuthStore.validate_session()`,
 so nothing about session handling assumes a browser.
