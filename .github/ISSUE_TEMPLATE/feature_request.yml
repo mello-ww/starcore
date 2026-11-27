@@ -1,0 +1,36 @@
+name: Feature request
+description: An idea for StarCore, a Satellite or the UI contract
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The need behind the idea, before the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What would it touch?
+      multiple: true
+      options:
+        - An existing Satellite
+        - A new Satellite
+        - The UI contract (a block, an action, a capability)
+        - The Engine or API
+        - Mission Control (web)
+        - StarCore for Android
+        - Deployment
+        - Not sure
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Alternatives you considered, how other self-hosted tools do it, sketches.

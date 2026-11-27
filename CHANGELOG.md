@@ -18,6 +18,12 @@ itself lives in the `VERSION` file (see `docs/project/releasing.md`).
   icons in the accent, as the Android app already did, which colours File Explorer's home.
   The app needs a new APK for the new default.
 
+- **The repository's front door.** The documentation is sorted into guides, concepts,
+  reference, Satellites, project and archive, with an index (`docs/README.md`) and a
+  first-Satellite tutorial (`docs/guide/first-satellite.md`). The README is rewritten around
+  new screenshots of 0.1.0, and the repository gains `CONTRIBUTING.md`, `SECURITY.md`, issue
+  and pull request templates, the checks as a GitHub Actions workflow and Dependabot.
+
 ### Fixed
 
 - `deploy/linux/install.sh` with `STARCORE_MEDIA` set to another folder: the service now

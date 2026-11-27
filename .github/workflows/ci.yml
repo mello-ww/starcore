@@ -1,0 +1,64 @@
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: Engine and Satellites (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    # Linux is the production platform, but the suite has so far been run on Windows only
+    # (docs/project/roadmap.md, "Not verified yet"): its Linux run reports without failing
+    # the workflow until it has passed once.
+    continue-on-error: ${{ matrix.os == 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the build number is the commit count
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen --extra thumbnails --extra encryption
+      - run: uv run python -m unittest discover -s tests -t .
+
+  web:
+    name: UI contract and Mission Control
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test contracts/ui/tests/web.test.mjs mission_control/tests/*.test.mjs
+
+  android:
+    name: Android app (tests, types, lint)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run lint

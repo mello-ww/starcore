@@ -1,0 +1,61 @@
+name: Bug report
+description: Something in StarCore doesn't work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For a security problem, please use the private form instead
+        (the repository's Security tab) - see SECURITY.md.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does it happen?
+      multiple: true
+      options:
+        - Engine or API
+        - Mission Control (web)
+        - StarCore for Android
+        - CLI
+        - A Satellite
+        - Installation or deployment
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Press ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: build
+    attributes:
+      label: Build info
+      description: >
+        Paste "Copy build info" from Mission Control (Configuration > About) or from the
+        Android app (Settings > About). It holds no address, account or token.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: The server's OS, how StarCore runs (directly, systemd, Docker, behind a proxy), the browser or Android version.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove host names, addresses and anything personal first.

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/mello-ww/starcore/security/advisories/new
+    about: Privately, never in a public issue. See SECURITY.md.
+  - name: Documentation
+    url: https://github.com/mello-ww/starcore/blob/main/docs/README.md
+    about: Guides, concepts and reference - the answer may already be there.
