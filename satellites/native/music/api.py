@@ -2,7 +2,7 @@
 
 from starcore.api.response import error_response, json_response
 
-from . import configuration, routes_catalog, routes_listener, routes_playback
+from . import configuration, opening, routes_catalog, routes_listener, routes_playback
 
 
 def routes() -> dict:
@@ -39,6 +39,8 @@ def routes() -> dict:
         "playback": routes_playback.playback,
         "queue": routes_playback.queue,
         "connect": routes_playback.connect,
+        # files.open: another interface's "Opens with" plays a sound by its path
+        "open": opening.open_file,
         # same convention as every other Satellite - see docs/satellites.md
         "configuration": configuration_route,
     }

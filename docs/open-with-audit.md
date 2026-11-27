@@ -194,3 +194,21 @@ a playlist going `missing`.
   item's `folder`), hidden when there is none.
 - Not done: opening the gallery's own viewer on a library item (the `file` page shows it and
   says it is in the library).
+
+## What O4 built
+
+- Music (`opening.py`): `open` answers the track page, for a library track at that path or for an
+  **external track** (migration 3: `external`, `last_used`; tags read like a scan's, no album,
+  artist or cover). `VISIBLE` leaves external tracks out of the library everywhere; playlists
+  and the queue keep them; a scan does not judge them (a source holding their folder takes them
+  in at the next scan).
+- Re-checks: `opening.refresh` asks `files.browse` `stat` again, with the asking session, for
+  the external tracks of a playback plan or stream, a playlist's load, a queue's expansion, a
+  lyrics call and the track page; a failure sets `missing`, a success clears it.
+- Clean-up: `opening.purge`, at each open, drops external tracks held by no playlist, saved
+  queue or play of the last 30 days and unused for that long.
+- The track page (`tracks/<id>?page=1`) gains **Add to playlist**, **Show in folder**
+  (`location`, only for a file the session may browse) and the "Not in the library" note.
+- Decided while building: opening a library track shows its page (Play is one tap away, the
+  contract's answer being a page, not a command); a like on an external track is not listed under
+  Liked Songs (the library's view), and is dropped with the track, with its plays.

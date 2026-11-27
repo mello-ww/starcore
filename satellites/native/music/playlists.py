@@ -294,7 +294,8 @@ class Playlists:
             return None
         lines = ["#EXTM3U", f"#PLAYLIST:{_one_line(playlist['name'])}"]
         for entry in playlist["tracks"]:
-            if entry.get("missing"):
+            # a sound from outside the library has no place relative to it
+            if entry.get("missing") or entry.get("external"):
                 continue
             artist = _one_line(entry.get("artist") or entry.get("album_artist") or "")
             lines.append(f"#EXTINF:{int(entry.get('duration') or -1)},{artist} - {_one_line(entry.get('title') or '')}")

@@ -4,7 +4,7 @@ import math
 
 from starcore.api.response import error_response, file_response
 
-from . import audio
+from . import audio, opening
 from .connect import ConnectError
 from .library import MusicScanError
 from .routing import identifier, ok, route
@@ -16,6 +16,10 @@ QUALITIES = ("original", "high", "normal", "low")
 def _plan(call, track_id: str):
     music = call.music
     track = music.catalog.track(track_id)
+    if track is not None and track["external"]:
+        # a sound from outside the library is only played while the session may still read it
+        opening.refresh(music, call.request, [track_id])
+        track = music.catalog.track(track_id)
     if track is None or track["missing"]:
         raise LookupError(f"unknown track '{track_id}'")
     quality = call.query.get("quality", "original")
@@ -83,6 +87,7 @@ def queue(call):
     if call.method == "GET":
         state = music.connect.state(call.user, device) or music.connect.state(call.user)
         if state and call.query.get("expand") == "1":
+            opening.refresh(music, call.request, state["queue"])
             state = {**state, "tracks": music.catalog.tracks_by_ids(state["queue"])}
         return ok({"state": state})
     if not isinstance(device, str):

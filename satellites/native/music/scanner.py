@@ -26,7 +26,7 @@ ROW_COLUMNS = (
     "copyright", "isrc", "compilation", "comment", "mb_track_id", "mb_album_id", "mb_artist_id",
     "mb_release_group_id", "duration", "codec", "bitrate", "sample_rate", "bit_depth", "channels", "lossless",
     "rg_track_gain", "rg_track_peak", "rg_album_gain", "rg_album_peak", "has_artwork", "has_lyrics", "missing",
-    "added_at", "indexed_at",
+    "external", "added_at", "indexed_at",
 )
 
 
@@ -90,7 +90,7 @@ class Scanner:
                   "restored": 0, "skipped": 0, "removed": 0}
         failed = []
         known = {row["path"]: row for row in self.db.all(
-            "SELECT id, path, source, size, mtime, missing, content_hash FROM tracks")}
+            "SELECT id, path, source, size, mtime, missing, content_hash, external FROM tracks")}
         seen = set()
 
         for root in roots:
@@ -112,7 +112,9 @@ class Scanner:
 
     def _one(self, root: Path, path: Path, known, counts: dict):
         status = os.stat(path)
-        if known is not None and known["size"] == status.st_size and known["mtime"] == int(status.st_mtime):
+        # a sound opened from outside the library that a source now holds joins the library: read again
+        if (known is not None and not known["external"] and known["size"] == status.st_size
+                and known["mtime"] == int(status.st_mtime)):
             if known["source"] != str(root):
                 folder = path.relative_to(root).parent.as_posix()
                 self.db.execute("UPDATE tracks SET source = ?, folder = ? WHERE id = ?",
@@ -141,7 +143,8 @@ class Scanner:
                 counts["updated"] += 1
                 return
 
-            twins = connection.execute("SELECT id, path FROM tracks WHERE content_hash = ?", (content,)).fetchall()
+            twins = connection.execute("SELECT id, path FROM tracks WHERE content_hash = ? AND external = 0",
+                                       (content,)).fetchall()
             live = [twin for twin in twins if twin["path"] != str(path) and Path(twin["path"]).is_file()]
             if live:
                 connection.execute("INSERT INTO duplicates (path, track_id, found_at) VALUES (?, ?, ?) "
@@ -194,7 +197,8 @@ class Scanner:
 
     def _flag_missing(self, seen: set) -> int:
         flagged = 0
-        for row in self.db.all("SELECT id, path FROM tracks WHERE missing = 0"):
+        # an external track is not the scan's to judge: it is checked where it is played
+        for row in self.db.all("SELECT id, path FROM tracks WHERE missing = 0 AND external = 0"):
             if row["path"] in seen:
                 continue
             if not Path(row["path"]).is_file():
@@ -284,6 +288,7 @@ class Scanner:
             "has_artwork": int(bool(tags.get("has_artwork")) or sidecar_art),
             "has_lyrics": int(bool(tags.get("lyrics")) or sidecar_lyrics),
             "missing": 0,
+            "external": 0,
             "added_at": stamp,
             "indexed_at": stamp,
         }

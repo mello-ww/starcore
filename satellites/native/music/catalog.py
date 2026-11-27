@@ -7,7 +7,8 @@ reveal where a collection lives; `path` is only added for the satellite's own ca
 from . import grouping
 from .db import loads
 
-VISIBLE = "t.missing = 0 AND t.hidden = 0"
+# external tracks (sounds opened from outside the library) are never part of it
+VISIBLE = "t.missing = 0 AND t.hidden = 0 AND t.external = 0"
 
 TRACK_SORTS = {
     "title": "t.title COLLATE NOCASE {order}",
@@ -88,6 +89,7 @@ def track_payload(row, include_path: bool = False) -> dict:
         },
         "missing": bool(row["missing"]),
         "hidden": bool(row["hidden"]),
+        "external": bool(row["external"]),
         "added_at": row["added_at"],
         "indexed_at": row["indexed_at"],
         "mtime": row["mtime"],
@@ -115,8 +117,9 @@ class Catalog:
         row = self.db.one(f"SELECT COUNT(*), COALESCE(SUM(size), 0), COALESCE(SUM(duration), 0), "
                           f"SUM(lossless), SUM(CASE WHEN lossless = 1 AND (bit_depth >= 24 OR sample_rate > 48000) "
                           f"THEN 1 ELSE 0 END) FROM tracks t WHERE {VISIBLE}")
-        missing = self.db.value("SELECT COUNT(*) FROM tracks WHERE missing = 1", default=0)
-        hidden = self.db.value("SELECT COUNT(*) FROM tracks WHERE hidden = 1 AND missing = 0", default=0)
+        missing = self.db.value("SELECT COUNT(*) FROM tracks WHERE missing = 1 AND external = 0", default=0)
+        hidden = self.db.value("SELECT COUNT(*) FROM tracks WHERE hidden = 1 AND missing = 0 AND external = 0",
+                               default=0)
         formats = {row[0]: row[1] for row in self.db.all(
             f"SELECT format, COUNT(*) FROM tracks t WHERE {VISIBLE} GROUP BY format")}
         return {"tracks": row[0], "size_bytes": row[1], "duration": round(row[2], 1),
@@ -147,7 +150,7 @@ class Catalog:
     def tracks(self, sort=None, order="asc", limit=None, offset=0, genre=None, quality=None,
                album_id=None, artist_id=None, folder=None, source=None, include_hidden=False,
                user=None, include_path=False) -> dict:
-        where = ["t.missing = 0"] if include_hidden else [VISIBLE]
+        where = ["t.missing = 0 AND t.external = 0"] if include_hidden else [VISIBLE]
         params = []
         if genre:
             where.append("(t.genre = ? COLLATE NOCASE OR t.genres LIKE ?)")
@@ -348,7 +351,8 @@ class Catalog:
         return [{"name": row[0], "tracks": row[1], "albums": row[2], "artwork": row[3]} for row in rows]
 
     def sources(self) -> list:
-        return [row[0] for row in self.db.all("SELECT DISTINCT source FROM tracks WHERE missing = 0 ORDER BY source")]
+        return [row[0] for row in self.db.all("SELECT DISTINCT source FROM tracks WHERE missing = 0 AND external = 0 "
+                                                            "ORDER BY source")]
 
     def folder(self, source_index: int, folder: str, source_paths: list):
         """One level of a source's folder tree, from what the index knows - never the disk."""

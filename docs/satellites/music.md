@@ -36,6 +36,9 @@ is moved aside as `music.db.damaged-<timestamp>` (never deleted) and a fresh one
 The first time the database opens next to an older `library.json`, every track in it is
 imported with its identifier unchanged, so links into the old index keep working.
 
+A track flagged `external` (migration 3) is a sound opened from outside the library: see
+"Playing a file by its path" below.
+
 ### Track identity
 
 A track's identifier is first derived from its size together with the first and last 256 KB
@@ -247,6 +250,35 @@ always streamed by the device that plays it. Browsers may refuse to start audio 
 click started, so Mission Control asks for a tap when a transfer lands while the tab has had
 no interaction; Android only listens for Connect events while the app is in the foreground.
 
+## Playing a file by its path
+
+Music provides `files.open` (`types` audio, the extensions it reads, label "Music"): another
+interface's "Opens with" line (File Explorer's file page) opens a sound here. `POST open {path}`
+answers `{page: "track", params: {id}}`: the track page, whose **Play**, **Add to queue** and
+**Add to playlist** act on it. The path is never trusted: `opening.py` asks whichever Satellite
+provides `files.browse`, through the Engine and with the user's session, for `stat`, so that
+Satellite's roots and the protected areas apply as when the user browses; anything else is a
+404, and a file Music cannot read as a sound is a 415. It names no other Satellite.
+
+- A sound at a path the library already holds opens that track.
+- Any other becomes an **external track**: a row of `tracks` with `external = 1`, its tags
+  read like a scan reads them, and no album, artist or cover (nothing in the library names
+  it). It is never part of the library: `VISIBLE` leaves it out of every list, count, search,
+  statistic and discovery query, a scan never flags it missing, and a copy of it found in a
+  source is a new library track. It does play, queue and join playlists as any track; the
+  m3u export skips it. A source that comes to hold its folder makes it a library track at the
+  next scan, with its identifier, likes and playlist entries intact.
+- **Re-checked at every use.** Streaming, the playback plan, a playlist's load, a queue's
+  expansion and the track page ask `files.browse` again with the asking session
+  (`opening.refresh`): a file moved, deleted or put in the Locked Folder since is `missing`
+  (the state a playlist already has), and comes back when the file does. A file whose size
+  changed is read again. The file is read only after that check.
+- **Dropped after a while.** One that no playlist, saved queue or play of the last 30 days
+  holds, and that was not used for that long, is deleted (`opening.purge`, run at each open)
+  with its plays and lyric offsets. Nothing about a file the session may not browse is stored.
+- **Show in folder** on the track page (`GET tracks/<id>?page=1` adds `location`, the file's
+  path, only for a file this session may browse, and `library_note`), through `locate`.
+
 ## API
 
 All routes are under `/api/satellites/music/`, need a session once StarCore has an account
@@ -254,6 +286,7 @@ All routes are under `/api/satellites/music/`, need a session once StarCore has 
 they serve a file.
 
 ```
+POST open                         files.open: {path} -> {page, params} (see "Playing a file by its path")
 GET  library                      summary, totals, formats, schema version, transcoding availability
 GET  library?tab=playlists|liked|albums|artists|recent|folders|genres&q=
                                   one Your Library tab for the shared interface (`showing` says which):

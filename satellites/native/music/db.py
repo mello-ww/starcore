@@ -216,6 +216,13 @@ MIGRATIONS = (
     """
     ALTER TABLE playlists ADD COLUMN unmatched TEXT;
     """,
+    # 3: sounds opened from outside the library (external tracks): kept for playlists and the queue,
+    # never part of the library itself; last_used says when one was last opened or played
+    """
+    ALTER TABLE tracks ADD COLUMN external INTEGER DEFAULT 0;
+    ALTER TABLE tracks ADD COLUMN last_used TEXT;
+    CREATE INDEX tracks_external ON tracks (external) WHERE external = 1;
+    """,
 )
 
 

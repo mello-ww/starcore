@@ -7,6 +7,13 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **Music plays a sound by its path.** It declares `files.open` for audio, so File Explorer's
+  "Opens with" offers it: a sound the library holds opens its page, any other becomes an
+  external track, playable, queueable and addable to playlists but never part of the library,
+  its tags read and kept in the database (migration 3). Music asks the browsing Satellite
+  (`stat`) with the user's session before it opens a path, and again at each play and playlist
+  load: a file moved, deleted or locked since shows as missing. Tracks nothing holds are dropped
+  after 30 days. The track page gains **Add to playlist** and **Show in folder**.
 - **Photos opens a file by its path.** It declares `files.open` for pictures and videos, so File
   Explorer's "Opens with" offers it: a `file` page shows the picture or the video, whether the
   library holds it, **Add to library** and **Show in folder**. Photos never reads the path itself;

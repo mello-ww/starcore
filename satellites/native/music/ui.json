@@ -9009,7 +9009,7 @@
     "id"
    ],
    "source": {
-    "route": "tracks/{$params.id}"
+    "route": "tracks/{$params.id}?page=1"
    },
    "blocks": [
     {
@@ -9026,6 +9026,12 @@
     {
      "type": "text",
      "text": "$.artist"
+    },
+    {
+     "type": "text",
+     "text": "$.library_note",
+     "style": "caption",
+     "visible": "$.external"
     },
     {
      "type": "button",
@@ -9077,6 +9083,52 @@
     },
     {
      "type": "button",
+     "label": "Add to playlist",
+     "style": "secondary",
+     "action": {
+      "choose": {
+       "source": "playlists?editable=1",
+       "items": "$.playlists",
+       "title": "Add to playlist",
+       "empty": "No playlists yet.",
+       "item": {
+        "title": "$.name",
+        "subtitle": "$.line",
+        "image": "playlists/{$.id}/picture?size=120&v={$.updated_at}"
+       },
+       "create": {
+        "label": "New playlist",
+        "field": "Playlist name",
+        "route": "playlists",
+        "body": {
+         "name": "$value",
+         "tracks": [
+          "$.id"
+         ]
+        }
+       }
+      },
+      "route": "playlists/{$value.id}/add",
+      "body": {
+       "tracks": [
+        "$.id"
+       ],
+       "ask": true
+      },
+      "conflict": {
+       "confirm": "This song is already in this playlist. Add it again?",
+       "route": "playlists/{$value.id}/add",
+       "body": {
+        "tracks": [
+         "$.id"
+        ],
+        "allow_duplicates": true
+       }
+      }
+     }
+    },
+    {
+     "type": "button",
      "label": "Go to album",
      "style": "secondary",
      "action": {
@@ -9084,6 +9136,16 @@
       "params": {
        "id": "$.album_id"
       }
+     },
+     "visible": "$.album_id"
+    },
+    {
+     "type": "button",
+     "label": "Show in folder",
+     "style": "secondary",
+     "visible": "$.location",
+     "action": {
+      "locate": "$.location"
      }
     },
     {

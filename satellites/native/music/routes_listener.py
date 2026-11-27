@@ -6,7 +6,7 @@ import secrets
 
 from starcore.api.response import error_response, file_response, json_response
 
-from . import configuration, views
+from . import configuration, opening, views
 from .history import year_now
 from .playlists import parse_m3u
 from .routes_catalog import image_type, mosaic_key
@@ -87,6 +87,8 @@ def playlists(call):
             return _export(call, playlist_id)
         if action == "picture":
             return _picture(call, playlist_id)
+        # the sounds from outside the library it holds are asked about again, as when they are played
+        opening.refresh_playlist(music, call.request, playlist_id)
         playlist = store.get(call.user, playlist_id)
         if playlist is None:
             return error_response(f"unknown playlist '{playlist_id}'")

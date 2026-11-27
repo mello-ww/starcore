@@ -25,3 +25,14 @@ operations = { search = "search", track = "tracks", resolve = "playback", artwor
 [provides."audio.session"]
 version = 1
 operations = { queue = "queue", history = "history", radio = "radio", preferences = "preferences", favorites = "favorites", stream = "stream", connect = "connect" }
+
+# the sounds it plays by their path (files.open v1): an interface that shows a file, such as a
+# file browser's file page, offers "Opens with Music". The path is never trusted: it is checked
+# through whichever Satellite provides files.browse, with the user's own session, then played
+# directly, kept out of the library, and addable to playlists (docs/satellites/music.md)
+[provides."files.open"]
+version = 1
+operations = { open = "open" }
+types = ["audio"]
+extensions = [".mp3", ".flac", ".wav", ".m4a", ".aac", ".m4b", ".alac", ".ogg", ".oga", ".opus"]
+label = "Music"

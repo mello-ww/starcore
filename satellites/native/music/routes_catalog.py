@@ -6,7 +6,7 @@ from pathlib import Path
 from starcore.api.response import error_response, file_response
 
 from . import lyrics as lyric_files
-from . import views
+from . import opening, views
 from .routing import identifier, ok, route
 
 MOSAIC_ALBUMS = views.MOSAIC_ALBUMS
@@ -46,9 +46,19 @@ def tracks(call):
             artist_id=query.get("artist"), include_hidden=query.get("hidden") == "1", user=call.user)
         return ok(result)
 
-    track = music.catalog.track(identifier(call.segment(0), "track"))
+    track_id = identifier(call.segment(0), "track")
+    row = music.catalog.track_row(track_id)
+    page = call.query.get("page") == "1"
+    if page and row is not None and row["external"]:
+        # a sound from outside the library: asked again, so the page shows whether it can still be played
+        opening.refresh(music, call.request, [track_id])
+    track = music.catalog.track(track_id)
     if track is None:
         return error_response(f"unknown track '{call.segment(0)}'")
+    if page:
+        # Show in folder: the file's path, only for a file this session may browse
+        track["location"] = opening.location(call.request, row["path"])
+        track["library_note"] = "Not in the library" if track["external"] else ""
     track["liked"] = music.collection.is_favorite(call.user, "track", track["id"])
     track["plays"] = music.history.play_counts(call.user).get(track["id"], 0)
     return ok(track)
@@ -225,6 +235,9 @@ def lyrics(call):
     music = call.music
     track_id = identifier(call.segment(0), "track")
     row = music.catalog.track_row(track_id)
+    if row is not None and row["external"]:
+        opening.refresh(music, call.request, [track_id])
+        row = music.catalog.track_row(track_id)
     if row is None or row["missing"]:
         return error_response(f"unknown track '{track_id}'")
     if call.method == "POST":

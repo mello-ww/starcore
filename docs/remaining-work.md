@@ -408,7 +408,7 @@ item's file in File Explorer. The audit and the plan: [`open-with-audit.md`](ope
       Engine, the vocabulary, the fixtures and both clients.
 - [x] O2 File Explorer: `stat` and `locate`, "Opens with" on the file page.
 - [x] O3 Photos: open by path, its page for a file outside the library, Show in folder.
-- [ ] O4 Music: open by path, external tracks (direct playback, playlists), Show in folder.
+- [x] O4 Music: open by path, external tracks (direct playback, playlists), Show in folder.
 - [ ] O5 security review of O1 to O4.
 - [ ] O6 runs on the web demo and the emulator, docs, a new APK.
 - [x] File Explorer names media types the way a desktop file manager does ("MP4 video",
