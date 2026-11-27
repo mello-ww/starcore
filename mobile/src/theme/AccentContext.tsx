@@ -67,6 +67,18 @@ export function AccentProvider({children}: {children: ReactNode}) {
   return <AccentContext.Provider value={value}>{children}</AccentContext.Provider>;
 }
 
+/** Draws its children with another accent (a colour of the player's own, say), or with the app's
+ * own when `color` is null. Only what is inside changes; the app's choice stays as it was. */
+export function AccentOverride({color, children}: {color: string | null; children: ReactNode}) {
+  const parent = useContext(AccentContext);
+  const hex = normalizeHex(color);
+  const value = useMemo(
+    () => (hex ? {...parent, color: hex, onColor: onAccentFor(hex)} : parent),
+    [parent, hex],
+  );
+  return <AccentContext.Provider value={value}>{children}</AccentContext.Provider>;
+}
+
 export function useAccent(): AccentValue {
   return useContext(AccentContext);
 }

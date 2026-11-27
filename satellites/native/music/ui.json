@@ -9378,7 +9378,12 @@
         "then": "refresh",
         "reloads": "audio.session"
        },
-       "description": "No silence between tracks of one album."
+       "description": "No silence between tracks of one album.",
+       "requires": {
+        "client": [
+         "media.audio-gapless"
+        ]
+       }
       },
       {
        "type": "slider",
@@ -9396,7 +9401,12 @@
         "then": "refresh",
         "reloads": "audio.session"
        },
-       "unit": "s"
+       "unit": "s",
+       "requires": {
+        "client": [
+         "media.audio-crossfade"
+        ]
+       }
       },
       {
        "type": "toggle",
@@ -9728,6 +9738,13 @@
          "then": "refresh",
          "reloads": "audio.session"
         }
+       },
+       "requires": {
+        "client": [
+         "media.audio-theme",
+         "media.audio-density",
+         "media.audio-visualizer"
+        ]
        }
       },
       {

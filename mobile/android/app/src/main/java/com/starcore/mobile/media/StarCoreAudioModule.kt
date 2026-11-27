@@ -1,11 +1,15 @@
 package com.starcore.mobile.media
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.audiofx.BassBoost
+import android.media.audiofx.DynamicsProcessing
 import android.media.audiofx.Equalizer
 import android.media.audiofx.LoudnessEnhancer
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import com.facebook.react.bridge.Arguments
@@ -14,6 +18,10 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableArray
+import com.facebook.react.bridge.ReadableMap
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.Executors
 import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -25,6 +33,8 @@ class StarCoreAudioModule(context: ReactApplicationContext) : ReactContextBaseJa
     private var equalizer: Equalizer? = null
     private var bassBoost: BassBoost? = null
     private var loudness: LoudnessEnhancer? = null
+    private var normalizer: DynamicsProcessing? = null
+    private val covers = Executors.newSingleThreadExecutor()
 
     override fun getName() = "StarCoreAudio"
 
@@ -54,7 +64,7 @@ class StarCoreAudioModule(context: ReactApplicationContext) : ReactContextBaseJa
     }
 
     private fun release() {
-        listOf(equalizer, bassBoost, loudness).forEach { effect ->
+        listOf(equalizer, bassBoost, loudness, normalizer).forEach { effect ->
             try {
                 effect?.release()
             } catch (_: Exception) {
@@ -63,6 +73,7 @@ class StarCoreAudioModule(context: ReactApplicationContext) : ReactContextBaseJa
         equalizer = null
         bassBoost = null
         loudness = null
+        normalizer = null
     }
 
     @ReactMethod
@@ -105,11 +116,80 @@ class StarCoreAudioModule(context: ReactApplicationContext) : ReactContextBaseJa
         result(true)
     }
 
+    /**
+     * Normalize volume: a gentle full-band compressor with make-up gain, then a limiter, the
+     * settings of Mission Control's own (threshold -24 dB, ratio 3, knee 12 dB, attack 20 ms,
+     * release 400 ms, +4 dB; the limiter at -1 dB). DynamicsProcessing needs Android 9.
+     */
+    @ReactMethod
+    fun setNormalize(enabled: Boolean, promise: Promise) = onMain(promise) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return@onMain result(false, "unsupported")
+        if (!ensureSession()) return@onMain result(false, "no-player")
+        val current = normalizer
+        if (!enabled) {
+            current?.enabled = false
+            return@onMain result(true)
+        }
+        val processor = current ?: DynamicsProcessing(0, session, normalizeConfig()).also { normalizer = it }
+        processor.enabled = true
+        result(true)
+    }
+
+    private fun normalizeConfig(): DynamicsProcessing.Config {
+        val config = DynamicsProcessing.Config.Builder(
+            DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION, 2,
+            false, 0, true, 1, false, 0, true,
+        ).build()
+        val band = DynamicsProcessing.MbcBand(true, 20000f, 20f, 400f, 3f, -24f, 12f, -90f, 1f, 0f, 4f)
+        config.setMbcAllChannelsTo(DynamicsProcessing.Mbc(true, true, 1).apply { setBand(0, band) })
+        config.setLimiterAllChannelsTo(DynamicsProcessing.Limiter(true, true, 0, 3f, 100f, 20f, -1f, 0f))
+        return config
+    }
+
     @ReactMethod
     fun setPlaybackParameters(speed: Double, semitones: Double, promise: Promise) = onMain(promise) {
         val pitch = 2.0.pow(semitones.coerceIn(-12.0, 12.0) / 12.0).toFloat()
         val applied = PlayerRegistry.setPlaybackParameters(speed.coerceIn(0.5, 2.0).toFloat(), pitch)
         result(applied, if (applied) null else "no-player")
+    }
+
+    /**
+     * The most telling colour of the cover at [url] (http or https, with [headers] such as the
+     * session's Authorization), as #rrggbb, or null when it can't be read. Off the main thread.
+     */
+    @ReactMethod
+    fun artworkColour(url: String, headers: ReadableMap?, promise: Promise) {
+        val fields = headers?.toHashMap().orEmpty().mapValues { it.value?.toString().orEmpty() }
+        covers.execute {
+            promise.resolve(
+                try {
+                    readColour(url, fields)
+                } catch (_: Exception) {
+                    null
+                },
+            )
+        }
+    }
+
+    private fun readColour(url: String, headers: Map<String, String>): String? {
+        val address = URL(url)
+        if (address.protocol != "http" && address.protocol != "https") return null
+        val connection = address.openConnection() as HttpURLConnection
+        try {
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 15_000
+            headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
+            if (connection.responseCode !in 200..299) return null
+            val picture = connection.inputStream.use { BitmapFactory.decodeStream(it) } ?: return null
+            val small = Bitmap.createScaledBitmap(picture, ArtworkPalette.SIZE, ArtworkPalette.SIZE, true)
+            val pixels = IntArray(ArtworkPalette.SIZE * ArtworkPalette.SIZE)
+            small.getPixels(pixels, 0, ArtworkPalette.SIZE, 0, 0, ArtworkPalette.SIZE, ArtworkPalette.SIZE)
+            if (small !== picture) small.recycle()
+            picture.recycle()
+            return ArtworkPalette.colour(pixels)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     @ReactMethod
@@ -142,6 +222,7 @@ class StarCoreAudioModule(context: ReactApplicationContext) : ReactContextBaseJa
 
     override fun invalidate() {
         main.post { release() }
+        covers.shutdown()
         super.invalidate()
     }
 

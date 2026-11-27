@@ -133,6 +133,7 @@ SATELLITE_CAPABILITIES = {name: {"versions": set(spec["versions"]), "operations"
 # the shared block bound to each capability
 CAPABILITY_BLOCKS = {"file-browser": "files.browse"}
 LIMITS = dict(VOCABULARY["limits"])
+CLIENT_CAPABILITIES = set(VOCABULARY["client_capabilities"]["reserved"])
 
 # segments the Core itself owns beneath every /api/satellites/<name>/ (see
 # api/server.py) - a document can never point an action at them
@@ -596,6 +597,23 @@ class _Validator:
             if not isinstance(values, list) or not all(isinstance(value, str) and value for value in values):
                 self.error(f"requires.{key}", "must be a list of names")
 
+    def check_block_requires(self, where: str, requires):
+        """{client: [names]} on a block (1.2, change 14): a client without every one of those
+        client capabilities leaves the block out, as Developer Mode leaves out a developer block.
+        Only reserved names, so a typo is refused instead of hiding the block everywhere."""
+        self.since(where, "a block's requires", 2)
+        if not isinstance(requires, dict):
+            self.error(where, "must be an object")
+            return
+        self.unknown_keys(where, requires, {"client"})
+        names = requires.get("client")
+        if not isinstance(names, list) or not names or not all(isinstance(name, str) for name in names):
+            self.error(f"{where}.client", "must be a list of client capability names")
+            return
+        for name in names:
+            if name not in CLIENT_CAPABILITIES:
+                self.error(f"{where}.client", f"unknown client capability {name!r}")
+
     def check_offline_omit(self, where: str, offline: dict, blocks):
         """{omit: [field names]} (1.2): names left out of what the client keeps, wherever they
         appear. A name an item is keyed by or addressed with ({$.id} in an image or a route)
@@ -757,6 +775,8 @@ class _Validator:
         for key in ("required", "developer"):
             if key in block and not isinstance(block[key], bool):
                 self.error(f"{where}.{key}", "must be true or false")
+        if "requires" in block:
+            self.check_block_requires(f"{where}.requires", block["requires"])
 
         for key in ("text", "label", "title", "description", "empty", "value", "unit", "detail"):
             if key in block and not (kind in ("toggle", "slider", "field", "metric", "code") and key == "value"):

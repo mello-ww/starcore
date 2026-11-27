@@ -19,6 +19,7 @@ import {AudioHost} from '../media/AudioHost';
 import {AudioDisc, AudioFlight} from '../media/ui/AudioDisc';
 import {FullPlayer} from '../media/ui/FullPlayer';
 import {MiniPlayer} from '../media/ui/MiniPlayer';
+import {PlayerAccent} from '../media/ui/PlayerAccent';
 import {TopBarSlot, TopBarSlotProvider} from '../components/TopBarSlot';
 import {FloatingPlayerInsetProvider} from '../components/FloatingPlayerInset';
 import {MediaSyncScreen} from '../sync/MediaSyncScreen';
@@ -188,7 +189,9 @@ export function MainTabs() {
           <View onLayout={event => setTabBarHeight(event.nativeEvent.layout.height)}>
             <BottomTabBar {...props} />
           </View>
-          <FullPlayer />
+          <PlayerAccent>
+            <FullPlayer />
+          </PlayerAccent>
         </>
         );
       }}
@@ -210,7 +213,9 @@ export function MainTabs() {
         pointerEvents="box-none"
         style={[styles.floating, {bottom: tabBarHeight}]}
         onLayout={event => setPlayerHeight(Math.round(event.nativeEvent.layout.height))}>
-        <MiniPlayer />
+        <PlayerAccent>
+          <MiniPlayer />
+        </PlayerAccent>
       </View>
       <AudioFlight />
       </View>

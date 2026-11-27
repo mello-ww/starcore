@@ -10,7 +10,7 @@
 
 import { createChart, meter, sparkline } from "./charts.js";
 import {
-    BLOCK_TYPES, canOpenSync, checkDocument, findProvider, formatValue, isSafeRoute, isVisible,
+    BLOCK_TYPES, canOpenSync, checkDocument, findProvider, formatValue, isSafeRoute, isVisible, servesBlock,
     missingRequirements, resolve, resolveTemplate, toneOf,
 } from "./contract.js";
 import { emptyRow, formBody, formProblem, formValues } from "./forms.js";
@@ -1484,7 +1484,7 @@ export function mount(context) {
         if (!block || typeof block !== "object") {
             return null;
         }
-        if (block.developer && !developer.enabled) {
+        if ((block.developer && !developer.enabled) || !servesBlock(block)) {
             return null;
         }
         if ("visible" in block && !isVisible(resolve(block.visible, scope))) {
@@ -2666,7 +2666,7 @@ export function renderWidget(widget, data, { developer = false, title, onOpen, i
     const body = el("div", "ui-widget-body");
     let metrics = null;
     for (const block of widget.blocks || []) {
-        if (!block || typeof block !== "object" || (block.developer && !developer)
+        if (!block || typeof block !== "object" || (block.developer && !developer) || !servesBlock(block)
             || ("visible" in block && !isVisible(resolve(block.visible, scope)))) {
             continue;
         }

@@ -492,6 +492,7 @@ export class PlayerController {
     const eq = preferences.equalizer;
     this.deps.effects.setEqualizer(eq.enabled, eq.bands, eq.preamp).catch(() => undefined);
     this.deps.effects.setBassBoost(preferences.bass_boost).catch(() => undefined);
+    this.deps.effects.setNormalize(Boolean(preferences.normalize)).catch(() => undefined);
     this.applyPlaybackParameters();
   }
 

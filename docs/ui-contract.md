@@ -309,6 +309,11 @@ Every block may also have:
   `""` or an empty list;
 - `developer: true`: shown only in Developer Mode, which is a display preference, never a
   permission;
+- `requires: {"client": [names]}` (1.2, contract change 14): the block is left out by a client
+  that lacks any of these client capabilities, as Developer Mode leaves out a developer block.
+  It is for a control that does something only some clients carry out (a player setting one
+  client's audio host does not apply), so a page never offers what has no effect. The names
+  are reserved ones (`vocabulary.json`); a Satellite capability is not accepted here;
 - `required: true`: see [Versions](#versions-and-negotiation).
 
 `tone` is `neutral`, `ok`, `warn` or `danger`, or a binding to one. `icon` names come from
@@ -1264,8 +1269,11 @@ The contract is `starcore.ui/<major>.<minor>`:
 capability protocol versions). Clients check a document's `requires` against their own client
 capabilities and the catalog's providers. Both clients claim `media.audio` (the `play` action)
 and `media.picker` (the `pick` action); the app also claims `secure.screen`, a window that can't
-be captured, which it applies to every protected document. The other reserved names are in
-`vocabulary.json`. The `own` action needs no capability: whether a client has a Satellite's own
+be captured, which it applies to every protected document. Mission Control alone claims what
+its audio host does beyond playing: `media.audio-gapless`, `media.audio-crossfade` (lining up
+the next track), `media.audio-theme`, `media.audio-density` and `media.audio-visualizer` (its
+player's looks); a block names them in its `requires` (change 14). The other reserved names are
+in `vocabulary.json`. The `own` action needs no capability: whether a client has a Satellite's own
 interface is its own knowledge, so it hides what it can't open.
 
 A client that meets a block or action it doesn't know skips it (see "Trust and validation").

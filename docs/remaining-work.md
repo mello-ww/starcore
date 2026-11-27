@@ -361,11 +361,18 @@ mechanisms first, since several Satellites use them, then each Satellite's items
       Appearance density on Mission Control (`theme.js` set the wrong attribute). The server
       and Mission Control read all the others. The Android app still ignores a few, listed
       next.
-- [ ] Music's playback settings the Android app does not apply yet (native audio work in
-      `mobile/src/media/`): gapless playback and crossfade (one player today, so the next
-      track is not lined up), Normalize volume (Mission Control runs a compressor), and the
-      Appearance card's player theme, density, visualizer and accent (Mission Control's player
-      only). Either implement them in the AudioHost or let the page hide them on Android.
+- [x] Music's playback settings the Android app did not apply. Normalize volume now runs on
+      the app's audio session (`DynamicsProcessing`, Android 9 and later, with Mission
+      Control's compressor and limiter settings), and the accent colours the floating player
+      and the full player (StarCore's, a colour of one's own, or the cover's, sampled by
+      Mission Control's rule in `media/ArtworkPalette.kt`). Gapless playback, crossfade and
+      the player theme, density and visualizer stay Mission Control's: the page hides them on
+      Android through a block's `requires` (contract change 14) and the client capabilities
+      `media.audio-gapless`, `-crossfade`, `-theme`, `-density` and `-visualizer`, which only
+      Mission Control claims. Lining up the next track needs a second player in the AudioHost.
+      Checking it found an older fault, now fixed: an Android form kept the values of its
+      first drawing, before the page's data came, so a select showed no choice and a saved one
+      seemed lost. A form now follows its data until the person changes something in it.
 - [x] Search: a grey bar under the search field. No longer seen after the earlier changes
       (checked on the web and the Android emulator); the owner confirmed it is gone.
 

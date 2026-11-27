@@ -371,6 +371,18 @@ describe('PlayerController', () => {
     expect(effects.setEqualizer).toHaveBeenCalledWith(true, [6, 5, 4, 2, 0, 0, 0, 0, 0, 0], -2);
     expect(effects.setBassBoost).toHaveBeenCalledWith(4);
     expect(effects.setPlaybackParameters).toHaveBeenCalledWith(1, 2);
+    expect(effects.setNormalize).toHaveBeenLastCalledWith(false);
+  });
+
+  it('normalizes the volume on the real player when the preference says so, and stops when it no longer does', async () => {
+    const {player, effects, setPrefs} = setup();
+    setPrefs({normalize: true});
+    await player.playTracks(tracks, 0);
+    player.onLoad(200);
+    expect(effects.setNormalize).toHaveBeenLastCalledWith(true);
+    setPrefs({normalize: false});
+    player.applyEffects();
+    expect(effects.setNormalize).toHaveBeenLastCalledWith(false);
   });
 });
 

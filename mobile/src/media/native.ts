@@ -6,6 +6,8 @@ export type EffectResult = {applied: boolean; reason?: string};
 export interface AudioEffects {
   setEqualizer(enabled: boolean, bands: number[], preampDb: number): Promise<EffectResult>;
   setBassBoost(strength: number): Promise<EffectResult>;
+  /** Evens out loud and quiet passages, as Mission Control's compressor does (normalize). */
+  setNormalize(enabled: boolean): Promise<EffectResult>;
   setLoudness(gainMillibels: number): Promise<EffectResult>;
   setPlaybackParameters(speed: number, semitones: number): Promise<EffectResult>;
   getNetworkType(): Promise<NetworkType>;
@@ -27,11 +29,28 @@ export const audioEffects: AudioEffects = {
   setEqualizer: (enabled, bands, preamp) =>
     NativeModules.StarCoreAudio?.setEqualizer(enabled, bands, preamp) ?? Promise.resolve(unsupported),
   setBassBoost: strength => NativeModules.StarCoreAudio?.setBassBoost(strength) ?? Promise.resolve(unsupported),
+  setNormalize: enabled => NativeModules.StarCoreAudio?.setNormalize(enabled) ?? Promise.resolve(unsupported),
   setLoudness: gain => NativeModules.StarCoreAudio?.setLoudness(Math.round(gain)) ?? Promise.resolve(unsupported),
   setPlaybackParameters: (speed, semitones) =>
     NativeModules.StarCoreAudio?.setPlaybackParameters(speed, semitones) ?? Promise.resolve(unsupported),
   getNetworkType: () => NativeModules.StarCoreAudio?.getNetworkType() ?? Promise.resolve('unknown'),
 };
+
+/**
+ * The most telling colour of a cover, as #rrggbb, sampled small by the app's audio module with
+ * Mission Control's rule (media/theme.js): the most saturated bucket, lifted so dark ink reads on
+ * it. Null where it can't be read (no module, no picture, offline).
+ */
+export function artworkColour(url: string, headers?: Record<string, string>): Promise<string | null> {
+  const module = NativeModules.StarCoreAudio;
+  if (!module?.artworkColour) {
+    return Promise.resolve(null);
+  }
+  return Promise.resolve(module.artworkColour(url, headers ?? {})).then(
+    (value: unknown) => (typeof value === 'string' && /^#[0-9a-f]{6}$/.test(value) ? value : null),
+    () => null,
+  );
+}
 
 export function nativeDownloads(): DownloadNative | null {
   const module = NativeModules.StarCoreDownloads;

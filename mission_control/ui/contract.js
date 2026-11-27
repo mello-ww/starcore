@@ -37,8 +37,13 @@ export const ICONS = new Set([
 ]);
 // device features this client offers a document beyond its blocks: the shared audio host
 // (mission_control/media/), which the play action plays through
-// and the media picker (ui/picker.js), which the pick action chooses through
-export const CLIENT_CAPABILITIES = new Set(["media.audio", "media.picker"]);
+// and the media picker (ui/picker.js), which the pick action chooses through; the audio host
+// also applies every playback and player preference a block's requires may name (gapless,
+// crossfade, the player's theme, density and visualizer)
+export const CLIENT_CAPABILITIES = new Set([
+    "media.audio", "media.audio-crossfade", "media.audio-density", "media.audio-gapless", "media.audio-theme",
+    "media.audio-visualizer", "media.picker",
+]);
 // Satellite capabilities this client has a shared block for, and the
 // protocol versions it speaks
 export const CAPABILITY_VERSIONS = { "files.browse": [1], "audio.library": [1], "media.gallery": [1], "media.vault": [1] };
@@ -161,6 +166,13 @@ function routeActions(node, found = []) {
         Object.values(node).forEach((value) => routeActions(value, found));
     }
     return found;
+}
+
+/** Whether this client offers every client capability a block's requires names (1.2, change
+ * 14): a block it can't serve is left out, as Developer Mode leaves out a developer block. */
+export function servesBlock(block) {
+    const names = block && block.requires && Array.isArray(block.requires.client) ? block.requires.client : [];
+    return names.every((name) => CLIENT_CAPABILITIES.has(name));
 }
 
 /** What a document needs that this client or this server can't give it. */

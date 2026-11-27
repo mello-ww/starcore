@@ -125,3 +125,15 @@ test("requirements and capability providers", () => {
     assert.deepEqual(contract.missingRequirements({ client: ["device.biometrics"], capabilities: ["future.thing"] }, providers),
         [{ kind: "client", name: "device.biometrics" }, { kind: "capability", name: "future.thing" }]);
 });
+
+test("a block's requires (change 14): left out unless this client offers every capability it names", () => {
+    for (const name of contract.CLIENT_CAPABILITIES) {
+        assert.ok(vocabulary.client_capabilities.reserved.includes(name), name);
+    }
+    assert.equal(contract.servesBlock({ type: "text", text: "x" }), true);
+    // Mission Control's audio host applies every playback and player preference
+    assert.equal(contract.servesBlock({ type: "toggle", requires: { client: ["media.audio-gapless", "media.audio-crossfade"] } }), true);
+    assert.equal(contract.servesBlock({ type: "card", requires: { client: ["media.audio-theme", "media.audio-density", "media.audio-visualizer"] } }), true);
+    assert.equal(contract.servesBlock({ type: "text", requires: { client: ["media.audio", "secure.screen"] } }), false);
+    assert.equal(contract.servesBlock({ type: "text", requires: { client: ["device.biometrics"] } }), false);
+});

@@ -21,7 +21,7 @@ import {boundTracks, offlineLabel, offlineState} from '../../media/offlineAction
 import type {DownloadManager} from '../../media/downloads';
 import {useImageSource} from './memoryImages';
 import {
-  BLOCK_TYPES, findProvider, formatValue, isIconName, isSafeRoute, isVisible, resolve, resolveTemplate, toneOf,
+  BLOCK_TYPES, findProvider, formatValue, isIconName, isSafeRoute, isVisible, resolve, resolveTemplate, servesBlock, toneOf,
   type Providers, type Scope, type UiAction, type UiBlock,
 } from './contract';
 import type {UiPreferences} from './preferences';
@@ -105,12 +105,12 @@ const TONE_COLORS: Record<string, string> = {neutral: palette.text, ok: palette.
 const DOT_COLORS: Record<string, string> = {neutral: palette.text3, ok: palette.textIcon, warn: palette.warn, danger: palette.danger};
 const METER_LEVELS: Record<string, 'warning' | 'critical' | null> = {neutral: null, ok: null, warn: 'warning', danger: 'critical'};
 
-/** Whether a block is drawn at all - Developer Mode and `visible`. */
+/** Whether a block is drawn at all - Developer Mode, the client capabilities it requires and `visible`. */
 export function isShown(block: UiBlock, scope: Scope, context: BlockContext): boolean {
   if (!block || typeof block !== 'object') {
     return false;
   }
-  if (block.developer && !context.developer) {
+  if ((block.developer && !context.developer) || !servesBlock(block)) {
     return false;
   }
   return !('visible' in block) || isVisible(resolve(block.visible, scope));
@@ -1268,20 +1268,31 @@ function SliderBlock({block, scope, context}: {block: UiBlock; scope: Scope; con
   );
 }
 
+/** For each screen's forms: the data each form last started from, as JSON. */
+const formSeeds = new WeakMap<object, Map<string, string>>();
+
 function FormBlock({block, scope, context}: {block: UiBlock; scope: Scope; context: BlockContext}) {
   const fields: any[] = Array.isArray(block.fields) ? block.fields : [];
   const key = block.id ?? `form-${fields.map(field => field.key).join(',')}`;
-  const initial = () => formValues(fields, scope);
-  if (!context.forms[key]) {
-    context.forms[key] = initial();
+  const [, redraw] = useReducer((count: number) => count + 1, 0);
+  const seeds = formSeeds.get(context.forms) ?? new Map<string, string>();
+  formSeeds.set(context.forms, seeds);
+  // a form starts from its data, and follows it while nothing in it was changed: the page's
+  // data can arrive or come back new (after a save) once the form is drawn
+  const seed = formValues(fields, scope);
+  const seedText = JSON.stringify(seed);
+  const known = seeds.get(key);
+  const untouched = known !== undefined && JSON.stringify(context.forms[key]) === known;
+  if (!context.forms[key] || (known !== seedText && untouched)) {
+    context.forms[key] = seed;
+    seeds.set(key, seedText);
   }
-  const [values, setValues] = useState<Record<string, any>>(context.forms[key]);
+  const values: Record<string, any> = context.forms[key];
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const update = (name: string, next: any) => {
-    const merged = {...values, [name]: next};
-    context.forms[key] = merged;
-    setValues(merged);
+    context.forms[key] = {...context.forms[key], [name]: next};
+    redraw();
   };
   const submit = async () => {
     const problem = formProblem(fields, values);
@@ -1293,10 +1304,11 @@ function FormBlock({block, scope, context}: {block: UiBlock; scope: Scope; conte
     setBusy(true);
     try {
       if (await context.runAction(block.submit?.action, {...scope, form: formBody(values)})) {
-        // a successful submit starts the form afresh - also when this page
-        // stays mounted behind the one the action opened
-        context.forms[key] = initial();
-        setValues(context.forms[key]);
+        // a successful submit starts the form afresh, from its data as it comes back - also
+        // when this page stays mounted behind the one the action opened
+        delete context.forms[key];
+        seeds.delete(key);
+        redraw();
       }
     } finally {
       setBusy(false);

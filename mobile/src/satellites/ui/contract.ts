@@ -44,6 +44,15 @@ export const ICONS = new Set([
  * through, a window that can't be captured (every protected document has it), and the
  * background backup of the phone's media (src/sync/), which the sync action opens. */
 export const CLIENT_CAPABILITIES = new Set<string>(['device.media-sync', 'media.audio', 'media.audio-offline', 'media.picker', 'secure.screen']);
+
+/** Whether this app offers every client capability a block's requires names (1.2, change 14): a
+ * block it can't serve, such as a player preference its audio host doesn't apply, is left out,
+ * as Developer Mode leaves out a developer block. */
+export function servesBlock(block: {requires?: unknown} | null | undefined): boolean {
+  const requires = block?.requires as {client?: unknown} | undefined;
+  const names = requires && Array.isArray(requires.client) ? requires.client : [];
+  return names.every(name => typeof name === 'string' && CLIENT_CAPABILITIES.has(name));
+}
 /** Satellite capabilities this app has a shared block for, and the protocol versions it speaks. */
 export const CAPABILITY_VERSIONS: Record<string, number[]> = {'files.browse': [1], 'audio.library': [1], 'media.gallery': [1], 'media.vault': [1]};
 /** What a protected document (1.2) may name, and the operations its gate (src/vault/gate.ts)
@@ -138,6 +147,7 @@ export interface UiBlock {
   visible?: Json;
   required?: boolean;
   developer?: boolean;
+  requires?: {client?: string[]};
   [key: string]: any;
 }
 

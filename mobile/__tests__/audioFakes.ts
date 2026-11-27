@@ -62,6 +62,7 @@ export function fakeEffects() {
   return {
     setEqualizer: jest.fn(async () => applied),
     setBassBoost: jest.fn(async () => applied),
+    setNormalize: jest.fn(async () => applied),
     setLoudness: jest.fn(async () => applied),
     setPlaybackParameters: jest.fn(async () => applied),
     getNetworkType: jest.fn(async () => 'wifi' as const),

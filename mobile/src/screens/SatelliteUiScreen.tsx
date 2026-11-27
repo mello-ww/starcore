@@ -13,7 +13,7 @@ import {useAppActive} from '../hooks/useAppActive';
 import {useServers} from '../servers/ServersContext';
 import {UiApi} from '../satellites/ui/api';
 import {
-  findProvider, formatValue, isIconName, isSafeRoute, isVisible, missingRequirements, resolve, resolveTemplate,
+  findProvider, formatValue, isIconName, isSafeRoute, isVisible, missingRequirements, resolve, resolveTemplate, servesBlock,
   type CapabilityProvider, type Providers, type Scope, type UiAction, type UiDocument, type UiSource,
 } from '../satellites/ui/contract';
 import {SatellitesApi} from '../satellites/api';
@@ -1219,6 +1219,7 @@ export function SatelliteUiScreen({route, navigation}: Props) {
             block?.type === 'media-grid' &&
             block.layout !== 'row' &&
             !(block.developer && !developer) &&
+            servesBlock(block) &&
             (!('visible' in block) || isVisible(resolve(block.visible, scope))),
         )
       : -1;

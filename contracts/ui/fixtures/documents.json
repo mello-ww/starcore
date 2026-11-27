@@ -353,6 +353,15 @@
         "pages": {"home": {"blocks": [{"type": "text", "text": "Hi"}]}, "library": {"blocks": [{"type": "text", "text": "Shelf"}]}}}
     },
     {
+      "name": "block-requires",
+      "_why": "1.2 (change 14): a block shown only by a client with every client capability it names - a playback setting where the client's audio host applies it; the toggle stays everywhere.",
+      "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"source": {"route": "settings"}, "blocks": [
+        {"type": "toggle", "label": "Gapless playback", "value": "$.gapless", "requires": {"client": ["media.audio-gapless"]}, "action": {"route": "settings", "body": {"gapless": "$value"}}},
+        {"type": "card", "title": "Player", "requires": {"client": ["media.audio-theme", "media.audio-visualizer"]}, "blocks": [{"type": "text", "text": "Looks"}]},
+        {"type": "toggle", "label": "Normalize volume", "value": "$.normalize", "action": {"route": "settings", "body": {"normalize": "$value"}}}
+      ]}}}
+    },
+    {
       "name": "actions-row",
       "_why": "1.2 (change 11): a page's actions on one line; a dropdown opens a panel under its button holding a form. The page carries its own way out, so it asks for no Back (change 12).",
       "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {
@@ -371,6 +380,10 @@
     {"name": "offline-action", "_why": "1.2, change 10: a page keeps its own Satellite's tracks on the device - a button the page's list, another what a route answers, a row's menu that one track - and a link opens the client's own Downloads screen. The labels and state are the client's; the Satellite must provide audio.library.", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"source": {"route": "albums/1"}, "blocks": [{"type": "button", "label": "Download", "action": {"offline": {"tracks": "$.tracks"}}}, {"type": "button", "label": "Download the mix", "action": {"offline": {"route": "mixes/{$.id}"}}}, {"type": "button", "label": "Downloads", "action": {"sync": {"capability": "audio.library"}}}, {"type": "media-list", "items": "$.tracks", "item": {"title": "$.title", "audio": "$.id"}, "menu": [{"label": "Download", "icon": "download", "action": {"offline": {"tracks": ["$"]}}}]}]}}}}
   ],
   "invalid": [
+    {"name": "block-requires-in-1-1", "document": {"contract": "starcore.ui/1.1", "entry": "home", "pages": {"home": {"blocks": [{"type": "text", "text": "Hi", "requires": {"client": ["media.audio"]}}]}}}, "error": "1.2"},
+    {"name": "block-requires-unknown-capability", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "text", "text": "Hi", "requires": {"client": ["media.audio-gaples"]}}]}}}, "error": "unknown client capability"},
+    {"name": "block-requires-empty", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "text", "text": "Hi", "requires": {"client": []}}]}}}, "error": "requires.client"},
+    {"name": "block-requires-satellite-capability", "document": {"contract": "starcore.ui/1.2", "entry": "home", "pages": {"home": {"blocks": [{"type": "text", "text": "Hi", "requires": {"capabilities": ["audio.library"]}}]}}}, "error": "requires"},
     {"name": "protected-before-1-2", "document": {"contract": "starcore.ui/1.1", "entry": "home", "protected": {"capability": "media.vault", "setup": "setup"}, "pages": {"home": {"source": {"route": "items"}, "blocks": [{"type": "media-grid", "id": "items", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"}}]}, "setup": {"source": {"route": "status"}, "blocks": [{"type": "text", "text": "$.message"}]}}}, "error": "1.2"},
     {"name": "protected-an-unknown-capability", "_why": "only what protected_capabilities lists: a client that doesn't know how to unlock a store must not show it", "document": {"contract": "starcore.ui/1.2", "entry": "home", "protected": {"capability": "files.browse", "setup": "setup"}, "pages": {"home": {"source": {"route": "items"}, "blocks": [{"type": "media-grid", "id": "items", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"}}]}, "setup": {"source": {"route": "status"}, "blocks": [{"type": "text", "text": "$.message"}]}}}, "error": "capability", "client": true},
     {"name": "protected-setup-names-no-page", "document": {"contract": "starcore.ui/1.2", "entry": "home", "protected": {"capability": "media.vault", "setup": "ghost"}, "pages": {"home": {"source": {"route": "items"}, "blocks": [{"type": "media-grid", "id": "items", "items": "$.items", "item": {"image": "thumbs/{$.id}", "key": "$.id"}}]}, "setup": {"source": {"route": "status"}, "blocks": [{"type": "text", "text": "$.message"}]}}}, "error": "setup"},

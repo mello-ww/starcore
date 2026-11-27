@@ -7,6 +7,15 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
 
 ### Added
 
+- **The Android player applies Normalize volume and Music's accent, and hides what it doesn't
+  apply.** Normalize runs a compressor and limiter on the app's audio session (Android 9 and
+  later); the floating and full players take StarCore's accent, a colour of one's own or the
+  cover's. A block can now name the client capabilities it needs (`requires`, UI contract 1.2,
+  contract change 14), so Music's gapless, crossfade, theme, density and visualizer settings
+  show only on Mission Control, whose player carries them out.
+- **Android forms show what was saved.** A form kept the values it had before its page's data
+  arrived, so a select showed no choice, a text field stayed empty, and after a save the form
+  went back to the old value. A form now follows its data until something in it is changed.
 - **Status's interface is back, with its graphs.** Since the Satellite icons its document still
   declared UI contract 1.1, which icons need 1.2 for, so the Engine refused it and both clients
   showed no interface. It now declares 1.2, a test loads every shipped `ui.json` together with
