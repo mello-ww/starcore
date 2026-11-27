@@ -39,7 +39,7 @@ Legend: as in `photos-parity-audit.md`.
 | 15 | Upload, several files, overwrite on conflict | ✅ | ✗ | ✅ fixed in F5: an Upload files button on the folder page (`upload` action, below), the unchanged `upload` route, a replacement only once confirmed, then `refresh` | F5 | L |
 | 16 | Errors as notices | ✅ | ✅ generic | – | – | – |
 
-## Contract additions (UI contract 1.2, unreleased, additive)
+## Contract additions (UI contract 1.2, released with 0.1.0, additive)
 
 1. **`list` paging (`more`)** - `{"route": "...&cursor={$value}", "cursor": "$.next"}`, exactly
    as `media-grid`. Validated in the Engine, `mission_control/ui/contract.js` and

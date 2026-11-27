@@ -8,12 +8,11 @@ planned. What was implemented but not verified is under "Not verified yet".
 
 ## Current state
 
-At 2026-11-27 (`347d7dd`), on top of the 0.1.0-alpha.1 release and the stable checkpoint
+At 2026-11-27, release 0.1.0 (the first stable release), after the 0.1.0-alpha.1 Alpha and the stable checkpoint
 `checkpoint-2026-11-02` (the StarCore design-language redesign). The test runs recorded at
 each step until then are in this file's history (`git log -p docs/roadmap.md`).
 
-- **UI contract 1.2** (`starcore.ui/1.2`) is complete and ships with the first release after the
-  Alpha; until then it is marked "not released yet" (`docs/ui-contract.md`). It added media
+- **UI contract 1.2** (`starcore.ui/1.2`) is complete and released with 0.1.0 (`docs/ui-contract.md`). It added media
   blocks and the shared viewer, `search` and `map`, `play`, `pick`, `own`, `secure`, `download`
   and `share`, offline pages, the actions row, templates and capabilities; changes 1 to 17 are
   listed there.
@@ -22,9 +21,9 @@ each step until then are in this file's history (`git log -p docs/roadmap.md`).
   exception lists are empty (`docs/remaining-work.md`). Music plays through the shared audio
   host, with gapless playback on Android; Photos' phone backup, the Locked Folder's
   management and "Open with" / "Show in folder" between Satellites are done.
-- What is left before release 1 is in `docs/remaining-work.md` and the sections below:
-  verification on a physical phone and on Linux, a dependency audit, then the release itself
-  (`docs/releasing.md`).
+- 0.1.0 was released after the pre-release audit (below). What is still open is in
+  `docs/remaining-work.md` and the sections below: verification on a physical phone and on
+  Linux.
 
 ### Not verified yet
 
@@ -187,7 +186,7 @@ Python dependencies (`cryptography` is an optional extra, for Locked Folder encr
 - [ ] Signal Bus
 - [x] UI contract 1.0: validated `ui.json`, revisions and ETags, the capability catalog, metadata-only rediscovery (`docs/ui-contract.md`)
 - [x] UI contract 1.1: `chart`, `table`, `choice`, `status`, `code`, the `dashboard` template, page state and sources, Home widgets, dates in formats
-- [x] UI contract 1.2 (ships with release 1): media blocks and the shared viewer, `search` and `map`, `play`, `pick`, `own`, `secure`, `download` and `share`, offline pages, `preview`
+- [x] UI contract 1.2 (released with 0.1.0): media blocks and the shared viewer, `search` and `map`, `play`, `pick`, `own`, `secure`, `download` and `share`, offline pages, `preview`
 - [x] UI contract next: templates, discovered sections
 - [x] Retire every Satellite-specific interface (`docs/remaining-work.md`)
 

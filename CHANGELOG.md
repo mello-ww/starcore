@@ -3,7 +3,11 @@
 All notable changes to StarCore. Versions follow [semver](https://semver.org/); the version
 itself lives in the `VERSION` file (see `docs/releasing.md`).
 
-## Unreleased
+## 0.1.0 - 2026-11-27
+
+The first stable release. Every Satellite now has only its shared interface (UI contract 1.2)
+on both clients, phone backup runs in the background on Android, and the pre-release audit's
+fixes are in. See `docs/releases/v0.1.0.md` for what it contains and its known limitations.
 
 ### Added
 
@@ -742,7 +746,7 @@ itself lives in the `VERSION` file (see `docs/releasing.md`).
   also with gapless playback or a crossfade, which used to move straight into the next track.
   While it is set, no next track is lined up.
 
-## 0.1.0-alpha.1 - unreleased
+## 0.1.0-alpha.1 - 2026-11-04
 
 The first Alpha: a stable, reproducible checkpoint of the Engine, Mission Control, the native
 Satellites and the Android app, deployed on a Linux server behind HTTPS. It is for testing by

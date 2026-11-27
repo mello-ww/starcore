@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mello-ww/starcore/releases/tag/v0.1.0-alpha.1"><b>v0.1.0-alpha.1</b> · pre-release</a>
+  <a href="https://github.com/mello-ww/starcore/releases/tag/v0.1.0"><b>v0.1.0</b> · stable</a>
   &nbsp;·&nbsp; <a href="#get-started">Get started</a>
   &nbsp;·&nbsp; <a href="#satellites">Satellites</a>
   &nbsp;·&nbsp; <a href="#documentation">Documentation</a>
@@ -80,11 +80,10 @@ More in [Architecture](docs/architecture.md) and [Terminology](docs/terminology.
 | <img src="docs/assets/readme/satellite-photo.svg" width="24" align="center" alt=""> [**Photo**](docs/satellites/photo.md) | Photo and video library with albums, map and phone backup | Web · Android |
 | <img src="docs/assets/readme/satellite-locked-folder.svg" width="24" align="center" alt=""> [**Locked&nbsp;Folder**](docs/satellites/locked_folder.md) | PIN-protected private area in Photos, optionally encrypted | Web · Android |
 | <img src="docs/assets/readme/satellite-music.svg" width="24" align="center" alt=""> [**Music**](docs/satellites/music.md) | Music library, streaming, playlists, Daily Mixes, lyrics, Connect | Web · Android |
-| <img src="docs/assets/readme/satellite-file-explorer.svg" width="24" align="center" alt=""> **File&nbsp;Explorer** | Browse, upload and manage files | Web · Android (browsing only, preview) |
+| <img src="docs/assets/readme/satellite-file-explorer.svg" width="24" align="center" alt=""> **File&nbsp;Explorer** | Browse, upload and manage files | Web · Android |
 | <img src="docs/assets/readme/satellite-docker.svg" width="24" align="center" alt=""> **Docker** | *Link Satellite* - a placeholder that loads and reports its status | — |
 
-<sub>Locked Folder on Android lives in the Photos tab; its location, encryption and recovery are
-managed from Mission Control. See [Satellites](docs/satellites.md) for how Satellites work and
+<sub>Locked Folder on Android lives in the Photos tab. See [Satellites](docs/satellites.md) for how Satellites work and
 how to build one.</sub>
 
 ## Get started
@@ -138,8 +137,8 @@ unattended startup, and [Releasing](docs/releasing.md) for updates, backups and 
 
 ### Install the Android app
 
-Download `StarCore-0.1.0-alpha.1.apk` from the
-[release page](https://github.com/mello-ww/starcore/releases/tag/v0.1.0-alpha.1) and enter
+Download `StarCore-0.1.0.apk` from the
+[release page](https://github.com/mello-ww/starcore/releases/tag/v0.1.0) and enter
 your server's address on first launch. A public host name is tried over HTTPS, a LAN address
 such as `192.168.1.20:8090` over HTTP. Android 7.0 or later. To build it yourself, see
 [`mobile/README.md`](mobile/README.md).
@@ -156,10 +155,11 @@ and the latest security review in the [Roadmap](docs/roadmap.md).
 
 ## Release
 
-The current release is **v0.1.0-alpha.1**, the first Alpha: a stable checkpoint to test and
-build on, not a feature-complete 1.0.
+The current release is **v0.1.0**, the first stable release: every Satellite on its shared
+interface (UI contract 1.2) on the web and on Android. The previous one was the Alpha,
+v0.1.0-alpha.1.
 
-- [Release notes and known limitations](docs/releases/v0.1.0-alpha.1.md)
+- [Release notes and known limitations](docs/releases/v0.1.0.md)
 - [Changelog](CHANGELOG.md)
 - [How releases are versioned, signed and published](docs/releasing.md)
 

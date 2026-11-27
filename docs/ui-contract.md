@@ -5,7 +5,7 @@ Satellite describes its interface as data, using reusable blocks; Mission Contro
 Android app each render that description with their own platform components. A new Satellite
 therefore needs no client update, unless it introduces a genuinely new native capability.
 
-This page is the specification of **UI contract 1.2** (`starcore.ui/1.2`), not released yet.
+This page is the specification of **UI contract 1.2** (`starcore.ui/1.2`), released with StarCore 0.1.0.
 Each minor only adds to the one before: every 1.0 document is a valid 1.1 and 1.2 document,
 and keeps working on clients that know only 1.0. What arrived in 1.1 and 1.2 is marked
 where it is described. It covers what is implemented today and what is still the target. The closed vocabulary itself is
