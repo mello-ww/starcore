@@ -22,7 +22,7 @@ itself lives in the `VERSION` file (see `docs/project/releasing.md`).
   reference, Satellites, project and archive, with an index (`docs/README.md`) and a
   first-Satellite tutorial (`docs/guide/first-satellite.md`). The README is rewritten around
   new screenshots of 0.1.0, and the repository gains `CONTRIBUTING.md`, `SECURITY.md`, issue
-  and pull request templates, the checks as a GitHub Actions workflow and Dependabot.
+  and pull request templates and the checks as a GitHub Actions workflow.
 
 ### Fixed
 
